@@ -1,4 +1,4 @@
-import { SecureStoreStorage } from "@/src/store";
+import { SecureStoreStorage } from "@/src/store/secureStoreStorage";
 import { createClient } from "@supabase/supabase-js";
 import "react-native-url-polyfill/auto";
 import { SupabaseStorage } from "./supabaseStorage";

@@ -4,7 +4,7 @@ import { KeyValueStorage } from "./keyValueStorage";
 export class SecureStoreStorage implements KeyValueStorage {
   constructor(private readonly namespace?: string) {}
   private k(key: string) {
-    return this.namespace ? `${this.namespace}:${key}` : key;
+    return this.namespace ? `${this.namespace}_${key}` : key;
   }
 
   async getItem(key: string) {

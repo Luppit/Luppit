@@ -6,7 +6,7 @@ export class SupabaseStorage implements KeyValueStorage {
     private readonly scope = "sb"
   ) {}
   private k(key: string) {
-    return `${this.scope}:${key}`;
+    return `${this.scope}_${key}`;
   }
 
   getItem(key: string) {
