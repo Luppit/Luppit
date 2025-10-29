@@ -1,5 +1,5 @@
 import Navbar from '@/src/components/navbar';
-import { spacing } from '@/src/themes';
+import { colors, spacing } from '@/src/themes';
 import { Slot, usePathname } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
@@ -24,5 +24,6 @@ const layoutStyles = {
     },
     view: {
         padding: spacing.md,
+        backgroundColor: colors.background
     }
 }
