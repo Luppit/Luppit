@@ -15,7 +15,7 @@ export const typography: Record<TextVariant, {
   letterSpacing?: number;
 }> = {
   title:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.xl, lineHeight: lineHeights.xl },
-  subtitle: { fontFamily: fontFamilies.medium,   fontSize: fontSizes.lg, lineHeight: lineHeights.lg },
+  subtitle: { fontFamily: fontFamilies.semibold,   fontSize: fontSizes.lg, lineHeight: lineHeights.lg },
   body:     { fontFamily: fontFamilies.regular,  fontSize: fontSizes.md, lineHeight: lineHeights.md },
   label:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
   caption:  { fontFamily: fontFamilies.regular,  fontSize: fontSizes.xs, lineHeight: lineHeights.xs, letterSpacing: 0.2 },
