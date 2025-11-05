@@ -5,14 +5,24 @@ export async function getSession() {
   return data.session ?? null;
 }
 
-export async function signInWithEmail(email: string, password: string) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error; return data.session ?? null;
+export async function signUpWithPhone(phone: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    phone: phone,
+    password: password,
+    options: {
+      channel: "sms",
+    },
+  });
+  if (error) throw error;
+  return data;
 }
 
-export async function signUpWithEmail(email: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error; return data.session ?? null;
+export async function signInWithPhoneOtp(phone: string) {
+  const { data, error } = await supabase.auth.signInWithOtp({
+    phone: phone,
+  });
+  if (error) throw error;
+  return data;
 }
 
 export async function signOut() {
@@ -22,7 +32,8 @@ export async function signOut() {
 
 export function onAuthChange(cb: (event: string, hasSession: boolean) => void) {
   const { data: sub } = supabase.auth.onAuthStateChange(async (evt) => {
-    const s = await getSession(); cb(evt, !!s);
+    const s = await getSession();
+    cb(evt, !!s);
   });
   return () => sub.subscription.unsubscribe();
 }

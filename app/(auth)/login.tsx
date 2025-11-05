@@ -1,7 +1,8 @@
 import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
-import { sharedStyles, spacing } from "@/src/themes";
+import { colors, sharedStyles, spacing } from "@/src/themes";
 import { Image } from "expo-image";
+import { Link, router } from "expo-router";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -21,8 +22,19 @@ export default function login() {
         Empieza a comprar y vender en nuetra comunidad.
       </Text>
 
-      <View style={{ width: "100%"}}>
-        <Button variant="white" title="Crear cuenta con teléfono" icon="smartphone"></Button>
+      <View style={{ width: "100%", paddingTop: spacing.lg }}>
+        <Button
+          onPress={() => router.push("/(auth)/signup")}
+          variant="white"
+          title="Crear cuenta con teléfono"
+          icon="smartphone"
+        ></Button>
+      </View>
+
+      <View style={styles.parentContainer}>
+        <View style={styles.childrenLine}></View>
+        <View style={styles.separatorCircle}></View>
+        <View style={styles.childrenLine}></View>
       </View>
 
       <View style={{ width: "100%" }}>
@@ -30,9 +42,18 @@ export default function login() {
       </View>
 
       <View style={styles.footer}>
-        <Text variant="caption" align="center">Hola</Text>
+        <Text variant="caption" align="center">
+          Al continuar, aceptas automáticamente los
+        </Text>
+        <Link href="https://google.com">
+          <Text
+            variant="caption"
+            style={{ textDecorationLine: "underline", fontWeight: "bold" }}
+          >
+            Términos y condiciones
+          </Text>
+        </Link>
       </View>
-
     </View>
   );
 }
@@ -47,6 +68,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: spacing.md,
+    flex: 1,
   },
   footer: {
     position: "absolute",
@@ -54,6 +76,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: spacing.md,
-    alignItems: "center"
-  }
+    alignItems: "center",
+  },
+  parentContainer: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  childrenLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.lg,
+  },
+  separatorCircle: {
+    width: 10,
+    height: 10,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    marginHorizontal: spacing.sm,
+  },
 });

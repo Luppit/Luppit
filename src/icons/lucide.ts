@@ -1,12 +1,13 @@
 import {
-    ArrowRight,
-    Check,
-    Heart,
-    Plus,
-    Search,
-    Smartphone,
-    Trash2,
-    X,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  Heart,
+  Plus,
+  Search,
+  Smartphone,
+  Trash2,
+  X,
 } from "lucide-react-native";
 
 export const lucideIcons = {
@@ -14,6 +15,7 @@ export const lucideIcons = {
   check: Check,
   x: X,
   "arrow-right": ArrowRight,
+  "arrow-left": ArrowLeft,
   "trash-2": Trash2,
   plus: Plus,
   search: Search,

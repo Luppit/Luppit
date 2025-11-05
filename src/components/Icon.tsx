@@ -7,10 +7,11 @@ type Props = {
   size?: number;
   color?: string;
   strokeWidth?: number;
+  onPress?: () => void;
 };
 
-export function Icon({ name, size = 20, color, strokeWidth = 2 }: Props) {
+export function Icon({ name, size = 20, color, strokeWidth = 2, onPress }: Props) {
   const t = useTheme();
   const Cmp = lucideIcons[name];
-  return <Cmp size={size} color={color ?? t.colors.textDark} strokeWidth={strokeWidth} />;
+  return <Cmp size={size} color={color ?? t.colors.textDark} strokeWidth={strokeWidth} onPress={onPress}/>;
 }
