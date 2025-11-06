@@ -1,6 +1,6 @@
 import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
-import { colors, sharedStyles, spacing } from "@/src/themes";
+import { borders, colors, spacing } from "@/src/themes";
 import { Image } from "expo-image";
 import { Link, router } from "expo-router";
 import React from "react";
@@ -10,7 +10,7 @@ export default function login() {
   return (
     <View
       style={{
-        ...sharedStyles.alignItemsCenter,
+        alignItems: "center",
         ...styles.container,
       }}
     >
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   separatorCircle: {
     width: 10,
     height: 10,
-    borderRadius: 15,
+    borderRadius: borders.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.background,

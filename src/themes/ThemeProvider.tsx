@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from "react";
+import { borders } from "./borders";
 import { colors } from "./colors";
 import { fontSizes, lineHeights } from "./fontScale";
 import { spacing } from "./spacing";
@@ -10,6 +11,7 @@ export type Theme = {
   typography: typeof typography;
   fontSizes: typeof fontSizes;
   lineHeights: typeof lineHeights;
+  borders: typeof borders;
 };
 
 const defaultTheme: Theme = {
@@ -18,6 +20,7 @@ const defaultTheme: Theme = {
   typography,
   fontSizes,
   lineHeights,
+  borders
 };
 
 const ThemeCtx = createContext<Theme>(defaultTheme);

@@ -22,13 +22,13 @@ export function createStepperStyles(t: Theme): StepperStyles {
   return {
     header: {
       container: {
-        marginHorizontal: spacing.md,
+        paddingHorizontal: spacing.md,
+        width: '100%'
       },
       icon: {
         marginBottom: spacing.lg,
       },
       content: {
-        flex: 1,
         flexDirection: "row"
       },
       contentInfo: {

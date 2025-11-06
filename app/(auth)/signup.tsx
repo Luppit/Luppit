@@ -1,12 +1,24 @@
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
+import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { router } from "expo-router";
 import React, { useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 function Step1({ next }: any) {
+
+  const tabs : Tab[] = [
+    {
+      title: "Tab 1",
+      content: <Text>Content 1</Text>,
+    },
+    {
+      title: "Tab 2",
+      content: <Text>Content 2</Text>,
+    }
+  ];
   return (
     <View>
-      <Text>Step 1</Text>
+      <Tabs tabs={tabs}></Tabs>
     </View>
   );
 }
@@ -38,7 +50,7 @@ export default function signup() {
   ];
 
   return (
-    <View style={styles.container} >
+    <View style={styles.container}>
       <Stepper
         steps={steps}
         ref={ref}

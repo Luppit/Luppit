@@ -3,9 +3,9 @@ import React, {
   forwardRef,
   useImperativeHandle,
   useMemo,
-  useState
+  useState,
 } from "react";
-import { Dimensions, StyleProp, View, ViewStyle } from "react-native";
+import { Pressable, StyleProp, View, ViewStyle } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Icon } from "../Icon";
 import { Text } from "../Text";
@@ -39,8 +39,6 @@ export type StepperProps = {
   onBackAtFirstStep?: () => void;
   style?: StyleProp<ViewStyle>;
 };
-
-const width = Dimensions.get("window").width;
 
 const Stepper = forwardRef<StepperRef, StepperProps>(
   ({ steps, initialStep = 0, onFinish, onBackAtFirstStep, style }, ref) => {
@@ -84,7 +82,9 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
       <View style={s.header.container}>
         {/* Header */}
         <View style={s.header.icon}>
-          <Icon name="arrow-left" size={20} onPress={goBack}></Icon>
+          <Pressable onPress={goBack}>
+            <Icon name="arrow-left" size={20}></Icon>
+          </Pressable>
         </View>
         <View style={s.header.content}>
           <ProgressCircle
@@ -94,9 +94,9 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
           ></ProgressCircle>
           <View style={s.header.contentInfo}>
             <Text variant="subtitle">{current.title}</Text>
-            <Text variant="body" color="stateAnulated">
+            <Text variant="caption" color="stateAnulated">
               <Text
-                variant="body"
+                variant="caption"
                 color="stateAnulated"
                 style={{ fontWeight: "bold" }}
               >
@@ -111,7 +111,7 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
         {/* Content */}
         <View style={s.base.contentContainer}>
           {current.render({ next: goNext, back: goBack, index: currentStep })}
-        </View> 
+        </View>
       </View>
     );
   }
@@ -137,6 +137,8 @@ function ProgressCircle({
   const r = (size - stroke) / 2;
   const circumference = 2 * Math.PI * r;
   const dash = circumference * progress;
+  const cx = size / 2;
+  const cy = size / 2;
 
   return (
     <View style={{ width: size, height: size, marginRight: 10 }}>
@@ -150,16 +152,15 @@ function ProgressCircle({
           fill="none"
         />
         <Circle
-          cx={size / 2}
-          cy={size / 2}
+          cx={cx}
+          cy={cy}
           r={r}
           stroke={colors.primary}
           strokeWidth={stroke}
           fill="none"
           strokeDasharray={`${dash}, ${circumference}`}
           strokeLinecap="round"
-          rotation="-90"
-          origin={`${size / 2}, ${size / 2}`}
+          transform={`rotate(-90 ${cx} ${cy})`}
         />
       </Svg>
       <View style={s.circle.counterCenter}>
