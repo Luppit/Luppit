@@ -1,3 +1,4 @@
+import { TextField } from "@/src/components/inputField/InputField";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { router } from "expo-router";
@@ -8,11 +9,13 @@ function Step1({ next }: any) {
 
   const tabs : Tab[] = [
     {
-      title: "Tab 1",
-      content: <Text>Content 1</Text>,
+      title: "Comprador",
+      content: <View>
+        <TextField label="Nombre completo"></TextField>
+      </View>,
     },
     {
-      title: "Tab 2",
+      title: "Vendedor",
       content: <Text>Content 2</Text>,
     }
   ];

@@ -31,7 +31,7 @@ export function Tabs({ tabs }: TabsProps) {
             key={index}
             onPress={() => setCurrentIndex(index)}
           >
-            <Text>{tab.content}</Text>
+            <Text>{tab.title}</Text>
           </Pressable>
         ))}
       </View>
