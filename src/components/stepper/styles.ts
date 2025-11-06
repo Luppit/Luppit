@@ -10,6 +10,7 @@ export type StepperStyles = {
     contentInfo : ViewStyle;
   };
   base: {
+    parent: ViewStyle;
     container: ViewStyle;
     contentContainer: ViewStyle;
   };
@@ -22,6 +23,8 @@ export function createStepperStyles(t: Theme): StepperStyles {
   return {
     header: {
       container: {
+        flex: 1,
+        flexDirection: "column",
         paddingHorizontal: spacing.md,
         width: '100%'
       },
@@ -37,12 +40,18 @@ export function createStepperStyles(t: Theme): StepperStyles {
       }
     },
     base: {
+      parent: {
+        flex: 1,
+        flexDirection: "column",
+      },
       container: {
         flex: 1,
         overflow: "hidden"
       },
       contentContainer: {
-        marginTop: spacing.xl
+        marginTop: spacing.xl,
+        flex: 1,
+        flexDirection: "column",
       }
     },
     circle: {

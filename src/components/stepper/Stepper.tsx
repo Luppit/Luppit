@@ -79,38 +79,40 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
     const current = steps[currentStep];
 
     return (
-      <View style={s.header.container}>
-        {/* Header */}
-        <View style={s.header.icon}>
-          <Pressable onPress={goBack}>
-            <Icon name="arrow-left" size={20}></Icon>
-          </Pressable>
-        </View>
-        <View style={s.header.content}>
-          <ProgressCircle
-            progress={progress}
-            currentStep={currentStep + 1}
-            totalSteps={totalSteps}
-          ></ProgressCircle>
-          <View style={s.header.contentInfo}>
-            <Text variant="subtitle">{current.title}</Text>
-            <Text variant="caption" color="stateAnulated">
-              <Text
-                variant="caption"
-                color="stateAnulated"
-                style={{ fontWeight: "bold" }}
-              >
-                Siguiente paso:{" "}
-              </Text>
-              {current.isNextStepShown
-                ? steps[currentStep + 1]?.title || current.description
-                : current.description}
-            </Text>
+      <View style={s.base.parent}>
+        <View style={s.header.container}>
+          {/* Header */}
+          <View style={s.header.icon}>
+            <Pressable onPress={goBack}>
+              <Icon name="arrow-left" size={20}></Icon>
+            </Pressable>
           </View>
-        </View>
-        {/* Content */}
-        <View style={s.base.contentContainer}>
-          {current.render({ next: goNext, back: goBack, index: currentStep })}
+          <View style={s.header.content}>
+            <ProgressCircle
+              progress={progress}
+              currentStep={currentStep + 1}
+              totalSteps={totalSteps}
+            ></ProgressCircle>
+            <View style={s.header.contentInfo}>
+              <Text variant="subtitle">{current.title}</Text>
+              <Text variant="caption" color="stateAnulated">
+                <Text
+                  variant="caption"
+                  color="stateAnulated"
+                  style={{ fontWeight: "bold" }}
+                >
+                  Siguiente paso:{" "}
+                </Text>
+                {current.isNextStepShown
+                  ? steps[currentStep + 1]?.title || current.description
+                  : current.description}
+              </Text>
+            </View>
+          </View>
+          {/* Content */}
+          <View style={s.base.contentContainer}>
+            {current.render({ next: goNext, back: goBack, index: currentStep })}
+          </View>
         </View>
       </View>
     );
