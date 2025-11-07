@@ -6,12 +6,44 @@ import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
-import React, { useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useRef, useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 
 function Step1({ next }: any) {
+  const [values, setValues] = useState({
+    fullName: "",
+    idDocument: "",
+    phoneNumber: "",
+  });
+
+  const [errors, setErrors] = useState({
+    fullName: "",
+    idDocument: "",
+    phoneNumber: "",
+  });
+
+  const validateFields = () => {
+    const newErrors: Record<string, string> = {};
+    if (!values.fullName.trim())
+      newErrors.fullName = "El nombre completo es obligatorio.";
+    if (!values.idDocument.trim())
+      newErrors.idDocument = "El documento de identificación es obligatorio.";
+    if (!values.phoneNumber.trim())
+      newErrors.phoneNumber = "El teléfono celular es obligatorio.";
+
+    if (values.phoneNumber && !!/^[0-9]{8}$/.test(values.phoneNumber)) {
+      newErrors.phoneNumber = "El teléfono celular debe tener 8 dígitos.";
+    }
+
+    setErrors(newErrors as any);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const createWithPhoneNumber = () => {
-    console.log("next");
+    if (!validateFields()) {
+      Alert.alert("Por favor corrige los errores antes de continuar.");
+      return;
+    }
     next();
   };
 
@@ -20,14 +52,47 @@ function Step1({ next }: any) {
       title: "Comprador",
       content: (
         <View>
-          <TextField label="Nombre completo"></TextField>
-          <TextField label="Documento de identificación personal"></TextField>
-          <InputPhone label="Teléfono celular"></InputPhone>
-            <Button
-              variant="dark"
-              onPress={() => createWithPhoneNumber()}
-              title="Siguiente"
-            ></Button>
+          <TextField
+            label="Nombre completo"
+            value={values.fullName}
+            onChangeText={(text) => {
+              setValues({ ...values, fullName: text });
+              if (errors.fullName && text.trim()) {
+                setErrors({ ...errors, fullName: "" });
+              }
+            }}
+            hasError={!!errors.fullName}
+            error={errors.fullName}
+          />
+          <TextField
+            label="Documento de identificación personal"
+            value={values.idDocument}
+            onChangeText={(text) => {
+              setValues({ ...values, idDocument: text });
+              if (errors.idDocument && text.trim()) {
+                setErrors({ ...errors, idDocument: "" });
+              }
+            }}
+            hasError={!!errors.idDocument}
+            error={errors.idDocument}
+          />
+          <InputPhone
+            label="Teléfono celular"
+            value={values.phoneNumber}
+            onChangeText={(text) => {
+              setValues({ ...values, phoneNumber: text });
+              if (errors.phoneNumber && /^[0-9]{8}$/.test(text)) {
+                setErrors({ ...errors, phoneNumber: "" });
+              }
+            }}
+            hasError={!!errors.phoneNumber}
+            error={errors.phoneNumber}
+          />
+          <Button
+            variant="dark"
+            onPress={() => createWithPhoneNumber()}
+            title="Siguiente"
+          />
         </View>
       ),
     },

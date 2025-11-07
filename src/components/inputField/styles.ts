@@ -2,6 +2,7 @@ import { Theme } from "@/src/themes";
 import { Platform, TextStyle, ViewStyle } from "react-native";
 
 export type InputFieldStyles = {
+  baseContainer?: ViewStyle;
   label: TextStyle;
   input: TextStyle;
   inputError?: ViewStyle;
@@ -12,6 +13,9 @@ export type InputFieldStyles = {
 
 export function createInputFieldStyles(t: Theme): InputFieldStyles {
   return {
+    baseContainer: {
+      marginBottom: t.spacing.lg,
+    },
     label: {
       paddingLeft: t.spacing.sm,
     },
@@ -21,7 +25,6 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
       borderColor: t.colors.border,
       height: 44,
       paddingHorizontal: t.spacing.sm,
-      marginBottom: t.spacing.lg,
     },
     input: {
       flex: 1,
@@ -43,8 +46,9 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
       borderWidth: 2,
     },
     errorLabel: {
-        color: t.colors.error,
-        marginTop: t.spacing.sm,
-    }
+      color: t.colors.error,
+      marginTop: t.spacing.xs,
+      paddingLeft: t.spacing.sm,
+    },
   };
 }

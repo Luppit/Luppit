@@ -21,11 +21,17 @@ export const TextField: React.FC<TextFieldProps> = ({
   const [focused, setFocused] = useState(false);
 
   return (
-    <View>
+    <View style={s.baseContainer}>
       <Text color="stateAnulated" style={s.label}>
         {label}:
       </Text>
-      <View style={[s.inputContainer, focused && s.inputFocused, hasError && s.inputError]}>
+      <View
+        style={[
+          s.inputContainer,
+          focused && s.inputFocused,
+          hasError && s.inputError,
+        ]}
+      >
         <TextInput
           {...props}
           style={s.input}
@@ -33,12 +39,12 @@ export const TextField: React.FC<TextFieldProps> = ({
           onBlur={() => setFocused(false)}
           placeholderTextColor={colors.stateAnulated}
         />
-        {error && (
-          <Text color="error" style={s.errorLabel}>
-            {error}
-          </Text>
-        )}
       </View>
+      {error && (
+        <Text color="error" style={s.errorLabel}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 };
