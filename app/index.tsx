@@ -27,5 +27,5 @@ export default function Index() {
 
   if (!supaBaseReady) return null; // splash screen while loading supabase
 
-  return <Redirect href={isAuth ? "/(tabs)" : "/(auth)/login"} />;
+  return <Redirect href={"/(tabs)"} />;
 }
