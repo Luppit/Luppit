@@ -1,13 +1,19 @@
 import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
-import { InputPhone } from "@/src/components/inputPhone/InputPhone";
+import { defaultCountryCode, InputPhone } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
+import { signInWithPhoneOtp, UserSignUpData } from "@/src/lib/supabase";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
+
+const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
+const ID_DOCUMENT_ERROR = "El documento de identificación es obligatorio.";
+const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
+const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 
 function Step1({ next }: any) {
   const [values, setValues] = useState({
@@ -22,29 +28,40 @@ function Step1({ next }: any) {
     phoneNumber: "",
   });
 
+  const phoneRegex = /^(?![0-9]{8}$)/;
+
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
     if (!values.fullName.trim())
-      newErrors.fullName = "El nombre completo es obligatorio.";
+      newErrors.fullName = FULL_NAME_ERROR;
     if (!values.idDocument.trim())
-      newErrors.idDocument = "El documento de identificación es obligatorio.";
+      newErrors.idDocument = ID_DOCUMENT_ERROR;
     if (!values.phoneNumber.trim())
-      newErrors.phoneNumber = "El teléfono celular es obligatorio.";
+      newErrors.phoneNumber = PHONE_NUMBER_ERROR;
 
-    if (values.phoneNumber && !!/^[0-9]{8}$/.test(values.phoneNumber)) {
-      newErrors.phoneNumber = "El teléfono celular debe tener 8 dígitos.";
+    if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
+      newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
     }
 
     setErrors(newErrors as any);
     return Object.keys(newErrors).length === 0;
   };
 
-  const createWithPhoneNumber = () => {
+  const createWithPhoneNumber = async () => {
     if (!validateFields()) {
-      Alert.alert("Por favor corrige los errores antes de continuar.");
       return;
     }
-    next();
+    const userData : UserSignUpData = {
+      fullName: values.fullName,
+      idDocument: values.idDocument
+    };
+    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber)
+      .then(() => {
+        next();
+      })
+      .catch((error) => {
+        Alert.alert("Error", error.message);
+      });
   };
 
   const tabs: Tab[] = [
@@ -81,7 +98,7 @@ function Step1({ next }: any) {
             value={values.phoneNumber}
             onChangeText={(text) => {
               setValues({ ...values, phoneNumber: text });
-              if (errors.phoneNumber && /^[0-9]{8}$/.test(text)) {
+              if (errors.phoneNumber && phoneRegex.test(text)) {
                 setErrors({ ...errors, phoneNumber: "" });
               }
             }}

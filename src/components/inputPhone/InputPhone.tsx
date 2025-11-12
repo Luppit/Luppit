@@ -11,7 +11,7 @@ type InputPhoneProps = TextInputProps & {
   hasError?: boolean;
 };
 
-const defaultCountryCode = "+506";
+export const defaultCountryCode = "+506";
 
 export const InputPhone = ({
   label,
@@ -24,8 +24,12 @@ export const InputPhone = ({
   const s = useMemo(() => createInputPhoneStyles(t), [t]);
   const [focused, setFocused] = useState(false);
 
+  const { children, ...textInputProps } = props as TextInputProps & {
+    children?: never;
+  };
+
   return (
-    <View>
+    <View style={s.phoneInputContainer}>
       <Text color="stateAnulated" style={s.label}>
         {label}:
       </Text>
@@ -43,7 +47,7 @@ export const InputPhone = ({
         </View>
         <View style={s.baseInputContainer}>
           <TextInput
-            {...props}
+            {...textInputProps}
             style={s.input}
             keyboardType="phone-pad"
             onFocus={() => setFocused(true)}
@@ -51,12 +55,12 @@ export const InputPhone = ({
             placeholderTextColor={t.colors.stateAnulated}
           />
         </View>
-        {error && (
-          <Text color="error" style={s.error.errorLabel}>
-            {error}
-          </Text>
-        )}
       </View>
+      {Boolean(error) && (
+        <Text color="error" style={s.error.errorLabel}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 };

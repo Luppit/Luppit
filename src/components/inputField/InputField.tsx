@@ -20,6 +20,10 @@ export const TextField: React.FC<TextFieldProps> = ({
   const s = useMemo(() => createInputFieldStyles(t), [t]);
   const [focused, setFocused] = useState(false);
 
+  const { children, ...textInputProps } = props as TextInputProps & {
+    children?: never;
+  };
+
   return (
     <View style={s.baseContainer}>
       <Text color="stateAnulated" style={s.label}>
@@ -33,14 +37,14 @@ export const TextField: React.FC<TextFieldProps> = ({
         ]}
       >
         <TextInput
-          {...props}
+          {...textInputProps}
           style={s.input}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholderTextColor={colors.stateAnulated}
         />
       </View>
-      {error && (
+      {Boolean(error) && (
         <Text color="error" style={s.errorLabel}>
           {error}
         </Text>

@@ -1,16 +1,35 @@
 import { supabase } from "./client";
 
+export type UserSignUpData = {
+  fullName: string;
+  idDocument: string;
+}
+
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session ?? null;
 }
 
-export async function signUpWithPhone(phone: string, password: string) {
-  const { data, error } = await supabase.auth.signUp({
+export async function verifyOtpCode(phone: string, otpCode : string) {
+  const { data, error } = await supabase.auth.verifyOtp({
     phone: phone,
-    password: password,
-    options: {
-      channel: "sms",
+    type: "sms",
+    token: otpCode,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function signUpWithPhoneOtp(phone: string, otpCode : string, userData: UserSignUpData) {
+
+  await verifyOtpCode(phone, otpCode).catch((error) => {
+    throw error;
+  });
+
+  const { data, error } = await supabase.auth.updateUser({
+    data: {
+      full_name: userData.fullName,
+      id_document: userData.idDocument,
     },
   });
   if (error) throw error;

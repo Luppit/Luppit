@@ -14,17 +14,17 @@ export type InputFieldStyles = {
 export function createInputFieldStyles(t: Theme): InputFieldStyles {
   return {
     baseContainer: {
-      marginBottom: t.spacing.lg,
+      marginBottom: t.spacing.lg
     },
     label: {
-      paddingLeft: t.spacing.sm,
+      paddingLeft: t.spacing.sm
     },
     inputContainer: {
       borderWidth: 1,
       borderRadius: t.borders.sm,
       borderColor: t.colors.border,
       height: 44,
-      paddingHorizontal: t.spacing.sm,
+      paddingHorizontal: t.spacing.sm
     },
     input: {
       flex: 1,
@@ -36,19 +36,19 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
           borderWidth: 0,
           backgroundColor: "transparent",
         } as TextStyle,
-        default: {},
+        default: {}
       }),
     },
     inputError: {
-      borderColor: t.colors.error,
+      borderColor: t.colors.error
     },
     inputFocused: {
-      borderWidth: 2,
+      borderWidth: 2
     },
     errorLabel: {
       color: t.colors.error,
       marginTop: t.spacing.xs,
-      paddingLeft: t.spacing.sm,
+      paddingLeft: t.spacing.sm
     },
   };
 }

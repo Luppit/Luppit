@@ -4,6 +4,7 @@ import { Platform, TextStyle, ViewStyle } from "react-native";
 export type InputPhoneStyles = {
   label: TextStyle;
   input: TextStyle;
+  phoneInputContainer?: ViewStyle; 
   baseInputContainer?: ViewStyle;
   country: {
     countryCodeContainer?: ViewStyle;
@@ -22,6 +23,9 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
     label: {
       paddingLeft: t.spacing.sm,
     },
+    phoneInputContainer: {
+        marginBottom: t.spacing.lg,
+    },
     baseInputContainer: {
         paddingHorizontal: t.spacing.sm,
         flex: 1,
@@ -31,7 +35,6 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
       borderRadius: t.borders.sm,
       borderColor: t.colors.border,
       height: 44,
-      marginBottom: t.spacing.lg,
       flexDirection: "row",
     },
     inputFocused: {
