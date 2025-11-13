@@ -5,43 +5,64 @@ export type UserSignUpData = {
   idDocument: string;
 }
 
-export async function getSession() {
-  const { data } = await supabase.auth.getSession();
-  return data.session ?? null;
+export enum AuthMethod {
+  SignIn,
+  SignUp
 }
 
-export async function verifyOtpCode(phone: string, otpCode : string) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone: phone,
-    type: "sms",
-    token: otpCode,
+async function sendPhoneOtp(phone : string, method: AuthMethod){
+  const shouldCreateUser = method === AuthMethod.SignUp;
+  const { data, error } = await supabase.auth.signInWithOtp({
+    phone,
+    options: {
+      shouldCreateUser
+    }
   });
   if (error) throw error;
   return data;
 }
 
-export async function signUpWithPhoneOtp(phone: string, otpCode : string, userData: UserSignUpData) {
-
-  await verifyOtpCode(phone, otpCode).catch((error) => {
-    throw error;
+async function VerifyPhoneOtp(phone: string, token: string, userData?: UserSignUpData){
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone,
+    token,
+    type: 'sms'
   });
+  if (error) throw error;
 
+  if(!userData) return data;
+  await updateUserProfile(userData).catch((err) => {
+    throw err;
+  });
+  return data;
+} 
+
+async function updateUserProfile(userData: UserSignUpData) {
   const { data, error } = await supabase.auth.updateUser({
     data: {
       full_name: userData.fullName,
-      id_document: userData.idDocument,
-    },
+      id_document: userData.idDocument
+    }
   });
   if (error) throw error;
-  return data;
+  return data; 
 }
 
 export async function signInWithPhoneOtp(phone: string) {
-  const { data, error } = await supabase.auth.signInWithOtp({
-    phone: phone,
-  });
-  if (error) throw error;
-  return data;
+  return await sendPhoneOtp(phone, AuthMethod.SignIn);
+}
+
+export async function signUpWithPhoneOtp(phone: string) {
+  return await sendPhoneOtp(phone, AuthMethod.SignUp);
+}
+
+export async function verifyPhoneOtp(phone: string, token: string, userData?: UserSignUpData) {
+  return await VerifyPhoneOtp(phone, token, userData);
+}
+
+export async function getSession() {
+  const { data } = await supabase.auth.getSession();
+  return data.session ?? null;
 }
 
 export async function signOut() {

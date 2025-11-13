@@ -1,116 +1,28 @@
-import Button from "@/src/components/button/Button";
-import { TextField } from "@/src/components/inputField/InputField";
-import { defaultCountryCode, InputPhone } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
-import { signInWithPhoneOtp, UserSignUpData } from "@/src/lib/supabase";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import CreateUserFormTab from "./signup/CreateUserFormTab";
+import VerifyCode from "./signup/VerifyCode";
 
-const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
-const ID_DOCUMENT_ERROR = "El documento de identificación es obligatorio.";
-const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
-const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
-
-function Step1({ next }: any) {
-  const [values, setValues] = useState({
-    fullName: "",
-    idDocument: "",
-    phoneNumber: "",
-  });
-
-  const [errors, setErrors] = useState({
-    fullName: "",
-    idDocument: "",
-    phoneNumber: "",
-  });
-
-  const phoneRegex = /^(?![0-9]{8}$)/;
-
-  const validateFields = () => {
-    const newErrors: Record<string, string> = {};
-    if (!values.fullName.trim())
-      newErrors.fullName = FULL_NAME_ERROR;
-    if (!values.idDocument.trim())
-      newErrors.idDocument = ID_DOCUMENT_ERROR;
-    if (!values.phoneNumber.trim())
-      newErrors.phoneNumber = PHONE_NUMBER_ERROR;
-
-    if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
-      newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
-    }
-
-    setErrors(newErrors as any);
-    return Object.keys(newErrors).length === 0;
-  };
-
+function Step1({ next, values, setValues }: any) {
   const createWithPhoneNumber = async () => {
-    if (!validateFields()) {
-      return;
-    }
-    const userData : UserSignUpData = {
-      fullName: values.fullName,
-      idDocument: values.idDocument
-    };
-    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber)
-      .then(() => {
-        next();
-      })
-      .catch((error) => {
-        Alert.alert("Error", error.message);
-      });
+    // await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    next();
   };
 
   const tabs: Tab[] = [
     {
       title: "Comprador",
       content: (
-        <View>
-          <TextField
-            label="Nombre completo"
-            value={values.fullName}
-            onChangeText={(text) => {
-              setValues({ ...values, fullName: text });
-              if (errors.fullName && text.trim()) {
-                setErrors({ ...errors, fullName: "" });
-              }
-            }}
-            hasError={!!errors.fullName}
-            error={errors.fullName}
-          />
-          <TextField
-            label="Documento de identificación personal"
-            value={values.idDocument}
-            onChangeText={(text) => {
-              setValues({ ...values, idDocument: text });
-              if (errors.idDocument && text.trim()) {
-                setErrors({ ...errors, idDocument: "" });
-              }
-            }}
-            hasError={!!errors.idDocument}
-            error={errors.idDocument}
-          />
-          <InputPhone
-            label="Teléfono celular"
-            value={values.phoneNumber}
-            onChangeText={(text) => {
-              setValues({ ...values, phoneNumber: text });
-              if (errors.phoneNumber && phoneRegex.test(text)) {
-                setErrors({ ...errors, phoneNumber: "" });
-              }
-            }}
-            hasError={!!errors.phoneNumber}
-            error={errors.phoneNumber}
-          />
-          <Button
-            variant="dark"
-            onPress={() => createWithPhoneNumber()}
-            title="Siguiente"
-          />
-        </View>
+        <CreateUserFormTab
+          values={values}
+          setValues={setValues}
+          onCreate={createWithPhoneNumber}
+        />
       ),
     },
     {
@@ -125,29 +37,38 @@ function Step1({ next }: any) {
   );
 }
 
-function Step2({ next, back }: any) {
+function Step2({ next, back, values }: any) {
+  const onVerify = async () => {
+    await next();
+  };
   return (
-    <View>
-      <Text>Step 1</Text>
-    </View>
+    <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />
   );
 }
 
 export default function signup() {
   const ref = useRef<StepperRef>(null);
 
+  const [values, setValues] = useState({
+    fullName: "",
+    idDocument: "",
+    phoneNumber: "",
+    bankAccount: "",
+    ownerName: "",
+  });
+
   const steps: Step[] = [
     {
       title: "Crear una cuenta",
       description: "Verificación de código",
       isNextStepShown: true,
-      render: (api) => <Step1 {...api} />,
+      render: (api) => <Step1 {...api} values={values} setValues={setValues} />,
     },
     {
       title: "Verificación de código",
-      description: "Completar perfil",
+      description: "Ingresa el código enviado a tu teléfono",
       isNextStepShown: false,
-      render: (api) => <Step2 {...api} />,
+      render: (api) => <Step2 {...api} values={values} />,
     },
   ];
 
