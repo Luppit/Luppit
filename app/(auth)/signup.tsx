@@ -1,6 +1,8 @@
+import { defaultCountryCode } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
+import { signUpWithPhoneOtp, UserSignUpData, verifyPhoneOtp } from "@/src/lib/supabase/auth";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -10,7 +12,7 @@ import VerifyCode from "./signup/VerifyCode";
 
 function Step1({ next, values, setValues }: any) {
   const createWithPhoneNumber = async () => {
-    //await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
     next();
   };
 
@@ -39,7 +41,19 @@ function Step1({ next, values, setValues }: any) {
 
 function Step2({ next, back, values }: any) {
   const onVerify = async (code : string) => {
-    console.log("Verifying code:", code);
+    const authUser : UserSignUpData = {
+      fullName: values.fullName,
+      idDocument: values.idDocument,
+    };
+    await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code, authUser)
+      .then(() => {
+        next();
+        return true;
+      })
+      .catch((err) => {
+        console.log("Error verifying OTP:", err);
+        return false;
+      });
     return false;
   };
 
@@ -79,7 +93,7 @@ export default function signup() {
       <Stepper
         steps={steps}
         ref={ref}
-        onFinish={() => console.log("hola")}
+        onFinish={() => router.push("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
       <View style={styles.footer}>
