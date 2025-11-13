@@ -1,6 +1,5 @@
-import { Text } from "@/src/components/Text";
+import { OtpVerifier } from "@/src/components/otpVerifier/OtpVerifier";
 import React from "react";
-import { View } from "react-native";
 
 export type VerifyCodeProps = {
   phoneNumber: string;
@@ -8,19 +7,9 @@ export type VerifyCodeProps = {
 };
 
 export default function VerifyCode({ phoneNumber, onVerify }: VerifyCodeProps) {
-  const maskPhone = (phone: string) => {
-    return phone.slice(0, -4).replace(/\d/g, "*") + phone.slice(-4);
-  };
-
   const verifyCode = async () => {
     await onVerify();
   };
 
-  return (
-    <View>
-      <Text variant="body" color="stateAnulated">
-        Se ha enviado un código a {maskPhone(phoneNumber)}
-      </Text>
-    </View>
-  );
+  return <OtpVerifier phoneNumber={phoneNumber} onVerify={verifyCode} />;
 }
