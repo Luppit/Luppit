@@ -7,10 +7,26 @@ export type OtpVerifierStyles = {
   otpCodeInputContainer: ViewStyle;
   otpCodeInput: TextStyle;
   resendCodeView: ViewStyle;
+  errorView: ViewStyle;
+  inputState: {
+    error : ViewStyle;
+    success : ViewStyle;
+  }
 };
 
 export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
   return {
+    inputState: {
+      error: {
+        borderColor: t.colors.error,
+      },
+      success: {
+        borderColor: t.colors.primary,
+      },
+    },
+    errorView: {
+      marginBottom: t.spacing.md,
+    },
     label: {
       marginBottom: t.spacing.md,
     },

@@ -10,7 +10,7 @@ import VerifyCode from "./signup/VerifyCode";
 
 function Step1({ next, values, setValues }: any) {
   const createWithPhoneNumber = async () => {
-    // await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    //await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
     next();
   };
 
@@ -38,9 +38,11 @@ function Step1({ next, values, setValues }: any) {
 }
 
 function Step2({ next, back, values }: any) {
-  const onVerify = async () => {
-    await next();
+  const onVerify = async (code : string) => {
+    console.log("Verifying code:", code);
+    return false;
   };
+
   return (
     <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />
   );

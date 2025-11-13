@@ -6,7 +6,7 @@ import { createOtpVerifierStyles } from "./styles";
 
 type OtpVerifierProps = {
   phoneNumber: string;
-  onVerify: (code: string) => Promise<void>;
+  onVerify: (code: string) => Promise<boolean>;
   otpLength?: number;
 };
 
@@ -29,6 +29,8 @@ export const OtpVerifier = ({
   );
 
   const [isActive, setIsActive] = useState<boolean>(true);
+  const [hasError, setHasError] = useState<boolean>(false);
+  const [isValid, setIsValid] = useState<boolean>(false);
 
   const INTERLVAL_TIME = 30;
   const [remainingTime, setRemainingTime] = useState<number>(INTERLVAL_TIME);
@@ -40,11 +42,18 @@ export const OtpVerifier = ({
 
   const maybeComplete = async (nextValues: string[]) => {
     if (nextValues.every((c) => c !== "")) {
-      await onVerify(nextValues.join(""));
+      const otp = nextValues.join("");
+      const success = await onVerify(otp);
+      setIsValid(success);
+      if (!success) {
+        setHasError(true);
+      }
     }
   };
 
   const handleChange = (text: string, i: number) => {
+    if (isValid) return;
+    setHasError(false);
     const cleaned = text.replace(/\D/g, "");
     if (cleaned.length === 0) {
       const next = [...values];
@@ -69,6 +78,7 @@ export const OtpVerifier = ({
   };
 
   const handleKeyPress = (e: any, i: number) => {
+    if (isValid) return;
     if (e.nativeEvent.key !== "Backspace") return;
     if (values[i] === "" && i > 0) {
       const next = [...values];
@@ -79,6 +89,7 @@ export const OtpVerifier = ({
   };
 
   const handleFocus = (i: number) => {
+    if (isValid) return;
     if (!values[i]) return;
     const next = [...values];
     next[i] = "";
@@ -111,18 +122,24 @@ export const OtpVerifier = ({
       </View>
       <View style={s.otpCodeContainer}>
         {Array.from({ length: otpLength }).map((_, index) => (
-          <View key={index} style={s.otpCodeInputContainer}>
+          <View key={index} style={[s.otpCodeInputContainer, 
+            hasError ? s.inputState.error : undefined,
+            isValid ? s.inputState.success : undefined
+          ]}>
             <TextInput
               ref={(el) => {
                 inputsRef.current[index] = el;
               }}
-              style={s.otpCodeInput}
+              style={
+                s.otpCodeInput
+              }
               value={values[index]}
               onChangeText={(txt) => handleChange(txt, index)}
               onKeyPress={(e) => handleKeyPress(e, index)}
               onFocus={() => handleFocus(index)}
               keyboardType="number-pad"
               maxLength={1}
+              editable={!isValid}
               textContentType="oneTimeCode"
               autoComplete="one-time-code"
               returnKeyType={index === otpLength - 1 ? "done" : "next"}
@@ -130,6 +147,13 @@ export const OtpVerifier = ({
           </View>
         ))}
       </View>
+      {Boolean(hasError) && (
+        <View style={s.errorView}>
+          <Text color="error">
+            Código inválido. Por favor, inténtalo de nuevo.
+          </Text>
+        </View>
+      )}
       <View style={s.resendCodeView}>
         <Pressable onPress={onResendCode}>
           <Text
