@@ -2,9 +2,6 @@ import { getSession, onAuthChange } from "@/src/lib/supabase";
 import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 
-// TODO: Auth
-const isAuthenticated = true;
-
 export default function Index() {
   const [supaBaseReady, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);

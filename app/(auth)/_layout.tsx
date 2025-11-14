@@ -17,10 +17,10 @@ export default function _layout() {
 const authLayoutStyles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
-    height: "100%",
+    flex: 1
   },
   viewStyles : {
-    alignItems: "center",
+    flex: 1,
     marginTop: spacing.xl
   }
 });
