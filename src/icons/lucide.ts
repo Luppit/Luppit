@@ -1,9 +1,11 @@
 import {
   ArrowRight,
   Check,
+  CirclePlus,
   Heart,
   House,
   MessageCircle,
+  MessageSquare,
   Plus,
   Search,
   Smartphone,
@@ -23,7 +25,12 @@ export const lucideIcons = {
   smartphone: Smartphone,
   house: House,
   "message-circle": MessageCircle,
-  user: User
+  user: User,
+  "circle-plus": CirclePlus,
+  "message-square": MessageSquare,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
+
+
+
