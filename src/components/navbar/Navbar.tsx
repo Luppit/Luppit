@@ -27,7 +27,7 @@ export default function Navbar() {
   return (
     <View style={[s.overlay, { paddingBottom: insets.bottom + 8 }]} accessibilityRole="tablist">
       <BlurView
-        intensity={5}                 // aumenta para un blur más marcado
+        intensity={1}                 // aumenta para un blur más marcado
         tint={colorScheme === "dark" ? "dark" : "light"}
         style={s.glass}
       >

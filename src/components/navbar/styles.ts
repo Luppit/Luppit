@@ -1,4 +1,4 @@
- import { Theme } from "@/src/themes";
+import { Theme } from "@/src/themes";
 import { Platform, StyleSheet } from "react-native";
 
 export const createNavbarStyles = (t: Theme) => {
@@ -6,7 +6,7 @@ export const createNavbarStyles = (t: Theme) => {
     active: t.colors.success ?? "#8AAE4D",
     text: t.colors.textDark ?? "#111",
     // nivel glass: muy transparente para que se vea claramente lo que está debajo
-    bgGlass: "rgba(255,255,255,0.6)",     // controla cuán "blanco" es el vidrio
+    bgGlass: "rgba(255,255,255,0.8)",     // controla el blanco del vidrio
     borderGlass: "rgba(255,255,255,1)", // borde sutil
     topHighlight: "rgba(255,255,255,0.05)",// brillo superior
     shadow: "rgba(2,6,23,0.12)",          // halo muy suave
@@ -22,6 +22,10 @@ export const createNavbarStyles = (t: Theme) => {
       bottom: 0,
       alignItems: "center",
       paddingHorizontal: 16,
+      shadowRadius: 10,
+      shadowColor: "#000",
+      shadowOpacity: 0.1,
+      shadowOffset: { width: 0, height: -2 },
       // Sin backgroundColor aquí para ser 100% transparente
     },
 
@@ -29,7 +33,7 @@ export const createNavbarStyles = (t: Theme) => {
     glass: {
       width: "100%",
       borderRadius: 40,
-     overflow: "hidden", // importante: recorta el blur y el highlight
+      overflow: "hidden", // importante: recorta el blur y el highlight
       alignItems: "center",
       justifyContent: "center",
     },
@@ -73,8 +77,6 @@ export const createNavbarStyles = (t: Theme) => {
       borderTopRightRadius: 40,
       backgroundColor: COLORS.topHighlight,
       opacity: 0.6,
-      transform: [{ translateY: -4 }],
-      // baja opacidad si se ve muy marcado
     },
 
     item: {
