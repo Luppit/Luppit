@@ -1,11 +1,86 @@
-import { Text } from '@/src/components/Text'
+import ProductCard from '@/src/components/ProductCard'
 import React from 'react'
-import { View } from 'react-native'
+import { ScrollView } from 'react-native'
+
 
 export default function index() {
   return (
-    <View>
-      <Text variant="title">Hello world</Text>
-    </View>
+  <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 120 }}>
+        <ProductCard
+          title="Compresor Sentra 2023"
+          subtitle="Sistema de A/C"
+          views={12}
+          rating={4.5}
+          ratingCount={16}
+          timestamp="Justo ahora"
+        />
+
+        <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+
+           <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+
+           <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+               <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+               <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+               <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+               <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+               <ProductCard
+          title="Filtro de aceite"
+          subtitle="Nissan"
+          views={35}
+          rating={4.8}
+          ratingCount={102}
+          timestamp="Hace 5 min"
+        /> 
+      </ScrollView>   
   )
 }

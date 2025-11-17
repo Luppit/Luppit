@@ -1,4 +1,4 @@
-import Navbar from '@/src/components/navbar';
+import Navbar from '@/src/components/navbar/Navbar';
 import { colors, spacing } from '@/src/themes';
 import { Slot, usePathname } from 'expo-router';
 import React from 'react';

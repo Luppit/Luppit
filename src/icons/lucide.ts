@@ -2,11 +2,16 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CirclePlus,
   Heart,
+  House,
+  MessageCircle,
+  MessageSquare,
   Plus,
   Search,
   Smartphone,
   Trash2,
+  User,
   X,
 } from "lucide-react-native";
 
@@ -20,6 +25,14 @@ export const lucideIcons = {
   plus: Plus,
   search: Search,
   smartphone: Smartphone,
+  house: House,
+  "message-circle": MessageCircle,
+  user: User,
+  "circle-plus": CirclePlus,
+  "message-square": MessageSquare,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
+
+
+
