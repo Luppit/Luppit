@@ -29,7 +29,7 @@ export const createNavbarStyles = (t: Theme) => {
     glass: {
       width: "100%",
       borderRadius: 40,
-     // overflow: "hidden", // importante: recorta el blur y el highlight
+     overflow: "hidden", // importante: recorta el blur y el highlight
       alignItems: "center",
       justifyContent: "center",
     },

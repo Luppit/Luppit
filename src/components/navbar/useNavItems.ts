@@ -15,7 +15,7 @@ export type NavItem = {
 export const useNavItems = (): NavItem[] =>
   React.useMemo(
     () => [
-      { name: "home",      label: "Inicio",    href: "/(tabs)",           icon: "house" },
+      { name: "home",      label: "Inicio",    href: "/",                 icon: "house" },
       { name: "create",    label: "Crear",     href: "/(tabs)/create",    icon: "circle-plus" },
       { name: "favorites", label: "Favoritas", href: "/(tabs)/favorites", icon: "heart" },
       { name: "chats",     label: "Chats",     href: "/(tabs)/chats",     icon: "message-square" },
