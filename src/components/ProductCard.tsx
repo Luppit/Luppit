@@ -2,6 +2,8 @@ import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+
+// ESTE COMPONENTE ES UNA PRUEBA Y DE MOMENTO SOLO SE USA PARA VER COMO SE VE EL SCROLL EN EL MENÚ
 type Props = {
   title: string;
   subtitle?: string;
