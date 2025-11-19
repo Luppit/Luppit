@@ -3,8 +3,7 @@ import { supabase } from "./client";
 export type UserSignUpData = {
   fullName: string;
   idDocument: string;
-  bankAccount?: string;
-  ownerName?: string;
+  isSeller?: boolean;
 };
 
 export enum AuthMethod {
@@ -48,6 +47,7 @@ async function updateUserProfile(userData: UserSignUpData) {
     data: {
       full_name: userData.fullName,
       id_document: userData.idDocument,
+      is_seller: userData.isSeller 
     },
   });
   if (error) throw error;
