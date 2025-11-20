@@ -20,4 +20,8 @@ export const colors = {
   background: "#F9FAFB",
 
   accentYellow: "#D8A600",
+
+   shadow:"#000",
+   ripple :"rgba(0,0,0,0.10)",
 };
+ 

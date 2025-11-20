@@ -2,7 +2,11 @@ import { defaultCountryCode } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
-import { signUpWithPhoneOtp, UserSignUpData, verifyPhoneOtp } from "@/src/lib/supabase/auth";
+import {
+  signUpWithPhoneOtp,
+  UserSignUpData,
+  verifyPhoneOtp,
+} from "@/src/lib/supabase/auth";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -11,7 +15,8 @@ import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
 
 function Step1({ next, values, setValues }: any) {
-  const createWithPhoneNumber = async () => {
+  const createWithPhoneNumber = async (isSeller: boolean) => {
+    values.isSeller = isSeller;
     await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
     next();
   };
@@ -29,7 +34,14 @@ function Step1({ next, values, setValues }: any) {
     },
     {
       title: "Vendedor",
-      content: <Text>Content 2</Text>,
+      content: (
+        <CreateUserFormTab
+          values={values}
+          setValues={setValues}
+          onCreate={createWithPhoneNumber}
+          isSeller={true}
+        />
+      ),
     },
   ];
   return (
@@ -40,59 +52,69 @@ function Step1({ next, values, setValues }: any) {
 }
 
 function Step2({ next, back, values }: any) {
-  const onVerify = async (code : string) => {
-    const authUser : UserSignUpData = {
+  const onVerify = async (code: string) => {
+    const authUser: UserSignUpData = {
       fullName: values.fullName,
       idDocument: values.idDocument,
+      isSeller: values.isSeller
     };
-    await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code, authUser)
+    await verifyPhoneOtp(
+      defaultCountryCode + values.phoneNumber,
+      code,
+      authUser
+    )
       .then(() => {
         next();
         return true;
       })
       .catch((err) => {
-        console.log("Error verifying OTP:", err);
         return false;
       });
     return false;
   };
 
-  return (
-    <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />
-  );
+  return <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />;
 }
 
 export default function signup() {
-  const ref = useRef<StepperRef>(null);
+  const stepperRef = useRef<StepperRef>(null);
 
   const [values, setValues] = useState({
     fullName: "",
     idDocument: "",
     phoneNumber: "",
-    bankAccount: "",
-    ownerName: "",
+    isSeller : false
   });
 
-  const steps: Step[] = [
-    {
-      title: "Crear una cuenta",
-      description: "Verificación de código",
-      isNextStepShown: true,
-      render: (api) => <Step1 {...api} values={values} setValues={setValues} />,
-    },
-    {
-      title: "Verificación de código",
-      description: "Ingresa el código enviado a tu teléfono",
-      isNextStepShown: false,
-      render: (api) => <Step2 {...api} values={values} />,
-    },
-  ];
+  const steps: Step[] = React.useMemo(() => {
+    const base: Step[] = [
+      {
+        title: "Crear una cuenta",
+        description: "Verificación de código",
+        isNextStepShown: true,
+        render: (api) => (
+          <Step1
+            {...api}
+            values={values}
+            setValues={setValues}
+          />
+        ),
+      },
+      {
+        title: "Verificación de código",
+        description: "Ingresa el código enviado a tu teléfono",
+        isNextStepShown: false,
+        render: (api) => <Step2 {...api} values={values} />,
+      },
+    ];
+    return base;
+  }, [values]);
 
   return (
     <View style={styles.container}>
       <Stepper
         steps={steps}
-        ref={ref}
+        ref={stepperRef}
         onFinish={() => router.push("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>

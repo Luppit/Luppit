@@ -7,7 +7,8 @@ import { View } from "react-native";
 export type CreateUserFormTabProps = {
   values: any;
   setValues: any;
-  onCreate: () => Promise<void>;
+  onCreate: (isSeller: boolean) => Promise<void>;
+  isSeller?: boolean;
 }
 
 const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
@@ -18,7 +19,8 @@ const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 export default function CreateUserFormTab({
   values,
   setValues,
-  onCreate
+  onCreate,
+  isSeller = false,
 }: CreateUserFormTabProps) {
 
 const [errors, setErrors] = useState({
@@ -45,13 +47,14 @@ const [errors, setErrors] = useState({
 
   const createUser = async () => {
     if (!validateFields()) return;
-    await onCreate();
+    await onCreate(isSeller);
   }
  
   return (
     <View>
       <TextField
-        label="Nombre completo"
+        label={isSeller ? "Nombre de la empresa" : "Nombre completo"}
+        id={"fullName"+(isSeller ? "Seller" : "Buyer")}
         value={values.fullName}
         onChangeText={(text) => {
           setValues({ ...values, fullName: text });
@@ -63,7 +66,8 @@ const [errors, setErrors] = useState({
         error={errors.fullName}
       />
       <TextField
-        label="Documento de identificación personal"
+        label={isSeller ? "Documento de identificación de la empresa" : "Documento de identificación personal"}
+        id={"idDocument"+(isSeller ? "Seller" : "Buyer")}
         value={values.idDocument}
         onChangeText={(text) => {
           setValues({ ...values, idDocument: text });
@@ -76,6 +80,7 @@ const [errors, setErrors] = useState({
       />
       <InputPhone
         label="Teléfono celular"
+        id={"phoneNumber"+(isSeller ? "Seller" : "Buyer")}
         value={values.phoneNumber}
         onChangeText={(text) => {
           setValues({ ...values, phoneNumber: text });
