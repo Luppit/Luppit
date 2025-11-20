@@ -18,6 +18,9 @@ export const colors = {
   textMedium: "#333333",
   border: "#DDDDDD",
   background: "#F9FAFB",
+  backgroudWhite: "#FFFFFF",
+
+  IconColorGray: "#BBBBBB",
 
   accentYellow: "#D8A600",
 };
