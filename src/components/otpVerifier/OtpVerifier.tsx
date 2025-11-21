@@ -1,12 +1,13 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes/ThemeProvider";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { createOtpVerifierStyles } from "./styles";
 
 type OtpVerifierProps = {
   phoneNumber: string;
   onVerify: (code: string) => Promise<boolean>;
+  onResendCode: () => Promise<void>;
   otpLength?: number;
 };
 
@@ -15,10 +16,15 @@ const otpLengthDefault = 6;
 export const OtpVerifier = ({
   phoneNumber,
   onVerify,
+  onResendCode,
   otpLength = otpLengthDefault,
 }: OtpVerifierProps) => {
   const t = useTheme();
   const s = useMemo(() => createOtpVerifierStyles(t), [t]);
+
+  useEffect(() => {
+    startCountdown();
+  }, []);
 
   const maskPhone = (phone: string) => {
     return phone.slice(0, -4).replace(/\d/g, "*") + phone.slice(-4);
@@ -96,9 +102,14 @@ export const OtpVerifier = ({
     setValues(next);
   };
 
-  const onResendCode = async () => {
+  const resendCode = async () => {
     if (!isActive) return;
-    console.log("Resend code");
+    setIsActive(false);
+    await onResendCode();
+    startCountdown();
+  };
+
+  const startCountdown = () => {
     setIsActive(false);
     setRemainingTime(INTERLVAL_TIME);
     const interval = setInterval(() => {
@@ -155,7 +166,7 @@ export const OtpVerifier = ({
         </View>
       )}
       <View style={s.resendCodeView}>
-        <Pressable onPress={onResendCode}>
+        <Pressable onPress={resendCode}>
           <Text
             style={{ textDecorationLine: "underline" }}
             color={isActive ? "textDark" : "stateAnulated"}

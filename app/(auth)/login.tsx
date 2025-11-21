@@ -1,101 +1,128 @@
 import Button from "@/src/components/button/Button";
-import { Text } from "@/src/components/Text";
-import { borders, colors, spacing } from "@/src/themes";
-import { Image } from "expo-image";
-import { Link, router } from "expo-router";
-import React from "react";
+import {
+  defaultCountryCode,
+  InputPhone,
+} from "@/src/components/inputPhone/InputPhone";
+import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
+import { signInWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase";
+import { router } from "expo-router";
+import React, { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import VerifyCode from "./signup/VerifyCode";
 
-export default function login() {
+export function Step1({ next, values, setValues }: any) {
+  const phoneRegex = /^(?![0-9]{8}$)/;
+
+  const [errors, setErrors] = useState({
+    phoneNumber: "",
+  });
+
+  const validateFields = () => {
+    const newErrors: Record<string, string> = {};
+    if (!values.phoneNumber.trim()) {
+      newErrors.phoneNumber = "El teléfono celular es obligatorio.";
+    }
+    if (!!phoneRegex.test(values.phoneNumber)) {
+      newErrors.phoneNumber = "El teléfono celular debe tener 8 dígitos.";
+    }
+    setErrors(newErrors as any);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const sendOtp = async () => {
+    if (!validateFields()) return;
+    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    next();
+  };
+
   return (
-    <View
-      style={{
-        alignItems: "center",
-        ...styles.container,
-      }}
-    >
-      <Image source={imageRoute} style={styles.image}></Image>
-      <Text variant="title" style={{ marginBottom: spacing.xs }}>
-        ¡Luppit te da la bienvenida!
-      </Text>
-      <Text variant="body" color="stateAnulated" align="center">
-        Empieza a comprar y vender en nuetra comunidad.
-      </Text>
-
-      <View style={{ width: "100%", paddingTop: spacing.lg }}>
-        <Button
-          onPress={() => router.push("/(auth)/signup")}
-          variant="white"
-          title="Crear cuenta con teléfono"
-          icon="smartphone"
-        ></Button>
-      </View>
-
-      <View style={styles.parentContainer}>
-        <View style={styles.childrenLine}></View>
-        <View style={styles.separatorCircle}></View>
-        <View style={styles.childrenLine}></View>
-      </View>
-
-      <View style={{ width: "100%" }}>
-        <Button variant="dark" title="Iniciar sesión con mi cuenta"></Button>
-      </View>
-
-      <View style={styles.footer}>
-        <Text variant="caption" align="center">
-          Al continuar, aceptas automáticamente los
-        </Text>
-        <Link href="https://google.com">
-          <Text
-            variant="caption"
-            style={{ textDecorationLine: "underline", fontWeight: "bold" }}
-          >
-            Términos y condiciones
-          </Text>
-        </Link>
-      </View>
+    <View>
+      <InputPhone
+        value={values.phoneNumber}
+        label="Número de teléfono"
+        keyboardType="phone-pad"
+        onChangeText={(text) => {
+          setValues({ ...values, phoneNumber: text });
+          if (errors.phoneNumber && phoneRegex.test(text)) {
+            setErrors({ ...errors, phoneNumber: "" });
+          }
+        }}
+        hasError={!!errors.phoneNumber}
+        error={errors.phoneNumber}
+      ></InputPhone>
+      <Button variant="dark" onPress={() => sendOtp()} title="Siguiente" />
     </View>
   );
 }
 
-const imageRoute = require("@/assets/images/icon.png");
+export function Step2({ next, back, values }: any) {
+  const onVerify = async (code: string) => {
+    await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
+      .then(() => {
+        next();
+        return true;
+      })
+      .catch((err) => {
+        return false;
+      });
+    return false;
+  };
+
+  const onResend = async () => {
+    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+  };
+
+  return (
+    <VerifyCode
+      phoneNumber={values.phoneNumber}
+      onVerify={onVerify}
+      onResend={onResend}
+    />
+  );
+}
+
+export default function login() {
+  const stepperRef = useRef<StepperRef>(null);
+
+  const [values, setValues] = useState({
+    phoneNumber: "",
+  });
+
+  const steps: Step[] = React.useMemo(
+    () => [
+      {
+        title: "Ingresa tu número de teléfono",
+        description: "Te enviaremos un código de verificación",
+        isNextStepShown: true,
+        render: (api) => (
+          <Step1 {...api} values={values} setValues={setValues} />
+        ),
+      },
+      {
+        title: "Verificación de código",
+        description: "Ingresa el código enviado a tu teléfono",
+        isNextStepShown: false,
+        render: (api) => <Step2 {...api} values={values} />,
+      },
+    ],
+    [values]
+  );
+
+  return (
+    <View style={styles.container}>
+      <Stepper
+        steps={steps}
+        ref={stepperRef}
+        onFinish={() => router.push("/(tabs)")}
+        onBackAtFirstStep={() => router.back()}
+      ></Stepper>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  image: {
-    width: 120,
-    height: 120,
-    marginBottom: spacing.lg,
-  },
   container: {
-    paddingHorizontal: spacing.md,
     flex: 1,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  parentContainer: {
-    width: "100%",
     flexDirection: "row",
-    alignItems: "center",
-  },
-  childrenLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.lg,
-  },
-  separatorCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: borders.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    marginHorizontal: spacing.sm,
   },
 });
