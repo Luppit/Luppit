@@ -55,7 +55,7 @@ function Step2({ next, back, values }: any) {
       name: values.fullName,
       id_document: values.idDocument,
       created_at: new Date().toISOString(),
-      user_id: "", 
+      user_id: "",
     };
 
     await verifyPhoneOtp(
@@ -74,7 +74,17 @@ function Step2({ next, back, values }: any) {
     return false;
   };
 
-  return <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />;
+  const onResend = async () => {
+    await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+  };
+
+  return (
+    <VerifyCode
+      phoneNumber={values.phoneNumber}
+      onVerify={onVerify}
+      onResend={onResend}
+    />
+  );
 }
 
 export default function signup() {

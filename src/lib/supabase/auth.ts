@@ -66,7 +66,7 @@ export async function signUpWithPhoneOtp(phone: string) {
 export async function verifyPhoneOtp(
   phone: string,
   token: string,
-  userProfile: Profile,
+  userProfile?: Profile,
   isSeller?: boolean
 ) {
   return await VerifyPhoneOtpInternal(phone, token, userProfile, isSeller);
