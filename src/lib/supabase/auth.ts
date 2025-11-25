@@ -1,22 +1,23 @@
+import { insertRoleToProfile } from "@/src/services/profile.role.service";
+import { createProfile, Profile } from "@/src/services/profile.service";
+import { getRoleByName, Roles } from "@/src/services/role.service";
 import { supabase } from "./client";
 
-export type UserSignUpData = {
-  fullName: string;
-  idDocument: string;
-  isSeller?: boolean;
-};
+export type AuthMethod = "sms";
+export type AuthEvent = "SignIn" | "SignUp";
 
-export enum AuthMethod {
-  SignIn,
-  SignUp,
+async function getLoggedInUserId(): Promise<string> {
+  const session = await getSession();
+  if (!session?.user.id) throw new Error("No logged in user");
+  return session.user.id;
 }
 
-async function sendPhoneOtp(phone: string, method: AuthMethod) {
-  const shouldCreateUser = method === AuthMethod.SignUp;
+async function sendPhoneOtp(phone: string, event: AuthEvent) {
+  const shouldCreateUser = event === "SignUp";
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
-      shouldCreateUser,
+      shouldCreateUser: shouldCreateUser,
     },
   });
   if (error) throw error;
@@ -26,7 +27,8 @@ async function sendPhoneOtp(phone: string, method: AuthMethod) {
 async function VerifyPhoneOtpInternal(
   phone: string,
   token: string,
-  userData?: UserSignUpData
+  userProfile?: Profile,
+  isSeller?: boolean
 ) {
   const { data, error } = await supabase.auth.verifyOtp({
     phone,
@@ -34,40 +36,40 @@ async function VerifyPhoneOtpInternal(
     type: "sms",
   });
   if (error) throw error;
-
-  if (!userData) return data;
-  await updateUserProfile(userData).catch((err) => {
-    throw err;
-  });
+  if (!userProfile) return data;
+  await supabase.auth.refreshSession();
+  await updateUserProfile(userProfile)
+    .then(async (data: Profile) => {
+      await addRoleToProfile(data.id, isSeller);
+      await supabase.auth.refreshSession();
+    })
+    .catch((err) => {
+      throw err;
+    });
   return data;
 }
 
-async function updateUserProfile(userData: UserSignUpData) {
-  const { data, error } = await supabase.auth.updateUser({
-    data: {
-      full_name: userData.fullName,
-      id_document: userData.idDocument,
-      is_seller: userData.isSeller 
-    },
-  });
-  if (error) throw error;
-  return data;
+async function updateUserProfile(profileData: Profile) {
+  const userId = await getLoggedInUserId();
+  profileData.user_id = userId;
+  return await createProfile(profileData);
 }
 
 export async function signInWithPhoneOtp(phone: string) {
-  return await sendPhoneOtp(phone, AuthMethod.SignIn);
+  return await sendPhoneOtp(phone, "SignIn");
 }
 
 export async function signUpWithPhoneOtp(phone: string) {
-  return await sendPhoneOtp(phone, AuthMethod.SignUp);
+  return await sendPhoneOtp(phone, "SignUp");
 }
 
 export async function verifyPhoneOtp(
   phone: string,
   token: string,
-  userData?: UserSignUpData
+  userProfile?: Profile,
+  isSeller?: boolean
 ) {
-  return await VerifyPhoneOtpInternal(phone, token, userData);
+  return await VerifyPhoneOtpInternal(phone, token, userProfile, isSeller);
 }
 
 export async function getSession() {
@@ -86,4 +88,10 @@ export function onAuthChange(cb: (event: string, hasSession: boolean) => void) {
     cb(evt, !!s);
   });
   return () => sub.subscription.unsubscribe();
+}
+
+async function addRoleToProfile(id: string, isSeller?: boolean) {
+  const role = await getRoleByName(isSeller ? Roles.SELLER : Roles.BUYER);
+  if (!role) throw new Error("Role not found");
+  await insertRoleToProfile(id, role.id);
 }

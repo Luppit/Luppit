@@ -2,11 +2,8 @@ import { defaultCountryCode } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
-import {
-  signUpWithPhoneOtp,
-  UserSignUpData,
-  verifyPhoneOtp,
-} from "@/src/lib/supabase/auth";
+import { signUpWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase/auth";
+import { Profile } from "@/src/services/profile.service";
 import { spacing } from "@/src/themes/spacing";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -53,15 +50,19 @@ function Step1({ next, values, setValues }: any) {
 
 function Step2({ next, back, values }: any) {
   const onVerify = async (code: string) => {
-    const authUser: UserSignUpData = {
-      fullName: values.fullName,
-      idDocument: values.idDocument,
-      isSeller: values.isSeller
+    const userProfile: Profile = {
+      id: "",
+      name: values.fullName,
+      id_document: values.idDocument,
+      created_at: new Date().toISOString(),
+      user_id: "",
     };
+
     await verifyPhoneOtp(
       defaultCountryCode + values.phoneNumber,
       code,
-      authUser
+      userProfile,
+      values.isSeller
     )
       .then(() => {
         next();
@@ -73,7 +74,17 @@ function Step2({ next, back, values }: any) {
     return false;
   };
 
-  return <VerifyCode phoneNumber={values.phoneNumber} onVerify={onVerify} />;
+  const onResend = async () => {
+    await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+  };
+
+  return (
+    <VerifyCode
+      phoneNumber={values.phoneNumber}
+      onVerify={onVerify}
+      onResend={onResend}
+    />
+  );
 }
 
 export default function signup() {
@@ -83,7 +94,7 @@ export default function signup() {
     fullName: "",
     idDocument: "",
     phoneNumber: "",
-    isSeller : false
+    isSeller: false,
   });
 
   const steps: Step[] = React.useMemo(() => {
@@ -93,11 +104,7 @@ export default function signup() {
         description: "Verificación de código",
         isNextStepShown: true,
         render: (api) => (
-          <Step1
-            {...api}
-            values={values}
-            setValues={setValues}
-          />
+          <Step1 {...api} values={values} setValues={setValues} />
         ),
       },
       {
