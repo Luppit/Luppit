@@ -122,7 +122,7 @@ export default function signup() {
       <Stepper
         steps={steps}
         ref={stepperRef}
-        onFinish={() => router.push("/(tabs)")}
+        onFinish={() => router.replace("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
       <View style={styles.footer}>
