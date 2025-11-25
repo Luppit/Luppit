@@ -1,6 +1,7 @@
 import { insertRoleToProfile } from "@/src/services/profile.role.service";
 import { createProfile, Profile } from "@/src/services/profile.service";
 import { getRoleByName, Roles } from "@/src/services/role.service";
+import { router } from "expo-router";
 import { supabase } from "./client";
 
 export type AuthMethod = "sms";
@@ -77,9 +78,9 @@ export async function getSession() {
   return data.session ?? null;
 }
 
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+export function signOut() {
+  supabase.auth.signOut();
+  router.replace("/(auth)/auth");
 }
 
 export function onAuthChange(cb: (event: string, hasSession: boolean) => void) {

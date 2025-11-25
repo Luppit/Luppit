@@ -1,4 +1,6 @@
+import Button from '@/src/components/button/Button'
 import ProductCard from '@/src/components/ProductCard'
+import { signOut } from '@/src/lib/supabase'
 import React from 'react'
 import { ScrollView } from 'react-native'
 
@@ -6,6 +8,7 @@ import { ScrollView } from 'react-native'
 export default function index() {
   return (
   <ScrollView contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 120 }}>
+    <Button title="Sign Out" onPress={signOut} />
         <ProductCard
           title="Compresor Sentra 2023"
           subtitle="Sistema de A/C"
