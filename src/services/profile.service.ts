@@ -13,3 +13,18 @@ export async function createProfile(profile : Profile): Promise<Profile> {
     if (error) throw error;
     return data;
 }
+
+export async function getProfileByPhone(phone: string): Promise<Profile | null> {
+    const { data, error } = await supabase
+        .from("profile")
+        .select("*")
+        .eq("phone", phone)
+        .single();
+    if (error){
+        if (error.code === "PGRST116") {
+            return null;
+        }
+        throw error;
+    };
+    return data;
+}

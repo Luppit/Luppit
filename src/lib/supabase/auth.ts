@@ -1,5 +1,5 @@
 import { insertRoleToProfile } from "@/src/services/profile.role.service";
-import { createProfile, Profile } from "@/src/services/profile.service";
+import { createProfile, getProfileByPhone, Profile } from "@/src/services/profile.service";
 import { getRoleByName, Roles } from "@/src/services/role.service";
 import { router } from "expo-router";
 import { supabase } from "./client";
@@ -15,6 +15,8 @@ async function getLoggedInUserId(): Promise<string> {
 
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
+  const existingProfile = await getProfileByPhone(phone);
+  if (shouldCreateUser && existingProfile) throw new Error("Profile with this phone number already exists");
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
@@ -57,6 +59,8 @@ async function updateUserProfile(profileData: Profile) {
 }
 
 export async function signInWithPhoneOtp(phone: string) {
+  const existingProfile = await getProfileByPhone(phone);
+  if (!existingProfile) throw new Error("Profile with this phone number does not exist");
   return await sendPhoneOtp(phone, "SignIn");
 }
 

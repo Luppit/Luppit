@@ -56,6 +56,7 @@ function Step2({ next, back, values }: any) {
       id_document: values.idDocument,
       created_at: new Date().toISOString(),
       user_id: "",
+      phone: defaultCountryCode + values.phoneNumber,
     };
 
     await verifyPhoneOtp(
