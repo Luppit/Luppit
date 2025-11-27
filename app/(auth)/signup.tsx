@@ -5,6 +5,7 @@ import { Text } from "@/src/components/Text";
 import { signUpWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase/auth";
 import { Profile } from "@/src/services/profile.service";
 import { spacing } from "@/src/themes/spacing";
+import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -14,8 +15,16 @@ import VerifyCode from "./signup/VerifyCode";
 function Step1({ next, values, setValues }: any) {
   const createWithPhoneNumber = async (isSeller: boolean) => {
     values.isSeller = isSeller;
-    await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
-    next();
+    signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber)
+    .then(() => {
+      next();
+    }) 
+    .catch(
+      (err) => {
+        showError(err.message);
+        return;
+      }
+    );
   };
 
   const tabs: Tab[] = [
@@ -70,6 +79,7 @@ function Step2({ next, back, values }: any) {
         return true;
       })
       .catch((err) => {
+        showError(err.message);
         return false;
       });
     return false;

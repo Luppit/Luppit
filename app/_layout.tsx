@@ -6,6 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/poppins";
 import { Slot } from "expo-router";
+import Toast from "react-native-toast-message";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -18,6 +19,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <Slot />
       {!fontsLoaded && null}
+      <Toast />
     </ThemeProvider>
   );
 }
