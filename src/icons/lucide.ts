@@ -1,3 +1,6 @@
+
+import { HomePinIcon } from "./HomePinIcon";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -30,6 +33,7 @@ export const lucideIcons = {
   user: User,
   "circle-plus": CirclePlus,
   "message-square": MessageSquare,
+  "home-pin": HomePinIcon, 
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
