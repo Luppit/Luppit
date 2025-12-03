@@ -5,6 +5,7 @@ import {
 } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { signInWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase";
+import { showError } from "@/src/utils";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -31,8 +32,16 @@ export function Step1({ next, values, setValues }: any) {
 
   const sendOtp = async () => {
     if (!validateFields()) return;
-    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
-    next();
+    signInWithPhoneOtp(defaultCountryCode + values.phoneNumber)
+    .then(() => {
+      next();
+    })
+    .catch(
+      (err) => {
+        showError(err.message);
+        return;
+      }
+    );
   };
 
   return (
@@ -63,13 +72,18 @@ export function Step2({ next, back, values }: any) {
         return true;
       })
       .catch((err) => {
+        showError(err.message);
         return false;
       });
     return false;
   };
 
   const onResend = async () => {
-    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber).catch(
+      (err) => {
+        showError(err.message);
+      }
+    );
   };
 
   return (

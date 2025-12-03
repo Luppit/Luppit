@@ -3,20 +3,21 @@ import { createProfile, getProfileByPhone, Profile } from "@/src/services/profil
 import { getRoleByName, Roles } from "@/src/services/role.service";
 import { router } from "expo-router";
 import { supabase } from "./client";
+import { AppError, fromAppError } from "./errors";
 
 export type AuthMethod = "sms";
 export type AuthEvent = "SignIn" | "SignUp";
 
-async function getLoggedInUserId(): Promise<string> {
+async function getLoggedInUserId(): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
   const session = await getSession();
-  if (!session?.user.id) throw new Error("No logged in user");
-  return session.user.id;
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+  return { ok: true, data: session.user.id };
 }
 
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
   const existingProfile = await getProfileByPhone(phone);
-  if (shouldCreateUser && existingProfile) throw new Error("Profile with this phone number already exists");
+  if (shouldCreateUser && existingProfile) throw new Error("El número de teléfono ya está registrado.");
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
@@ -41,26 +42,23 @@ async function VerifyPhoneOtpInternal(
   if (error) throw error;
   if (!userProfile) return data;
   await supabase.auth.refreshSession();
-  await updateUserProfile(userProfile)
-    .then(async (data: Profile) => {
-      await addRoleToProfile(data.id, isSeller);
-      await supabase.auth.refreshSession();
-    })
-    .catch((err) => {
-      throw err;
-    });
+  const profileResult = await updateUserProfile(userProfile);
+  if (profileResult.ok === false) throw new Error(profileResult.error.message);
+  await addRoleToProfile(profileResult.data.id, isSeller);
+  await supabase.auth.refreshSession();
   return data;
 }
 
 async function updateUserProfile(profileData: Profile) {
   const userId = await getLoggedInUserId();
-  profileData.user_id = userId;
+  if (!userId.ok) throw new Error(userId.error.message);
+  profileData.user_id = userId.data;
   return await createProfile(profileData);
 }
 
 export async function signInWithPhoneOtp(phone: string) {
   const existingProfile = await getProfileByPhone(phone);
-  if (!existingProfile) throw new Error("Profile with this phone number does not exist");
+  if(existingProfile?.ok === false) throw new Error(existingProfile.error.message);
   return await sendPhoneOtp(phone, "SignIn");
 }
 
@@ -97,6 +95,6 @@ export function onAuthChange(cb: (event: string, hasSession: boolean) => void) {
 
 async function addRoleToProfile(id: string, isSeller?: boolean) {
   const role = await getRoleByName(isSeller ? Roles.SELLER : Roles.BUYER);
-  if (!role) throw new Error("Role not found");
-  await insertRoleToProfile(id, role.id);
+  if(role.ok === false) throw new Error(role.error.message);
+  await insertRoleToProfile(id, role.data.id);
 }
