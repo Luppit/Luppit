@@ -4,26 +4,31 @@ import { InputPhone } from "@/src/components/inputPhone/InputPhone";
 import React, { useState } from "react";
 import { View } from "react-native";
 
-export type CreateUserFormTabProps = {
-  values: any;
-  setValues: any;
-  onCreate: (isSeller: boolean) => Promise<void>;
-  isSeller?: boolean;
-}
+export type CreateSellerAdminFormTabProps = {
+  values: {
+    fullName: string;
+    idDocument: string;
+    phoneNumber: string;
+  };
+  setValues: (values: {
+    fullName: string;
+    idDocument: string;
+    phoneNumber: string;
+  }) => void;
+  onCreate: () => Promise<void>;
+};
 
 const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
 const ID_DOCUMENT_ERROR = "El documento de identificación es obligatorio.";
 const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 
-export default function CreateUserFormTab({
+export default function CreateSellerAdminFormTab({
   values,
   setValues,
   onCreate,
-  isSeller = false,
-}: CreateUserFormTabProps) {
-
-const [errors, setErrors] = useState({
+}: CreateSellerAdminFormTabProps) {
+  const [errors, setErrors] = useState({
     fullName: "",
     idDocument: "",
     phoneNumber: "",
@@ -35,28 +40,26 @@ const [errors, setErrors] = useState({
     const newErrors: Record<string, string> = {};
     if (!values.fullName.trim()) newErrors.fullName = FULL_NAME_ERROR;
     if (!values.idDocument.trim()) newErrors.idDocument = ID_DOCUMENT_ERROR;
-    if (!isSeller) {
-      if (!values.phoneNumber.trim()) newErrors.phoneNumber = PHONE_NUMBER_ERROR;
+    if (!values.phoneNumber.trim()) newErrors.phoneNumber = PHONE_NUMBER_ERROR;
 
-      if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
-        newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
-      }
+    if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
+      newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
     }
 
     setErrors(newErrors as any);
     return Object.keys(newErrors).length === 0;
   };
 
-  const createUser = async () => {
+  const createSellerAdmin = async () => {
     if (!validateFields()) return;
-    await onCreate(isSeller);
-  }
- 
+    await onCreate();
+  };
+
   return (
     <View>
       <TextField
-        label={isSeller ? "Nombre del negocio" : "Nombre completo"}
-        id={"fullName"+(isSeller ? "Seller" : "Buyer")}
+        label="Nombre completo"
+        id="fullNameSellerAdmin"
         value={values.fullName}
         onChangeText={(text) => {
           setValues({ ...values, fullName: text });
@@ -68,8 +71,8 @@ const [errors, setErrors] = useState({
         error={errors.fullName}
       />
       <TextField
-        label={isSeller ? "Documento de identificacion del negocio" : "Documento de identificación personal"}
-        id={"idDocument"+(isSeller ? "Seller" : "Buyer")}
+        label="Documento de identificación personal"
+        id="idDocumentSellerAdmin"
         value={values.idDocument}
         onChangeText={(text) => {
           setValues({ ...values, idDocument: text });
@@ -80,26 +83,20 @@ const [errors, setErrors] = useState({
         hasError={!!errors.idDocument}
         error={errors.idDocument}
       />
-      {!isSeller && (
-        <InputPhone
-          label="Teléfono celular"
-          id={"phoneNumber"+(isSeller ? "Seller" : "Buyer")}
-          value={values.phoneNumber}
-          onChangeText={(text) => {
-            setValues({ ...values, phoneNumber: text });
-            if (errors.phoneNumber && phoneRegex.test(text)) {
-              setErrors({ ...errors, phoneNumber: "" });
-            }
-          }}
-          hasError={!!errors.phoneNumber}
-          error={errors.phoneNumber}
-        />
-      )}
-      <Button
-        variant="dark"
-        onPress={() => createUser()}
-        title="Siguiente"
+      <InputPhone
+        label="Teléfono celular"
+        id="phoneNumberSellerAdmin"
+        value={values.phoneNumber}
+        onChangeText={(text) => {
+          setValues({ ...values, phoneNumber: text });
+          if (errors.phoneNumber && phoneRegex.test(text)) {
+            setErrors({ ...errors, phoneNumber: "" });
+          }
+        }}
+        hasError={!!errors.phoneNumber}
+        error={errors.phoneNumber}
       />
+      <Button variant="dark" onPress={createSellerAdmin} title="Siguiente" />
     </View>
   );
 }

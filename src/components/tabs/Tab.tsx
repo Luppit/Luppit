@@ -11,13 +11,23 @@ export type Tab = {
 
 export type TabsProps = {
   tabs: Tab[];
+  currentIndex?: number;
+  onTabChange?: (index: number) => void;
 };
 
-export function Tabs({ tabs }: TabsProps) {
+export function Tabs({ tabs, currentIndex, onTabChange }: TabsProps) {
   const t = useTheme();
   const s = useMemo(() => createTabsStyles(t), [t]);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [internalIndex, setInternalIndex] = useState(0);
+  const selectedIndex = currentIndex ?? internalIndex;
+
+  const handleChange = (index: number) => {
+    if (currentIndex === undefined) {
+      setInternalIndex(index);
+    }
+    onTabChange?.(index);
+  };
 
   return (
     <View>
@@ -26,16 +36,16 @@ export function Tabs({ tabs }: TabsProps) {
           <Pressable
             style={{
               ...s.header.tabsContainer,
-              ...(index === currentIndex ? s.header.tabsContainerActive : {}),
+              ...(index === selectedIndex ? s.header.tabsContainerActive : {}),
             }}
             key={index}
-            onPress={() => setCurrentIndex(index)}
+            onPress={() => handleChange(index)}
           >
             <Text>{tab.title}</Text>
           </Pressable>
         ))}
       </View>
-      <View style={s.content.container}>{tabs[currentIndex].content}</View>
+      <View style={s.content.container}>{tabs[selectedIndex].content}</View>
     </View>
   );
 }

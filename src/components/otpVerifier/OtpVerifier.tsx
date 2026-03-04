@@ -153,7 +153,6 @@ export const OtpVerifier = ({
               editable={!isValid}
               textContentType="oneTimeCode"
               autoComplete="one-time-code"
-              returnKeyType={index === otpLength - 1 ? "done" : "next"}
             />
           </View>
         ))}
