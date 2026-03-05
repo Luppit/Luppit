@@ -1,4 +1,5 @@
 import Navbar from "@/src/components/navbar/Navbar";
+import { RoleProvider } from "@/src/components/role/RoleContext";
 import { colors, spacing } from "@/src/themes";
 import { Redirect, Slot } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -33,9 +34,11 @@ export default function TabsLayout() {
 
   return (
     <SafeAreaView style={{ ...layoutStyles.container, ...layoutStyles.view }}>
-      <View style={layoutStyles.container}>
-        <Slot />
-      </View>
+      <RoleProvider>
+        <View style={layoutStyles.container}>
+          <Slot />
+        </View>
+      </RoleProvider>
       <Navbar />
     </SafeAreaView>
   );

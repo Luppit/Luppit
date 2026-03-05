@@ -1,12 +1,17 @@
-// app/crear.tsx (similar estructura para favoritas, chats, perfil)
-import { Text, View } from "react-native";
+import RoleGate from "@/src/components/role/RoleGate";
+import { Text } from "@/src/components/Text";
+import React from "react";
+import { View } from "react-native";
 
-export default function Chats() {
+export default function FavoritesScreen() {
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text style={{ fontSize: 28 }}>Favorites</Text>
-
-      {/* Barra fija al fondo */}
+    <View style={{ flex: 1, padding: 16, gap: 16 }}>
+      <Text variant="subtitle">Navbar</Text>
+      <RoleGate
+        loading={<Text>Cargando contenido...</Text>}
+        buyer={<Text style={{ fontSize: 28 }}>Favorites Buyer</Text>}
+        seller={<Text style={{ fontSize: 28 }}>Favorites Seller</Text>}
+      />
     </View>
   );
 }

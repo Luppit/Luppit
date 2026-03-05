@@ -25,3 +25,14 @@ export async function getProfileByPhone(phone: string): Promise<{ok: true; data:
     if (!data) return null;
     return { ok: true, data: data as Profile };
 }
+
+export async function getProfileByUserId(userId: string): Promise<{ok: true; data: Profile} | {ok: false; error: AppError} | null > {
+    const { data, error } = await supabase
+        .from("profile")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+    if (error) return {ok: false, error: fromSupabaseError(error) };
+    if (!data) return null;
+    return { ok: true, data: data as Profile };
+}
