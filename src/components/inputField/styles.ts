@@ -4,6 +4,7 @@ import { Platform, TextStyle, ViewStyle } from "react-native";
 export type InputFieldStyles = {
   baseContainer?: ViewStyle;
   label: TextStyle;
+  inputContent: ViewStyle;
   input: TextStyle;
   inputError?: ViewStyle;
   inputFocused?: ViewStyle;
@@ -38,6 +39,12 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
         } as TextStyle,
         default: {}
       }),
+    },
+    inputContent: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
     },
     inputError: {
       borderColor: t.colors.error

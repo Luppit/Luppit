@@ -6,7 +6,6 @@ import { View } from "react-native";
 export default function ChatsScreen() {
   return (
     <View style={{ flex: 1, padding: 16, gap: 16 }}>
-      <Text variant="subtitle">Navbar</Text>
       <RoleGate
         loading={<Text>Cargando contenido...</Text>}
         buyer={<Text style={{ fontSize: 28 }}>Chats Buyer</Text>}

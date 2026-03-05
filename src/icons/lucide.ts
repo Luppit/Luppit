@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   CirclePlus,
   Heart,
   House,
@@ -18,6 +19,7 @@ import {
 export const lucideIcons = {
   heart: Heart,
   check: Check,
+  "chevron-down": ChevronDown,
   x: X,
   "arrow-right": ArrowRight,
   "arrow-left": ArrowLeft,
@@ -33,6 +35,5 @@ export const lucideIcons = {
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
-
 
 
