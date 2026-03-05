@@ -17,7 +17,10 @@ async function getLoggedInUserId(): Promise<{ ok: true; data: string } | { ok: f
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
   const existingProfile = await getProfileByPhone(phone);
-  if (shouldCreateUser && existingProfile) throw new Error("El número de teléfono ya está registrado.");
+  if (existingProfile?.ok === false) throw new Error(existingProfile.error.message);
+  if (shouldCreateUser && existingProfile?.ok === true) {
+    throw new Error("El número de teléfono ya está registrado.");
+  }
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
@@ -32,7 +35,8 @@ async function VerifyPhoneOtpInternal(
   phone: string,
   token: string,
   userProfile?: Profile,
-  isSeller?: boolean
+  isSeller?: boolean,
+  onProfileCreated?: (profile: Profile) => Promise<void>
 ) {
   const { data, error } = await supabase.auth.verifyOtp({
     phone,
@@ -45,6 +49,9 @@ async function VerifyPhoneOtpInternal(
   const profileResult = await updateUserProfile(userProfile);
   if (profileResult.ok === false) throw new Error(profileResult.error.message);
   await addRoleToProfile(profileResult.data.id, isSeller);
+  if (onProfileCreated) {
+    await onProfileCreated(profileResult.data);
+  }
   await supabase.auth.refreshSession();
   return data;
 }
@@ -70,9 +77,16 @@ export async function verifyPhoneOtp(
   phone: string,
   token: string,
   userProfile?: Profile,
-  isSeller?: boolean
+  isSeller?: boolean,
+  onProfileCreated?: (profile: Profile) => Promise<void>
 ) {
-  return await VerifyPhoneOtpInternal(phone, token, userProfile, isSeller);
+  return await VerifyPhoneOtpInternal(
+    phone,
+    token,
+    userProfile,
+    isSeller,
+    onProfileCreated
+  );
 }
 
 export async function getSession() {

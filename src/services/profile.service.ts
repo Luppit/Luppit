@@ -20,7 +20,8 @@ export async function getProfileByPhone(phone: string): Promise<{ok: true; data:
         .from("profile")
         .select("*")
         .eq("phone", phone)
-        .single();
+        .maybeSingle();
     if (error) return {ok: false, error: fromSupabaseError(error) };
+    if (!data) return null;
     return { ok: true, data: data as Profile };
 }

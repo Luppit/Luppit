@@ -3,28 +3,67 @@ import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import { signUpWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase/auth";
+import { createBusiness } from "@/src/services/business.service";
+import { insertProfileToBusiness } from "@/src/services/profile.business.service";
 import { Profile } from "@/src/services/profile.service";
 import { spacing } from "@/src/themes/spacing";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import CreateSellerAdminFormTab from "./signup/CreateSellerAdminFormTab";
+import CreateSellerBusinessFormTab from "./signup/CreateSellerBusinessFormTab";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
 
-function Step1({ next, values, setValues }: any) {
-  const createWithPhoneNumber = async (isSeller: boolean) => {
-    values.isSeller = isSeller;
-    signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber)
-    .then(() => {
-      next();
-    }) 
-    .catch(
-      (err) => {
+type UserType = "buyer" | "seller";
+
+type BuyerFormValues = {
+  fullName: string;
+  idDocument: string;
+  phoneNumber: string;
+};
+
+type SellerBusinessValues = {
+  businessName: string;
+  businessIdDocument: string;
+};
+
+type SellerAdminValues = {
+  fullName: string;
+  idDocument: string;
+  phoneNumber: string;
+};
+
+function SignupEntryStep({
+  next,
+  userType,
+  setUserType,
+  buyerValues,
+  setBuyerValues,
+  sellerBusinessValues,
+  setSellerBusinessValues,
+}: {
+  next: () => void;
+  userType: UserType;
+  setUserType: (userType: UserType) => void;
+  buyerValues: BuyerFormValues;
+  setBuyerValues: (values: BuyerFormValues) => void;
+  sellerBusinessValues: SellerBusinessValues;
+  setSellerBusinessValues: (values: SellerBusinessValues) => void;
+}) {
+  const createBuyer = async () => {
+    signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber)
+      .then(() => {
+        next();
+      })
+      .catch((err) => {
         showError(err.message);
-        return;
-      }
-    );
+      });
+  };
+
+  const goToSellerAdminStep = async () => {
+    next();
   };
 
   const tabs: Tab[] = [
@@ -32,47 +71,125 @@ function Step1({ next, values, setValues }: any) {
       title: "Comprador",
       content: (
         <CreateUserFormTab
-          values={values}
-          setValues={setValues}
-          onCreate={createWithPhoneNumber}
+          values={buyerValues}
+          setValues={setBuyerValues}
+          onCreate={createBuyer}
         />
       ),
     },
     {
       title: "Vendedor",
       content: (
-        <CreateUserFormTab
-          values={values}
-          setValues={setValues}
-          onCreate={createWithPhoneNumber}
-          isSeller={true}
+        <CreateSellerBusinessFormTab
+          values={sellerBusinessValues}
+          setValues={setSellerBusinessValues}
+          onCreate={goToSellerAdminStep}
         />
       ),
     },
   ];
+
   return (
     <View>
-      <Tabs tabs={tabs}></Tabs>
+      <Tabs
+        tabs={tabs}
+        currentIndex={userType === "seller" ? 1 : 0}
+        onTabChange={(index) => setUserType(index === 1 ? "seller" : "buyer")}
+      />
     </View>
   );
 }
 
-function Step2({ next, back, values }: any) {
+function SellerAdminStep({
+  next,
+  sellerAdminValues,
+  setSellerAdminValues,
+}: {
+  next: () => void;
+  sellerAdminValues: SellerAdminValues;
+  setSellerAdminValues: (values: SellerAdminValues) => void;
+}) {
+  const createSellerAdmin = async () => {
+    signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber)
+      .then(() => {
+        next();
+      })
+      .catch((err) => {
+        showError(err.message);
+      });
+  };
+
+  return (
+    <CreateSellerAdminFormTab
+      values={sellerAdminValues}
+      setValues={setSellerAdminValues}
+      onCreate={createSellerAdmin}
+    />
+  );
+}
+
+function VerifyStep({
+  next,
+  userType,
+  buyerValues,
+  sellerBusinessValues,
+  sellerAdminValues,
+}: {
+  next: () => void;
+  userType: UserType;
+  buyerValues: BuyerFormValues;
+  sellerBusinessValues: SellerBusinessValues;
+  sellerAdminValues: SellerAdminValues;
+}) {
+  const isSeller = userType === "seller";
+
+  const phoneNumber = isSeller
+    ? sellerAdminValues.phoneNumber
+    : buyerValues.phoneNumber;
+
+  const fullName = isSeller ? sellerAdminValues.fullName : buyerValues.fullName;
+  const idDocument = isSeller
+    ? sellerAdminValues.idDocument
+    : buyerValues.idDocument;
+
   const onVerify = async (code: string) => {
     const userProfile: Profile = {
       id: "",
-      name: values.fullName,
-      id_document: values.idDocument,
+      name: fullName,
+      id_document: idDocument,
       created_at: new Date().toISOString(),
       user_id: "",
-      phone: defaultCountryCode + values.phoneNumber,
+      phone: defaultCountryCode + phoneNumber,
     };
 
     await verifyPhoneOtp(
-      defaultCountryCode + values.phoneNumber,
+      defaultCountryCode + phoneNumber,
       code,
       userProfile,
-      values.isSeller
+      isSeller,
+      async (createdProfile) => {
+        if (!isSeller) return;
+
+        const businessResult = await createBusiness({
+          id: "",
+          created_at: new Date().toISOString(),
+          name: sellerBusinessValues.businessName,
+          id_document: sellerBusinessValues.businessIdDocument,
+        });
+
+        if (businessResult.ok === false) {
+          throw new Error(businessResult.error.message);
+        }
+
+        const linkResult = await insertProfileToBusiness(
+          createdProfile.id,
+          businessResult.data.id,
+        );
+
+        if (linkResult.ok === false) {
+          throw new Error(linkResult.error.message);
+        }
+      },
     )
       .then(() => {
         next();
@@ -82,16 +199,17 @@ function Step2({ next, back, values }: any) {
         showError(err.message);
         return false;
       });
+
     return false;
   };
 
   const onResend = async () => {
-    await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
+    await signUpWithPhoneOtp(defaultCountryCode + phoneNumber);
   };
 
   return (
     <VerifyCode
-      phoneNumber={values.phoneNumber}
+      phoneNumber={phoneNumber}
       onVerify={onVerify}
       onResend={onResend}
     />
@@ -101,32 +219,117 @@ function Step2({ next, back, values }: any) {
 export default function signup() {
   const stepperRef = useRef<StepperRef>(null);
 
-  const [values, setValues] = useState({
+  const [userType, setUserType] = useState<UserType>("buyer");
+
+  const [buyerValues, setBuyerValues] = useState<BuyerFormValues>({
     fullName: "",
     idDocument: "",
     phoneNumber: "",
-    isSeller: false,
   });
 
-  const steps: Step[] = React.useMemo(() => {
-    const base: Step[] = [
+  const [sellerBusinessValues, setSellerBusinessValues] =
+    useState<SellerBusinessValues>({
+      businessName: "",
+      businessIdDocument: "",
+    });
+
+  const [sellerAdminValues, setSellerAdminValues] = useState<SellerAdminValues>(
+    {
+      fullName: "",
+      idDocument: "",
+      phoneNumber: "",
+    },
+  );
+
+  const steps: Step[] = useMemo(() => {
+    if (userType === "seller") {
+      return [
+        {
+          title: "Crear una cuenta",
+          description: "Información personal",
+          isNextStepShown: true,
+          render: (api) => (
+            <SignupEntryStep
+              {...api}
+              userType={userType}
+              setUserType={setUserType}
+              buyerValues={buyerValues}
+              setBuyerValues={setBuyerValues}
+              sellerBusinessValues={sellerBusinessValues}
+              setSellerBusinessValues={setSellerBusinessValues}
+            />
+          ),
+        },
+        {
+          title: "Administrador(a)",
+          description: `Agrega la información de la persona administradora de ${
+            sellerBusinessValues.businessName.trim() || "negocio"
+          }.`,
+          isNextStepShown: true,
+          render: (api) => (
+            <SellerAdminStep
+              {...api}
+              sellerAdminValues={sellerAdminValues}
+              setSellerAdminValues={setSellerAdminValues}
+            />
+          ),
+        },
+        {
+          title: "Verificación de código",
+          description: "Ingresa el código enviado a tu teléfono",
+          isNextStepShown: false,
+          render: (api) => (
+            <VerifyStep
+              {...api}
+              userType={userType}
+              buyerValues={buyerValues}
+              sellerBusinessValues={sellerBusinessValues}
+              sellerAdminValues={sellerAdminValues}
+            />
+          ),
+        },
+      ];
+    }
+
+    return [
       {
         title: "Crear una cuenta",
         description: "Verificación de código",
         isNextStepShown: true,
         render: (api) => (
-          <Step1 {...api} values={values} setValues={setValues} />
+          <SignupEntryStep
+            {...api}
+            userType={userType}
+            setUserType={setUserType}
+            buyerValues={buyerValues}
+            setBuyerValues={setBuyerValues}
+            sellerBusinessValues={sellerBusinessValues}
+            setSellerBusinessValues={setSellerBusinessValues}
+          />
         ),
       },
       {
         title: "Verificación de código",
         description: "Ingresa el código enviado a tu teléfono",
         isNextStepShown: false,
-        render: (api) => <Step2 {...api} values={values} />,
+        render: (api) => (
+          <VerifyStep
+            {...api}
+            userType={userType}
+            buyerValues={buyerValues}
+            sellerBusinessValues={sellerBusinessValues}
+            sellerAdminValues={sellerAdminValues}
+          />
+        ),
       },
     ];
-    return base;
-  }, [values]);
+  }, [
+    buyerValues,
+    sellerAdminValues,
+    sellerBusinessValues,
+    userType,
+    setUserType,
+  ]);
 
   return (
     <View style={styles.container}>
