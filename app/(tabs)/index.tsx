@@ -3,12 +3,15 @@ import ProductCard from "@/src/components/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { getCurrentUserPurchaseRequest } from "@/src/services/purchase.request.service";
+import { useTheme } from "@/src/themes";
+import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Image, ScrollView, View } from "react-native";
 
 export default function HomeScreen() {
+  const t = useTheme();
   return (
-    <View style={{ flex: 1, padding: 16 }}>
+    <View style={{ flex: 1, padding: t.spacing.md }}>
       <RoleGate
         loading={<Text>Cargando contenido...</Text>}
         buyer={<BuyerHomeContent />}
@@ -19,6 +22,7 @@ export default function HomeScreen() {
 }
 
 function BuyerHomeContent() {
+  const t = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [categoryName, setCategoryName] = useState<string | null>(null);
 
@@ -56,8 +60,8 @@ function BuyerHomeContent() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          gap: 16,
-          paddingHorizontal: 24,
+          gap: t.spacing.md,
+          paddingHorizontal: t.spacing.lg,
           paddingBottom: 96,
         }}
       >
@@ -74,7 +78,7 @@ function BuyerHomeContent() {
             variant="dark"
             icon="plus"
             title="Crear nueva solicitud"
-            onPress={() => console.log("create purchase request")}
+            onPress={() => router.push("/(chat)/chat")}
           />
         </View>
       </View>
@@ -87,9 +91,10 @@ function BuyerHomeContent() {
 }
 
 function SellerHomeContent() {
+  const t = useTheme();
   return (
-    <ScrollView contentContainerStyle={{ gap: 16, paddingBottom: 120 }}>
-      <View style={{ gap: 16 }}>
+    <ScrollView contentContainerStyle={{ gap: t.spacing.md, paddingBottom: 120 }}>
+      <View style={{ gap: t.spacing.md }}>
         <Text variant="subtitle">Inicio Vendedor</Text>
         <Text>Tus productos más vistos</Text>
         <ProductCard

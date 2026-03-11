@@ -23,9 +23,9 @@ export const createTopNavbarStyles = (t: Theme) =>
     searchInputContainer: {
       borderRadius: 999,
       height: 48,
-      backgroundColor: "#F3F3F3",
-      borderColor: "#DCDCDC",
-      shadowColor: "#000",
+      backgroundColor: t.colors.backgroudWhite,
+      borderColor: t.colors.border,
+      shadowColor: t.colors.shadow,
       shadowOpacity: 0.12,
       shadowOffset: { width: 0, height: 2 },
       shadowRadius: 6,
