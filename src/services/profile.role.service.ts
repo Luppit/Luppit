@@ -14,3 +14,16 @@ export async function insertRoleToProfile(
   if (error) throw { ok: false, error: fromSupabaseError(error) };
   return { ok: true, data: data != null };
 }
+
+export async function getProfileRoleByProfileId(
+  profileId: string
+): Promise<{ ok: true; data: ProfileRole } | { ok: false; error: AppError } | null> {
+  const { data, error } = await supabase
+    .from("profile_role")
+    .select("*")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  if (!data) return null;
+  return { ok: true, data: data as ProfileRole };
+}

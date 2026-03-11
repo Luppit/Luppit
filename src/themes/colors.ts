@@ -18,7 +18,8 @@ export const colors = {
   textMedium: "#333333",
   border: "#DDDDDD",
   background: "#F9FAFB",
-
+  IconColorGray: "#BBBBBB",
+  backgroudWhite: "#FFFFFF",
   accentYellow: "#D8A600",
 
    shadow:"#000",

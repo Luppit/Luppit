@@ -20,3 +20,16 @@ export async function getRoleByName(name: Roles): Promise<{ ok: true; data: Role
   }
   return { ok: true, data: data as Role };
 }
+
+export async function getRoleById(id: string): Promise<{ ok: true; data: Role } | { ok: false; error: AppError } | null> {
+  const { data, error } = await supabase
+    .from("role")
+    .select()
+    .eq("id", id)
+    .maybeSingle();
+  if (error) {
+    return { ok: false, error: fromSupabaseError(error) };
+  }
+  if (!data) return null;
+  return { ok: true, data: data as Role };
+}

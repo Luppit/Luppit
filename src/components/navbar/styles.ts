@@ -42,10 +42,11 @@ export const createNavbarStyles = (t: Theme) => {
     pill: {
       flexDirection: "row",
       width: "100%",
+      height: 65,
       justifyContent: "space-between",
+      alignItems: "center",
 
       borderRadius: 40,
-      paddingVertical: 12,
       paddingHorizontal: 18,
 
       backgroundColor: COLORS.bgGlass,
@@ -83,13 +84,12 @@ export const createNavbarStyles = (t: Theme) => {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      minHeight: 44,
-      paddingVertical: 6,
+      height: "100%",
     },
     itemInner: {
       alignItems: "center",
       justifyContent: "center",
-      gap: 6,
+      gap: 2,
     },
     label: { fontSize: 13, color: COLORS.text, fontWeight: "500", fontFamily: t.typography.caption.fontFamily },
     labelActive: { color: COLORS.active, fontWeight: "700" },
