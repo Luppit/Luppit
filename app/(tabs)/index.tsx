@@ -1,12 +1,14 @@
 import Button from "@/src/components/button/Button";
-import ProductCard from "@/src/components/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
+import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
 import { getCurrentUserPurchaseRequest } from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
+import { Asset } from "expo-asset";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Image, ScrollView, View } from "react-native";
+import { Image, View } from "react-native";
+import { SvgUri } from "react-native-svg";
 
 export default function HomeScreen() {
   const t = useTheme();
@@ -92,28 +94,68 @@ function BuyerHomeContent() {
 
 function SellerHomeContent() {
   const t = useTheme();
+  const emptyBoxAsset = Asset.fromModule(
+    require("../../assets/images/empty_box.svg"),
+  );
+
   return (
-    <ScrollView contentContainerStyle={{ gap: t.spacing.md, paddingBottom: 120 }}>
-      <View style={{ gap: t.spacing.md }}>
-        <Text variant="subtitle">Inicio Vendedor</Text>
-        <Text>Tus productos más vistos</Text>
-        <ProductCard
-          title="Kit de clutch"
-          subtitle="Hyundai"
-          views={85}
-          rating={4.6}
-          ratingCount={28}
-          timestamp="Actualizado hoy"
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: t.spacing.md,
+        paddingHorizontal: t.spacing.lg,
+        paddingBottom: 96,
+      }}
+    >
+      {emptyBoxAsset?.uri ? (
+        <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
+      ) : (
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={{ width: 84, height: 84 }}
+          resizeMode="contain"
         />
-        <ProductCard
-          title="Amortiguador delantero"
-          subtitle="Kia"
-          views={64}
-          rating={4.9}
-          ratingCount={52}
-          timestamp="Actualizado hace 1 hora"
+      )}
+      <Text align="center" variant="body">
+        Aún no hay solicitudes en ninguna categoría, pero tranquilo: ¡las
+        oportunidades están por llegar!
+      </Text>
+      <View style={{ width: "100%" }}>
+        <Button
+          variant="dark"
+          title="Abrir solicitud mock"
+          onPress={() =>
+            router.push({
+              pathname: "/(conversation)/chat",
+              params: {
+                purchaseRequest: JSON.stringify(purchaseRequestExample),
+                showComposer: "false",
+                showActionButtons: "true",
+                actionButtons: JSON.stringify([
+                  {
+                    id: "discard",
+                    label: "Descartar",
+                    icon: "trash-2",
+                    backgroundColorKey: "backgroudWhite",
+                    textColorKey: "error",
+                    iconColorKey: "error",
+                  },
+                  {
+                    id: "offer",
+                    label: "Ofertar",
+                    icon: "tag",
+                    backgroundColorKey: "primary",
+                    textColorKey: "backgroudWhite",
+                    iconColorKey: "backgroudWhite",
+                  },
+                ]),
+              },
+            })
+          }
         />
       </View>
-    </ScrollView>
+    </View>
   );
 }

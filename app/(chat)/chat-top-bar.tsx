@@ -2,8 +2,8 @@ import { LucideIconName } from "@/src/icons/lucide";
 import { useTheme } from "@/src/themes";
 import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
-import { Icon } from "../Icon";
-import { Text } from "../Text";
+import { Icon } from "@/src/components/Icon";
+import { Text } from "@/src/components/Text";
 
 type ChatTopBarProps = {
   title?: string;

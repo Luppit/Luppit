@@ -1,6 +1,6 @@
 import {
   useChatSession,
-} from "@/src/components/chatLayout/ChatSessionContext";
+} from "./chat-session.context";
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React from "react";

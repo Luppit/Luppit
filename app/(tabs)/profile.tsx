@@ -1,5 +1,7 @@
+import Button from "@/src/components/button/Button";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
+import { signOut } from "@/src/lib/supabase";
 import { useTheme } from "@/src/themes";
 import React from "react";
 import { View } from "react-native";
@@ -13,6 +15,7 @@ export default function ProfileScreen() {
         buyer={<Text variant="title">Profile Buyer</Text>}
         seller={<Text variant="title">Profile Seller</Text>}
       />
+      <Button variant="dark" title="Sign Out" onPress={signOut} />
     </View>
   );
 }
