@@ -61,8 +61,14 @@ export const TextField: React.FC<TextFieldProps> = ({
           <TextInput
             {...textInputProps}
             style={[s.input, inputStyle]}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onFocus={(event) => {
+              setFocused(true);
+              textInputProps.onFocus?.(event);
+            }}
+            onBlur={(event) => {
+              setFocused(false);
+              textInputProps.onBlur?.(event);
+            }}
             placeholderTextColor={colors.stateAnulated}
           />
         </View>

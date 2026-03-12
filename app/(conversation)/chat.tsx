@@ -9,8 +9,9 @@ import { getProfileByUserId } from "@/src/services/profile.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Roles } from "@/src/services/role.service";
 import { useTheme } from "@/src/themes";
+import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 
 export default function ConversationChatScreen() {
@@ -19,10 +20,10 @@ export default function ConversationChatScreen() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [currentRole, setCurrentRole] = useState<Roles | null>(null);
 
-  useEffect(() => {
+  const loadMessages = useCallback(async () => {
     let active = true;
 
-    const loadMessages = async () => {
+    try {
       const session = await getSession();
       if (!session?.user.id || !active) return;
 
@@ -40,14 +41,16 @@ export default function ConversationChatScreen() {
       });
 
       if (active) setMessages(data);
-    };
-
-    void loadMessages();
-
-    return () => {
+    } finally {
       active = false;
-    };
+    }
   }, [purchaseRequest.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadMessages();
+    }, [loadMessages])
+  );
 
   const mineSender = currentRole === Roles.SELLER ? "seller" : "buyer";
   const mockReferenceImage = require("../../assets/images/android-icon-foreground.png");
@@ -77,7 +80,7 @@ export default function ConversationChatScreen() {
               message.sender === mineSender
                 ? t.colors.primaryLight
                 : t.colors.backgroudWhite,
-            gap: t.spacing.sm,
+            gap: t.spacing.xs,
           }}
         >
           {message.imageKey === "mockReference" ? (
@@ -96,7 +99,12 @@ export default function ConversationChatScreen() {
           <Text variant="body" color="textDark">
             {message.text}
           </Text>
-          <Text color="stateAnulated" align="right">
+          <Text
+            variant="caption"
+            color="stateAnulated"
+            align="right"
+            style={{ marginTop: 2 }}
+          >
             {message.createdAt}
           </Text>
         </View>
