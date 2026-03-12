@@ -53,13 +53,12 @@ function SignupEntryStep({
   setSellerBusinessValues: (values: SellerBusinessValues) => void;
 }) {
   const createBuyer = async () => {
-    signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber)
-      .then(() => {
-        next();
-      })
-      .catch((err) => {
-        showError(err.message);
-      });
+    try {
+      await signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber);
+      next();
+    } catch (err: any) {
+      showError(err.message);
+    }
   };
 
   const goToSellerAdminStep = async () => {
@@ -110,13 +109,12 @@ function SellerAdminStep({
   setSellerAdminValues: (values: SellerAdminValues) => void;
 }) {
   const createSellerAdmin = async () => {
-    signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber)
-      .then(() => {
-        next();
-      })
-      .catch((err) => {
-        showError(err.message);
-      });
+    try {
+      await signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber);
+      next();
+    } catch (err: any) {
+      showError(err.message);
+    }
   };
 
   return (
@@ -339,7 +337,7 @@ export default function signup() {
         onFinish={() => router.replace("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
-      <View style={styles.footer}>
+      <View style={styles.footer} pointerEvents="box-none">
         <Text variant="caption" align="center">
           Al ingresar tu número, aceptas automáticamente los
         </Text>

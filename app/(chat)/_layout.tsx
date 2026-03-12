@@ -1,8 +1,8 @@
-import ChatTopBar from "@/src/components/chatLayout/ChatTopBar";
+import ChatTopBar from "./chat-top-bar";
 import {
   ChatSessionProvider,
   useChatSession,
-} from "@/src/components/chatLayout/ChatSessionContext";
+} from "./chat-session.context";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Roles } from "@/src/services/role.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
