@@ -1,3 +1,4 @@
+import GlobalPopupHost from "@/src/components/popup/GlobalPopupHost";
 import { ThemeProvider } from "@/src/themes/ThemeProvider";
 import {
   Poppins_400Regular,
@@ -20,6 +21,7 @@ export default function RootLayout() {
       <Slot />
       {!fontsLoaded && null}
       <Toast />
+      <GlobalPopupHost />
     </ThemeProvider>
   );
 }

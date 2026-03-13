@@ -6,6 +6,7 @@ import InputChat from "@/src/components/inputChat/inputChat";
 import RoleGate from "@/src/components/role/RoleGate";
 import { RoleProvider } from "@/src/components/role/RoleContext";
 import { Text } from "@/src/components/Text";
+import { openPopup } from "@/src/services/popup.service";
 import { PurchaseRequest } from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
@@ -133,7 +134,32 @@ export default function ConversationLayout() {
                 </Text>
 
                 <Pressable
-                  onPress={() => console.log("conversation action")}
+                  onPress={() =>
+                    openPopup({
+                      options: [
+                        {
+                          id: "discard",
+                          label: "Descartar",
+                          icon: "trash-2",
+                          textColorKey: "error",
+                          iconColorKey: "error",
+                          onPress: () => console.log("conversation popup: discard"),
+                        },
+                        {
+                          id: "offer",
+                          label: "Ofertar",
+                          icon: "tag",
+                          textColorKey: "primary",
+                          iconColorKey: "primary",
+                          onPress: () =>
+                            router.push({
+                              pathname: "/(modal)/offer",
+                              params: { title: "Ofertar" },
+                            }),
+                        },
+                      ],
+                    })
+                  }
                   hitSlop={12}
                   style={{ width: 40, alignItems: "flex-end" }}
                 >
@@ -161,7 +187,16 @@ export default function ConversationLayout() {
                   >
                     <ConversationActionButtons
                       buttons={actionButtons}
-                      onPress={(id) => console.log(`conversation action button: ${id}`)}
+                      onPress={(id) => {
+                        if (id === "offer") {
+                          router.push({
+                            pathname: "/(modal)/offer",
+                            params: { title: "Ofertar" },
+                          });
+                          return;
+                        }
+                        console.log(`conversation action button: ${id}`);
+                      }}
                     />
                   </View>
                 ) : null

@@ -3,9 +3,12 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  ChevronUp,
   CirclePlus,
   Ellipsis,
   Eye,
+  FileText,
+  FolderClosed,
   Info,
   Heart,
   House,
@@ -18,16 +21,21 @@ import {
   Smartphone,
   Tag,
   Trash2,
+  Truck,
   User,
   X,
+  Sparkles,
 } from "lucide-react-native";
 
 export const lucideIcons = {
   heart: Heart,
   check: Check,
   "chevron-down": ChevronDown,
+  "chevron-up": ChevronUp,
   ellipsis: Ellipsis,
   eye: Eye,
+  "file-text": FileText,
+  "folder-closed": FolderClosed,
   info: Info,
   x: X,
   "arrow-right": ArrowRight,
@@ -44,6 +52,8 @@ export const lucideIcons = {
   "circle-plus": CirclePlus,
   "message-square": MessageSquare,
   tag: Tag,
+  truck: Truck,
+  sparkles: Sparkles,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
