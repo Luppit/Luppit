@@ -1,4 +1,5 @@
 import Button from "@/src/components/button/Button";
+import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
@@ -13,7 +14,7 @@ import { SvgUri } from "react-native-svg";
 export default function HomeScreen() {
   const t = useTheme();
   return (
-    <View style={{ flex: 1, padding: t.spacing.md }}>
+    <View style={{ flex: 1, padding: t.spacing.xs }}>
       <RoleGate
         loading={<Text>Cargando contenido...</Text>}
         buyer={<BuyerHomeContent />}
@@ -57,31 +58,50 @@ function BuyerHomeContent() {
 
   if (!categoryName) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          gap: t.spacing.md,
-          paddingHorizontal: t.spacing.lg,
-          paddingBottom: 96,
-        }}
-      >
-        <Image
-          source={require("../../assets/images/icon.png")}
-          style={{ width: 84, height: 84 }}
-          resizeMode="contain"
+      <View style={{ flex: 1 }}>
+        <ProductCard
+          title={purchaseRequestExample.title ?? "Solicitud"}
+          subtitle={purchaseRequestExample.category_name ?? "-"}
+          views={12}
+          statusLabel="Activa"
+          offersLabel="# ofertas"
+          onPress={() =>
+            router.push({
+              pathname: "/(detail)/purchase-request",
+              params: {
+                title: purchaseRequestExample.title ?? "Detalle de solicitud",
+                purchaseRequest: JSON.stringify(purchaseRequestExample),
+              },
+            })
+          }
         />
-        <Text align="center" variant="body">
-          Cuéntanos qué necesitas y te ayudamos a encontrarlo!
-        </Text>
-        <View style={{ width: "100%" }}>
-          <Button
-            variant="dark"
-            icon="plus"
-            title="Crear nueva solicitud"
-            onPress={() => router.push("/(chat)/chat")}
+
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            gap: t.spacing.md,
+            paddingHorizontal: t.spacing.lg,
+            paddingBottom: 96,
+          }}
+        >
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={{ width: 84, height: 84 }}
+            resizeMode="contain"
           />
+          <Text align="center" variant="body">
+            Cuéntanos qué necesitas y te ayudamos a encontrarlo!
+          </Text>
+          <View style={{ width: "100%" }}>
+            <Button
+              variant="dark"
+              icon="plus"
+              title="Crear nueva solicitud"
+              onPress={() => router.push("/(chat)/chat")}
+            />
+          </View>
         </View>
       </View>
     );

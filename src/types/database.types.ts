@@ -55,35 +55,89 @@ export type Database = {
       }
       category_requirement: {
         Row: {
+          allowed_values: Json | null
           category_id: string
           created_at: string
-          optional_fields: string[] | null
-          required_fields: string[]
+          field_name: string
+          field_type: string | null
+          id: string
+          is_array: boolean | null
+          required: boolean | null
           version: number
         }
         Insert: {
+          allowed_values?: Json | null
           category_id?: string
           created_at?: string
-          optional_fields?: string[] | null
-          required_fields: string[]
+          field_name: string
+          field_type?: string | null
+          id?: string
+          is_array?: boolean | null
+          required?: boolean | null
           version?: number
         }
         Update: {
+          allowed_values?: Json | null
           category_id?: string
           created_at?: string
-          optional_fields?: string[] | null
-          required_fields?: string[]
+          field_name?: string
+          field_type?: string | null
+          id?: string
+          is_array?: boolean | null
+          required?: boolean | null
           version?: number
         }
         Relationships: [
           {
             foreignKeyName: "category_requirement_category_id_fkey"
             columns: ["category_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "category"
             referencedColumns: ["id"]
           },
         ]
+      }
+      currency: {
+        Row: {
+          created_at: string
+          currency_code: string | null
+          display_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string | null
+          display_name?: string | null
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string | null
+          display_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      delivery_catalog: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          hint: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          hint?: string | null
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          hint?: string | null
+          id?: string
+        }
+        Relationships: []
       }
       menu_item: {
         Row: {
@@ -253,20 +307,118 @@ export type Database = {
       purchase_offer: {
         Row: {
           created_at: string
+          currency_id: string | null
+          delivery_id: string | null
+          description: string | null
           id: string
-          purchase_request_id: string
+          price: number | null
+          purchase_request_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency_id?: string | null
+          delivery_id?: string | null
+          description?: string | null
+          id?: string
+          price?: number | null
+          purchase_request_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency_id?: string | null
+          delivery_id?: string | null
+          description?: string | null
+          id?: string
+          price?: number | null
+          purchase_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_currency_id_fkey"
+            columns: ["currency_id"]
+            isOneToOne: false
+            referencedRelation: "currency"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_offer_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer_delivery"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_offer_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_offer_delivery: {
+        Row: {
+          after_days: number | null
+          created_at: string
+          delivery_cat_id: string | null
+          id: string
+          max_days: number | null
+          price: number | null
+        }
+        Insert: {
+          after_days?: number | null
+          created_at?: string
+          delivery_cat_id?: string | null
+          id?: string
+          max_days?: number | null
+          price?: number | null
+        }
+        Update: {
+          after_days?: number | null
+          created_at?: string
+          delivery_cat_id?: string | null
+          id?: string
+          max_days?: number | null
+          price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_delivery_delivery_id_fkey"
+            columns: ["delivery_cat_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_offer_image: {
+        Row: {
+          created_at: string
+          id: string
+          path: string | null
+          purchase_offer_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
-          purchase_request_id?: string
+          path?: string | null
+          purchase_offer_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
-          purchase_request_id?: string
+          path?: string | null
+          purchase_offer_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_image_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchase_request: {
         Row: {
@@ -452,6 +604,7 @@ export type Database = {
           version: number
         }[]
       }
+      is_category_leaf: { Args: { category_id: string }; Returns: boolean }
       search_category: {
         Args: { search_text: string }
         Returns: {

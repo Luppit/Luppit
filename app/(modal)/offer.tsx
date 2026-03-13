@@ -4,13 +4,25 @@ import FilePicker, {
   SelectedFile,
 } from "@/src/components/filePicker/FilePicker";
 import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
+import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
+import { Currency, getCurrencies } from "@/src/services/currency.service";
+import {
+  DeliveryCatalog,
+  getDeliveryCatalog,
+} from "@/src/services/delivery.catalog.service";
+import {
+  createPurchaseOffer,
+  CreatePurchaseOfferInput,
+} from "@/src/services/purchase.offer.service";
 import { openPopup } from "@/src/services/popup.service";
+import { PurchaseRequest } from "@/src/services/purchase.request.service";
 import { Text } from "@/src/components/Text";
 import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useGlobalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   Keyboard,
   ScrollView,
@@ -18,52 +30,152 @@ import {
   View,
 } from "react-native";
 
-type CurrencyOption = "colones" | "dolares";
 type DeliveryTimeOption = "horas" | "dias";
+
+function parsePurchaseRequestParam(
+  raw: string | string[] | undefined
+): PurchaseRequest | null {
+  if (!raw) return null;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  try {
+    return JSON.parse(value) as PurchaseRequest;
+  } catch {
+    return null;
+  }
+}
+
+function normalize(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 export default function OfferScreen() {
   const t = useTheme();
+  const params = useGlobalSearchParams<{ purchaseRequest?: string | string[] }>();
+  const purchaseRequest =
+    parsePurchaseRequestParam(params.purchaseRequest) ?? purchaseRequestExample;
+  const [currencies, setCurrencies] = useState<Currency[]>([]);
+  const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
-  const [currency, setCurrency] = useState<CurrencyOption>("colones");
+  const [currencyId, setCurrencyId] = useState("");
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<string[]>([]);
   const [pickupDelay, setPickupDelay] = useState("");
   const [pickupDelayUnit, setPickupDelayUnit] =
     useState<DeliveryTimeOption>("horas");
   const [shippingCost, setShippingCost] = useState("");
-  const [shippingCostCurrency, setShippingCostCurrency] =
-    useState<CurrencyOption>("colones");
+  const [shippingCostCurrencyId, setShippingCostCurrencyId] = useState("");
   const [shippingMaxTime, setShippingMaxTime] = useState("");
   const [shippingMaxTimeUnit, setShippingMaxTimeUnit] =
     useState<DeliveryTimeOption>("horas");
+  const pickupCatalog = useMemo(
+    () =>
+      deliveryCatalog.find((item) => {
+        const hint = normalize(item.hint);
+        return hint.length > 0;
+      }) ??
+      null,
+    [deliveryCatalog]
+  );
+  const shippingCatalog = useMemo(
+    () => deliveryCatalog.find((item) => item.id !== pickupCatalog?.id) ?? null,
+    [deliveryCatalog, pickupCatalog]
+  );
+  const currencyToggleOptions = useMemo(() => {
+    return currencies.slice(0, 2).map((currency) => ({
+      label: currency.display_name ?? "-",
+      value: currency.id,
+    }));
+  }, [currencies]);
   const canSubmitOffer =
     description.trim().length > 0 &&
     price.trim().length > 0 &&
     files.length > 0 &&
-    deliveryMethods.length > 0;
+    deliveryMethods.length > 0 &&
+    currencyId.length > 0;
+
+  const loadCatalogs = useCallback(async () => {
+    setCatalogLoading(true);
+    const [currencyResult, deliveryResult] = await Promise.all([
+      getCurrencies(),
+      getDeliveryCatalog(),
+    ]);
+
+    if (currencyResult.ok) setCurrencies(currencyResult.data);
+    else setCurrencies([]);
+
+    if (deliveryResult.ok) setDeliveryCatalog(deliveryResult.data);
+    else setDeliveryCatalog([]);
+
+    setCatalogLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadCatalogs();
+  }, [loadCatalogs]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCatalogs();
+    }, [loadCatalogs])
+  );
+
+  useEffect(() => {
+    const firstCurrencyId = currencyToggleOptions[0]?.value ?? "";
+    if (firstCurrencyId.length === 0) return;
+
+    if (!currencyId || !currencyToggleOptions.some((option) => option.value === currencyId)) {
+      setCurrencyId(firstCurrencyId);
+    }
+
+    if (
+      !shippingCostCurrencyId ||
+      !currencyToggleOptions.some((option) => option.value === shippingCostCurrencyId)
+    ) {
+      setShippingCostCurrencyId(firstCurrencyId);
+    }
+  }, [currencyId, shippingCostCurrencyId, currencyToggleOptions]);
 
   const handlePriceChange = (text: string) => {
     setPrice(text.replace(/\D/g, ""));
   };
 
-  const priceLabel = currency === "colones" ? `₡${price}` : `$${price}`;
+  const toDays = (value: number | null | undefined, unit: DeliveryTimeOption) => {
+    if (!value || value <= 0) return null;
+    if (unit === "dias") return value;
+    return Math.ceil(value / 24);
+  };
+
+  const selectedCurrency = currencies.find((currency) => currency.id === currencyId) ?? null;
+  const selectedShippingCurrency =
+    currencies.find((currency) => currency.id === shippingCostCurrencyId) ?? null;
+  const isColonCurrency = normalize(selectedCurrency?.currency_code) === "col";
+  const isShippingColonCurrency =
+    normalize(selectedShippingCurrency?.currency_code) === "col";
+  const priceLabel = isColonCurrency ? `₡${price}` : `$${price}`;
   const deliverySummary = deliveryMethods
     .map((method) => {
-      if (method === "pickup") {
-        if (!pickupDelay) return "Recoger en tienda";
-        return `Recoger en tienda: después de ${pickupDelay} ${pickupDelayUnit}.`;
+      const catalog = deliveryCatalog.find((item) => item.id === method);
+      const displayName = catalog?.display_name ?? "Entrega";
+      if (pickupCatalog && method === pickupCatalog.id) {
+        if (!pickupDelay) return displayName;
+        return `${displayName}: después de ${pickupDelay} ${pickupDelayUnit}.`;
       }
-      if (method === "shipping") {
+      if (shippingCatalog && method === shippingCatalog.id) {
         const costText = shippingCost
-          ? `${shippingCostCurrency === "colones" ? "₡" : "$"}${shippingCost}`
+          ? `${isShippingColonCurrency ? "₡" : "$"}${shippingCost}`
           : "Sin costo definido";
         const timeText = shippingMaxTime
           ? `${shippingMaxTime} ${shippingMaxTimeUnit}`
           : "sin tiempo definido";
-        return `Envío: ${costText}, tiempo máximo ${timeText}.`;
+        return `${displayName}: ${costText}, tiempo máximo ${timeText}.`;
       }
-      return method;
+      return displayName;
     })
     .join(" ");
 
@@ -96,19 +208,27 @@ export default function OfferScreen() {
           placeholder="Describe el producto para que el comprador sepa exactamente qué recibirá. Ejemplo: Compresor original, usado, en buen estado con 3 meses de garantía."
         />
 
-        <TextFieldWithToggle<CurrencyOption>
-          label="Precio"
-          value={price}
-          onChangeText={handlePriceChange}
-          options={[
-            { label: "Colones", value: "colones" },
-            { label: "Dólares", value: "dolares" },
-          ]}
-          selectedOption={currency}
-          onOptionChange={setCurrency}
-          keyboardType="number-pad"
-          inputMode="numeric"
-        />
+        {currencyToggleOptions.length >= 2 ? (
+          <TextFieldWithToggle<string>
+            label="Precio"
+            value={price}
+            onChangeText={handlePriceChange}
+            options={
+              currencyToggleOptions as [
+                { label: string; value: string },
+                { label: string; value: string },
+              ]
+            }
+            selectedOption={currencyId || currencyToggleOptions[0]?.value || ""}
+            onOptionChange={setCurrencyId}
+            keyboardType="number-pad"
+            inputMode="numeric"
+          />
+        ) : (
+          <Text color="stateAnulated">
+            {catalogLoading ? "Cargando monedas..." : "No hay monedas disponibles."}
+          </Text>
+        )}
 
         <FilePicker
           label="Imágenes"
@@ -119,83 +239,89 @@ export default function OfferScreen() {
           onChange={setFiles}
         />
 
-        <OptionsChecklistCard
-          icon="truck"
-          title="Método de entrega"
-          description="Selecciona todas las opciones que brindarás para esta oferta."
-          allowMultiple
-          value={deliveryMethods}
-          onChange={setDeliveryMethods}
-          options={[
-            {
-              id: "pickup",
-              label: "Recoger en tienda",
-              hint: "Indica en cuánto tiempo estará lista la opción de retiro en tienda.",
-              content: (
-                <View style={{ gap: t.spacing.xs }}>
-                  <Text color="stateAnulated">Después de</Text>
-                  <TextFieldWithToggle<DeliveryTimeOption>
-                    value={pickupDelay}
-                    onChangeText={(text) =>
-                      setPickupDelay(text.replace(/\D/g, ""))
-                    }
-                    options={[
-                      { label: "Hora(s)", value: "horas" },
-                      { label: "Día(s)", value: "dias" },
-                    ]}
-                    selectedOption={pickupDelayUnit}
-                    onOptionChange={setPickupDelayUnit}
-                    keyboardType="number-pad"
-                    inputMode="numeric"
-                  />
-                </View>
-              ),
-            },
-            {
-              id: "shipping",
-              label: "Envío",
-              content: (
-                <View style={{ gap: t.spacing.xs }}>
+        {deliveryCatalog.length > 0 ? (
+          <OptionsChecklistCard
+            icon="truck"
+            title="Método de entrega"
+            description="Selecciona todas las opciones que brindarás para esta oferta."
+            allowMultiple
+            value={deliveryMethods}
+            onChange={setDeliveryMethods}
+            options={deliveryCatalog.map((delivery) => ({
+              id: delivery.id,
+              label: delivery.display_name ?? "-",
+              hint: delivery.hint ?? undefined,
+              content:
+                pickupCatalog && delivery.id === pickupCatalog.id ? (
                   <View style={{ gap: t.spacing.xs }}>
-                    <Text color="stateAnulated">Costo</Text>
-                    <TextFieldWithToggle<CurrencyOption>
-                      value={shippingCost}
-                      onChangeText={(text) =>
-                        setShippingCost(text.replace(/\D/g, ""))
-                      }
-                      options={[
-                        { label: "Colones", value: "colones" },
-                        { label: "Dólares", value: "dolares" },
-                      ]}
-                      selectedOption={shippingCostCurrency}
-                      onOptionChange={setShippingCostCurrency}
-                      keyboardType="number-pad"
-                      inputMode="numeric"
-                    />
-                  </View>
-
-                  <View style={{ gap: t.spacing.xs }}>
-                    <Text color="stateAnulated">Tiempo máximo de entrega</Text>
+                    <Text color="stateAnulated">Después de</Text>
                     <TextFieldWithToggle<DeliveryTimeOption>
-                      value={shippingMaxTime}
+                      value={pickupDelay}
                       onChangeText={(text) =>
-                        setShippingMaxTime(text.replace(/\D/g, ""))
+                        setPickupDelay(text.replace(/\D/g, ""))
                       }
                       options={[
                         { label: "Hora(s)", value: "horas" },
                         { label: "Día(s)", value: "dias" },
                       ]}
-                      selectedOption={shippingMaxTimeUnit}
-                      onOptionChange={setShippingMaxTimeUnit}
+                      selectedOption={pickupDelayUnit}
+                      onOptionChange={setPickupDelayUnit}
                       keyboardType="number-pad"
                       inputMode="numeric"
                     />
                   </View>
-                </View>
-              ),
-            },
-          ]}
-        />
+                ) : shippingCatalog && delivery.id === shippingCatalog.id ? (
+                  <View style={{ gap: t.spacing.xs }}>
+                    <View style={{ gap: t.spacing.xs }}>
+                      <Text color="stateAnulated">Costo</Text>
+                      <TextFieldWithToggle<string>
+                        value={shippingCost}
+                        onChangeText={(text) =>
+                          setShippingCost(text.replace(/\D/g, ""))
+                        }
+                        options={
+                          currencyToggleOptions as [
+                            { label: string; value: string },
+                            { label: string; value: string },
+                          ]
+                        }
+                        selectedOption={
+                          shippingCostCurrencyId || currencyToggleOptions[0]?.value || ""
+                        }
+                        onOptionChange={setShippingCostCurrencyId}
+                        keyboardType="number-pad"
+                        inputMode="numeric"
+                      />
+                    </View>
+
+                    <View style={{ gap: t.spacing.xs }}>
+                      <Text color="stateAnulated">Tiempo máximo de entrega</Text>
+                      <TextFieldWithToggle<DeliveryTimeOption>
+                        value={shippingMaxTime}
+                        onChangeText={(text) =>
+                          setShippingMaxTime(text.replace(/\D/g, ""))
+                        }
+                        options={[
+                          { label: "Hora(s)", value: "horas" },
+                          { label: "Día(s)", value: "dias" },
+                        ]}
+                        selectedOption={shippingMaxTimeUnit}
+                        onOptionChange={setShippingMaxTimeUnit}
+                        keyboardType="number-pad"
+                        inputMode="numeric"
+                      />
+                    </View>
+                  </View>
+                ) : undefined,
+            }))}
+          />
+        ) : (
+          <Text color="stateAnulated">
+            {catalogLoading
+              ? "Cargando métodos de entrega..."
+              : "No hay métodos de entrega disponibles."}
+          </Text>
+        )}
 
         {canSubmitOffer ? (
           <Button
@@ -230,20 +356,37 @@ export default function OfferScreen() {
                     backgroundColorKey: "primary",
                     textColorKey: "backgroudWhite",
                     iconColorKey: "backgroudWhite",
-                    onPress: () => {
-                      console.log("offer payload", {
+                    onPress: async () => {
+                      const primaryDeliveryCatalogId =
+                        (shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
+                          ? shippingCatalog.id
+                          : deliveryMethods[0]) ?? "";
+
+                      const payload: CreatePurchaseOfferInput = {
+                        purchaseRequestId: purchaseRequest.id,
                         description,
-                        price,
-                        currency,
+                        price: Number(price),
+                        currencyId,
+                        primaryDeliveryCatalogId,
                         files,
                         deliveryMethods,
-                        pickupDelay,
+                        pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
                         pickupDelayUnit,
-                        shippingCost,
-                        shippingCostCurrency,
-                        shippingMaxTime,
+                        shippingCost: Number(shippingCost || 0),
+                        shippingMaxTime: toDays(
+                          Number(shippingMaxTime || 0),
+                          shippingMaxTimeUnit
+                        ),
                         shippingMaxTimeUnit,
-                      });
+                      };
+
+                      const result = await createPurchaseOffer(payload);
+                      if (!result.ok) {
+                        console.log("create purchase offer error", result.error);
+                        return;
+                      }
+
+                      console.log("create purchase offer success", result.data);
                       router.back();
                     },
                   },

@@ -15,8 +15,6 @@ export type OptionsChecklistCardStyles = {
   label: TextStyle;
   hintButton: ViewStyle;
   expandedContent: ViewStyle;
-  hintBackdrop: ViewStyle;
-  hintCard: ViewStyle;
 };
 
 export function createOptionsChecklistCardStyles(t: Theme): OptionsChecklistCardStyles {
@@ -97,24 +95,6 @@ export function createOptionsChecklistCardStyles(t: Theme): OptionsChecklistCard
       paddingRight: rowHorizontal,
       paddingBottom: t.spacing.md,
       gap: t.spacing.xs,
-    },
-    hintBackdrop: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.22)",
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: t.spacing.lg,
-    },
-    hintCard: {
-      width: "100%",
-      borderRadius: t.borders.md,
-      backgroundColor: t.colors.backgroudWhite,
-      padding: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 4 },
-      shadowRadius: 10,
-      elevation: 6,
     },
   };
 }
