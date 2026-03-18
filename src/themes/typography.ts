@@ -6,7 +6,14 @@ export const fontFamilies = {
   semibold: "Poppins_600SemiBold",
 } as const;
 
-export type TextVariant = "title" | "subtitle" | "body" | "label" | "caption";
+export type TextVariant =
+  | "title"
+  | "titleRegular"
+  | "subtitle"
+  | "body"
+  | "label"
+  | "caption"
+  | "price";
 
 export const typography: Record<TextVariant, {
   fontFamily: string;
@@ -15,8 +22,10 @@ export const typography: Record<TextVariant, {
   letterSpacing?: number;
 }> = {
   title:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.xl, lineHeight: lineHeights.xl },
+  titleRegular: { fontFamily: fontFamilies.regular, fontSize: fontSizes.xl, lineHeight: lineHeights.xl },
   subtitle: { fontFamily: fontFamilies.semibold,   fontSize: fontSizes.lg, lineHeight: lineHeights.lg },
   body:     { fontFamily: fontFamilies.regular,  fontSize: fontSizes.md, lineHeight: lineHeights.md },
   label:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
   caption:  { fontFamily: fontFamilies.regular,  fontSize: fontSizes.xs, lineHeight: lineHeights.xs, letterSpacing: 0.2 },
+  price:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.xxl, lineHeight: lineHeights.xxl },
 };

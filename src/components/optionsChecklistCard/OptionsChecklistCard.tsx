@@ -1,9 +1,10 @@
 import { Icon } from "@/src/components/Icon";
+import HintModal from "@/src/components/hintModal/HintModal";
 import { Text } from "@/src/components/Text";
 import { LucideIconName } from "@/src/icons/lucide";
 import { useTheme } from "@/src/themes";
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { createOptionsChecklistCardStyles } from "./styles";
 
 export type ChecklistOption = {
@@ -119,18 +120,11 @@ export default function OptionsChecklistCard({
         );
       })}
 
-      <Modal
-        transparent
+      <HintModal
         visible={visibleHint != null}
-        animationType="fade"
-        onRequestClose={() => setVisibleHint(null)}
-      >
-        <Pressable style={s.hintBackdrop} onPress={() => setVisibleHint(null)}>
-          <View style={s.hintCard}>
-            <Text variant="body">{visibleHint ?? ""}</Text>
-          </View>
-        </Pressable>
-      </Modal>
+        text={visibleHint ?? ""}
+        onClose={() => setVisibleHint(null)}
+      />
     </View>
   );
 }

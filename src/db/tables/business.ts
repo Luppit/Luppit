@@ -7,4 +7,7 @@ export const COL_BUSINESS = {
   created_at: "created_at",
   name: "name",
   id_document: "id_document",
+  location_id: "location_id",
+  rating: "rating",
+  num_ratings: "num_ratings",
 } as const satisfies { [K in keyof Row<"business"> & string]: K };

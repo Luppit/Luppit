@@ -154,7 +154,10 @@ export default function ConversationLayout() {
                           onPress: () =>
                             router.push({
                               pathname: "/(modal)/offer",
-                              params: { title: "Ofertar" },
+                              params: {
+                                title: "Ofertar",
+                                purchaseRequest: JSON.stringify(purchaseRequest),
+                              },
                             }),
                         },
                       ],
@@ -191,7 +194,10 @@ export default function ConversationLayout() {
                         if (id === "offer") {
                           router.push({
                             pathname: "/(modal)/offer",
-                            params: { title: "Ofertar" },
+                            params: {
+                              title: "Ofertar",
+                              purchaseRequest: JSON.stringify(purchaseRequest),
+                            },
                           });
                           return;
                         }
