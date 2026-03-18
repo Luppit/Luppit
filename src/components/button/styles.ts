@@ -7,6 +7,7 @@ export type ButtonStyles = {
   base: {
     container: ViewStyle;
     label: TextStyle;
+    shadow: ViewStyle;
   };
   variants: {
     container: Record<ButtonVariant, ViewStyle>;
@@ -30,6 +31,13 @@ export function createButtonStyles(t: Theme): ButtonStyles {
       },
       label: {
         textAlign: "center",
+      },
+      shadow: {
+        shadowColor: t.colors.shadow,
+        shadowOpacity: 0.2,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        elevation: 6,
       },
     },
     variants: {

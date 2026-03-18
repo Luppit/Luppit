@@ -3,7 +3,14 @@ import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
-import { getCurrentUserPurchaseRequest } from "@/src/services/purchase.request.service";
+import {
+  getPurchaseRequestVisualizationCount,
+  registerPurchaseRequestVisualization,
+} from "@/src/services/purchase.request.visualization.service";
+import {
+  getCurrentUserPurchaseRequest,
+  PurchaseRequest,
+} from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
@@ -27,7 +34,10 @@ export default function HomeScreen() {
 function BuyerHomeContent() {
   const t = useTheme();
   const [isLoading, setIsLoading] = useState(true);
-  const [categoryName, setCategoryName] = useState<string | null>(null);
+  const [visualizations, setVisualizations] = useState(0);
+  const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -36,11 +46,15 @@ function BuyerHomeContent() {
       const result = await getCurrentUserPurchaseRequest();
       if (!active) return;
 
-      if (result.ok && result.data) {
-        setCategoryName(result.data.category_name ?? null);
-      } else {
-        setCategoryName(null);
-      }
+      const requestToShow =
+        result.ok && result.data ? result.data : purchaseRequestExample;
+      setPurchaseRequest(requestToShow);
+
+      const countResult = await getPurchaseRequestVisualizationCount(
+        requestToShow.id,
+      );
+      if (!active) return;
+      setVisualizations(countResult.ok ? countResult.data : 0);
 
       setIsLoading(false);
     };
@@ -56,26 +70,9 @@ function BuyerHomeContent() {
     return <Text>Cargando contenido...</Text>;
   }
 
-  if (!categoryName) {
+  if (!purchaseRequest) {
     return (
       <View style={{ flex: 1 }}>
-        <ProductCard
-          title={purchaseRequestExample.title ?? "Solicitud"}
-          subtitle={purchaseRequestExample.category_name ?? "-"}
-          views={12}
-          statusLabel="Activa"
-          offersLabel="# ofertas"
-          onPress={() =>
-            router.push({
-              pathname: "/(detail)/purchase-request",
-              params: {
-                title: purchaseRequestExample.title ?? "Detalle de solicitud",
-                purchaseRequest: JSON.stringify(purchaseRequestExample),
-              },
-            })
-          }
-        />
-
         <View
           style={{
             flex: 1,
@@ -108,7 +105,22 @@ function BuyerHomeContent() {
   }
 
   return (
-    <Text>{categoryName}</Text>
+    <ProductCard
+      title={purchaseRequest.title ?? "Solicitud"}
+      subtitle={purchaseRequest.category_name ?? "-"}
+      views={visualizations}
+      statusLabel="Activa"
+      offersLabel="# ofertas"
+      onPress={() =>
+        router.push({
+          pathname: "/(detail)/purchase-request",
+          params: {
+            title: purchaseRequest.title ?? "Detalle de solicitud",
+            purchaseRequest: JSON.stringify(purchaseRequest),
+          },
+        })
+      }
+    />
   );
 }
 
@@ -146,7 +158,8 @@ function SellerHomeContent() {
         <Button
           variant="dark"
           title="Abrir solicitud mock"
-          onPress={() =>
+          onPress={async () => {
+            await registerPurchaseRequestVisualization(purchaseRequestExample.id);
             router.push({
               pathname: "/(conversation)/chat",
               params: {
@@ -172,8 +185,8 @@ function SellerHomeContent() {
                   },
                 ]),
               },
-            })
-          }
+            });
+          }}
         />
       </View>
     </View>

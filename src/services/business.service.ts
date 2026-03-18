@@ -1,22 +1,32 @@
+import { InsertRow, Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
 
-export type Business = {
-  id: string;
-  created_at: string;
-  name: string;
-  id_document: string;
-};
+export type Business = Row<"business">;
+export type BusinessInsert = InsertRow<"business">;
 
 export async function createBusiness(
-  business: Business
+  business: BusinessInsert
 ): Promise<{ ok: true; data: Business } | { ok: false; error: AppError }> {
-  const { id: _omit, ...insertData } = business;
-  const { data, error } = await (supabase as any)
+  const { data, error } = await supabase
     .from("business")
-    .insert(insertData)
+    .insert(business)
     .select()
     .single();
   if (error) return { ok: false, error: fromSupabaseError(error) };
+  return { ok: true, data: data as Business };
+}
+
+export async function getBusinessById(
+  businessId: string
+): Promise<{ ok: true; data: Business } | { ok: false; error: AppError } | null> {
+  const { data, error } = await supabase
+    .from("business")
+    .select("*")
+    .eq("id", businessId)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  if (!data) return null;
   return { ok: true, data: data as Business };
 }

@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import { openPopup } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
 import { router } from "expo-router";
 import React from "react";
@@ -35,7 +36,44 @@ export default function DetailTopBar({ title }: DetailTopBarProps) {
       </Text>
 
       <Pressable
-        onPress={() => console.log("detail top action")}
+        onPress={() =>
+          openPopup({
+            options: [
+              {
+                id: "favorite",
+                label: "Añadir como favorito",
+                icon: "star",
+                textColorKey: "textDark",
+                iconColorKey: "textDark",
+                onPress: () => console.log("detail popup: favorite"),
+              },
+              {
+                id: "category-info",
+                label: "Información sobre categorías",
+                icon: "circle-help",
+                textColorKey: "textDark",
+                iconColorKey: "textDark",
+                onPress: () => console.log("detail popup: category info"),
+              },
+              {
+                id: "share",
+                label: "Compartir",
+                icon: "share-2",
+                textColorKey: "textDark",
+                iconColorKey: "textDark",
+                onPress: () => console.log("detail popup: share"),
+              },
+              {
+                id: "cancel-request",
+                label: "Cancelar solicitud",
+                icon: "trash-2",
+                textColorKey: "error",
+                iconColorKey: "error",
+                onPress: () => console.log("detail popup: cancel request"),
+              },
+            ],
+          })
+        }
         hitSlop={12}
         style={{ width: 40, alignItems: "flex-end" }}
       >

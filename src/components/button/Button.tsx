@@ -11,6 +11,7 @@ export type ButtonProps = {
   title?: string;
   onPress?: () => void;
   disabled?: boolean;
+  shadow?: boolean;
   textVariant?: TextVariant,
   variant?: ButtonVariant;
   labelStyle?: TextStyle | TextStyle[];
@@ -22,6 +23,7 @@ export default function Button({
   title,
   onPress,
   disabled,
+  shadow = false,
   variant = "dark",
   textVariant = "body",
   labelStyle,
@@ -42,6 +44,7 @@ export default function Button({
       style={({ pressed }) => [
         s.base.container,
         s.variants.container[v],
+        shadow && s.base.shadow,
         pressed && !disabled && s.states.pressed,
       ]}
     >

@@ -18,6 +18,7 @@ import {
   Plus,
   ArrowUpDown,
   Search,
+  Share2,
   Smartphone,
   Tag,
   Trash2,
@@ -25,6 +26,8 @@ import {
   User,
   X,
   Sparkles,
+  Star,
+  CircleHelp,
 } from "lucide-react-native";
 
 export const lucideIcons = {
@@ -45,6 +48,7 @@ export const lucideIcons = {
   "trash-2": Trash2,
   plus: Plus,
   search: Search,
+  "share-2": Share2,
   smartphone: Smartphone,
   house: House,
   "message-circle": MessageCircle,
@@ -54,6 +58,8 @@ export const lucideIcons = {
   tag: Tag,
   truck: Truck,
   sparkles: Sparkles,
+  star: Star,
+  "circle-help": CircleHelp,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;

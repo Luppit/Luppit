@@ -1,6 +1,9 @@
 import { Row } from "../db/types";
+import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import { getBusinessIdByProfileId } from "./profile.business.service";
+import { getProfileByUserId } from "./profile.service";
 
 export type PurchaseOffer = Row<"purchase_offer">;
 export type PurchaseOfferDelivery = Row<"purchase_offer_delivery">;
@@ -34,6 +37,19 @@ export type CreatePurchaseOfferResult = {
   delivery: PurchaseOfferDelivery;
   images: PurchaseOfferImage[];
 };
+
+export async function getPurchaseOffersByPurchaseRequestId(
+  purchaseRequestId: string
+): Promise<{ ok: true; data: PurchaseOffer[] } | { ok: false; error: AppError }> {
+  const { data, error } = await supabase
+    .from("purchase_offer")
+    .select("*")
+    .eq("purchase_request_id", purchaseRequestId)
+    .order("created_at", { ascending: false });
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  return { ok: true, data: (data ?? []) as PurchaseOffer[] };
+}
 
 function getFileExtension(file: OfferFile, fallback = "jpg") {
   const fromName = file.name?.split(".").pop()?.toLowerCase();
@@ -80,6 +96,17 @@ export async function createPurchaseOffer(
   if (input.price <= 0 || input.files.length === 0 || input.deliveryMethods.length === 0) {
     return { ok: false, error: fromAppError("validation") };
   }
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const businessRef = await getBusinessIdByProfileId(profile.data.id);
+  if (businessRef?.ok === false) return { ok: false, error: businessRef.error };
+  if (!businessRef) return { ok: false, error: fromAppError("not_found") };
   
   const hasPickup = (input.pickupDelay ?? 0) > 0;
   const hasShipping = (input.shippingMaxTime ?? 0) > 0 || (input.shippingCost ?? 0) > 0;
@@ -119,6 +146,7 @@ export async function createPurchaseOffer(
   const offerInsert = await supabase
     .from("purchase_offer")
     .insert({
+      business_id: businessRef.data,
       purchase_request_id: input.purchaseRequestId,
       delivery_id: delivery.id,
       currency_id: input.currencyId,

@@ -1,18 +1,24 @@
-import { Icon } from "@/src/components/Icon";
 import HintModal from "@/src/components/hintModal/HintModal";
+import { Icon } from "@/src/components/Icon";
+import OfferCard from "@/src/components/offerCard/OfferCard";
 import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
+import {
+  getPurchaseOffersByPurchaseRequestId,
+  PurchaseOffer,
+} from "@/src/services/purchase.offer.service";
+import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import { PurchaseRequest } from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import { Image } from "expo-image";
-import { useGlobalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { router, useGlobalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 function parsePurchaseRequestParam(
-  raw: string | string[] | undefined
+  raw: string | string[] | undefined,
 ): PurchaseRequest | null {
   if (!raw) return null;
   const value = Array.isArray(raw) ? raw[0] : raw;
@@ -26,14 +32,56 @@ function parsePurchaseRequestParam(
 export default function PurchaseRequestDetailScreen() {
   const t = useTheme();
   const [showCategoryHint, setShowCategoryHint] = useState(false);
-  const params = useGlobalSearchParams<{ purchaseRequest?: string | string[] }>();
+  const [offers, setOffers] = useState<PurchaseOffer[]>([]);
+  const [offersLoading, setOffersLoading] = useState(true);
+  const [viewsCount, setViewsCount] = useState(0);
+  const params = useGlobalSearchParams<{
+    purchaseRequest?: string | string[];
+  }>();
   const purchaseRequest =
     parsePurchaseRequestParam(params.purchaseRequest) ?? purchaseRequestExample;
-  const offersCount = 0;
-  const viewsCount = 12;
+  const offersCount = offers.length;
   const noOffersAsset = Asset.fromModule(
-    require("../../assets/images/no_offers_request.svg")
+    require("../../assets/images/no_offers_request.svg"),
   );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOffers = async () => {
+      setOffersLoading(true);
+      const result = await getPurchaseOffersByPurchaseRequestId(
+        purchaseRequest.id,
+      );
+      if (!active) return;
+
+      if (result.ok) setOffers(result.data);
+      else setOffers([]);
+
+      setOffersLoading(false);
+    };
+
+    void loadOffers();
+
+    return () => {
+      active = false;
+    };
+  }, [purchaseRequest.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadVisualizations = async () => {
+      const result = await getPurchaseRequestVisualizationCount(purchaseRequest.id);
+      if (!active) return;
+      setViewsCount(result.ok ? result.data : 0);
+    };
+
+    void loadVisualizations();
+    return () => {
+      active = false;
+    };
+  }, [purchaseRequest.id]);
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
@@ -67,9 +115,13 @@ export default function PurchaseRequestDetailScreen() {
         <View style={{ marginTop: t.spacing.lg, gap: t.spacing.sm }}>
           <Text variant="subtitle">Categoría:</Text>
           <View
-            style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: t.spacing.xs,
+            }}
           >
-            <Text variant="title">{purchaseRequest.category_name ?? "-"}</Text>
+            <Text variant="titleRegular">{purchaseRequest.category_name ?? "-"}</Text>
             <Pressable hitSlop={8} onPress={() => setShowCategoryHint(true)}>
               <Icon name="info" size={18} color={t.colors.primary} />
             </Pressable>
@@ -101,31 +153,60 @@ export default function PurchaseRequestDetailScreen() {
                 size={18}
                 color={t.colors.stateAnulated}
               />
-              <Icon name="arrow-up-down" size={18} color={t.colors.stateAnulated} />
+              <Icon
+                name="arrow-up-down"
+                size={18}
+                color={t.colors.stateAnulated}
+              />
             </View>
           </View>
 
-          <View
-            style={{
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: t.spacing.xl,
-              gap: t.spacing.md,
-            }}
-          >
-            <Text color="stateAnulated" align="center">
-              Cuando recibas una oferta, aparecerá aquí.
-            </Text>
-            {noOffersAsset?.uri ? (
-              <SvgUri uri={noOffersAsset.uri} width={260} height={340} />
-            ) : (
-              <Image
-                source={require("../../assets/images/no_offers_request.svg")}
-                style={{ width: 260, height: 340 }}
-                contentFit="contain"
-              />
-            )}
-          </View>
+          {offersLoading ? (
+            <View style={{ marginTop: t.spacing.lg }}>
+              <Text color="stateAnulated">Cargando ofertas...</Text>
+            </View>
+          ) : offersCount === 0 ? (
+            <View
+              style={{
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: t.spacing.xl,
+                gap: t.spacing.md,
+              }}
+            >
+              <Text color="stateAnulated" align="center">
+                Cuando recibas una oferta, aparecerá aquí.
+              </Text>
+              {noOffersAsset?.uri ? (
+                <SvgUri uri={noOffersAsset.uri} width={260} height={340} />
+              ) : (
+                <Image
+                  source={require("../../assets/images/no_offers_request.svg")}
+                  style={{ width: 260, height: 340 }}
+                  contentFit="contain"
+                />
+              )}
+            </View>
+          ) : (
+            <View style={{ marginTop: t.spacing.lg, gap: t.spacing.md }}>
+              {offers.map((offer) => (
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  onConnect={() =>
+                    router.push({
+                      pathname: "/(conversation)/offer",
+                      params: {
+                        purchaseRequest: JSON.stringify(purchaseRequest),
+                        showComposer: "false",
+                        showActionButtons: "false",
+                      },
+                    })
+                  }
+                />
+              ))}
+            </View>
+          )}
         </View>
       </View>
 

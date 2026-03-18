@@ -19,21 +19,38 @@ export type Database = {
           created_at: string
           id: string
           id_document: string | null
+          location_id: string | null
           name: string | null
+          num_ratings: number | null
+          rating: number | null
         }
         Insert: {
           created_at?: string
           id?: string
           id_document?: string | null
+          location_id?: string | null
           name?: string | null
+          num_ratings?: number | null
+          rating?: number | null
         }
         Update: {
           created_at?: string
           id?: string
           id_document?: string | null
+          location_id?: string | null
           name?: string | null
+          num_ratings?: number | null
+          rating?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "business_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       category: {
         Row: {
@@ -136,6 +153,30 @@ export type Database = {
           display_name?: string | null
           hint?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      location: {
+        Row: {
+          canton: string | null
+          created_at: string
+          district: string | null
+          id: string
+          province: string | null
+        }
+        Insert: {
+          canton?: string | null
+          created_at?: string
+          district?: string | null
+          id?: string
+          province?: string | null
+        }
+        Update: {
+          canton?: string | null
+          created_at?: string
+          district?: string | null
+          id?: string
+          province?: string | null
         }
         Relationships: []
       }
@@ -306,6 +347,7 @@ export type Database = {
       }
       purchase_offer: {
         Row: {
+          business_id: string | null
           created_at: string
           currency_id: string | null
           delivery_id: string | null
@@ -315,6 +357,7 @@ export type Database = {
           purchase_request_id: string | null
         }
         Insert: {
+          business_id?: string | null
           created_at?: string
           currency_id?: string | null
           delivery_id?: string | null
@@ -324,6 +367,7 @@ export type Database = {
           purchase_request_id?: string | null
         }
         Update: {
+          business_id?: string | null
           created_at?: string
           currency_id?: string | null
           delivery_id?: string | null
@@ -333,6 +377,13 @@ export type Database = {
           purchase_request_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "purchase_offer_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchase_offer_currency_id_fkey"
             columns: ["currency_id"]
@@ -479,6 +530,42 @@ export type Database = {
             columns: ["draft_id"]
             isOneToOne: false
             referencedRelation: "request_draft"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_request_visualization: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string | null
+          purchase_request_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id?: string | null
+          purchase_request_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string | null
+          purchase_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_visualization_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_visualization_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
             referencedColumns: ["id"]
           },
         ]
