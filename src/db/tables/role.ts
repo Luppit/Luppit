@@ -6,4 +6,5 @@ export const COL_ROLE = {
   id: "id",
   created_at: "created_at",
   name: "name",
+  role_code: "role_code",
 } as const satisfies { [K in keyof Row<"role"> & string]: K };

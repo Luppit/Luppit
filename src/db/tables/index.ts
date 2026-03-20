@@ -1,5 +1,14 @@
 export { COL_BUSINESS, TB_BUSINESS } from "./business";
 export { COL_CATEGORY, TB_CATEGORY } from "./category";
+export { COL_CONVERSATION, TB_CONVERSATION } from "./conversation";
+export {
+  COL_CONVERSATION_ACTION,
+  TB_CONVERSATION_ACTION,
+} from "./conversation_action";
+export {
+  COL_CONVERSATION_MESSAGE,
+  TB_CONVERSATION_MESSAGE,
+} from "./conversation_message";
 export { COL_CURRENCY, TB_CURRENCY } from "./currency";
 export { COL_DELIVERY_CATALOG, TB_DELIVERY_CATALOG } from "./delivery_catalog";
 export { COL_LOCATION, TB_LOCATION } from "./location";

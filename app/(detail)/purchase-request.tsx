@@ -3,6 +3,7 @@ import { Icon } from "@/src/components/Icon";
 import OfferCard from "@/src/components/offerCard/OfferCard";
 import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
+import { getConversationByPurchaseOfferId } from "@/src/services/conversation.service";
 import {
   getPurchaseOffersByPurchaseRequestId,
   PurchaseOffer,
@@ -67,6 +68,19 @@ export default function PurchaseRequestDetailScreen() {
       active = false;
     };
   }, [purchaseRequest.id]);
+
+  const openOfferConversation = async (purchaseOfferId: string) => {
+    const conversation = await getConversationByPurchaseOfferId(purchaseOfferId);
+    if (!conversation || conversation.ok === false) return;
+
+    router.push({
+      pathname: "/(conversation)/offer",
+      params: {
+        conversationId: conversation.data.id,
+        title: purchaseRequest.title ?? "Conversación",
+      },
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -193,16 +207,7 @@ export default function PurchaseRequestDetailScreen() {
                 <OfferCard
                   key={offer.id}
                   offer={offer}
-                  onConnect={() =>
-                    router.push({
-                      pathname: "/(conversation)/offer",
-                      params: {
-                        purchaseRequest: JSON.stringify(purchaseRequest),
-                        showComposer: "false",
-                        showActionButtons: "false",
-                      },
-                    })
-                  }
+                  onConnect={() => void openOfferConversation(offer.id)}
                 />
               ))}
             </View>

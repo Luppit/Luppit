@@ -1,33 +1,38 @@
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
+  ArrowUpDown,
   Check,
+  CheckCheck,
   ChevronDown,
   ChevronUp,
+  CircleHelp,
   CirclePlus,
   Ellipsis,
   Eye,
   FileText,
   FolderClosed,
-  Info,
+  Handshake,
   Heart,
   House,
+  Info,
   MessageCircle,
   MessageSquare,
-  SlidersHorizontal,
+  Pencil,
   Plus,
-  ArrowUpDown,
   Search,
   Share2,
+  SlidersHorizontal,
   Smartphone,
+  Sparkles,
+  Star,
   Tag,
   Trash2,
   Truck,
   User,
   X,
-  Sparkles,
-  Star,
-  CircleHelp,
+  XCircle
 } from "lucide-react-native";
 
 export const lucideIcons = {
@@ -45,6 +50,7 @@ export const lucideIcons = {
   "arrow-left": ArrowLeft,
   "sliders-horizontal": SlidersHorizontal,
   "arrow-up-down": ArrowUpDown,
+  "alert-circle": AlertCircle,
   "trash-2": Trash2,
   plus: Plus,
   search: Search,
@@ -60,6 +66,10 @@ export const lucideIcons = {
   sparkles: Sparkles,
   star: Star,
   "circle-help": CircleHelp,
+  pencil: Pencil,
+  "check-check": CheckCheck,
+  "x-circle": XCircle,
+  handshake: Handshake
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;

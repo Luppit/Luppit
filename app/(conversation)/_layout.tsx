@@ -3,25 +3,35 @@ import ConversationActionButtons, {
 } from "@/src/components/conversation/ConversationActionButtons";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
-import RoleGate from "@/src/components/role/RoleGate";
-import { RoleProvider } from "@/src/components/role/RoleContext";
 import { Text } from "@/src/components/Text";
-import { openPopup } from "@/src/services/popup.service";
-import { PurchaseRequest } from "@/src/services/purchase.request.service";
+import Button from "@/src/components/button/Button";
+import {
+  ConversationView,
+  ConversationViewAction,
+  getCurrentUserConversationView,
+} from "@/src/services/conversation.service";
+import { createConversationMessages } from "@/src/services/conversation.message.service";
 import { useTheme } from "@/src/themes";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
-import React, { createContext, useContext, useMemo } from "react";
+import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 
 type ConversationLayoutContextValue = {
-  purchaseRequest: PurchaseRequest;
+  conversationId: string;
+  profileId: string;
+  conversationView: ConversationView;
+  refreshConversation: () => Promise<void>;
+  messageRefreshTick: number;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -36,208 +46,256 @@ export function useConversationLayout() {
   return value;
 }
 
-function parsePurchaseRequest(
-  raw: string | string[] | undefined
-): PurchaseRequest | null {
+function parseStringParam(raw: string | string[] | undefined): string | null {
   if (!raw) return null;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  try {
-    return JSON.parse(value) as PurchaseRequest;
-  } catch {
-    return null;
-  }
+  return Array.isArray(raw) ? raw[0] : raw;
 }
 
-function parseBooleanParam(raw: string | string[] | undefined, fallback: boolean) {
-  if (raw === undefined) return fallback;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  if (value === "true") return true;
-  if (value === "false") return false;
-  return fallback;
+function normalizeIcon(icon: string | null): LucideIconName {
+  if (icon && icon in lucideIcons) return icon as LucideIconName;
+  return "ellipsis";
 }
 
-function parseActionButtons(
-  raw: string | string[] | undefined
-): ConversationActionButtonConfig[] {
-  if (!raw) return [];
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  try {
-    const parsed = JSON.parse(value) as ConversationActionButtonConfig[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
-  } catch {
-    return [];
-  }
+function normalizeStyleFlags(styleCode: string | null) {
+  const value = (styleCode ?? "").toLowerCase().trim();
+  const isDanger =
+    value.includes("error") ||
+    value.includes("danger") ||
+    value.includes("destructive") ||
+    value.includes("reject") ||
+    value.includes("cancel");
+  const isPrimary =
+    value.includes("primary") ||
+    value.includes("success") ||
+    value.includes("positive") ||
+    value.includes("confirm");
+
+  return { isDanger, isPrimary };
+}
+
+function toTopButtonConfig(action: ConversationViewAction): ConversationActionButtonConfig {
+  const { isDanger, isPrimary } = normalizeStyleFlags(action.style_code);
+
+  return {
+    id: action.code || action.id,
+    label: action.label || action.code || "",
+    icon: normalizeIcon(action.icon),
+    backgroundColorKey: isPrimary ? "primary" : "backgroudWhite",
+    textColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
+    iconColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
+  };
+}
+
+function toAuxButtonVariant(styleCode: string | null): "dark" | "white" {
+  const { isPrimary } = normalizeStyleFlags(styleCode);
+  return isPrimary ? "dark" : "white";
 }
 
 export default function ConversationLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const params = useGlobalSearchParams<{
-    purchaseRequest?: string | string[];
-    showComposer?: string | string[];
-    showActionButtons?: string | string[];
-    actionButtons?: string | string[];
+    conversationId?: string | string[];
+    title?: string | string[];
   }>();
-
-  const purchaseRequest = useMemo(
-    () => parsePurchaseRequest(params.purchaseRequest),
-    [params.purchaseRequest]
+  const [conversationView, setConversationView] = useState<ConversationView | null>(
+    null,
   );
-  const showComposer = parseBooleanParam(params.showComposer, true);
-  const showActionButtons = parseBooleanParam(params.showActionButtons, false);
-  const actionButtons = parseActionButtons(params.actionButtons);
-  const actionButtonsOverlaySpace = showActionButtons ? 76 : 0;
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [messageRefreshTick, setMessageRefreshTick] = useState(0);
 
-  if (!purchaseRequest) return <Redirect href="/(tabs)" />;
+  const conversationId = useMemo(
+    () => parseStringParam(params.conversationId),
+    [params.conversationId]
+  );
+  const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
+
+  const refreshConversation = useCallback(async () => {
+    if (!conversationId) return;
+
+    const result = await getCurrentUserConversationView(conversationId);
+    if (!result.ok) {
+      setConversationView(null);
+      setProfileId(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setConversationView(result.data);
+    setProfileId(result.profileId);
+    setIsLoading(false);
+  }, [conversationId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      void refreshConversation();
+    }, [refreshConversation])
+  );
+
+  if (!conversationId) return <Redirect href="/(tabs)" />;
+
+  if (isLoading || !conversationView || !profileId) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: t.colors.background,
+        }}
+      >
+        <Text>Cargando conversación...</Text>
+      </View>
+    );
+  }
+
+  const topActions = conversationView.actions
+    .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
+    .map(toTopButtonConfig);
+  const auxActions = conversationView.actions.filter(
+    (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
+  );
+  const showComposer = conversationView.permissions.can_send_messages;
+  const showActionButtons = topActions.length > 0;
+  const actionButtonsOverlaySpace = showActionButtons ? 76 + t.spacing.md : 0;
+  const title = routeTitle ?? "Conversación";
+
+  const providerValue: ConversationLayoutContextValue = {
+    conversationId,
+    profileId,
+    conversationView,
+    refreshConversation,
+    messageRefreshTick,
+  };
 
   return (
-    <ConversationLayoutContext.Provider value={{ purchaseRequest }}>
-      <RoleProvider>
-        <KeyboardAvoidingView
-          style={{ flex: 1, backgroundColor: t.colors.background }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={0}
-        >
-          <View style={{ flex: 1 }}>
+    <ConversationLayoutContext.Provider value={providerValue}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: t.colors.background }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={0}
+      >
+        <View style={{ flex: 1 }}>
+          <View
+            style={{
+              paddingTop: insets.top,
+              paddingHorizontal: t.spacing.md,
+              paddingBottom: t.spacing.sm,
+              backgroundColor: t.colors.backgroudWhite,
+              shadowColor: t.colors.shadow,
+              shadowOpacity: 0.08,
+              shadowOffset: { width: 0, height: 3 },
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
             <View
               style={{
-                paddingTop: insets.top,
-                paddingHorizontal: t.spacing.md,
-                paddingBottom: t.spacing.sm,
-                backgroundColor: t.colors.backgroudWhite,
-                shadowColor: t.colors.shadow,
-                shadowOpacity: 0.08,
-                shadowOffset: { width: 0, height: 3 },
-                shadowRadius: 8,
-                elevation: 4,
+                height: 68,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              <View
-                style={{
-                  height: 68,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={12}
+                style={{ width: 40, alignItems: "flex-start" }}
               >
-                <Pressable
-                  onPress={() => router.back()}
-                  hitSlop={12}
-                  style={{ width: 40, alignItems: "flex-start" }}
-                >
-                  <Icon name="arrow-left" size={28} />
-                </Pressable>
+                <Icon name="arrow-left" size={28} />
+              </Pressable>
 
-                <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
-                  {purchaseRequest.title ?? "Solicitud"}
-                </Text>
+              <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
+                {title}
+              </Text>
 
-                <Pressable
-                  onPress={() =>
-                    openPopup({
-                      options: [
-                        {
-                          id: "discard",
-                          label: "Descartar",
-                          icon: "trash-2",
-                          textColorKey: "error",
-                          iconColorKey: "error",
-                          onPress: () => console.log("conversation popup: discard"),
-                        },
-                        {
-                          id: "offer",
-                          label: "Ofertar",
-                          icon: "tag",
-                          textColorKey: "primary",
-                          iconColorKey: "primary",
-                          onPress: () =>
-                            router.push({
-                              pathname: "/(modal)/offer",
-                              params: {
-                                title: "Ofertar",
-                                purchaseRequest: JSON.stringify(purchaseRequest),
-                              },
-                            }),
-                        },
-                      ],
-                    })
-                  }
-                  hitSlop={12}
-                  style={{ width: 40, alignItems: "flex-end" }}
-                >
-                  <Icon name="ellipsis" size={28} />
-                </Pressable>
-              </View>
+              <View style={{ width: 40 }} />
             </View>
-
-            <RoleGate
-              buyer={null}
-              seller={
-                showActionButtons ? (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: insets.top + 68 + 2,
-                      left: 0,
-                      right: 0,
-                      zIndex: 10,
-                      elevation: 10,
-                      alignItems: "center",
-                      backgroundColor: "transparent",
-                    }}
-                    pointerEvents="box-none"
-                  >
-                    <ConversationActionButtons
-                      buttons={actionButtons}
-                      onPress={(id) => {
-                        if (id === "offer") {
-                          router.push({
-                            pathname: "/(modal)/offer",
-                            params: {
-                              title: "Ofertar",
-                              purchaseRequest: JSON.stringify(purchaseRequest),
-                            },
-                          });
-                          return;
-                        }
-                        console.log(`conversation action button: ${id}`);
-                      }}
-                    />
-                  </View>
-                ) : null
-              }
-            />
-
-            <View
-              style={{
-                flex: 1,
-                paddingHorizontal: t.spacing.md,
-                paddingTop: actionButtonsOverlaySpace,
-              }}
-              onTouchStart={() => Keyboard.dismiss()}
-            >
-              <Slot />
-            </View>
-
-            {showComposer ? (
-              <View
-                style={{
-                  paddingHorizontal: t.spacing.md,
-                  paddingTop: t.spacing.sm,
-                  paddingBottom: Math.max(insets.bottom, t.spacing.sm),
-                }}
-              >
-                <InputChat
-                  onSend={({ text, images }) => {
-                    console.log("conversation composer payload", { text, images });
-                  }}
-                />
-              </View>
-            ) : null}
           </View>
-        </KeyboardAvoidingView>
-      </RoleProvider>
+
+          {showActionButtons ? (
+            <View
+              style={{
+                position: "absolute",
+                top: insets.top + 68 + 2,
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                elevation: 10,
+                alignItems: "center",
+                backgroundColor: "transparent",
+              }}
+              pointerEvents="box-none"
+            >
+              <ConversationActionButtons
+                buttons={topActions}
+                onPress={(id) => {
+                  console.log(`conversation top action: ${id}`);
+                }}
+              />
+            </View>
+          ) : null}
+
+          <View
+            style={{
+              flex: 1,
+              paddingHorizontal: t.spacing.md,
+              paddingTop: actionButtonsOverlaySpace,
+            }}
+            onTouchStart={() => Keyboard.dismiss()}
+          >
+            <Slot />
+          </View>
+
+          {auxActions.length > 0 ? (
+            <ScrollView
+              style={{ maxHeight: 120 }}
+              contentContainerStyle={{
+                paddingHorizontal: t.spacing.md,
+                gap: t.spacing.sm,
+                paddingBottom: t.spacing.sm,
+              }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {auxActions.map((action) => (
+                <Button
+                  key={action.id}
+                  variant={toAuxButtonVariant(action.style_code)}
+                  title={action.label}
+                  onPress={() => console.log(`conversation aux action: ${action.code}`)}
+                  icon={normalizeIcon(action.icon)}
+                  shadow
+                />
+              ))}
+            </ScrollView>
+          ) : null}
+
+          {showComposer ? (
+            <View
+              style={{
+                paddingHorizontal: t.spacing.md,
+                paddingTop: t.spacing.sm,
+                paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+              }}
+            >
+              <InputChat
+                onSend={async ({ text, images }) => {
+                  const created = await createConversationMessages({
+                    conversationId,
+                    text,
+                    images,
+                  });
+                  if (created.ok) {
+                    setMessageRefreshTick((prev) => prev + 1);
+                  }
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      </KeyboardAvoidingView>
     </ConversationLayoutContext.Provider>
   );
 }
