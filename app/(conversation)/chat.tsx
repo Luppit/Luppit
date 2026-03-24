@@ -1,4 +1,3 @@
-import { useConversationLayout } from "./_layout";
 import { Text } from "@/src/components/Text";
 import {
   ConversationMessage,
@@ -7,16 +6,25 @@ import {
 import { useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
-import { Image, ScrollView, View } from "react-native";
+import { Image, Pressable, ScrollView, View } from "react-native";
+import { useConversationLayout } from "./_layout";
 
 export default function ConversationChatScreen() {
   const t = useTheme();
-  const { conversationId, profileId, messageRefreshTick } = useConversationLayout();
+  const {
+    conversationId,
+    profileId,
+    messageRefreshTick,
+    auxActions,
+    onActionPress,
+    isExecutingAction,
+  } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const imageMessageWidth = 230;
 
   const loadMessages = useCallback(async () => {
-    const result = await getConversationMessagesByConversationId(conversationId);
+    const result =
+      await getConversationMessagesByConversationId(conversationId);
     if (!result.ok) return;
     setMessages(result.data);
   }, [conversationId]);
@@ -24,7 +32,7 @@ export default function ConversationChatScreen() {
   useFocusEffect(
     useCallback(() => {
       void loadMessages();
-    }, [loadMessages])
+    }, [loadMessages]),
   );
 
   useEffect(() => {
@@ -32,7 +40,29 @@ export default function ConversationChatScreen() {
   }, [messageRefreshTick, loadMessages]);
 
   const formatTime = (date: string) =>
-    new Date(date).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    new Date(date).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+  const getAuxActionTextColor = (styleCode: string | null) => {
+    const value = (styleCode ?? "").toLowerCase().trim();
+    const isDanger =
+      value.includes("error") ||
+      value.includes("danger") ||
+      value.includes("destructive") ||
+      value.includes("reject") ||
+      value.includes("cancel");
+    const isPrimary =
+      value.includes("primary") ||
+      value.includes("success") ||
+      value.includes("positive") ||
+      value.includes("confirm");
+
+    if (isDanger) return t.colors.error;
+    if (isPrimary) return t.colors.primary;
+    return t.colors.textDark;
+  };
 
   return (
     <ScrollView
@@ -51,14 +81,51 @@ export default function ConversationChatScreen() {
           (message.image_url as string | null | undefined) ??
           ((message as any).imageUrl as string | null | undefined) ??
           null;
+        const isSystemMessage = messageKind === "SYSTEM";
         const isImageMessage = messageKind === "IMAGE" || Boolean(imageUri);
+
+        if (isSystemMessage) {
+          return (
+            <View
+              key={message.id}
+              style={{
+                alignSelf: "stretch",
+                alignItems: "center",
+                marginVertical: t.spacing.xs,
+                gap: t.spacing.xs,
+              }}
+            >
+              <View
+                style={{
+                  width: "72%",
+                  height: 1,
+                  backgroundColor: t.colors.border,
+                }}
+              />
+              {message.text ? (
+                <Text variant="body" color="stateAnulated" align="center">
+                  {message.text}
+                </Text>
+              ) : null}
+              <View
+                style={{
+                  width: "72%",
+                  height: 1,
+                  backgroundColor: t.colors.border,
+                }}
+              />
+            </View>
+          );
+        }
 
         return (
           <View
             key={message.id}
             style={{
               alignSelf:
-                message.sender_profile_id === profileId ? "flex-end" : "flex-start",
+                message.sender_profile_id === profileId
+                  ? "flex-end"
+                  : "flex-start",
               maxWidth: "88%",
               borderWidth: message.sender_profile_id === profileId ? 0 : 1,
               borderColor: t.colors.border,
@@ -74,7 +141,11 @@ export default function ConversationChatScreen() {
             {isImageMessage && imageUri ? (
               <Image
                 source={{ uri: imageUri }}
-                style={{ width: imageMessageWidth, height: 170, borderRadius: t.borders.sm }}
+                style={{
+                  width: imageMessageWidth,
+                  height: 170,
+                  borderRadius: t.borders.sm,
+                }}
                 resizeMode="cover"
                 onError={(error) => {
                   console.log("conversation image render error", {
@@ -100,6 +171,28 @@ export default function ConversationChatScreen() {
           </View>
         );
       })}
+
+      {auxActions.map((action) => (
+        <Pressable
+          key={action.id}
+          onPress={() => onActionPress(action)}
+          disabled={isExecutingAction}
+          hitSlop={8}
+          style={{
+            alignSelf: "center",
+            paddingVertical: t.spacing.xs,
+            opacity: isExecutingAction ? 0.6 : 1,
+          }}
+        >
+          <Text
+            variant="body"
+            align="center"
+            style={{ color: getAuxActionTextColor(action.style_code) }}
+          >
+            {action.label}
+          </Text>
+        </Pressable>
+      ))}
     </ScrollView>
   );
 }

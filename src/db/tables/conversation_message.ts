@@ -10,4 +10,5 @@ export const COL_CONVERSATION_MESSAGE = {
   sender_profile_id: "sender_profile_id",
   text: "text",
   message_kind: "message_kind",
+  image_path: "image_path",
 } as const satisfies { [K in keyof Row<"conversation_message"> & string]: K };

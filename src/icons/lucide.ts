@@ -11,6 +11,7 @@ import {
   CirclePlus,
   Ellipsis,
   Eye,
+  FilePenLine,
   FileText,
   FolderClosed,
   Handshake,
@@ -69,7 +70,8 @@ export const lucideIcons = {
   pencil: Pencil,
   "check-check": CheckCheck,
   "x-circle": XCircle,
-  handshake: Handshake
+  handshake: Handshake,
+  "file-pen-line": FilePenLine
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;

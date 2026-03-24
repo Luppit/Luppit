@@ -1,17 +1,22 @@
+import { useFocusEffect } from "@react-navigation/native";
 import ConversationActionButtons, {
   ConversationActionButtonConfig,
 } from "@/src/components/conversation/ConversationActionButtons";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Text } from "@/src/components/Text";
-import Button from "@/src/components/button/Button";
+import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
+import { openPopup } from "@/src/services/popup.service";
+import { createConversationMessages } from "@/src/services/conversation.message.service";
 import {
   ConversationView,
   ConversationViewAction,
+  executeConversationAction,
+  executeConversationActionByExecutor,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
-import { createConversationMessages } from "@/src/services/conversation.message.service";
 import { useTheme } from "@/src/themes";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import {
@@ -19,17 +24,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   View,
 } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 
 type ConversationLayoutContextValue = {
   conversationId: string;
   profileId: string;
   conversationView: ConversationView;
+  auxActions: ConversationViewAction[];
+  onActionPress: (action: ConversationViewAction) => void;
+  isExecutingAction: boolean;
   refreshConversation: () => Promise<void>;
   messageRefreshTick: number;
 };
@@ -56,8 +61,18 @@ function normalizeIcon(icon: string | null): LucideIconName {
   return "ellipsis";
 }
 
+function normalizeOptionalIcon(icon: string | null | undefined): LucideIconName | undefined {
+  if (!icon) return undefined;
+  if (icon in lucideIcons) return icon as LucideIconName;
+  return undefined;
+}
+
+function normalizeText(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().trim();
+}
+
 function normalizeStyleFlags(styleCode: string | null) {
-  const value = (styleCode ?? "").toLowerCase().trim();
+  const value = normalizeText(styleCode);
   const isDanger =
     value.includes("error") ||
     value.includes("danger") ||
@@ -77,7 +92,7 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
   const { isDanger, isPrimary } = normalizeStyleFlags(action.style_code);
 
   return {
-    id: action.code || action.id,
+    id: action.id,
     label: action.label || action.code || "",
     icon: normalizeIcon(action.icon),
     backgroundColorKey: isPrimary ? "primary" : "backgroudWhite",
@@ -86,9 +101,20 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
   };
 }
 
-function toAuxButtonVariant(styleCode: string | null): "dark" | "white" {
-  const { isPrimary } = normalizeStyleFlags(styleCode);
-  return isPrimary ? "dark" : "white";
+function interpolateTemplate(
+  template: string,
+  context: Record<string, unknown>
+) {
+  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_, key: string) => {
+    const value = context[key];
+    return value == null ? "" : String(value);
+  });
+}
+
+function toStringValue(value: unknown) {
+  if (value == null) return "-";
+  if (typeof value === "string") return value;
+  return String(value);
 }
 
 export default function ConversationLayout() {
@@ -99,11 +125,12 @@ export default function ConversationLayout() {
     title?: string | string[];
   }>();
   const [conversationView, setConversationView] = useState<ConversationView | null>(
-    null,
+    null
   );
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
 
   const conversationId = useMemo(
     () => parseStringParam(params.conversationId),
@@ -134,6 +161,118 @@ export default function ConversationLayout() {
     }, [refreshConversation])
   );
 
+  const runAction = useCallback(
+    async (action: ConversationViewAction) => {
+      if (!conversationId || !profileId) return;
+      if (!action.code) {
+        showError("Acción no disponible", "Esta acción no tiene código de ejecución.");
+        return;
+      }
+      if (isExecutingAction) return;
+
+      setIsExecutingAction(true);
+
+      let result:
+        | { ok: true; data: unknown }
+        | { ok: false; error: { message: string } };
+
+      if (action.executor?.execution_type === "server_rpc") {
+        result = await executeConversationActionByExecutor({
+          conversationId,
+          profileId,
+          actionCode: action.code,
+          executor: action.executor,
+        });
+      } else if (action.executor?.execution_type === "client_command") {
+        if (action.executor.target !== "popup.close") {
+          showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
+        }
+        result = { ok: true, data: null };
+      } else {
+        result = await executeConversationAction({
+          conversationId,
+          profileId,
+          actionCode: action.code,
+        });
+      }
+
+      setIsExecutingAction(false);
+
+      if (!result.ok) {
+        showError("No se pudo ejecutar la acción", result.error.message);
+        return;
+      }
+
+      const shouldRefresh = action.executor?.requires_refresh ?? true;
+      if (shouldRefresh) {
+        await refreshConversation();
+        setMessageRefreshTick((prev) => prev + 1);
+      }
+
+      if (action.executor?.execution_type !== "client_command") {
+        showSuccess("Acción completada");
+      }
+    },
+    [conversationId, profileId, isExecutingAction, refreshConversation]
+  );
+
+  const handleActionPress = useCallback(
+    (action: ConversationViewAction) => {
+      const confirmation = action.confirmation;
+      if (!confirmation) {
+        void runAction(action);
+        return;
+      }
+
+      const description = interpolateTemplate(
+        confirmation.description_template,
+        conversationView?.context ?? {}
+      );
+      const rows = confirmation.fields.map((field) => ({
+        label: field.label,
+        value: toStringValue(field.value),
+      }));
+      const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
+
+      openPopup({
+        type: "summary",
+        title: confirmation.title,
+        description,
+        rows,
+        actions: [
+          {
+            id: `${action.id}-cancel`,
+            label: confirmation.cancel_label || "Volver",
+            icon: normalizeOptionalIcon(confirmation.cancel_icon),
+            backgroundColorKey: "backgroudWhite",
+            textColorKey: "textDark",
+            iconColorKey: "textDark",
+          },
+          {
+            id: `${action.id}-confirm`,
+            label: confirmation.confirm_label || action.label || "Confirmar",
+            icon: normalizeOptionalIcon(confirmation.confirm_icon),
+            backgroundColorKey: confirmStyle.isPrimary ? "primary" : "backgroudWhite",
+            textColorKey: confirmStyle.isPrimary
+              ? "backgroudWhite"
+              : confirmStyle.isDanger
+                ? "error"
+                : "textDark",
+            iconColorKey: confirmStyle.isPrimary
+              ? "backgroudWhite"
+              : confirmStyle.isDanger
+                ? "error"
+                : "textDark",
+            onPress: () => {
+              void runAction(action);
+            },
+          },
+        ],
+      });
+    },
+    [conversationView?.context, runAction]
+  );
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
@@ -154,10 +293,16 @@ export default function ConversationLayout() {
   const topActions = conversationView.actions
     .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
     .map(toTopButtonConfig);
+  const topActionsById = new Map(
+    conversationView.actions
+      .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
+      .map((action) => [action.id, action] as const)
+  );
   const auxActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
   );
-  const showComposer = conversationView.permissions.can_send_messages;
+  const hasAuxActions = auxActions.length > 0;
+  const showComposer = conversationView.permissions.can_send_messages && !hasAuxActions;
   const showActionButtons = topActions.length > 0;
   const actionButtonsOverlaySpace = showActionButtons ? 76 + t.spacing.md : 0;
   const title = routeTitle ?? "Conversación";
@@ -166,6 +311,9 @@ export default function ConversationLayout() {
     conversationId,
     profileId,
     conversationView,
+    auxActions,
+    onActionPress: handleActionPress,
+    isExecutingAction,
     refreshConversation,
     messageRefreshTick,
   };
@@ -232,7 +380,9 @@ export default function ConversationLayout() {
               <ConversationActionButtons
                 buttons={topActions}
                 onPress={(id) => {
-                  console.log(`conversation top action: ${id}`);
+                  const action = topActionsById.get(id);
+                  if (!action) return;
+                  handleActionPress(action);
                 }}
               />
             </View>
@@ -248,29 +398,6 @@ export default function ConversationLayout() {
           >
             <Slot />
           </View>
-
-          {auxActions.length > 0 ? (
-            <ScrollView
-              style={{ maxHeight: 120 }}
-              contentContainerStyle={{
-                paddingHorizontal: t.spacing.md,
-                gap: t.spacing.sm,
-                paddingBottom: t.spacing.sm,
-              }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {auxActions.map((action) => (
-                <Button
-                  key={action.id}
-                  variant={toAuxButtonVariant(action.style_code)}
-                  title={action.label}
-                  onPress={() => console.log(`conversation aux action: ${action.code}`)}
-                  icon={normalizeIcon(action.icon)}
-                  shadow
-                />
-              ))}
-            </ScrollView>
-          ) : null}
 
           {showComposer ? (
             <View

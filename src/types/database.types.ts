@@ -198,7 +198,9 @@ export type Database = {
       conversation_action: {
         Row: {
           code: string | null
+          confirmation_template_id: string | null
           created_at: string
+          executor_code: string | null
           icon: string | null
           id: string
           label: string | null
@@ -207,7 +209,9 @@ export type Database = {
         }
         Insert: {
           code?: string | null
+          confirmation_template_id?: string | null
           created_at?: string
+          executor_code?: string | null
           icon?: string | null
           id?: string
           label?: string | null
@@ -216,7 +220,9 @@ export type Database = {
         }
         Update: {
           code?: string | null
+          confirmation_template_id?: string | null
           created_at?: string
+          executor_code?: string | null
           icon?: string | null
           id?: string
           label?: string | null
@@ -224,6 +230,20 @@ export type Database = {
           ui_slot?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_action_confirmation_template_id_fkey"
+            columns: ["confirmation_template_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_action_executor_code_fkey"
+            columns: ["executor_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_action_executor"
+            referencedColumns: ["code"]
+          },
           {
             foreignKeyName: "conversation_action_style_code_fkey"
             columns: ["style_code"]
@@ -236,6 +256,129 @@ export type Database = {
             columns: ["ui_slot"]
             isOneToOne: false
             referencedRelation: "ui_slot_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_action_execution_type_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+        }
+        Relationships: []
+      }
+      conversation_action_executor: {
+        Row: {
+          code: string
+          created_at: string
+          execution_type: string
+          requires_refresh: boolean
+          target: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          execution_type: string
+          requires_refresh?: boolean
+          target: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          execution_type?: string
+          requires_refresh?: boolean
+          target?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_action_executor_execution_type_fkey"
+            columns: ["execution_type"]
+            isOneToOne: false
+            referencedRelation: "conversation_action_execution_type_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_confirmation_field: {
+        Row: {
+          id: string
+          label: string
+          sort_order: number
+          template_id: string
+          value_source: string
+        }
+        Insert: {
+          id?: string
+          label: string
+          sort_order?: number
+          template_id: string
+          value_source: string
+        }
+        Update: {
+          id?: string
+          label?: string
+          sort_order?: number
+          template_id?: string
+          value_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_field_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_confirmation_template: {
+        Row: {
+          cancel_label: string
+          code: string
+          confirm_label: string
+          confirm_style_code: string | null
+          created_at: string
+          description_template: string
+          id: string
+          title: string
+        }
+        Insert: {
+          cancel_label?: string
+          code: string
+          confirm_label?: string
+          confirm_style_code?: string | null
+          created_at?: string
+          description_template: string
+          id?: string
+          title: string
+        }
+        Update: {
+          cancel_label?: string
+          code?: string
+          confirm_label?: string
+          confirm_style_code?: string | null
+          created_at?: string
+          description_template?: string
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_template_confirm_style_code_fkey"
+            columns: ["confirm_style_code"]
+            isOneToOne: false
+            referencedRelation: "action_style_catalog"
             referencedColumns: ["code"]
           },
         ]
@@ -287,6 +430,7 @@ export type Database = {
           conversation_id: string | null
           created_at: string
           id: string
+          image_path: string | null
           message_kind: string | null
           sender_profile_id: string | null
           text: string | null
@@ -295,6 +439,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           id?: string
+          image_path?: string | null
           message_kind?: string | null
           sender_profile_id?: string | null
           text?: string | null
@@ -303,6 +448,7 @@ export type Database = {
           conversation_id?: string | null
           created_at?: string
           id?: string
+          image_path?: string | null
           message_kind?: string | null
           sender_profile_id?: string | null
           text?: string | null
@@ -443,6 +589,7 @@ export type Database = {
           id: string
           is_enabled: boolean | null
           role_id: string | null
+          sort_order: number
           status_code: string | null
         }
         Insert: {
@@ -451,6 +598,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean | null
           role_id?: string | null
+          sort_order?: number
           status_code?: string | null
         }
         Update: {
@@ -459,6 +607,7 @@ export type Database = {
           id?: string
           is_enabled?: boolean | null
           role_id?: string | null
+          sort_order?: number
           status_code?: string | null
         }
         Relationships: [
@@ -1185,6 +1334,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_category_children: {
+        Args: { category_id_input: string }
+        Returns: {
+          id: string
+          name: string
+          path: unknown
+        }[]
+      }
       get_category_lineage: {
         Args: { leaf_id: string }
         Returns: {
@@ -1202,11 +1359,32 @@ export type Database = {
           version: number
         }[]
       }
+      get_conversation_messages: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          image_path: string | null
+          message_kind: string | null
+          sender_profile_id: string | null
+          text: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversation_message"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
-      is_category_leaf: { Args: { category_id: string }; Returns: boolean }
+      is_category_leaf: {
+        Args: { category_id_input: string }
+        Returns: boolean
+      }
       search_category: {
         Args: { search_text: string }
         Returns: {
@@ -1215,6 +1393,53 @@ export type Database = {
           path: unknown
         }[]
       }
+      send_conversation_message:
+        | {
+            Args: {
+              p_conversation_id: string
+              p_profile_id: string
+              p_text: string
+            }
+            Returns: {
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              sender_profile_id: string | null
+              text: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_conversation_id: string
+              p_image_path?: string
+              p_message_kind?: string
+              p_profile_id: string
+              p_text?: string
+            }
+            Returns: {
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              sender_profile_id: string | null
+              text: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
     }

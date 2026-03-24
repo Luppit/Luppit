@@ -11,6 +11,33 @@ export type ConversationViewPermission = {
   can_send_attachments: boolean;
 };
 
+export type ConversationActionExecutor = {
+  code: string;
+  target: string;
+  execution_type: string;
+  requires_refresh: boolean;
+};
+
+export type ConversationActionConfirmationField = {
+  label: string;
+  value_source: string;
+  value: string;
+  sort_order: number;
+};
+
+export type ConversationActionConfirmation = {
+  id: string;
+  code: string;
+  title: string;
+  description_template: string;
+  cancel_label: string;
+  cancel_icon: string | null;
+  confirm_label: string;
+  confirm_icon: string | null;
+  confirm_style_code: string | null;
+  fields: ConversationActionConfirmationField[];
+};
+
 export type ConversationViewAction = {
   id: string;
   code: string;
@@ -19,6 +46,8 @@ export type ConversationViewAction = {
   style_code: string | null;
   ui_slot: string | null;
   sort_order: number | null;
+  executor: ConversationActionExecutor | null;
+  confirmation: ConversationActionConfirmation | null;
 };
 
 export type ConversationView = {
@@ -32,8 +61,95 @@ export type ConversationView = {
   };
   role_code: string;
   permissions: ConversationViewPermission;
+  context: Record<string, unknown>;
   actions: ConversationViewAction[];
 };
+
+export type ExecuteConversationActionInput = {
+  conversationId: string;
+  profileId: string;
+  actionCode: string;
+  payload?: Record<string, unknown> | null;
+};
+
+export type ExecuteConversationActionByExecutorInput = ExecuteConversationActionInput & {
+  executor: ConversationActionExecutor;
+};
+
+function parseConversationActionExecutor(raw: unknown): ConversationActionExecutor | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  const code = typeof value.code === "string" ? value.code : "";
+  const target = typeof value.target === "string" ? value.target : "";
+  const executionType = typeof value.execution_type === "string" ? value.execution_type : "";
+
+  if (!code || !target || !executionType) return null;
+
+  return {
+    code,
+    target,
+    execution_type: executionType,
+    requires_refresh:
+      typeof value.requires_refresh === "boolean" ? value.requires_refresh : true,
+  };
+}
+
+function parseConversationActionConfirmationField(
+  raw: unknown
+): ConversationActionConfirmationField | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const label = typeof value.label === "string" ? value.label : "";
+  if (!label) return null;
+
+  const valueSource = typeof value.value_source === "string" ? value.value_source : "";
+  const rawValue = value.value;
+  const parsedValue =
+    typeof rawValue === "string"
+      ? rawValue
+      : rawValue == null
+        ? ""
+        : String(rawValue);
+
+  return {
+    label,
+    value_source: valueSource,
+    value: parsedValue,
+    sort_order: typeof value.sort_order === "number" ? value.sort_order : 0,
+  };
+}
+
+function parseConversationActionConfirmation(raw: unknown): ConversationActionConfirmation | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  const id = typeof value.id === "string" ? value.id : "";
+  const code = typeof value.code === "string" ? value.code : "";
+  const title = typeof value.title === "string" ? value.title : "";
+  if (!id || !code || !title) return null;
+
+  const rawFields = Array.isArray(value.fields) ? value.fields : [];
+  const fields = rawFields
+    .map((field) => parseConversationActionConfirmationField(field))
+    .filter((field): field is ConversationActionConfirmationField => Boolean(field))
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  return {
+    id,
+    code,
+    title,
+    description_template:
+      typeof value.description_template === "string" ? value.description_template : "",
+    cancel_label: typeof value.cancel_label === "string" ? value.cancel_label : "Volver",
+    cancel_icon: typeof value.cancel_icon === "string" ? value.cancel_icon : null,
+    confirm_label: typeof value.confirm_label === "string" ? value.confirm_label : "Confirmar",
+    confirm_icon: typeof value.confirm_icon === "string" ? value.confirm_icon : null,
+    confirm_style_code:
+      typeof value.confirm_style_code === "string" ? value.confirm_style_code : null,
+    fields,
+  };
+}
 
 function parseConversationViewAction(raw: unknown): ConversationViewAction | null {
   if (!raw || typeof raw !== "object") return null;
@@ -62,6 +178,8 @@ function parseConversationViewAction(raw: unknown): ConversationViewAction | nul
           : null,
     ui_slot: typeof value.ui_slot === "string" ? value.ui_slot : null,
     sort_order: typeof value.sort_order === "number" ? value.sort_order : null,
+    executor: parseConversationActionExecutor(value.executor),
+    confirmation: parseConversationActionConfirmation(value.confirmation),
   };
 }
 
@@ -120,6 +238,10 @@ function parseConversationView(raw: unknown): ConversationView | null {
           ? permissionsValue.can_send_attachments
           : false,
     },
+    context:
+      value.context && typeof value.context === "object"
+        ? (value.context as Record<string, unknown>)
+        : {},
     actions,
   };
 }
@@ -178,4 +300,80 @@ export async function getCurrentUserConversationView(
   if (!view.ok) return view;
 
   return { ok: true, data: view.data, profileId: profile.data.id };
+}
+
+export async function executeConversationAction(
+  input: ExecuteConversationActionInput
+): Promise<{ ok: true; data: unknown } | { ok: false; error: AppError }> {
+  const actionCode = input.actionCode.trim();
+  if (!input.conversationId || !input.profileId || !actionCode) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const rpcResult: any = await (supabase as any).rpc("execute_conversation_action", {
+    p_conversation_id: input.conversationId,
+    p_profile_id: input.profileId,
+    p_action_code: actionCode,
+    p_payload: input.payload ?? null,
+  });
+
+  if (rpcResult.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
+
+  return { ok: true, data: rpcResult.data ?? null };
+}
+
+function normalizeRpcTarget(target: string): string {
+  return target.includes(".") ? target.split(".").pop() ?? target : target;
+}
+
+export async function executeConversationActionByExecutor(
+  input: ExecuteConversationActionByExecutorInput
+): Promise<{ ok: true; data: unknown } | { ok: false; error: AppError }> {
+  if (input.executor.execution_type !== "server_rpc") {
+    return { ok: true, data: null };
+  }
+
+  const rpcName = normalizeRpcTarget(input.executor.target).trim();
+  if (!rpcName) {
+    return executeConversationAction(input);
+  }
+
+  const payload = input.payload ?? null;
+  const variants = [
+    {
+      p_conversation_id: input.conversationId,
+      p_profile_id: input.profileId,
+      p_action_code: input.actionCode,
+      p_payload: payload,
+    },
+    {
+      p_conversation_id: input.conversationId,
+      p_profile_id: input.profileId,
+      p_action_code: input.actionCode,
+    },
+    {
+      p_conversation_id: input.conversationId,
+      p_profile_id: input.profileId,
+    },
+    {
+      conversation_id: input.conversationId,
+      profile_id: input.profileId,
+    },
+  ];
+
+  let lastError: any = null;
+  for (const args of variants) {
+    const rpcResult: any = await (supabase as any).rpc(rpcName, args);
+    if (!rpcResult.error) {
+      return { ok: true, data: rpcResult.data ?? null };
+    }
+    lastError = rpcResult.error;
+  }
+
+  const fallback = await executeConversationAction(input);
+  if (fallback.ok) return fallback;
+
+  return lastError
+    ? { ok: false, error: fromSupabaseError(lastError) }
+    : fallback;
 }

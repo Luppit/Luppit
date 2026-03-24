@@ -51,6 +51,20 @@ export async function getPurchaseOffersByPurchaseRequestId(
   return { ok: true, data: (data ?? []) as PurchaseOffer[] };
 }
 
+export async function getPurchaseOfferById(
+  purchaseOfferId: string
+): Promise<{ ok: true; data: PurchaseOffer } | { ok: false; error: AppError } | null> {
+  const { data, error } = await supabase
+    .from("purchase_offer")
+    .select("*")
+    .eq("id", purchaseOfferId)
+    .maybeSingle();
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  if (!data) return null;
+  return { ok: true, data: data as PurchaseOffer };
+}
+
 function getFileExtension(file: OfferFile, fallback = "jpg") {
   const fromName = file.name?.split(".").pop()?.toLowerCase();
   if (fromName) return fromName;
