@@ -5,8 +5,9 @@ import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
 import { getConversationByPurchaseOfferId } from "@/src/services/conversation.service";
 import {
+  getCachedPurchaseOffersByPurchaseRequestId,
   getPurchaseOffersByPurchaseRequestId,
-  PurchaseOffer,
+  PurchaseOfferCardData,
 } from "@/src/services/purchase.offer.service";
 import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import { PurchaseRequest } from "@/src/services/purchase.request.service";
@@ -33,7 +34,7 @@ function parsePurchaseRequestParam(
 export default function PurchaseRequestDetailScreen() {
   const t = useTheme();
   const [showCategoryHint, setShowCategoryHint] = useState(false);
-  const [offers, setOffers] = useState<PurchaseOffer[]>([]);
+  const [offers, setOffers] = useState<PurchaseOfferCardData[]>([]);
   const [offersLoading, setOffersLoading] = useState(true);
   const [viewsCount, setViewsCount] = useState(0);
   const params = useGlobalSearchParams<{
@@ -50,6 +51,15 @@ export default function PurchaseRequestDetailScreen() {
     let active = true;
 
     const loadOffers = async () => {
+      const cachedOffers = getCachedPurchaseOffersByPurchaseRequestId(
+        purchaseRequest.id,
+      );
+      if (cachedOffers) {
+        setOffers(cachedOffers);
+        setOffersLoading(false);
+        return;
+      }
+
       setOffersLoading(true);
       const result = await getPurchaseOffersByPurchaseRequestId(
         purchaseRequest.id,

@@ -1,17 +1,14 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
-import { getBusinessById } from "@/src/services/business.service";
-import { getCurrencyById } from "@/src/services/currency.service";
-import { getLocationById } from "@/src/services/location.service";
 import { openPopup } from "@/src/services/popup.service";
-import { PurchaseOffer } from "@/src/services/purchase.offer.service";
+import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { useTheme } from "@/src/themes";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { createOfferCardStyles } from "./styles";
 
 type OfferCardProps = {
-  offer: PurchaseOffer;
+  offer: PurchaseOfferCardData;
   onConnect?: () => void;
 };
 
@@ -26,51 +23,11 @@ function normalize(value: string | null | undefined) {
 export default function OfferCard({ offer, onConnect }: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
-  const [businessName, setBusinessName] = useState("-");
-  const [province, setProvince] = useState("-");
-  const [rating, setRating] = useState<number>(0);
-  const [numRatings, setNumRatings] = useState<number>(0);
-  const [currencyCode, setCurrencyCode] = useState<string>("CRC");
-
-  useEffect(() => {
-    let active = true;
-
-    const loadData = async () => {
-      if (offer.business_id) {
-        const businessResult = await getBusinessById(offer.business_id);
-        if (!active) return;
-        if (businessResult?.ok) {
-          setBusinessName(businessResult.data.name ?? "-");
-          setRating(businessResult.data.rating ?? 0);
-          setNumRatings(businessResult.data.num_ratings ?? 0);
-
-          if (businessResult.data.location_id) {
-            const locationResult = await getLocationById(
-              businessResult.data.location_id,
-            );
-            if (!active) return;
-            if (locationResult?.ok) {
-              setProvince(locationResult.data.province ?? "-");
-            }
-          }
-        }
-      }
-
-      if (offer.currency_id) {
-        const currencyResult = await getCurrencyById(offer.currency_id);
-        if (!active) return;
-        if (currencyResult?.ok) {
-          setCurrencyCode(currencyResult.data.currency_code ?? "CRC");
-        }
-      }
-    };
-
-    void loadData();
-    return () => {
-      active = false;
-    };
-  }, [offer.business_id, offer.currency_id]);
-
+  const businessName = offer.business_name ?? "-";
+  const province = offer.business_province ?? "-";
+  const rating = offer.business_rating ?? 0;
+  const numRatings = offer.business_num_ratings ?? 0;
+  const currencyCode = offer.offer_currency_code ?? "CRC";
   const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
   const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("en-US")}`;
   const badgeText = rating >= 4.7 ? "Mejor reputación" : "Mejor oferta";

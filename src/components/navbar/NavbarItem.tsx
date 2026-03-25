@@ -28,8 +28,15 @@ export default function NavbarItem({ item, active }: Props) {
         testID={`tab-${item.name}`}
       >
         <View style={s.itemInner}>
-          <Icon name={item.icon} size={22} color={labelColor} />
-          <Text style={[s.label, active && s.labelActive]}>{item.label}</Text>
+          {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.85}
+            style={[s.label, active && s.labelActive]}
+          >
+            {item.label}
+          </Text>
         </View>
       </Pressable>
     </Link>

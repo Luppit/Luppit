@@ -1,25 +1,52 @@
-import { LucideIconName } from "@/src/icons/lucide";
+import { LucideIconName, lucideIcons } from "@/src/icons/lucide";
+import { getCurrentUserNavbarItems } from "@/src/services/navbar.service";
 import { type Href } from "expo-router";
 import React from "react";
 
-export type NavName = "home" | "create" | "favorites" | "chats" | "profile";
+export type NavName = string;
 
 export type NavItem = {
   name: NavName;
   label: string;
-  href: Href;              
-  icon: LucideIconName;    
+  href: Href;
+  icon?: LucideIconName;
 };
 
-// Mapea a los nombres que soporte tu <Icon />
-export const useNavItems = (): NavItem[] =>
-  React.useMemo(
-    () => [
-      { name: "home",      label: "Inicio",    href: "/",                 icon: "house" },
-      { name: "create",    label: "Crear",     href: "/(tabs)/create",    icon: "circle-plus" },
-      { name: "favorites", label: "Favoritas", href: "/(tabs)/favorites", icon: "heart" },
-      { name: "chats",     label: "Chats",     href: "/(tabs)/chats",     icon: "message-square" },
-      { name: "profile",   label: "Perfil",    href: "/(tabs)/profile",   icon: "user" },
-    ],
-    []
-  );
+function isLucideIconName(icon: string): icon is LucideIconName {
+  return icon in lucideIcons;
+}
+
+export const useNavItems = (): NavItem[] => {
+  const [items, setItems] = React.useState<NavItem[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+
+    setItems([]);
+
+    const loadFromDb = async () => {
+      const result = await getCurrentUserNavbarItems();
+      if (!active || !result.ok) {
+        setItems([]);
+        return;
+      }
+
+      const mappedItems: NavItem[] = result.data.map((item) => ({
+        name: item.menuCode,
+        label: item.label,
+        href: item.route as Href,
+        icon: isLucideIconName(item.icon) ? item.icon : undefined,
+      }));
+
+      setItems(mappedItems);
+    };
+
+    void loadFromDb();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return items;
+};

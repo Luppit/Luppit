@@ -3,6 +3,7 @@ import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
+import { getPurchaseOffersCountByPurchaseRequestId } from "@/src/services/purchase.offer.service";
 import {
   getPurchaseRequestVisualizationCount,
   registerPurchaseRequestVisualization,
@@ -35,6 +36,7 @@ function BuyerHomeContent() {
   const t = useTheme();
   const [isLoading, setIsLoading] = useState(true);
   const [visualizations, setVisualizations] = useState(0);
+  const [offersCount, setOffersCount] = useState(0);
   const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest | null>(
     null,
   );
@@ -46,15 +48,23 @@ function BuyerHomeContent() {
       const result = await getCurrentUserPurchaseRequest();
       if (!active) return;
 
-      const requestToShow =
-        result.ok && result.data ? result.data : purchaseRequestExample;
+      const requestToShow = result.ok ? result.data : null;
       setPurchaseRequest(requestToShow);
 
-      const countResult = await getPurchaseRequestVisualizationCount(
-        requestToShow.id,
-      );
+      if (!requestToShow) {
+        setVisualizations(0);
+        setOffersCount(0);
+        setIsLoading(false);
+        return;
+      }
+
+      const [countResult, offersCountResult] = await Promise.all([
+        getPurchaseRequestVisualizationCount(requestToShow.id),
+        getPurchaseOffersCountByPurchaseRequestId(requestToShow.id),
+      ]);
       if (!active) return;
       setVisualizations(countResult.ok ? countResult.data : 0);
+      setOffersCount(offersCountResult.ok ? offersCountResult.data : 0);
 
       setIsLoading(false);
     };
@@ -110,7 +120,7 @@ function BuyerHomeContent() {
       subtitle={purchaseRequest.category_name ?? "-"}
       views={visualizations}
       statusLabel="Activa"
-      offersLabel="# ofertas"
+      offersLabel={`${offersCount} ofertas`}
       onPress={() =>
         router.push({
           pathname: "/(detail)/purchase-request",
