@@ -16,18 +16,23 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 
 ### Requests & Offers
 - `purchase_request`: buyer request.
+- `purchase_request_status`: purchase request lifecycle catalog (`code`, `description`, `is_terminal`).
 - `purchase_request_visualization`: seller views on request.
 - `purchase_offer`: seller offer for request.
 - `purchase_offer_delivery`: delivery terms for offer.
 - `purchase_offer_image`: offer images.
 - `currency`: currency catalog.
 - `delivery_catalog`: delivery method catalog.
+- `purchase_request.status` is lifecycle state and must reference `purchase_request_status.code`.
+- Current required lifecycle codes:
+  - `active`
+  - `offer_accepted`
 - Buyer home request resolution must use `purchase_request_visualization.profile_id -> purchase_request_visualization.purchase_request_id -> purchase_request.id` (do not assume `purchase_request.profile_id` matches `public.profile.id` in every environment).
 - Offer cards in purchase-request detail must include DB-backed business + location + currency metadata (`business.name`, `business.rating`, `business.num_ratings`, `location.province`, `currency.currency_code`) together with `purchase_offer.price`.
 
 ### Conversation Core
 - `conversation`: buyer-seller conversation linked to offer/request.
-- `conversation_status`: conversation state machine states.
+- `conversation_status`: conversation state machine states, includes UI timeline icon key (`icon`).
 - `conversation_message`: conversation messages (text/image/system), includes `image_path`.
   - System message visibility can be role-targeted via `visible_to_role_id` (FK to `role.id`).
 - `conversation_message_kind`: message kind catalog.
@@ -59,6 +64,26 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `conversation_confirmation_field`:
   - `template_id`
   - `label`, `value_source`, `sort_order`
+- `conversation_confirmation_template_condition`:
+  - conditional branch by `template_id + delivery_cat_id`
+  - optional `description_append` to extend base template text by delivery type
+- `conversation_confirmation_condition_input`:
+  - conditional input metadata by `condition_id`
+  - supports `input_kind` (currently `otp`)
+  - payload contract (`payload_key`, `otp_length`, `is_required`, `sort_order`)
+- `conversation_transaction_code`:
+  - per-conversation secure OTP/code record (`code_hash`, `code_last4`)
+  - ownership and usage tracking (`created_by_profile_id`, `consumed_by_profile_id`, `consumed_at`)
+
+## Conditional Confirmation Resolution
+- Confirmation behavior must remain DB-driven:
+  - Resolve current delivery type from `conversation.purchase_offer_id -> purchase_offer.delivery_id -> purchase_offer_delivery.delivery_cat_id`.
+  - Select condition from `conversation_confirmation_template_condition` by `(template_id, delivery_cat_id)`.
+  - Build final confirmation payload with:
+    - base template fields
+    - appended description when condition provides `description_append`
+    - conditional `inputs[]` from `conversation_confirmation_condition_input`.
+- `delivery_catalog` labels are presentation data; matching logic should rely on FK IDs, not client-side string comparisons.
 
 ## Transition Procedure Pattern
 - Procedures referenced by `conversation_action_executor.target` must encapsulate transition logic in DB.
@@ -71,9 +96,21 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - actor role (`actor_role_id`)
   - Update `conversation.status_code` to resolved `to_status_code`.
   - Insert `conversation_status_history` audit row.
+  - When action requires conditional inputs (for example OTP), validate against DB configuration and payload keys before transition.
+  - For OTP/code flows, compare payload code against stored hash and mark code as consumed atomically.
   - When writing system chat messages, set `conversation_message.visible_to_role_id` to target buyer/seller role-specific visibility when needed.
   - Return a JSON result with at least success + status transition details.
 - Current implemented example: `public.buyer_accept_offer`.
+- `public.buyer_accept_offer` must also update `purchase_request.status` from `active` to `offer_accepted` atomically with the conversation transition.
 
 ## Role-Specific System Messages
 - For role-specific system messages, write `conversation_message.visible_to_role_id` using role catalog IDs (not client-side string flags).
+
+## Timeline Resolution (DB-Driven)
+- Offer timeline on purchase-request detail must be resolved by DB RPC `public.get_conversation_timeline(p_conversation_id uuid)`.
+- The RPC must return:
+  - completed states (newest first) from `conversation_status_history`
+  - next possible non-system state from `conversation_transition` as pending (`is_next = true`)
+  - state display metadata from `conversation_status` (`description`, `icon`)
+  - legible date string for UI (`reached_at_label`) and optional prefix (`pre_label`, e.g. `A la espera de:`)
+- Client must not rebuild the timeline graph with direct table joins when this RPC exists.

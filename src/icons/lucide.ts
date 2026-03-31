@@ -19,11 +19,14 @@ import {
   Heart,
   House,
   Info,
+  MailWarning,
   MessageCircle,
   MessageSquare,
   Pencil,
+  Plane,
   Plus,
   Search,
+  Send,
   Share2,
   SlidersHorizontal,
   Smartphone,
@@ -73,7 +76,10 @@ export const lucideIcons = {
   "check-check": CheckCheck,
   "x-circle": XCircle,
   handshake: Handshake,
-  "file-pen-line": FilePenLine
+  "file-pen-line": FilePenLine,
+  "plane": Plane,
+  "mail-warning": MailWarning,
+  "send": Send,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;

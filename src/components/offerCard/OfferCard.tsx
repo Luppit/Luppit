@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import { LucideIconName } from "@/src/icons/lucide";
 import { openPopup } from "@/src/services/popup.service";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { useTheme } from "@/src/themes";
@@ -7,9 +8,22 @@ import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { createOfferCardStyles } from "./styles";
 
+export type OfferCardTimelineItem = {
+  code: string;
+  label: string;
+  icon: LucideIconName;
+  reached_at?: string | null;
+  reached_at_label?: string | null;
+  pre_label?: string | null;
+  is_completed: boolean;
+  is_next: boolean;
+};
+
 type OfferCardProps = {
   offer: PurchaseOfferCardData;
   onConnect?: () => void;
+  connectLabel?: string;
+  timeline?: OfferCardTimelineItem[];
 };
 
 function normalize(value: string | null | undefined) {
@@ -20,7 +34,12 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 
-export default function OfferCard({ offer, onConnect }: OfferCardProps) {
+export default function OfferCard({
+  offer,
+  onConnect,
+  connectLabel = "Conectar",
+  timeline = [],
+}: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
   const businessName = offer.business_name ?? "-";
@@ -66,6 +85,57 @@ export default function OfferCard({ offer, onConnect }: OfferCardProps) {
         </View>
       </View>
 
+      {timeline.length > 0 ? (
+        <>
+          <View style={s.separator} />
+          <View style={s.timelineContainer}>
+            {timeline.map((step, index) => {
+              const isLast = index === timeline.length - 1;
+              const iconColor = t.colors.backgroudWhite;
+              const iconContainerStyle = step.is_next
+                ? [s.timelineIconCircle, s.timelineIconCirclePending]
+                : [s.timelineIconCircle, { backgroundColor: t.colors.success }];
+
+              return (
+                <View key={`${step.code}-${index}`} style={s.timelineRow}>
+                  <View style={s.timelineIconColumn}>
+                    <View style={iconContainerStyle}>
+                      <Icon name={step.icon} size={18} color={iconColor} />
+                    </View>
+                    {!isLast ? (
+                      <View
+                        style={[
+                          s.timelineConnector,
+                          {
+                            backgroundColor: t.colors.border,
+                            bottom: -t.spacing.sm,
+                          },
+                        ]}
+                      />
+                    ) : null}
+                  </View>
+
+                  <View style={s.timelineTextContainer}>
+                    {step.is_next ? (
+                      <Text color="stateAnulated" style={s.timelineDateText}>
+                        {step.pre_label?.trim() || "A la espera de:"}
+                      </Text>
+                    ) : step.reached_at_label || step.reached_at ? (
+                      <Text color="stateAnulated" style={s.timelineDateText}>
+                        {step.reached_at_label?.trim() || step.reached_at}
+                      </Text>
+                    ) : null}
+                    <Text variant="subtitle" style={s.timelineLabelText}>
+                      {step.label}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
       <View style={s.actionsRow}>
         <Pressable
           style={s.menuButton}
@@ -95,7 +165,7 @@ export default function OfferCard({ offer, onConnect }: OfferCardProps) {
 
         <Pressable style={s.connectButton} onPress={onConnect}>
           <Text variant="body" style={s.connectText}>
-            Conectar
+            {connectLabel}
           </Text>
         </Pressable>
       </View>

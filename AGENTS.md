@@ -9,11 +9,14 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Preserve the existing architecture and naming patterns.
 - Reuse current services, RPCs, and tables before adding new abstractions.
 - Keep UI behavior DB-driven when DB configuration exists.
+- Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
 - Never hardcode conversation action behavior when DB metadata exists.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.
+- For conversation confirmations with conditional behavior (e.g. by delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
 
 ## Scoped Guidance Map
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
+- Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
 - Navbar UI behavior: `src/components/navbar/AGENTS.md`
 - RPC/runtime contracts and execution behavior: `src/services/AGENTS.md`
 - Data model and SQL transition/procedure constraints: `src/db/AGENTS.md`

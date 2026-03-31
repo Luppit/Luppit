@@ -162,7 +162,10 @@ export default function ConversationLayout() {
   );
 
   const runAction = useCallback(
-    async (action: ConversationViewAction) => {
+    async (
+      action: ConversationViewAction,
+      payload?: Record<string, unknown> | null
+    ) => {
       if (!conversationId || !profileId) return;
       if (!action.code) {
         showError("Acción no disponible", "Esta acción no tiene código de ejecución.");
@@ -181,6 +184,7 @@ export default function ConversationLayout() {
           conversationId,
           profileId,
           actionCode: action.code,
+          payload: payload ?? null,
           executor: action.executor,
         });
       } else if (action.executor?.execution_type === "client_command") {
@@ -193,6 +197,7 @@ export default function ConversationLayout() {
           conversationId,
           profileId,
           actionCode: action.code,
+          payload: payload ?? null,
         });
       }
 
@@ -224,6 +229,7 @@ export default function ConversationLayout() {
         return;
       }
 
+      const inputValues: Record<string, string> = {};
       const description = interpolateTemplate(
         confirmation.description_template,
         conversationView?.context ?? {}
@@ -232,6 +238,18 @@ export default function ConversationLayout() {
         label: field.label,
         value: toStringValue(field.value),
       }));
+      const inputs = confirmation.inputs.map((input) => ({
+        id: input.id,
+        kind: input.kind,
+        payload_key: input.payload_key,
+        label: input.label,
+        helper_text: input.helper_text,
+        otp_length: input.otp_length,
+        is_required: input.is_required,
+        onValueChange: (value: string) => {
+          inputValues[input.payload_key] = value;
+        },
+      }));
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
 
       openPopup({
@@ -239,6 +257,7 @@ export default function ConversationLayout() {
         title: confirmation.title,
         description,
         rows,
+        inputs,
         actions: [
           {
             id: `${action.id}-cancel`,
@@ -264,7 +283,34 @@ export default function ConversationLayout() {
                 ? "error"
                 : "textDark",
             onPress: () => {
-              void runAction(action);
+              const invalidInput = confirmation.inputs.find((input) => {
+                const value = (inputValues[input.payload_key] ?? "").trim();
+                if (input.is_required && !value) return true;
+                if (input.kind === "otp" && value && value.length !== input.otp_length) {
+                  return true;
+                }
+                return false;
+              });
+
+              if (invalidInput) {
+                const message =
+                  invalidInput.kind === "otp"
+                    ? `Ingresa un código de ${invalidInput.otp_length} dígitos.`
+                    : `${invalidInput.label} es obligatorio.`;
+                showError("Dato inválido", message);
+                return;
+              }
+
+              const payload =
+                confirmation.inputs.length > 0
+                  ? confirmation.inputs.reduce<Record<string, unknown>>((acc, input) => {
+                      const value = (inputValues[input.payload_key] ?? "").trim();
+                      if (value) acc[input.payload_key] = value;
+                      return acc;
+                    }, {})
+                  : null;
+
+              void runAction(action, payload);
             },
           },
         ],

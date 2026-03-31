@@ -1,3 +1,4 @@
+import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
 import {
   ConversationMessage,
@@ -63,6 +64,9 @@ export default function ConversationChatScreen() {
     if (isPrimary) return t.colors.primary;
     return t.colors.textDark;
   };
+
+  const isBlackAuxAction = (styleCode: string | null) =>
+    (styleCode ?? "").toLowerCase().trim().includes("black");
 
   return (
     <ScrollView
@@ -173,25 +177,42 @@ export default function ConversationChatScreen() {
       })}
 
       {auxActions.map((action) => (
-        <Pressable
-          key={action.id}
-          onPress={() => onActionPress(action)}
-          disabled={isExecutingAction}
-          hitSlop={8}
-          style={{
-            alignSelf: "center",
-            paddingVertical: t.spacing.xs,
-            opacity: isExecutingAction ? 0.6 : 1,
-          }}
-        >
-          <Text
-            variant="body"
-            align="center"
-            style={{ color: getAuxActionTextColor(action.style_code) }}
+        isBlackAuxAction(action.style_code) ? (
+          <View
+            key={action.id}
+            style={{
+              alignSelf: "stretch",
+              paddingTop: t.spacing.xs,
+            }}
           >
-            {action.label}
-          </Text>
-        </Pressable>
+            <Button
+              title={action.label}
+              onPress={() => onActionPress(action)}
+              disabled={isExecutingAction}
+              variant="dark"
+            />
+          </View>
+        ) : (
+          <Pressable
+            key={action.id}
+            onPress={() => onActionPress(action)}
+            disabled={isExecutingAction}
+            hitSlop={8}
+            style={{
+              alignSelf: "center",
+              paddingVertical: t.spacing.xs,
+              opacity: isExecutingAction ? 0.6 : 1,
+            }}
+          >
+            <Text
+              variant="body"
+              align="center"
+              style={{ color: getAuxActionTextColor(action.style_code) }}
+            >
+              {action.label}
+            </Text>
+          </Pressable>
+        )
       ))}
     </ScrollView>
   );

@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import { Text } from "@/src/components/Text";
 import {
   closePopup,
@@ -12,7 +13,10 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +36,7 @@ export default function GlobalPopupHost() {
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -85,6 +90,17 @@ export default function GlobalPopupHost() {
     });
   }, [opacity, translateY]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const handleOptionPress = (option: PopupOption) => {
     closePopup();
     option.onPress?.();
@@ -113,18 +129,27 @@ export default function GlobalPopupHost() {
           />
         </Animated.View>
 
-        <View style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Animated.View
-            style={{
-              transform: [{ translateY }],
-            }}
-          >
-            <View
-              style={[
-                s.bottomSheet,
-                { paddingBottom: Math.max(insets.bottom, t.spacing.sm) },
-              ]}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={0}
+        >
+          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+            <Animated.View
+              style={{
+                transform: [{ translateY }],
+              }}
             >
+              <View
+                style={[
+                  s.bottomSheet,
+                  {
+                    paddingBottom: isKeyboardVisible
+                      ? t.spacing.sm
+                      : Math.max(insets.bottom, t.spacing.sm),
+                  },
+                ]}
+              >
               <View style={s.indicator} />
               {summaryConfig ? (
                 <>
@@ -159,6 +184,23 @@ export default function GlobalPopupHost() {
                             </Text>
                           </View>
                         ))}
+                      </View>
+                    ) : null}
+
+                    {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
+                      <View style={s.summaryInputsList}>
+                        {summaryConfig.inputs.map((input) => {
+                          if (input.kind !== "otp") return null;
+                          return (
+                            <OtpValidator
+                              key={input.id}
+                              label={input.label}
+                              helperText={input.helper_text}
+                              otpLength={input.otp_length ?? 4}
+                              onChange={(value) => input.onValueChange?.(value)}
+                            />
+                          );
+                        })}
                       </View>
                     ) : null}
 
@@ -260,9 +302,10 @@ export default function GlobalPopupHost() {
                   );
                 })
               )}
-            </View>
-          </Animated.View>
-        </View>
+              </View>
+            </Animated.View>
+          </View>
+        </KeyboardAvoidingView>
       </View>
 
       <Modal

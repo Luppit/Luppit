@@ -15,6 +15,7 @@ export type GlobalPopupStyles = {
   summaryTitle: TextStyle;
   summaryDescription: TextStyle;
   summaryRowsList: ViewStyle;
+  summaryInputsList: ViewStyle;
   summaryRowBlock: ViewStyle;
   summaryImageBlock: ViewStyle;
   summaryRowLabel: TextStyle;
@@ -100,6 +101,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     summaryRowsList: {
+      gap: t.spacing.md,
+    },
+    summaryInputsList: {
       gap: t.spacing.md,
     },
     summaryRowBlock: {

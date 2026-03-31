@@ -25,6 +25,17 @@ export type ConversationActionConfirmationField = {
   sort_order: number;
 };
 
+export type ConversationActionConfirmationInput = {
+  id: string;
+  kind: string;
+  payload_key: string;
+  label: string;
+  helper_text: string | null;
+  otp_length: number;
+  is_required: boolean;
+  sort_order: number;
+};
+
 export type ConversationActionConfirmation = {
   id: string;
   code: string;
@@ -36,6 +47,7 @@ export type ConversationActionConfirmation = {
   confirm_icon: string | null;
   confirm_style_code: string | null;
   fields: ConversationActionConfirmationField[];
+  inputs: ConversationActionConfirmationInput[];
 };
 
 export type ConversationViewAction = {
@@ -74,6 +86,17 @@ export type ExecuteConversationActionInput = {
 
 export type ExecuteConversationActionByExecutorInput = ExecuteConversationActionInput & {
   executor: ConversationActionExecutor;
+};
+
+export type ConversationStatusTimelineItem = {
+  status_code: string;
+  label: string;
+  icon: string | null;
+  reached_at: string | null;
+  reached_at_label: string | null;
+  pre_label: string | null;
+  is_next: boolean;
+  is_completed: boolean;
 };
 
 function parseConversationActionExecutor(raw: unknown): ConversationActionExecutor | null {
@@ -120,6 +143,30 @@ function parseConversationActionConfirmationField(
   };
 }
 
+function parseConversationActionConfirmationInput(
+  raw: unknown
+): ConversationActionConfirmationInput | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  const id = typeof value.id === "string" ? value.id : "";
+  const kind = typeof value.kind === "string" ? value.kind : "";
+  const payloadKey = typeof value.payload_key === "string" ? value.payload_key : "";
+  const label = typeof value.label === "string" ? value.label : "";
+  if (!id || !kind || !payloadKey || !label) return null;
+
+  return {
+    id,
+    kind,
+    payload_key: payloadKey,
+    label,
+    helper_text: typeof value.helper_text === "string" ? value.helper_text : null,
+    otp_length: typeof value.otp_length === "number" ? value.otp_length : 4,
+    is_required: typeof value.is_required === "boolean" ? value.is_required : true,
+    sort_order: typeof value.sort_order === "number" ? value.sort_order : 0,
+  };
+}
+
 function parseConversationActionConfirmation(raw: unknown): ConversationActionConfirmation | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -133,6 +180,11 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
   const fields = rawFields
     .map((field) => parseConversationActionConfirmationField(field))
     .filter((field): field is ConversationActionConfirmationField => Boolean(field))
+    .sort((a, b) => a.sort_order - b.sort_order);
+  const rawInputs = Array.isArray(value.inputs) ? value.inputs : [];
+  const inputs = rawInputs
+    .map((input) => parseConversationActionConfirmationInput(input))
+    .filter((input): input is ConversationActionConfirmationInput => Boolean(input))
     .sort((a, b) => a.sort_order - b.sort_order);
 
   return {
@@ -148,6 +200,7 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
     confirm_style_code:
       typeof value.confirm_style_code === "string" ? value.confirm_style_code : null,
     fields,
+    inputs,
   };
 }
 
@@ -258,6 +311,104 @@ export async function getConversationByPurchaseOfferId(
   if (error) return { ok: false, error: fromSupabaseError(error) };
   if (!data) return null;
   return { ok: true, data: data as Conversation };
+}
+
+export async function getAcceptedConversationByPurchaseRequestId(
+  purchaseRequestId: string
+): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const conversationsResult = await supabase
+    .from("conversation")
+    .select("id,purchase_offer_id,status_code,purchase_request_id,buyer_profile_id,seller_profile_id,created_at")
+    .eq("purchase_request_id", purchaseRequestId)
+    .not("purchase_offer_id", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (conversationsResult.error) {
+    return { ok: false, error: fromSupabaseError(conversationsResult.error) };
+  }
+
+  const conversations = (conversationsResult.data ?? []) as Conversation[];
+  if (conversations.length === 0) return null;
+
+  const actionResult = await supabase
+    .from("conversation_action")
+    .select("id")
+    .eq("code", "BUYER_ACCEPT_OFFER")
+    .maybeSingle();
+
+  if (actionResult.error) {
+    return { ok: false, error: fromSupabaseError(actionResult.error) };
+  }
+
+  const actionId = actionResult.data?.id;
+  if (!actionId) {
+    return { ok: true, data: conversations[0] };
+  }
+
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const historyResult = await supabase
+    .from("conversation_status_history")
+    .select("conversation_id,created_at")
+    .eq("action_id", actionId)
+    .in("conversation_id", conversationIds)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (historyResult.error) {
+    return { ok: false, error: fromSupabaseError(historyResult.error) };
+  }
+
+  const acceptedConversationId = historyResult.data?.[0]?.conversation_id ?? null;
+  if (!acceptedConversationId) {
+    return { ok: true, data: conversations[0] };
+  }
+
+  const acceptedConversation =
+    conversations.find((conversation) => conversation.id === acceptedConversationId) ?? null;
+  if (!acceptedConversation) return { ok: true, data: conversations[0] };
+
+  return { ok: true, data: acceptedConversation };
+}
+
+export async function getConversationTimeline(
+  conversationId: string
+): Promise<{ ok: true; data: ConversationStatusTimelineItem[] } | { ok: false; error: AppError }> {
+  if (!conversationId) return { ok: false, error: fromAppError("validation") };
+
+  const rpcResult: any = await (supabase as any).rpc("get_conversation_timeline", {
+    p_conversation_id: conversationId,
+  });
+
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+  const rows = Array.isArray(rpcResult.data)
+    ? (rpcResult.data as Record<string, unknown>[])
+    : [];
+
+  const timeline = rows
+    .map((row) => {
+      const statusCode = typeof row.status_code === "string" ? row.status_code : "";
+      const label = typeof row.label === "string" ? row.label : "";
+      if (!statusCode || !label) return null;
+
+      return {
+        status_code: statusCode,
+        label,
+        icon: typeof row.icon === "string" ? row.icon : null,
+        reached_at: typeof row.reached_at === "string" ? row.reached_at : null,
+        reached_at_label:
+          typeof row.reached_at_label === "string" ? row.reached_at_label : null,
+        pre_label: typeof row.pre_label === "string" ? row.pre_label : null,
+        is_next: row.is_next === true,
+        is_completed: row.is_completed === true,
+      } satisfies ConversationStatusTimelineItem;
+    })
+    .filter((item): item is ConversationStatusTimelineItem => Boolean(item));
+
+  return { ok: true, data: timeline };
 }
 
 export async function getConversationView(
