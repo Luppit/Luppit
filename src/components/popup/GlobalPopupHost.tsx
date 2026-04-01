@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
+import RatingInput from "@/src/components/popup/RatingInput";
 import { Text } from "@/src/components/Text";
 import {
   closePopup,
@@ -156,7 +157,7 @@ export default function GlobalPopupHost() {
                   <View style={s.section}>
                     <View style={s.summaryHeaderBlock}>
                       <View style={s.summaryHeader}>
-                        <Text variant="label" style={s.summaryTitle}>
+                        <Text variant="subtitle" style={s.summaryTitle}>
                           {summaryConfig.title}
                         </Text>
                         {summaryConfig.icon ? (
@@ -190,16 +191,31 @@ export default function GlobalPopupHost() {
                     {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
                       <View style={s.summaryInputsList}>
                         {summaryConfig.inputs.map((input) => {
-                          if (input.kind !== "otp") return null;
-                          return (
-                            <OtpValidator
-                              key={input.id}
-                              label={input.label}
-                              helperText={input.helper_text}
-                              otpLength={input.otp_length ?? 4}
-                              onChange={(value) => input.onValueChange?.(value)}
-                            />
-                          );
+                          if (input.kind === "otp") {
+                            return (
+                              <OtpValidator
+                                key={input.id}
+                                label={input.label}
+                                helperText={input.helper_text}
+                                otpLength={input.otp_length ?? 4}
+                                onChange={(value) => input.onValueChange?.(value)}
+                              />
+                            );
+                          }
+
+                          if (input.kind === "rating") {
+                            return (
+                              <RatingInput
+                                key={input.id}
+                                label={input.label}
+                                helperText={input.helper_text}
+                                componentConfig={input.component_config}
+                                onChange={(value) => input.onValueChange?.(value)}
+                              />
+                            );
+                          }
+
+                          return null;
                         })}
                       </View>
                     ) : null}

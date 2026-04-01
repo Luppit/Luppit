@@ -117,6 +117,22 @@ function toStringValue(value: unknown) {
   return String(value);
 }
 
+type RatingPayload = {
+  stars: number;
+  tags: string[];
+  comment: string;
+};
+
+function isRatingPayload(value: unknown): value is RatingPayload {
+  if (!value || typeof value !== "object") return false;
+  const parsed = value as Record<string, unknown>;
+  return (
+    typeof parsed.stars === "number" &&
+    Array.isArray(parsed.tags) &&
+    typeof parsed.comment === "string"
+  );
+}
+
 export default function ConversationLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -229,7 +245,7 @@ export default function ConversationLayout() {
         return;
       }
 
-      const inputValues: Record<string, string> = {};
+      const inputValues: Record<string, unknown> = {};
       const description = interpolateTemplate(
         confirmation.description_template,
         conversationView?.context ?? {}
@@ -245,8 +261,9 @@ export default function ConversationLayout() {
         label: input.label,
         helper_text: input.helper_text,
         otp_length: input.otp_length,
+        component_config: input.component_config,
         is_required: input.is_required,
-        onValueChange: (value: string) => {
+        onValueChange: (value: unknown) => {
           inputValues[input.payload_key] = value;
         },
       }));
@@ -284,11 +301,23 @@ export default function ConversationLayout() {
                 : "textDark",
             onPress: () => {
               const invalidInput = confirmation.inputs.find((input) => {
-                const value = (inputValues[input.payload_key] ?? "").trim();
-                if (input.is_required && !value) return true;
-                if (input.kind === "otp" && value && value.length !== input.otp_length) {
-                  return true;
+                const raw = inputValues[input.payload_key];
+
+                if (input.kind === "otp") {
+                  const value = typeof raw === "string" ? raw.trim() : "";
+                  if (input.is_required && !value) return true;
+                  if (value && value.length !== input.otp_length) return true;
+                  return false;
                 }
+
+                if (input.kind === "rating") {
+                  if (!input.is_required) return false;
+                  if (!isRatingPayload(raw)) return true;
+                  return raw.stars < 1;
+                }
+
+                const value = typeof raw === "string" ? raw.trim() : "";
+                if (input.is_required && !value) return true;
                 return false;
               });
 
@@ -296,6 +325,8 @@ export default function ConversationLayout() {
                 const message =
                   invalidInput.kind === "otp"
                     ? `Ingresa un código de ${invalidInput.otp_length} dígitos.`
+                    : invalidInput.kind === "rating"
+                      ? "Selecciona una calificación en estrellas."
                     : `${invalidInput.label} es obligatorio.`;
                 showError("Dato inválido", message);
                 return;
@@ -304,8 +335,19 @@ export default function ConversationLayout() {
               const payload =
                 confirmation.inputs.length > 0
                   ? confirmation.inputs.reduce<Record<string, unknown>>((acc, input) => {
-                      const value = (inputValues[input.payload_key] ?? "").trim();
-                      if (value) acc[input.payload_key] = value;
+                      const raw = inputValues[input.payload_key];
+
+                      if (input.kind === "rating") {
+                        if (isRatingPayload(raw) && raw.stars >= 1) {
+                          acc[input.payload_key] = raw;
+                        }
+                        return acc;
+                      }
+
+                      const value = typeof raw === "string" ? raw.trim() : "";
+                      if (value) {
+                        acc[input.payload_key] = value;
+                      }
                       return acc;
                     }, {})
                   : null;

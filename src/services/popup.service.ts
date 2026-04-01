@@ -46,7 +46,8 @@ export type PopupSummaryInput = {
   helper_text?: string | null;
   otp_length?: number;
   is_required?: boolean;
-  onValueChange?: (value: string) => void;
+  component_config?: Record<string, unknown> | null;
+  onValueChange?: (value: unknown) => void;
 };
 
 export type PopupSummaryConfig = {

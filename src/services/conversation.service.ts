@@ -34,6 +34,7 @@ export type ConversationActionConfirmationInput = {
   otp_length: number;
   is_required: boolean;
   sort_order: number;
+  component_config: Record<string, unknown> | null;
 };
 
 export type ConversationActionConfirmation = {
@@ -164,6 +165,10 @@ function parseConversationActionConfirmationInput(
     otp_length: typeof value.otp_length === "number" ? value.otp_length : 4,
     is_required: typeof value.is_required === "boolean" ? value.is_required : true,
     sort_order: typeof value.sort_order === "number" ? value.sort_order : 0,
+    component_config:
+      value.component_config && typeof value.component_config === "object"
+        ? (value.component_config as Record<string, unknown>)
+        : null,
   };
 }
 
