@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_style_catalog: {
+        Row: {
+          code: string
+          created_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       business: {
         Row: {
           created_at: string
@@ -114,6 +129,612 @@ export type Database = {
           },
         ]
       }
+      conversation: {
+        Row: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        Insert: {
+          buyer_profile_id?: string | null
+          created_at?: string
+          id?: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          seller_profile_id?: string | null
+          status_code?: string | null
+        }
+        Update: {
+          buyer_profile_id?: string | null
+          created_at?: string
+          id?: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          seller_profile_id?: string | null
+          status_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_buyer_profile_id_fkey"
+            columns: ["buyer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: true
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_code_fkey"
+            columns: ["status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_action: {
+        Row: {
+          code: string | null
+          confirmation_template_id: string | null
+          created_at: string
+          executor_code: string | null
+          icon: string | null
+          id: string
+          label: string | null
+          style_code: string | null
+          ui_slot: string | null
+        }
+        Insert: {
+          code?: string | null
+          confirmation_template_id?: string | null
+          created_at?: string
+          executor_code?: string | null
+          icon?: string | null
+          id?: string
+          label?: string | null
+          style_code?: string | null
+          ui_slot?: string | null
+        }
+        Update: {
+          code?: string | null
+          confirmation_template_id?: string | null
+          created_at?: string
+          executor_code?: string | null
+          icon?: string | null
+          id?: string
+          label?: string | null
+          style_code?: string | null
+          ui_slot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_action_confirmation_template_id_fkey"
+            columns: ["confirmation_template_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_action_executor_code_fkey"
+            columns: ["executor_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_action_executor"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_action_style_code_fkey"
+            columns: ["style_code"]
+            isOneToOne: false
+            referencedRelation: "action_style_catalog"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_action_ui_slot_fkey"
+            columns: ["ui_slot"]
+            isOneToOne: false
+            referencedRelation: "ui_slot_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_action_execution_type_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+        }
+        Relationships: []
+      }
+      conversation_action_executor: {
+        Row: {
+          code: string
+          created_at: string
+          execution_type: string
+          requires_refresh: boolean
+          target: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          execution_type: string
+          requires_refresh?: boolean
+          target: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          execution_type?: string
+          requires_refresh?: boolean
+          target?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_action_executor_execution_type_fkey"
+            columns: ["execution_type"]
+            isOneToOne: false
+            referencedRelation: "conversation_action_execution_type_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_confirmation_field: {
+        Row: {
+          id: string
+          label: string
+          sort_order: number
+          template_id: string
+          value_source: string
+        }
+        Insert: {
+          id?: string
+          label: string
+          sort_order?: number
+          template_id: string
+          value_source: string
+        }
+        Update: {
+          id?: string
+          label?: string
+          sort_order?: number
+          template_id?: string
+          value_source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_field_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_confirmation_template: {
+        Row: {
+          cancel_label: string
+          code: string
+          confirm_label: string
+          confirm_style_code: string | null
+          created_at: string
+          description_template: string
+          id: string
+          title: string
+        }
+        Insert: {
+          cancel_label?: string
+          code: string
+          confirm_label?: string
+          confirm_style_code?: string | null
+          created_at?: string
+          description_template: string
+          id?: string
+          title: string
+        }
+        Update: {
+          cancel_label?: string
+          code?: string
+          confirm_label?: string
+          confirm_style_code?: string | null
+          created_at?: string
+          description_template?: string
+          id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_template_confirm_style_code_fkey"
+            columns: ["confirm_style_code"]
+            isOneToOne: false
+            referencedRelation: "action_style_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_deadline: {
+        Row: {
+          created_at: string
+          deadline_type: string | null
+          due_at: string | null
+          id: string
+          resolved_at: string | null
+          trigger_transition_to: string | null
+        }
+        Insert: {
+          created_at?: string
+          deadline_type?: string | null
+          due_at?: string | null
+          id?: string
+          resolved_at?: string | null
+          trigger_transition_to?: string | null
+        }
+        Update: {
+          created_at?: string
+          deadline_type?: string | null
+          due_at?: string | null
+          id?: string
+          resolved_at?: string | null
+          trigger_transition_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_deadline_deadline_type_fkey"
+            columns: ["deadline_type"]
+            isOneToOne: false
+            referencedRelation: "deadline_type_catalog"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_deadline_trigger_transition_to_fkey"
+            columns: ["trigger_transition_to"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_message: {
+        Row: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          image_path: string | null
+          message_kind: string | null
+          sender_profile_id: string | null
+          text: string | null
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          message_kind?: string | null
+          sender_profile_id?: string | null
+          text?: string | null
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          image_path?: string | null
+          message_kind?: string | null
+          sender_profile_id?: string | null
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_message_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_message_message_kind_fkey"
+            columns: ["message_kind"]
+            isOneToOne: false
+            referencedRelation: "conversation_message_kind"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_message_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_message_kind: {
+        Row: {
+          code: string
+          created_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      conversation_status: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          is_terminal: boolean | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          is_terminal?: boolean | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          is_terminal?: boolean | null
+        }
+        Relationships: []
+      }
+      conversation_status_history: {
+        Row: {
+          action_id: string | null
+          actor_profile_id: string | null
+          conversation_id: string | null
+          created_at: string
+          from_status_code: string | null
+          id: string
+          reason: string | null
+          to_status_code: string | null
+        }
+        Insert: {
+          action_id?: string | null
+          actor_profile_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          from_status_code?: string | null
+          id?: string
+          reason?: string | null
+          to_status_code?: string | null
+        }
+        Update: {
+          action_id?: string | null
+          actor_profile_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          from_status_code?: string | null
+          id?: string
+          reason?: string | null
+          to_status_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_status_history_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_history_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_history_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_history_from_status_code_fkey"
+            columns: ["from_status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_status_history_to_status_code_fkey"
+            columns: ["to_status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_status_role_action: {
+        Row: {
+          action_id: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean | null
+          role_id: string | null
+          sort_order: number
+          status_code: string | null
+        }
+        Insert: {
+          action_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          role_id?: string | null
+          sort_order?: number
+          status_code?: string | null
+        }
+        Update: {
+          action_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean | null
+          role_id?: string | null
+          sort_order?: number
+          status_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_status_role_action_action_id_fkey1"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_role_action_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_role_action_status_code_fkey"
+            columns: ["status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_status_role_rule: {
+        Row: {
+          can_send_attachments: boolean | null
+          can_send_messages: boolean | null
+          conversation_status: string | null
+          created_at: string
+          id: string
+          role_id: string | null
+        }
+        Insert: {
+          can_send_attachments?: boolean | null
+          can_send_messages?: boolean | null
+          conversation_status?: string | null
+          created_at?: string
+          id?: string
+          role_id?: string | null
+        }
+        Update: {
+          can_send_attachments?: boolean | null
+          can_send_messages?: boolean | null
+          conversation_status?: string | null
+          created_at?: string
+          id?: string
+          role_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_status_role_rule_conversation_status_fkey"
+            columns: ["conversation_status"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_status_role_rule_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_transition: {
+        Row: {
+          action_id: string | null
+          actor_role_id: string | null
+          created_at: string
+          from_status_code: string | null
+          id: string
+          is_system_transition: boolean | null
+          to_status_code: string | null
+        }
+        Insert: {
+          action_id?: string | null
+          actor_role_id?: string | null
+          created_at?: string
+          from_status_code?: string | null
+          id?: string
+          is_system_transition?: boolean | null
+          to_status_code?: string | null
+        }
+        Update: {
+          action_id?: string | null
+          actor_role_id?: string | null
+          created_at?: string
+          from_status_code?: string | null
+          id?: string
+          is_system_transition?: boolean | null
+          to_status_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_transition_action_id_fkey"
+            columns: ["action_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_action"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transition_actor_role_id_fkey"
+            columns: ["actor_role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transition_from_status_code_fkey"
+            columns: ["from_status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_transition_to_status_code_fkey"
+            columns: ["to_status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       currency: {
         Row: {
           created_at: string
@@ -132,6 +753,24 @@ export type Database = {
           currency_code?: string | null
           display_name?: string | null
           id?: string
+        }
+        Relationships: []
+      }
+      deadline_type_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
         }
         Relationships: []
       }
@@ -623,16 +1262,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          role_code: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          role_code?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          role_code?: string | null
         }
         Relationships: []
       }
@@ -669,11 +1311,37 @@ export type Database = {
           },
         ]
       }
+      ui_slot_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_category_children: {
+        Args: { category_id_input: string }
+        Returns: {
+          id: string
+          name: string
+          path: unknown
+        }[]
+      }
       get_category_lineage: {
         Args: { leaf_id: string }
         Returns: {
@@ -691,7 +1359,32 @@ export type Database = {
           version: number
         }[]
       }
-      is_category_leaf: { Args: { category_id: string }; Returns: boolean }
+      get_conversation_messages: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          conversation_id: string | null
+          created_at: string
+          id: string
+          image_path: string | null
+          message_kind: string | null
+          sender_profile_id: string | null
+          text: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversation_message"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_conversation_view: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      is_category_leaf: {
+        Args: { category_id_input: string }
+        Returns: boolean
+      }
       search_category: {
         Args: { search_text: string }
         Returns: {
@@ -700,6 +1393,53 @@ export type Database = {
           path: unknown
         }[]
       }
+      send_conversation_message:
+        | {
+            Args: {
+              p_conversation_id: string
+              p_profile_id: string
+              p_text: string
+            }
+            Returns: {
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              sender_profile_id: string | null
+              text: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_conversation_id: string
+              p_image_path?: string
+              p_message_kind?: string
+              p_profile_id: string
+              p_text?: string
+            }
+            Returns: {
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              sender_profile_id: string | null
+              text: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
     }

@@ -1,18 +1,29 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
-import { getBusinessById } from "@/src/services/business.service";
-import { getCurrencyById } from "@/src/services/currency.service";
-import { getLocationById } from "@/src/services/location.service";
+import { LucideIconName } from "@/src/icons/lucide";
 import { openPopup } from "@/src/services/popup.service";
-import { PurchaseOffer } from "@/src/services/purchase.offer.service";
+import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { useTheme } from "@/src/themes";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
 import { createOfferCardStyles } from "./styles";
 
+export type OfferCardTimelineItem = {
+  code: string;
+  label: string;
+  icon: LucideIconName;
+  reached_at?: string | null;
+  reached_at_label?: string | null;
+  pre_label?: string | null;
+  is_completed: boolean;
+  is_next: boolean;
+};
+
 type OfferCardProps = {
-  offer: PurchaseOffer;
+  offer: PurchaseOfferCardData;
   onConnect?: () => void;
+  connectLabel?: string;
+  timeline?: OfferCardTimelineItem[];
 };
 
 function normalize(value: string | null | undefined) {
@@ -23,54 +34,19 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 
-export default function OfferCard({ offer, onConnect }: OfferCardProps) {
+export default function OfferCard({
+  offer,
+  onConnect,
+  connectLabel = "Conectar",
+  timeline = [],
+}: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
-  const [businessName, setBusinessName] = useState("-");
-  const [province, setProvince] = useState("-");
-  const [rating, setRating] = useState<number>(0);
-  const [numRatings, setNumRatings] = useState<number>(0);
-  const [currencyCode, setCurrencyCode] = useState<string>("CRC");
-
-  useEffect(() => {
-    let active = true;
-
-    const loadData = async () => {
-      if (offer.business_id) {
-        const businessResult = await getBusinessById(offer.business_id);
-        if (!active) return;
-        if (businessResult?.ok) {
-          setBusinessName(businessResult.data.name ?? "-");
-          setRating(businessResult.data.rating ?? 0);
-          setNumRatings(businessResult.data.num_ratings ?? 0);
-
-          if (businessResult.data.location_id) {
-            const locationResult = await getLocationById(
-              businessResult.data.location_id,
-            );
-            if (!active) return;
-            if (locationResult?.ok) {
-              setProvince(locationResult.data.province ?? "-");
-            }
-          }
-        }
-      }
-
-      if (offer.currency_id) {
-        const currencyResult = await getCurrencyById(offer.currency_id);
-        if (!active) return;
-        if (currencyResult?.ok) {
-          setCurrencyCode(currencyResult.data.currency_code ?? "CRC");
-        }
-      }
-    };
-
-    void loadData();
-    return () => {
-      active = false;
-    };
-  }, [offer.business_id, offer.currency_id]);
-
+  const businessName = offer.business_name ?? "-";
+  const province = offer.business_province ?? "-";
+  const rating = offer.business_rating ?? 0;
+  const numRatings = offer.business_num_ratings ?? 0;
+  const currencyCode = offer.offer_currency_code ?? "CRC";
   const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
   const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("en-US")}`;
   const badgeText = rating >= 4.7 ? "Mejor reputación" : "Mejor oferta";
@@ -109,6 +85,57 @@ export default function OfferCard({ offer, onConnect }: OfferCardProps) {
         </View>
       </View>
 
+      {timeline.length > 0 ? (
+        <>
+          <View style={s.separator} />
+          <View style={s.timelineContainer}>
+            {timeline.map((step, index) => {
+              const isLast = index === timeline.length - 1;
+              const iconColor = t.colors.backgroudWhite;
+              const iconContainerStyle = step.is_next
+                ? [s.timelineIconCircle, s.timelineIconCirclePending]
+                : [s.timelineIconCircle, { backgroundColor: t.colors.success }];
+
+              return (
+                <View key={`${step.code}-${index}`} style={s.timelineRow}>
+                  <View style={s.timelineIconColumn}>
+                    <View style={iconContainerStyle}>
+                      <Icon name={step.icon} size={18} color={iconColor} />
+                    </View>
+                    {!isLast ? (
+                      <View
+                        style={[
+                          s.timelineConnector,
+                          {
+                            backgroundColor: t.colors.border,
+                            bottom: -t.spacing.sm,
+                          },
+                        ]}
+                      />
+                    ) : null}
+                  </View>
+
+                  <View style={s.timelineTextContainer}>
+                    {step.is_next ? (
+                      <Text color="stateAnulated" style={s.timelineDateText}>
+                        {step.pre_label?.trim() || "A la espera de:"}
+                      </Text>
+                    ) : step.reached_at_label || step.reached_at ? (
+                      <Text color="stateAnulated" style={s.timelineDateText}>
+                        {step.reached_at_label?.trim() || step.reached_at}
+                      </Text>
+                    ) : null}
+                    <Text variant="subtitle" style={s.timelineLabelText}>
+                      {step.label}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+
       <View style={s.actionsRow}>
         <Pressable
           style={s.menuButton}
@@ -138,7 +165,7 @@ export default function OfferCard({ offer, onConnect }: OfferCardProps) {
 
         <Pressable style={s.connectButton} onPress={onConnect}>
           <Text variant="body" style={s.connectText}>
-            Conectar
+            {connectLabel}
           </Text>
         </Pressable>
       </View>

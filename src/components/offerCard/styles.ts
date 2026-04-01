@@ -11,6 +11,16 @@ export type OfferCardStyles = {
   priceText: TextStyle;
   badge: ViewStyle;
   badgeText: TextStyle;
+  separator: ViewStyle;
+  timelineContainer: ViewStyle;
+  timelineRow: ViewStyle;
+  timelineIconColumn: ViewStyle;
+  timelineIconCircle: ViewStyle;
+  timelineIconCirclePending: ViewStyle;
+  timelineConnector: ViewStyle;
+  timelineTextContainer: ViewStyle;
+  timelineDateText: TextStyle;
+  timelineLabelText: TextStyle;
   actionsRow: ViewStyle;
   menuButton: ViewStyle;
   connectButton: ViewStyle;
@@ -59,6 +69,53 @@ export function createOfferCardStyles(t: Theme): OfferCardStyles {
       backgroundColor: t.colors.primaryLight,
     },
     badgeText: {
+      color: t.colors.textDark,
+    },
+    separator: {
+      height: 1,
+      backgroundColor: t.colors.border,
+      marginTop: 0,
+      marginBottom: t.spacing.md,
+    },
+    timelineContainer: {
+      gap: t.spacing.md,
+      marginBottom: t.spacing.md,
+    },
+    timelineRow: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: t.spacing.sm,
+    },
+    timelineIconColumn: {
+      width: 24,
+      position: "relative",
+      alignItems: "center",
+    },
+    timelineIconCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    timelineIconCirclePending: {
+      backgroundColor: t.colors.stateAnulated,
+    },
+    timelineConnector: {
+      position: "absolute",
+      left: 11,
+      top: 32,
+      width: 2,
+      borderRadius: 99,
+    },
+    timelineTextContainer: {
+      flex: 1,
+      paddingBottom: t.spacing.sm,
+    },
+    timelineDateText: {
+      marginBottom: 2,
+    },
+    timelineLabelText: {
       color: t.colors.textDark,
     },
     actionsRow: {

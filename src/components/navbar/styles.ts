@@ -45,6 +45,7 @@ export const createNavbarStyles = (t: Theme) => {
       height: 65,
       justifyContent: "space-between",
       alignItems: "center",
+      columnGap: 6,
 
       borderRadius: 40,
       paddingHorizontal: 18,

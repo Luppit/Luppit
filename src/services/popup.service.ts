@@ -38,12 +38,25 @@ export type PopupSummaryAction = {
   onPress?: () => void;
 };
 
+export type PopupSummaryInput = {
+  id: string;
+  kind: string;
+  payload_key: string;
+  label: string;
+  helper_text?: string | null;
+  otp_length?: number;
+  is_required?: boolean;
+  component_config?: Record<string, unknown> | null;
+  onValueChange?: (value: unknown) => void;
+};
+
 export type PopupSummaryConfig = {
   type: "summary";
   title: string;
   icon?: LucideIconName;
   description?: string;
   rows?: PopupSummaryRow[];
+  inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];
   actions?: PopupSummaryAction[];
   dismissOnBackdropPress?: boolean;
