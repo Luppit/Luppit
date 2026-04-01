@@ -106,13 +106,13 @@ export default function RatingInput({
     emit({ comment: value });
   };
 
-  const heading = targetName || label;
-
   return (
     <View style={s.container}>
-      <Text variant="subtitleRegular" style={s.targetName}>
-        {heading}
-      </Text>
+      {targetName ? (
+        <Text variant="subtitleRegular" style={s.targetName}>
+          {targetName}
+        </Text>
+      ) : null}
       {helperText ? (
         <Text variant="caption" style={s.helperText}>
           {helperText}

@@ -267,11 +267,13 @@ export default function ConversationLayout() {
           inputValues[input.payload_key] = value;
         },
       }));
+      const ratingInputTitle =
+        confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
 
       openPopup({
         type: "summary",
-        title: confirmation.title,
+        title: ratingInputTitle || confirmation.title,
         description,
         rows,
         inputs,
