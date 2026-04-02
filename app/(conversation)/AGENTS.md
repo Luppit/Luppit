@@ -8,7 +8,7 @@ Applies to conversation screens and conversation UI behavior.
 - Which action executes what comes from action executor metadata in DB.
 - Whether an action opens confirmation comes from confirmation template metadata in DB.
 - Confirmation title/description/rows/buttons/icons must come from DB payload.
-- Conditional confirmation additions (description append + inputs like OTP) must come resolved from DB payload for the active conversation state/delivery context.
+- Conditional confirmation additions (description append + inputs like OTP/rating) must come resolved from DB payload for the active conversation context.
 - Client can apply only presentational fallback values (for resilience), but must not define product logic.
 
 ## Implementation Rules
@@ -18,6 +18,8 @@ Applies to conversation screens and conversation UI behavior.
 - Render confirmation rows from `confirmation.fields`.
 - Render conditional confirmation inputs from `confirmation.inputs`.
 - For OTP input kind, collect digits and send executor payload under DB-provided `payload_key`.
+- For rating input kind, render the rating component from DB `component_config` and send structured payload (`stars`, `tags`, `comment`) under DB-provided `payload_key`.
+- For rating confirmations, popup title should use the rating input label from DB when present, instead of a hardcoded local title.
 - Render button labels/icons from confirmation template values.
 - Execute server actions via configured executor target (`execution_type='server_rpc'`).
 - Respect `requires_refresh` to decide whether to reload conversation view/messages.

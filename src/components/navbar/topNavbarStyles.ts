@@ -42,13 +42,22 @@ export const createTopNavbarStyles = (t: Theme) =>
       borderBottomColor: "transparent",
       minWidth: 54,
     },
+    categoryButtonDisabled: {
+      opacity: 0.45,
+    },
     categoryButtonActive: {
       borderBottomColor: t.colors.textDark,
+    },
+    categoryImageContainer: {
+      width: 34,
+      height: 34,
+      marginBottom: 2,
+      alignItems: "center",
+      justifyContent: "center",
     },
     categoryImage: {
       width: 34,
       height: 34,
-      marginBottom: 2,
       borderRadius: 8,
     },
   });
