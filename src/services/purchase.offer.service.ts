@@ -32,6 +32,7 @@ type OfferFile = {
 
 export type CreatePurchaseOfferInput = {
   purchaseRequestId: string;
+  conversationId?: string | null;
   description: string;
   price: number;
   currencyId: string;
@@ -304,18 +305,19 @@ function getFileExtension(file: OfferFile, fallback = "jpg") {
   return fallback;
 }
 
-async function uploadOfferImage(
-  offerId: string,
+async function uploadImageToBucket(
+  bucket: "offers" | "conversations",
+  storagePrefix: string,
   file: OfferFile,
   index: number
 ): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
   const extension = getFileExtension(file);
-  const filePath = `${offerId}/${Date.now()}_${index}.${extension}`;
+  const filePath = `${storagePrefix}/${Date.now()}_${index}.${extension}`;
 
   const response = await fetch(file.uri);
   const body = await response.arrayBuffer();
 
-  const { error } = await supabase.storage.from("offers").upload(filePath, body, {
+  const { error } = await supabase.storage.from(bucket).upload(filePath, body, {
     contentType: file.mime ?? undefined,
     upsert: false,
   });
@@ -344,9 +346,9 @@ export async function createPurchaseOffer(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const businessRef = await getBusinessIdByProfileId(profile.data.id);
-  if (businessRef?.ok === false) return { ok: false, error: businessRef.error };
-  if (!businessRef) return { ok: false, error: fromAppError("not_found") };
+  if (!input.conversationId) {
+    return { ok: false, error: fromAppError("validation") };
+  }
   
   const hasPickup = (input.pickupDelay ?? 0) > 0;
   const hasShipping = (input.shippingMaxTime ?? 0) > 0 || (input.shippingCost ?? 0) > 0;
@@ -366,64 +368,77 @@ export async function createPurchaseOffer(
       ? input.shippingCost ?? null
       : null;
 
-  const deliveryInsert = await supabase
-    .from("purchase_offer_delivery")
-    .insert({
-      delivery_cat_id: input.primaryDeliveryCatalogId,
-      after_days: pickupAfterDays,
-      max_days: shippingMaxDays,
-      price: shippingPrice,
-    })
-    .select()
-    .single();
-
-  if (deliveryInsert.error) {
-    return { ok: false, error: fromSupabaseError(deliveryInsert.error) };
-  }
-
-  const delivery = deliveryInsert.data as PurchaseOfferDelivery;
-
-  const offerInsert = await supabase
-    .from("purchase_offer")
-    .insert({
-      business_id: businessRef.data,
-      purchase_request_id: input.purchaseRequestId,
-      delivery_id: delivery.id,
-      currency_id: input.currencyId,
-      description: input.description.trim(),
-      price: input.price,
-    })
-    .select()
-    .single();
-
-  if (offerInsert.error) return { ok: false, error: fromSupabaseError(offerInsert.error) };
-  const offer = offerInsert.data as PurchaseOffer;
-
-  const uploadedPaths: string[] = [];
+  const offerUploadStoragePrefix = `${input.purchaseRequestId}/${input.conversationId}`;
+  const conversationUploadStoragePrefix = input.conversationId;
+  const uploadedOfferImagePaths: string[] = [];
+  const uploadedConversationImagePaths: string[] = [];
   for (let i = 0; i < input.files.length; i += 1) {
-    const upload = await uploadOfferImage(offer.id, input.files[i], i);
-    if (!upload.ok) return upload;
-    uploadedPaths.push(upload.data);
+    const offerUpload = await uploadImageToBucket(
+      "offers",
+      offerUploadStoragePrefix,
+      input.files[i],
+      i
+    );
+    if (!offerUpload.ok) return offerUpload;
+    uploadedOfferImagePaths.push(offerUpload.data);
+
+    const conversationUpload = await uploadImageToBucket(
+      "conversations",
+      conversationUploadStoragePrefix,
+      input.files[i],
+      i
+    );
+    if (!conversationUpload.ok) return conversationUpload;
+    uploadedConversationImagePaths.push(conversationUpload.data);
   }
 
-  const imageRows = uploadedPaths.map((path) => ({
-    purchase_offer_id: offer.id,
-    path,
-  }));
+  const rpcResult: any = await (supabase as any).rpc(
+    "create_seller_offer_from_conversation",
+    {
+      p_conversation_id: input.conversationId,
+      p_profile_id: profile.data.id,
+      p_description: input.description.trim(),
+      p_price: input.price,
+      p_currency_id: input.currencyId,
+      p_primary_delivery_catalog_id: input.primaryDeliveryCatalogId,
+      p_pickup_after_days: pickupAfterDays,
+      p_shipping_max_days: shippingMaxDays,
+      p_shipping_price: shippingPrice,
+      p_offer_image_paths: uploadedOfferImagePaths,
+      p_conversation_image_paths: uploadedConversationImagePaths,
+    }
+  );
 
-  const imageInsert = await supabase
-    .from("purchase_offer_image")
-    .insert(imageRows)
-    .select();
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
 
-  if (imageInsert.error) return { ok: false, error: fromSupabaseError(imageInsert.error) };
+  const payload =
+    rpcResult?.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+      ? (rpcResult.data as Record<string, unknown>)
+      : null;
+  if (!payload) return { ok: false, error: fromAppError("unknown") };
+
+  const offerRaw =
+    payload.offer && typeof payload.offer === "object"
+      ? (payload.offer as Record<string, unknown>)
+      : null;
+  const deliveryRaw =
+    payload.delivery && typeof payload.delivery === "object"
+      ? (payload.delivery as Record<string, unknown>)
+      : null;
+  if (!offerRaw || !deliveryRaw) return { ok: false, error: fromAppError("unknown") };
+
+  const images = Array.isArray(payload.images)
+    ? (payload.images as PurchaseOfferImage[])
+    : [];
 
   return {
     ok: true,
     data: {
-      offer,
-      delivery,
-      images: (imageInsert.data ?? []) as PurchaseOfferImage[],
+      offer: offerRaw as PurchaseOffer,
+      delivery: deliveryRaw as PurchaseOfferDelivery,
+      images,
     },
   };
 }

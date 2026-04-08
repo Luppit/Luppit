@@ -13,16 +13,18 @@ Expected payload includes:
   - `executor` object (or null)
   - `confirmation` object (or null), including:
     - `fields[]`
-    - `inputs[]` (conditional dynamic inputs; currently OTP input supported)
+    - `inputs[]` (conditional dynamic inputs; currently supports `otp` and `rating`)
     - `cancel_label`, `cancel_icon`
     - `confirm_label`, `confirm_icon`, `confirm_style_code`
     - `description_template` already resolved by DB for active condition (base + append when applicable)
+    - for each input: `component_config` (optional JSON config for rich input renderers)
 
 Agents must parse and use this payload directly for rendering and execution decisions.
 
 ## Conditional Confirmation Inputs
 - Client must render `confirmation.inputs[]` by input kind, not by action code.
 - For OTP input entries, use `payload_key` to build action payload dynamically.
+- For rating input entries, submit structured payload under `payload_key` (e.g. stars/tags/comment) and use `component_config` to drive UI.
 - Client-side validation is presentational only (required/length checks); source of truth is DB executor validation.
 
 ## RPC Contract: `get_conversation_messages`
@@ -64,6 +66,49 @@ Expected payload includes ordered rows with:
 - `role_name`
 
 Agents must use this payload directly for navbar rendering decisions.
+
+## Table Contract: `segment`
+Current query contract:
+- Read from `public.segment` with fields:
+  - `name`
+  - `svg_name`
+  - `is_disabled`
+  - `created_at`
+- Order is DB-driven (currently `created_at asc` in service behavior).
+
+Service behavior:
+- Top-navbar segment chips for buyer/seller home must come from this table (no hardcoded list).
+- `is_disabled=true` must be propagated to UI so chips render disabled (greyed out + non-pressable).
+- `svg_name` maps to bundled app asset `assets/segments/{svg_name}.svg`.
+
+## RPC Contract: `get_seller_home_purchase_requests`
+Current function contract:
+- `public.get_seller_home_purchase_requests(p_profile_id uuid)`
+- Returns JSON object with `groups[]`.
+
+Expected payload for each group entry:
+- `code`
+- `name`
+- `total`
+- `items[]` (purchase request cards for that group)
+
+Expected item fields in `items[]`:
+- `id`
+- `title`
+- `summary_text`
+- `category_id`
+- `category_name`
+- `category_path`
+- `status`
+- `published_at`
+- `created_at`
+- `views_count`
+
+Service behavior:
+- Seller home must call this RPC for request discovery/grouping.
+- Do not send per-group limits from client; limits are DB configuration in `seller_home_group_preset_item.max_items`.
+- Do not hardcode group visibility/order in services.
+- Do not build seller-home request groups from local mocks when this RPC is available.
 
 ## Action Execution and Safe Fallbacks
 - If an action has no executor, use legacy action execution RPC only as compatibility fallback.

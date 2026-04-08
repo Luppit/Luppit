@@ -3,46 +3,38 @@ import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { getSession } from "@/src/lib/supabase";
 import { getProfileByUserId } from "@/src/services/profile.service";
+import { getSegments, Segment } from "@/src/services/segment.service";
+import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import React, { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
+import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { createTopNavbarStyles } from "./topNavbarStyles";
 
-const categories = [
-  {
-    key: "all",
-    label: "Todas",
-    image: require("../../../assets/images/icon.png"),
-  },
-  {
-    key: "vehicles",
-    label: "Vehículos",
-    image: require("../../../assets/images/icon.png"),
-  },
-  {
-    key: "furniture",
-    label: "Muebles",
-    image: require("../../../assets/images/icon.png"),
-  },
-  {
-    key: "plants",
-    label: "Plantas",
-    image: require("../../../assets/images/icon.png"),
-  },
-  {
-    key: "tools",
-    label: "Herramientas",
-    image: require("../../../assets/images/icon.png"),
-  },
-];
+const segmentSvgModules: Record<string, number> = {
+  todas: require("../../../assets/segments/todas.svg"),
+  vehiculos: require("../../../assets/segments/vehiculos.svg"),
+  muebles: require("../../../assets/segments/muebles.svg"),
+  plantas: require("../../../assets/segments/plantas.svg"),
+  herramientas: require("../../../assets/segments/herramientas.svg"),
+};
 
 function SharedTopNavbarContent() {
   const t = useTheme();
   const s = useMemo(() => createTopNavbarStyles(t), [t]);
-  const [selectedCategory, setSelectedCategory] = useState(categories[0].key);
+  const segmentIconUris = useMemo(() => {
+    const uris: Record<string, string> = {};
+    for (const [svgName, moduleRef] of Object.entries(segmentSvgModules)) {
+      uris[svgName] = Asset.fromModule(moduleRef).uri;
+    }
+    return uris;
+  }, []);
+  const [segments, setSegments] = useState<Segment[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [profileName, setProfileName] = useState("Mi perfil");
+  const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
 
   useEffect(() => {
     let active = true;
@@ -61,6 +53,32 @@ function SharedTopNavbarContent() {
     };
 
     void loadProfileName();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSegments = async () => {
+      const segmentResult = await getSegments();
+      if (!active || segmentResult.ok === false) return;
+
+      setSegments(segmentResult.data);
+      setSelectedCategory((current) => {
+        const hasCurrentEnabled = segmentResult.data.some(
+          (segment) => segment.svgName === current && !segment.isDisabled
+        );
+        if (hasCurrentEnabled) return current;
+
+        const firstEnabled = segmentResult.data.find((segment) => !segment.isDisabled)?.svgName;
+        return firstEnabled ?? segmentResult.data[0]?.svgName ?? "";
+      });
+    };
+
+    void loadSegments();
 
     return () => {
       active = false;
@@ -91,22 +109,53 @@ function SharedTopNavbarContent() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.categoryListContainer}
       >
-        {categories.map((category) => (
-          <Pressable
-            key={category.key}
-            onPress={() => {
-              setSelectedCategory(category.key);
-              console.log("open category", category.key);
-            }}
-            style={[
-              s.categoryButton,
-              selectedCategory === category.key && s.categoryButtonActive,
-            ]}
-          >
-            <Image source={category.image} style={s.categoryImage} />
-            <Text>{category.label}</Text>
-          </Pressable>
-        ))}
+        {segments.map((segment) => {
+          const segmentIconUri = segmentIconUris[segment.svgName];
+
+          return (
+            <Pressable
+              key={segment.svgName}
+              disabled={segment.isDisabled}
+              onPress={() => {
+                if (segment.isDisabled) return;
+                setSelectedCategory(segment.svgName);
+                console.log("open category", segment.svgName);
+              }}
+              style={[
+                s.categoryButton,
+                selectedCategory === segment.svgName &&
+                  !segment.isDisabled &&
+                  s.categoryButtonActive,
+                segment.isDisabled && s.categoryButtonDisabled,
+              ]}
+            >
+              <View style={s.categoryImageContainer}>
+                {!segmentIconUri || failedSegmentIcons[segment.svgName] ? (
+                  <Image
+                    source={require("../../../assets/images/icon.png")}
+                    style={s.categoryImage}
+                  />
+                ) : (
+                  <SvgUri
+                    uri={segmentIconUri}
+                    width={34}
+                    height={34}
+                    onError={() =>
+                      setFailedSegmentIcons((current) =>
+                        current[segment.svgName]
+                          ? current
+                          : { ...current, [segment.svgName]: true }
+                      )
+                    }
+                  />
+                )}
+              </View>
+              <Text color={segment.isDisabled ? "IconColorGray" : "textDark"}>
+                {segment.name}
+              </Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
     </View>
   );

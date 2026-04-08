@@ -153,6 +153,7 @@ export default function ConversationLayout() {
     [params.conversationId]
   );
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
+  const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
 
   const refreshConversation = useCallback(async () => {
     if (!conversationId) return;
@@ -204,7 +205,25 @@ export default function ConversationLayout() {
           executor: action.executor,
         });
       } else if (action.executor?.execution_type === "client_command") {
-        if (action.executor.target !== "popup.close") {
+        if (action.executor.target === "modal.offer") {
+          if (!purchaseRequestId) {
+            showError(
+              "No se pudo abrir la oferta",
+              "La conversación no tiene una solicitud asociada."
+            );
+            setIsExecutingAction(false);
+            return;
+          }
+
+          router.push({
+            pathname: "/(modal)/offer",
+            params: {
+              title: "Crear oferta",
+              purchaseRequestId,
+              conversationId,
+            },
+          });
+        } else if (action.executor.target !== "popup.close") {
           showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
         }
         result = { ok: true, data: null };
@@ -234,7 +253,7 @@ export default function ConversationLayout() {
         showSuccess("Acción completada");
       }
     },
-    [conversationId, profileId, isExecutingAction, refreshConversation]
+    [conversationId, profileId, isExecutingAction, purchaseRequestId, refreshConversation]
   );
 
   const handleActionPress = useCallback(

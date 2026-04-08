@@ -318,6 +318,37 @@ export async function getConversationByPurchaseOfferId(
   return { ok: true, data: data as Conversation };
 }
 
+export async function getOrCreateCurrentSellerConversationByPurchaseRequestId(
+  purchaseRequestId: string
+): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "get_or_create_seller_purchase_request_conversation",
+    {
+      p_purchase_request_id: purchaseRequestId,
+      p_profile_id: profile.data.id,
+    }
+  );
+
+  if (rpcResult?.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
+
+  const data =
+    rpcResult?.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+      ? rpcResult.data
+      : null;
+
+  if (!data || typeof data.id !== "string") return null;
+  return { ok: true, data: data as Conversation };
+}
+
 export async function getAcceptedConversationByPurchaseRequestId(
   purchaseRequestId: string
 ): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {

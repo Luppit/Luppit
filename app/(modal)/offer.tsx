@@ -15,11 +15,15 @@ import {
   CreatePurchaseOfferInput,
 } from "@/src/services/purchase.offer.service";
 import { openPopup } from "@/src/services/popup.service";
-import { PurchaseRequest } from "@/src/services/purchase.request.service";
+import {
+  getPurchaseRequestById,
+  PurchaseRequest,
+} from "@/src/services/purchase.request.service";
 import { Text } from "@/src/components/Text";
 import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
+import { showError, showSuccess } from "@/src/utils/useToast";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -54,9 +58,22 @@ function normalize(value: string | null | undefined) {
 
 export default function OfferScreen() {
   const t = useTheme();
-  const params = useGlobalSearchParams<{ purchaseRequest?: string | string[] }>();
-  const purchaseRequest =
-    parsePurchaseRequestParam(params.purchaseRequest) ?? purchaseRequestExample;
+  const params = useGlobalSearchParams<{
+    purchaseRequest?: string | string[];
+    purchaseRequestId?: string | string[];
+    conversationId?: string | string[];
+  }>();
+  const initialPurchaseRequest = parsePurchaseRequestParam(params.purchaseRequest);
+  const purchaseRequestId = Array.isArray(params.purchaseRequestId)
+    ? params.purchaseRequestId[0]
+    : params.purchaseRequestId;
+  const conversationId = Array.isArray(params.conversationId)
+    ? params.conversationId[0]
+    : params.conversationId;
+  const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest>(
+    initialPurchaseRequest ?? purchaseRequestExample
+  );
+  const [requestLoading, setRequestLoading] = useState(!initialPurchaseRequest && !!purchaseRequestId);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -114,6 +131,41 @@ export default function OfferScreen() {
 
     setCatalogLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (initialPurchaseRequest) {
+      setPurchaseRequest(initialPurchaseRequest);
+      setRequestLoading(false);
+      return;
+    }
+
+    if (!purchaseRequestId) {
+      setRequestLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const loadPurchaseRequest = async () => {
+      setRequestLoading(true);
+      const result = await getPurchaseRequestById(purchaseRequestId);
+      if (!active) return;
+
+      if (result?.ok) {
+        setPurchaseRequest(result.data);
+      } else {
+        showError("No se pudo cargar la solicitud", "Intenta abrir la oferta de nuevo.");
+      }
+
+      setRequestLoading(false);
+    };
+
+    void loadPurchaseRequest();
+
+    return () => {
+      active = false;
+    };
+  }, [initialPurchaseRequest, purchaseRequestId]);
 
   useEffect(() => {
     void loadCatalogs();
@@ -178,6 +230,62 @@ export default function OfferScreen() {
       return displayName;
     })
     .join(" ");
+  const handlePublishOffer = useCallback(async () => {
+    const primaryDeliveryCatalogId =
+      (shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
+        ? shippingCatalog.id
+        : deliveryMethods[0]) ?? "";
+
+    const payload: CreatePurchaseOfferInput = {
+      purchaseRequestId: purchaseRequest.id,
+      conversationId,
+      description,
+      price: Number(price),
+      currencyId,
+      primaryDeliveryCatalogId,
+      files,
+      deliveryMethods,
+      pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
+      pickupDelayUnit,
+      shippingCost: Number(shippingCost || 0),
+      shippingMaxTime: toDays(
+        Number(shippingMaxTime || 0),
+        shippingMaxTimeUnit
+      ),
+      shippingMaxTimeUnit,
+    };
+
+    const result = await createPurchaseOffer(payload);
+    if (!result.ok) {
+      showError("No se pudo publicar la oferta", result.error.message);
+      return;
+    }
+
+    showSuccess("Oferta publicada");
+    router.back();
+  }, [
+    conversationId,
+    currencyId,
+    deliveryMethods,
+    description,
+    files,
+    pickupDelay,
+    pickupDelayUnit,
+    price,
+    purchaseRequest.id,
+    shippingCatalog,
+    shippingCost,
+    shippingMaxTime,
+    shippingMaxTimeUnit,
+  ]);
+
+  if (requestLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text>Cargando solicitud...</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
@@ -356,39 +464,7 @@ export default function OfferScreen() {
                     backgroundColorKey: "primary",
                     textColorKey: "backgroudWhite",
                     iconColorKey: "backgroudWhite",
-                    onPress: async () => {
-                      const primaryDeliveryCatalogId =
-                        (shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
-                          ? shippingCatalog.id
-                          : deliveryMethods[0]) ?? "";
-
-                      const payload: CreatePurchaseOfferInput = {
-                        purchaseRequestId: purchaseRequest.id,
-                        description,
-                        price: Number(price),
-                        currencyId,
-                        primaryDeliveryCatalogId,
-                        files,
-                        deliveryMethods,
-                        pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
-                        pickupDelayUnit,
-                        shippingCost: Number(shippingCost || 0),
-                        shippingMaxTime: toDays(
-                          Number(shippingMaxTime || 0),
-                          shippingMaxTimeUnit
-                        ),
-                        shippingMaxTimeUnit,
-                      };
-
-                      const result = await createPurchaseOffer(payload);
-                      if (!result.ok) {
-                        console.log("create purchase offer error", result.error);
-                        return;
-                      }
-
-                      console.log("create purchase offer success", result.data);
-                      router.back();
-                    },
+                    onPress: () => void handlePublishOffer(),
                   },
                 ],
               })
