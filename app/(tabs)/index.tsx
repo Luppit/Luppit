@@ -3,6 +3,7 @@ import Button from "@/src/components/button/Button";
 import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
+import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { getPurchaseOffersCountByPurchaseRequestId } from "@/src/services/purchase.offer.service";
 import {
   getCurrentSellerHomePurchaseRequestGroups,
@@ -13,6 +14,7 @@ import {
 } from "@/src/services/purchase.request.service";
 import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
+import { showError, showInfo } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
@@ -270,18 +272,31 @@ function SellerHomeGroupSection({
 function SellerHomeRequestCard({ item }: { item: SellerHomePurchaseRequestItem }) {
   const t = useTheme();
   const publishedLabel = formatPublishedLabel(item.published_at ?? item.created_at);
+  const openRequestConversation = useCallback(async () => {
+    const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
+
+    if (!conversation) {
+      showInfo("Sin conversación", "No se pudo preparar el chat para esta solicitud.");
+      return;
+    }
+
+    if (!conversation.ok) {
+      showError("No se pudo abrir la conversación", conversation.error.message);
+      return;
+    }
+
+    router.push({
+      pathname: "/(conversation)/offer",
+      params: {
+        conversationId: conversation.data.id,
+        title: item.title ?? "Conversación",
+      },
+    });
+  }, [item.id, item.title]);
 
   return (
     <Pressable
-      onPress={() =>
-        router.push({
-          pathname: "/(detail)/purchase-request",
-          params: {
-            title: item.title ?? "Detalle de solicitud",
-            purchaseRequest: JSON.stringify(toPurchaseRequest(item)),
-          },
-        })
-      }
+      onPress={() => void openRequestConversation()}
       accessibilityRole="button"
       style={{
         width: 270,
@@ -360,23 +375,4 @@ function formatPublishedLabel(rawDate: string | null): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `Hace ${diffDays} d`;
   return date.toLocaleDateString("es-CR");
-}
-
-function toPurchaseRequest(item: SellerHomePurchaseRequestItem): PurchaseRequest {
-  const timestamp = item.published_at ?? item.created_at;
-  return {
-    id: item.id,
-    profile_id: "",
-    draft_id: null,
-    category_id: item.category_id,
-    category_path: item.category_path,
-    category_name: item.category_name,
-    title: item.title,
-    summary_text: item.summary_text,
-    contract: {},
-    status: item.status,
-    created_at: item.created_at,
-    published_at: timestamp,
-    updated_at: timestamp,
-  };
 }

@@ -1,11 +1,12 @@
 import ProductCard from "@/src/components/productCard/ProductCard";
 import { Text } from "@/src/components/Text";
+import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import {
   getCurrentSellerHomePurchaseRequestGroups,
-  PurchaseRequest,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
+import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -33,25 +34,6 @@ function formatPublishedLabel(rawDate: string | null): string {
   return date.toLocaleDateString("es-CR");
 }
 
-function toPurchaseRequest(item: SellerHomePurchaseRequestItem): PurchaseRequest {
-  const timestamp = item.published_at ?? item.created_at;
-  return {
-    id: item.id,
-    profile_id: "",
-    draft_id: null,
-    category_id: item.category_id,
-    category_path: item.category_path,
-    category_name: item.category_name,
-    title: item.title,
-    summary_text: item.summary_text,
-    contract: {},
-    status: item.status,
-    created_at: item.created_at,
-    published_at: timestamp,
-    updated_at: timestamp,
-  };
-}
-
 export default function SellerHomeGroupScreen() {
   const t = useTheme();
   const params = useGlobalSearchParams<{
@@ -60,6 +42,23 @@ export default function SellerHomeGroupScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<SellerHomePurchaseRequestItem[]>([]);
   const groupCode = useMemo(() => parseStringParam(params.groupCode), [params.groupCode]);
+  const openRequestConversation = useCallback(async (item: SellerHomePurchaseRequestItem) => {
+    const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
+
+    if (!conversation?.ok) {
+      const message = conversation?.error.message ?? "Ocurrió un error, intenta de nuevo.";
+      showError("No se pudo abrir la conversación", message);
+      return;
+    }
+
+    router.push({
+      pathname: "/(conversation)/offer",
+      params: {
+        conversationId: conversation.data.id,
+        title: item.title ?? "Conversación",
+      },
+    });
+  }, []);
 
   const loadGroup = useCallback(async () => {
     if (!groupCode) {
@@ -113,15 +112,7 @@ export default function SellerHomeGroupScreen() {
             views={item.views_count}
             statusLabel="Activa"
             offersLabel={formatPublishedLabel(item.published_at ?? item.created_at)}
-            onPress={() =>
-              router.push({
-                pathname: "/(detail)/purchase-request",
-                params: {
-                  title: item.title ?? "Detalle de solicitud",
-                  purchaseRequest: JSON.stringify(toPurchaseRequest(item)),
-                },
-              })
-            }
+            onPress={() => void openRequestConversation(item)}
           />
         </View>
       ))}
