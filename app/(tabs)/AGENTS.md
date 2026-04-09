@@ -16,6 +16,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
 - Do not use local purchase-request mocks for seller home flows when RPC data exists.
 - Keep client behavior presentation-only (horizontal carousels, navigation, loading/empty states).
 - Group header action should navigate to a dedicated group listing screen (for example with `groupCode` param).
+- Seller request card press (home + group listing) must not navigate to purchase-request detail for seller role.
+- Seller request card press must open `/(conversation)/offer` and resolve conversation via DB RPC `public.get_or_create_seller_purchase_request_conversation(...)`.
 - Carousel geometry convention for seller home:
   - carousels can be full-bleed within seller-home screen context
   - first card must align with the group header text at initial position

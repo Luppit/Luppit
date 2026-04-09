@@ -2,6 +2,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import ConversationActionButtons, {
   ConversationActionButtonConfig,
 } from "@/src/components/conversation/ConversationActionButtons";
+import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Text } from "@/src/components/Text";
@@ -15,7 +16,7 @@ import {
   executeConversationActionByExecutor,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
-import { useTheme } from "@/src/themes";
+import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ type ConversationLayoutContextValue = {
   profileId: string;
   conversationView: ConversationView;
   auxActions: ConversationViewAction[];
+  showComposer: boolean;
   onActionPress: (action: ConversationViewAction) => void;
   isExecutingAction: boolean;
   refreshConversation: () => Promise<void>;
@@ -99,6 +101,18 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
     textColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
   };
+}
+
+function getAuxActionTextColor(styleCode: string | null, theme: Theme) {
+  const { isDanger, isPrimary } = normalizeStyleFlags(styleCode);
+
+  if (isDanger) return theme.colors.error;
+  if (isPrimary) return theme.colors.primary;
+  return theme.colors.textDark;
+}
+
+function isBlackAuxAction(styleCode: string | null) {
+  return normalizeText(styleCode).includes("black");
 }
 
 function interpolateTemplate(
@@ -410,8 +424,7 @@ export default function ConversationLayout() {
   const auxActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
   );
-  const hasAuxActions = auxActions.length > 0;
-  const showComposer = conversationView.permissions.can_send_messages && !hasAuxActions;
+  const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
   const actionButtonsOverlaySpace = showActionButtons ? 76 + t.spacing.md : 0;
   const title = routeTitle ?? "Conversación";
@@ -421,6 +434,7 @@ export default function ConversationLayout() {
     profileId,
     conversationView,
     auxActions,
+    showComposer,
     onActionPress: handleActionPress,
     isExecutingAction,
     refreshConversation,
@@ -509,13 +523,57 @@ export default function ConversationLayout() {
           </View>
 
           {showComposer ? (
-            <View
-              style={{
-                paddingHorizontal: t.spacing.md,
-                paddingTop: t.spacing.sm,
-                paddingBottom: Math.max(insets.bottom, t.spacing.sm),
-              }}
-            >
+            <>
+              {auxActions.length > 0 ? (
+                <View
+                  style={{
+                    paddingHorizontal: t.spacing.md,
+                    paddingTop: t.spacing.sm,
+                    paddingBottom: t.spacing.sm,
+                    gap: t.spacing.sm,
+                  }}
+                >
+                  {auxActions.map((action) =>
+                    isBlackAuxAction(action.style_code) ? (
+                      <Button
+                        key={action.id}
+                        title={action.label}
+                        onPress={() => handleActionPress(action)}
+                        disabled={isExecutingAction}
+                        variant="dark"
+                      />
+                    ) : (
+                      <Pressable
+                        key={action.id}
+                        onPress={() => handleActionPress(action)}
+                        disabled={isExecutingAction}
+                        hitSlop={8}
+                        style={{
+                          alignSelf: "center",
+                          paddingVertical: t.spacing.xs,
+                          opacity: isExecutingAction ? 0.6 : 1,
+                        }}
+                      >
+                        <Text
+                          variant="body"
+                          align="center"
+                          style={{ color: getAuxActionTextColor(action.style_code, t) }}
+                        >
+                          {action.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  )}
+                </View>
+              ) : null}
+
+              <View
+                style={{
+                  paddingHorizontal: t.spacing.md,
+                  paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
+                  paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+                }}
+              >
               <InputChat
                 onSend={async ({ text, images }) => {
                   const created = await createConversationMessages({
@@ -528,7 +586,8 @@ export default function ConversationLayout() {
                   }
                 }}
               />
-            </View>
+              </View>
+            </>
           ) : null}
         </View>
       </KeyboardAvoidingView>

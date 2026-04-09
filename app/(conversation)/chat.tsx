@@ -15,20 +15,36 @@ export default function ConversationChatScreen() {
   const {
     conversationId,
     profileId,
+    conversationView,
     messageRefreshTick,
     auxActions,
     onActionPress,
     isExecutingAction,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const scrollViewRef = React.useRef<ScrollView | null>(null);
   const imageMessageWidth = 230;
+  const showComposer = conversationView.permissions.can_send_messages;
+  const scrollToBottom = useCallback((animated = false) => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated });
+      }, 0);
+    });
+  }, []);
 
   const loadMessages = useCallback(async () => {
     const result =
       await getConversationMessagesByConversationId(conversationId);
     if (!result.ok) return;
     setMessages(result.data);
-  }, [conversationId]);
+    if (result.data.length > 0) {
+      scrollToBottom(false);
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 120);
+    }
+  }, [conversationId, scrollToBottom]);
 
   useFocusEffect(
     useCallback(() => {
@@ -45,6 +61,23 @@ export default function ConversationChatScreen() {
       hour: "numeric",
       minute: "2-digit",
     });
+
+  const formatSystemDate = (date: string) => {
+    const parts = new Intl.DateTimeFormat("es-CR", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).formatToParts(new Date(date));
+
+    const day = parts.find((part) => part.type === "day")?.value ?? "";
+    const monthRaw = parts.find((part) => part.type === "month")?.value ?? "";
+    const year = parts.find((part) => part.type === "year")?.value ?? "";
+    const month = monthRaw
+      ? `${monthRaw.charAt(0).toUpperCase()}${monthRaw.slice(1).toLowerCase()}`
+      : "";
+
+    return `${day} ${month}, ${year}`.trim();
+  };
 
   const getAuxActionTextColor = (styleCode: string | null) => {
     const value = (styleCode ?? "").toLowerCase().trim();
@@ -70,6 +103,7 @@ export default function ConversationChatScreen() {
 
   return (
     <ScrollView
+      ref={scrollViewRef}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
@@ -78,6 +112,10 @@ export default function ConversationChatScreen() {
         paddingBottom: t.spacing.xl,
       }}
       showsVerticalScrollIndicator={false}
+      onContentSizeChange={() => {
+        if (messages.length === 0) return;
+        scrollToBottom(false);
+      }}
     >
       {messages.map((message) => {
         const messageKind = (message.message_kind ?? "").toUpperCase();
@@ -95,29 +133,27 @@ export default function ConversationChatScreen() {
               style={{
                 alignSelf: "stretch",
                 alignItems: "center",
-                marginVertical: t.spacing.xs,
-                gap: t.spacing.xs,
+                marginVertical: t.spacing.sm,
+                gap: t.spacing.md,
               }}
             >
               <View
                 style={{
-                  width: "72%",
-                  height: 1,
+                  borderRadius: 999,
+                  paddingHorizontal: t.spacing.sm + 2,
+                  paddingVertical: 2,
                   backgroundColor: t.colors.border,
                 }}
-              />
+              >
+                <Text variant="body" color="textDark" align="center">
+                  {formatSystemDate(message.created_at)}
+                </Text>
+              </View>
               {message.text ? (
                 <Text variant="body" color="stateAnulated" align="center">
                   {message.text}
                 </Text>
               ) : null}
-              <View
-                style={{
-                  width: "72%",
-                  height: 1,
-                  backgroundColor: t.colors.border,
-                }}
-              />
             </View>
           );
         }
@@ -176,13 +212,17 @@ export default function ConversationChatScreen() {
         );
       })}
 
-      {auxActions.map((action) => (
-        isBlackAuxAction(action.style_code) ? (
+      {!showComposer ? auxActions.map((action, index) => {
+        const isLastAuxAction = index === auxActions.length - 1;
+        const auxBottomSpacing = showComposer && isLastAuxAction ? t.spacing.sm : 0;
+
+        return isBlackAuxAction(action.style_code) ? (
           <View
             key={action.id}
             style={{
               alignSelf: "stretch",
               paddingTop: t.spacing.xs,
+              marginBottom: auxBottomSpacing,
             }}
           >
             <Button
@@ -201,6 +241,7 @@ export default function ConversationChatScreen() {
             style={{
               alignSelf: "center",
               paddingVertical: t.spacing.xs,
+              marginBottom: auxBottomSpacing,
               opacity: isExecutingAction ? 0.6 : 1,
             }}
           >
@@ -212,8 +253,8 @@ export default function ConversationChatScreen() {
               {action.label}
             </Text>
           </Pressable>
-        )
-      ))}
+        );
+      }) : null}
     </ScrollView>
   );
 }

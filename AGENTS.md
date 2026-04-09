@@ -13,6 +13,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Do not reintroduce seller-home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
 - Never hardcode conversation action behavior when DB metadata exists.
+- Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.
 - Never hardcode top-navbar segment chips when DB `segment` configuration exists.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.

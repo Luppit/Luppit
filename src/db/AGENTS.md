@@ -98,6 +98,22 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `conversation_transition`: valid state transitions by action + actor role.
 - `conversation_status_history`: transition audit.
 - `conversation_deadline`: deadline-based transitions.
+  - Current model is one active deadline row per conversation, keyed by `conversation.id`.
+  - Later lifecycle deadlines overwrite/reset the active row instead of preserving deadline history.
+- `deadline_type_catalog`: deadline behavior metadata.
+  - `expiration_days` may be null.
+  - `due_at_source` defines how `conversation_deadline.due_at` is computed.
+  - `active_status_code`, `default_trigger_transition_to`, `buyer_overdue_message`, and `seller_overdue_message` are DB-driven source of truth.
+- Current deadline types:
+  - `SELLER_CONCRETAR_EXPIRATION`: `SELLER_ACCEPTED -> DELAYED_ACCEPTANCE`, fixed days from catalog.
+  - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`, days from `purchase_offer_delivery.max_days`.
+- Seller request bootstrap states in current flow:
+  - `REQUEST_OPENED`: seller opened request chat before first offer.
+  - `REQUEST_DISCARDED`: seller discarded request chat.
+- Seller first-offer action in current flow:
+  - `conversation_action.code = 'SELLER_CREATE_OFFER'`
+  - executor uses `execution_type='client_command'` with target `modal.offer`
+  - transition from `REQUEST_OPENED` to `OFFER_MADE` is DB-driven via `conversation_transition`.
 
 ### Conversation Action Execution
 - `conversation_action_execution_type_catalog`: executor type catalog (e.g. `server_rpc`, `client_command`).
@@ -161,9 +177,21 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - Return a JSON result with at least success + status transition details.
 - Current implemented example: `public.buyer_accept_offer`.
 - `public.buyer_accept_offer` must also update `purchase_request.status` from `active` to `offer_accepted` atomically with the conversation transition.
+- `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'`.
+- `public.seller_finalize_transaction(...)` must require `purchase_offer_delivery.max_days > 0`, transition to `SENT_SHIPMENT`, then create/reset the active deadline from `deadline_type_catalog.code = 'SENT_SHIPMENT_EXPIRATION'`.
+- Seller request bootstrap/create-offer flow currently uses:
+  - `public.get_or_create_seller_purchase_request_conversation(...)`
+  - `public.create_seller_offer_from_conversation(...)`
+- `public.create_seller_offer_from_conversation(...)` must atomically:
+  - create `purchase_offer_delivery`, `purchase_offer`, `purchase_offer_image`
+  - apply conversation transition/history for seller first offer
+  - create chat messages in order: one `TEXT` summary first, then `IMAGE` messages.
+- For offer-publish chat images, `conversation_message.image_path` must reference files uploaded to the `conversations` storage bucket (same contract as chat image upload), not offer-only storage paths.
 
 ## Role-Specific System Messages
 - For role-specific system messages, write `conversation_message.visible_to_role_id` using role catalog IDs (not client-side string flags).
+- Overdue deadline messages must come from deadline metadata and be written separately for buyer and seller visibility.
+- The shared deadline expiry processor must resolve active status, target status, and overdue copy from `deadline_type_catalog`, not from hardcoded status checks.
 
 ## Timeline Resolution (DB-Driven)
 - Offer timeline on purchase-request detail must be resolved by DB RPC `public.get_conversation_timeline(p_conversation_id uuid)`.

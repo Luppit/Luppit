@@ -22,9 +22,15 @@ Applies to conversation screens and conversation UI behavior.
 - For rating confirmations, popup title should use the rating input label from DB when present, instead of a hardcoded local title.
 - Render button labels/icons from confirmation template values.
 - Execute server actions via configured executor target (`execution_type='server_rpc'`).
+- For `execution_type='client_command'`, resolve behavior by `executor.target`.
+- Current required client command: `executor.target='modal.offer'` must open `/(modal)/offer` with `purchaseRequestId` + `conversationId`.
 - Respect `requires_refresh` to decide whether to reload conversation view/messages.
 - Do not hardcode buyer/seller system-message visibility in client logic; rely on `get_conversation_messages` DB filtering.
 - Keyboard behavior in popup confirmations must keep inputs visible (avoid keyboard overlap) while preserving sheet visibility.
+- Chat screen should open anchored at the newest message (bottom) on initial load/refresh.
+- `permissions.can_send_messages=true` must show the composer even when AUX actions exist.
+- AUX actions and the composer are not mutually exclusive; when both are present, render AUX actions in a fixed bottom area above the composer, not inside the scrollable message history.
+- When `permissions.can_send_messages=false`, AUX actions may continue using the in-thread placement behavior.
 
 ## Live Configuration Reference
 - Buyer accept offer action is currently configured as:
@@ -33,3 +39,8 @@ Applies to conversation screens and conversation UI behavior.
   - executor type: `server_rpc`
   - confirmation template: `BUYER_ACCEPT_OFFER_CONFIRMATION`
   - server-side effect: besides conversation transition to `OFFER_ACCEPTED`, it also updates the linked `purchase_request.status` to `offer_accepted`.
+- Current delayed conversation flows:
+  - `SELLER_CONCRETAR` transitions `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then the active deadline may expire to `DELAYED_ACCEPTANCE`.
+  - `seller_finalize_transaction(...)` transitions to `SENT_SHIPMENT`, then the active deadline may expire to `DELAYED_SHIPMENT` using `purchase_offer_delivery.max_days`.
+  - `DELAYED_ACCEPTANCE` may have messaging permissions enabled and may also expose AUX or TOP actions from DB metadata.
+  - The client must not suppress the composer just because an AUX action exists.
