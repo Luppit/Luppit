@@ -4,21 +4,21 @@ import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
-import { getPurchaseOffersCountByPurchaseRequestId } from "@/src/services/purchase.offer.service";
+import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import {
+  BuyerHomePurchaseRequestGroup,
+  BuyerHomePurchaseRequestItem,
+  getCurrentBuyerHomePurchaseRequestGroups,
   getCurrentSellerHomePurchaseRequestGroups,
-  getCurrentUserPurchaseRequest,
-  PurchaseRequest,
   SellerHomePurchaseRequestGroup,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
-import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
 import { showError, showInfo } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
@@ -37,103 +37,109 @@ export default function HomeScreen() {
 
 function BuyerHomeContent() {
   const t = useTheme();
+  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const [isLoading, setIsLoading] = useState(true);
-  const [visualizations, setVisualizations] = useState(0);
-  const [offersCount, setOffersCount] = useState(0);
-  const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest | null>(
-    null
-  );
+  const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
+  const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
+  const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
-  useEffect(() => {
-    let active = true;
+  const loadGroups = useCallback(async () => {
+    setIsLoading(true);
+    const result = await getCurrentBuyerHomePurchaseRequestGroups();
+    const nextGroups = result.ok ? result.data : [];
+    setGroups(nextGroups);
 
-    const loadPurchaseRequest = async () => {
-      const result = await getCurrentUserPurchaseRequest();
-      if (!active) return;
-
-      const requestToShow = result.ok ? result.data : null;
-      setPurchaseRequest(requestToShow);
-
-      if (!requestToShow) {
-        setVisualizations(0);
-        setOffersCount(0);
-        setIsLoading(false);
-        return;
-      }
-
-      const [countResult, offersCountResult] = await Promise.all([
-        getPurchaseRequestVisualizationCount(requestToShow.id),
-        getPurchaseOffersCountByPurchaseRequestId(requestToShow.id),
-      ]);
-      if (!active) return;
-      setVisualizations(countResult.ok ? countResult.data : 0);
-      setOffersCount(offersCountResult.ok ? offersCountResult.data : 0);
-
-      setIsLoading(false);
-    };
-
-    void loadPurchaseRequest();
-
-    return () => {
-      active = false;
-    };
+    const requestIds = nextGroups.flatMap((group) => group.items.map((item) => item.id));
+    const countsResult = await getPurchaseOffersCountByPurchaseRequestIds(requestIds);
+    setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
+    setIsLoading(false);
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadGroups();
+      return () => {};
+    }, [loadGroups])
+  );
+
+  const hasAnyItems = useMemo(
+    () => groups.some((group) => group.items.length > 0),
+    [groups]
+  );
+
   if (isLoading) {
-    return <Text>Cargando contenido...</Text>;
+    return <Text>Cargando solicitudes...</Text>;
   }
 
-  if (!purchaseRequest) {
+  if (!hasAnyItems) {
     return (
-      <View style={{ flex: 1 }}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-            gap: t.spacing.md,
-            paddingHorizontal: t.spacing.lg,
-            paddingBottom: 96,
-          }}
-        >
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          gap: t.spacing.md,
+          paddingHorizontal: t.spacing.lg,
+          paddingBottom: 96,
+        }}
+      >
+        {emptyBoxAsset?.uri ? (
+          <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
+        ) : (
           <Image
             source={require("../../assets/images/icon.png")}
             style={{ width: 84, height: 84 }}
             resizeMode="contain"
           />
-          <Text align="center" variant="body">
-            Cuéntanos qué necesitas y te ayudamos a encontrarlo!
-          </Text>
-          <View style={{ width: "100%" }}>
-            <Button
-              variant="dark"
-              icon="plus"
-              title="Crear nueva solicitud"
-              onPress={() => router.push("/(chat)/chat")}
-            />
-          </View>
+        )}
+        <Text align="center" variant="body">
+          Cuéntanos qué necesitas y te ayudamos a encontrarlo!
+        </Text>
+        <View style={{ width: "100%" }}>
+          <Button
+            variant="dark"
+            icon="plus"
+            title="Crear nueva solicitud"
+            onPress={() => router.push("/(chat)/chat")}
+          />
         </View>
       </View>
     );
   }
 
   return (
-    <ProductCard
-      title={purchaseRequest.title ?? "Solicitud"}
-      subtitle={purchaseRequest.category_name ?? "-"}
-      views={visualizations}
-      statusLabel="Activa"
-      offersLabel={`${offersCount} ofertas`}
-      onPress={() =>
-        router.push({
-          pathname: "/(detail)/purchase-request",
-          params: {
-            title: purchaseRequest.title ?? "Detalle de solicitud",
-            purchaseRequest: JSON.stringify(purchaseRequest),
-          },
-        })
-      }
-    />
+    <ScrollView
+      style={{ marginHorizontal: -fullBleedOffset }}
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{
+        gap: t.spacing.md,
+        paddingBottom: t.spacing.xl,
+      }}
+    >
+      {groups.map((group) => (
+        <HomeGroupSection
+          key={group.code}
+          group={group}
+          headerInset={fullBleedOffset}
+          onOpenGroup={() =>
+            router.push({
+              pathname: "/(detail)/buyer-home-group",
+              params: {
+                title: group.name,
+                groupCode: group.code,
+              },
+            })
+          }
+          renderItem={(item) => (
+            <BuyerHomeRequestCard
+              key={item.id}
+              item={item}
+              offersCount={offerCountsByRequestId[item.id] ?? 0}
+            />
+          )}
+        />
+      ))}
+    </ScrollView>
   );
 }
 
@@ -206,18 +212,38 @@ function SellerHomeContent() {
       }}
     >
       {groups.map((group) => (
-        <SellerHomeGroupSection key={group.code} group={group} headerInset={fullBleedOffset} />
+        <HomeGroupSection
+          key={group.code}
+          group={group}
+          headerInset={fullBleedOffset}
+          onOpenGroup={() =>
+            router.push({
+              pathname: "/(detail)/seller-home-group",
+              params: {
+                title: group.name,
+                groupCode: group.code,
+              },
+            })
+          }
+          renderItem={(item) => <SellerHomeRequestCard key={item.id} item={item} />}
+        />
       ))}
     </ScrollView>
   );
 }
 
-function SellerHomeGroupSection({
+function HomeGroupSection({
   group,
   headerInset,
+  onOpenGroup,
+  renderItem,
 }: {
-  group: SellerHomePurchaseRequestGroup;
+  group: BuyerHomePurchaseRequestGroup | SellerHomePurchaseRequestGroup;
   headerInset: number;
+  onOpenGroup: () => void;
+  renderItem: (
+    item: BuyerHomePurchaseRequestItem | SellerHomePurchaseRequestItem
+  ) => React.ReactNode;
 }) {
   const t = useTheme();
 
@@ -225,15 +251,7 @@ function SellerHomeGroupSection({
     <View style={{ gap: t.spacing.sm }}>
       <Pressable
         accessibilityRole="button"
-        onPress={() =>
-          router.push({
-            pathname: "/(detail)/seller-home-group",
-            params: {
-              title: group.name,
-              groupCode: group.code,
-            },
-          })
-        }
+        onPress={onOpenGroup}
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -260,11 +278,38 @@ function SellerHomeGroupSection({
             paddingVertical: t.spacing.xs,
           }}
         >
-          {group.items.map((item) => (
-            <SellerHomeRequestCard key={item.id} item={item} />
-          ))}
+          {group.items.map((item) => renderItem(item))}
         </ScrollView>
       )}
+    </View>
+  );
+}
+
+function BuyerHomeRequestCard({
+  item,
+  offersCount,
+}: {
+  item: BuyerHomePurchaseRequestItem;
+  offersCount: number;
+}) {
+  return (
+    <View style={{ width: 270 }}>
+      <ProductCard
+        title={item.title ?? "Solicitud"}
+        subtitle={item.category_name ?? "-"}
+        views={item.views_count}
+        statusLabel={item.status === "active" ? "Activa" : item.status}
+        offersLabel={`${offersCount} ofertas`}
+        onPress={() =>
+          router.push({
+            pathname: "/(detail)/purchase-request",
+            params: {
+              title: item.title ?? "Detalle de solicitud",
+              purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
+            },
+          })
+        }
+      />
     </View>
   );
 }
@@ -375,4 +420,22 @@ function formatPublishedLabel(rawDate: string | null): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `Hace ${diffDays} d`;
   return date.toLocaleDateString("es-CR");
+}
+
+function toPurchaseRequestParam(item: BuyerHomePurchaseRequestItem) {
+  return {
+    id: item.id,
+    profile_id: "",
+    draft_id: null,
+    category_id: item.category_id,
+    category_path: item.category_path,
+    category_name: item.category_name,
+    title: item.title,
+    summary_text: item.summary_text,
+    contract: {},
+    status: item.status,
+    created_at: item.created_at,
+    published_at: item.published_at ?? item.created_at,
+    updated_at: item.created_at,
+  };
 }

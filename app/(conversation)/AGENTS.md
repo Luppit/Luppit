@@ -9,6 +9,7 @@ Applies to conversation screens and conversation UI behavior.
 - Whether an action opens confirmation comes from confirmation template metadata in DB.
 - Confirmation title/description/rows/buttons/icons must come from DB payload.
 - Conditional confirmation additions (description append + inputs like OTP/rating) must come resolved from DB payload for the active conversation context.
+- Rating actions must disappear when the current participant already submitted the matching conversation rating; this visibility rule is DB-resolved in `get_conversation_view(...)`.
 - Client can apply only presentational fallback values (for resilience), but must not define product logic.
 
 ## Implementation Rules
@@ -25,6 +26,7 @@ Applies to conversation screens and conversation UI behavior.
 - For `execution_type='client_command'`, resolve behavior by `executor.target`.
 - Current required client command: `executor.target='modal.offer'` must open `/(modal)/offer` with `purchaseRequestId` + `conversationId`.
 - Respect `requires_refresh` to decide whether to reload conversation view/messages.
+- Do not locally suppress or persist rating-action visibility; after execution, refresh and trust the DB-returned `actions[]`.
 - Do not hardcode buyer/seller system-message visibility in client logic; rely on `get_conversation_messages` DB filtering.
 - Keyboard behavior in popup confirmations must keep inputs visible (avoid keyboard overlap) while preserving sheet visibility.
 - Chat screen should open anchored at the newest message (bottom) on initial load/refresh.
@@ -39,6 +41,10 @@ Applies to conversation screens and conversation UI behavior.
   - executor type: `server_rpc`
   - confirmation template: `BUYER_ACCEPT_OFFER_CONFIRMATION`
   - server-side effect: besides conversation transition to `OFFER_ACCEPTED`, it also updates the linked `purchase_request.status` to `offer_accepted`.
+- Conversation rating actions are currently configured so the DB may return them only when the current actor has not rated yet:
+  - `BUYER_RATE_SELLER`
+  - `SELLER_RATE_BUYER`
+  - executor target: `public.submit_conversation_rating`
 - Current delayed conversation flows:
   - `SELLER_CONCRETAR` transitions `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then the active deadline may expire to `DELAYED_ACCEPTANCE`.
   - `seller_finalize_transaction(...)` transitions to `SENT_SHIPMENT`, then the active deadline may expire to `DELAYED_SHIPMENT` using `purchase_offer_delivery.max_days`.

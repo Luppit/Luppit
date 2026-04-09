@@ -18,6 +18,7 @@ Applies to navbar UI components and rendering behavior.
 - Segment icon identity must render from `segment.svg_name`, resolved against bundled assets at `assets/segments/{svg_name}.svg`.
 - `segment.is_disabled=true` must render segment as disabled (greyed out) and non-clickable.
 - No hardcoded segment list fallback is allowed.
+- Segment chips are separate DB configuration from home-group presets; do not infer seller/buyer home grouping or request filtering from segment values unless a DB-backed contract explicitly adds that behavior.
 
 ## Implementation Rules
 - Do not define static buyer/seller navbar lists in app code.

@@ -7,6 +7,10 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 
 ### Business & Identity
 - `business`: seller business data.
+- `business_rating_summary`: aggregated business reputation snapshot (`rating`, `num_ratings`).
+- `profile_rating_summary`: aggregated profile reputation snapshot (`rating`, `num_ratings`).
+- `business_with_rating`: compatibility/read view that exposes business base fields plus rating summary fields.
+- `profile_with_rating`: compatibility/read view that exposes profile base fields plus rating summary fields.
 - `profile_business`: profile-business mapping.
 - `business_category_preference`: business-to-category preference mapping used for seller request discovery.
 - `location`: geographic data.
@@ -22,21 +26,28 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Segment icon identity is DB-driven via `segment.svg_name`.
 - Icon file location is a fixed app asset convention: `assets/segments/{svg_name}.svg` (bundled app asset path).
 
-### Seller Home Group Configuration
-- `seller_home_group`: group catalog for seller home sections (for example `all`, `popular`, `newest`).
-- `seller_home_group_preset`: preset catalog (for example `default`, `minimalist`).
-- `seller_home_group_preset_item`: enabled groups per preset + `sort_order` + `max_items` (group-level limit).
-- `business_seller_home_group_preset`: assigned preset per business.
-- Group limits must come from `seller_home_group_preset_item.max_items`; do not pass limits as procedure parameters.
+### Shared Home Group Configuration
+- `home_group`: shared group catalog for home sections, keyed by `surface_code` (currently `seller_home`, `buyer_home`).
+- `home_group_preset`: shared preset catalog for home surfaces, keyed by `surface_code`.
+- `home_group_preset_item`: enabled groups per preset + `sort_order` + `max_items` (group-level limit).
+- `business_home_group_preset`: assigned preset per seller business.
+- `profile_home_group_preset`: assigned preset per buyer profile.
+- Group limits must come from `home_group_preset_item.max_items`; do not pass limits as procedure parameters.
 - Key constraints (must be preserved):
   - `business_category_preference`: unique (`business_id`, `category_id`)
-  - `seller_home_group_preset_item`: unique (`preset_id`, `group_code`)
-  - `business_seller_home_group_preset`: unique (`business_id`)
-- `seller_home_group_preset_item.max_items` is required DB config (`not null`, `> 0`) and is the only source of per-group limits.
+  - `home_group`: unique (`surface_code`, `code`)
+  - `home_group_preset`: unique (`surface_code`, `code`)
+  - `home_group_preset_item`: unique (`preset_id`, `group_id`)
+  - `business_home_group_preset`: unique (`business_id`)
+  - `profile_home_group_preset`: unique (`profile_id`)
+- `home_group_preset_item.max_items` is required DB config (`not null`, `> 0`) and is the only source of per-group limits.
 - Seeded reference codes currently expected:
   - group codes: `all`, `popular`, `newest`
   - preset codes: `default`, `minimalist`
-- Default assignment convention: businesses without explicit assignment should be linked to preset code `default`.
+- Default assignment convention:
+  - businesses without explicit seller assignment should resolve preset code `default` under `surface_code = 'seller_home'`
+  - profiles without explicit buyer assignment should resolve preset code `default` under `surface_code = 'buyer_home'`
+- Legacy seller-only home-group tables should not be reintroduced as the runtime source of truth once shared home-group config exists.
 
 ### Requests & Offers
 - `purchase_request`: buyer request.
@@ -51,16 +62,25 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Current required lifecycle codes:
   - `active`
   - `offer_accepted`
-- Buyer home request resolution must use `purchase_request_visualization.profile_id -> purchase_request_visualization.purchase_request_id -> purchase_request.id` (do not assume `purchase_request.profile_id` matches `public.profile.id` in every environment).
-- Offer cards in purchase-request detail must include DB-backed business + location + currency metadata (`business.name`, `business.rating`, `business.num_ratings`, `location.province`, `currency.currency_code`) together with `purchase_offer.price`.
+- Buyer grouped home discovery must come from `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home groups from legacy single-request visualization lookup in client code.
+- Offer cards in purchase-request detail must include DB-backed business + location + currency metadata from `business_with_rating` (or equivalent DB-backed summary join), together with `purchase_offer.price`.
+- `business.rating` and `business.num_ratings` are legacy-removed fields and must not be used as runtime source of truth.
+
+### Ratings
+- `conversation_rating`: source-of-truth table for ratings submitted through conversation actions.
+- Rating ownership is actor-based and conversation-scoped:
+  - buyer rates seller with `BUYER_RATE_SELLER`
+  - seller rates buyer with `SELLER_RATE_BUYER`
+- Seller ratings may also roll up to `business_rating_summary` through the seller business linked from `purchase_offer.business_id`.
+- Aggregated rating values must be read from summary tables/views, not recalculated in client code and not stored as source-of-truth columns on `business`.
 
 ## Seller Home Discovery RPC (DB-Driven)
 - Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid)`.
 - Resolution flow:
   - resolve business by `profile_business` using `p_profile_id`
   - resolve category scope by `business_category_preference`
-  - resolve active preset by `business_seller_home_group_preset` (fallback to active preset code `default` when missing)
-  - resolve visible groups/order/limits by `seller_home_group_preset_item` + `seller_home_group`
+  - resolve active preset by `business_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
+  - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'seller_home'`
   - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`).
 - Popularity must be computed from `purchase_request_visualization` count per `purchase_request_id` (returned as `views_count` in items).
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
@@ -81,6 +101,31 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - If no business is resolved for the input profile, return `{ "groups": [] }`.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
 
+## Buyer Home Discovery RPC (DB-Driven)
+- Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid)`.
+- Resolution flow:
+  - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'buyer_home'` (fallback to active preset code `default` when missing)
+  - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'buyer_home'`
+  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and active lifecycle (`status = 'active'`).
+- Popularity must be computed from `purchase_request_visualization` count per `purchase_request_id` (returned as `views_count` in items).
+- The RPC must not require limit parameters; limits are fully DB-driven via preset items.
+- Procedure output contract is JSON with `groups[]`; each group includes:
+  - `code`
+  - `name`
+  - `total`
+  - `items[]`
+- Item payload expected in `items[]`:
+  - `id`, `title`, `summary_text`
+  - `category_id`, `category_name`, `category_path`
+  - `status`, `published_at`, `created_at`
+  - `views_count`
+- Sorting behavior by group code (current convention):
+  - `all`: by `published_at desc nulls last`, then `created_at desc`
+  - `popular`: by views (`purchase_request_visualization` count) desc, then recency
+  - `newest`: by `created_at desc`
+- If no active preset is resolved, return `{ "groups": [] }`.
+- Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
+
 ### Conversation Core
 - `conversation`: buyer-seller conversation linked to offer/request.
 - `conversation_status`: conversation state machine states, includes UI timeline icon key (`icon`).
@@ -95,6 +140,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `conversation_status_role_rule`: per role + state messaging permissions.
 - `conversation_status_role_action`: per role + state enabled actions and order.
 - `conversation_status_role_action.status_code` must reference an existing `conversation_status.code` value. Do not assume an action code (for example `SELLER_CONCRETAR`) is also a valid status code.
+- Rating actions must be hidden by DB action resolution once the same participant has already submitted the matching `conversation_rating` row for that conversation/action.
 - `conversation_transition`: valid state transitions by action + actor role.
 - `conversation_status_history`: transition audit.
 - `conversation_deadline`: deadline-based transitions.
@@ -176,7 +222,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - When writing system chat messages, set `conversation_message.visible_to_role_id` to target buyer/seller role-specific visibility when needed.
   - Return a JSON result with at least success + status transition details.
 - Current implemented example: `public.buyer_accept_offer`.
+- Current rating executor example: `public.submit_conversation_rating`.
 - `public.buyer_accept_offer` must also update `purchase_request.status` from `active` to `offer_accepted` atomically with the conversation transition.
+- `public.submit_conversation_rating(...)` must validate actor membership, validate the structured `rating` payload, write/update `conversation_rating`, refresh rating summaries, and only apply a conversation transition when a matching DB transition exists.
 - `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'`.
 - `public.seller_finalize_transaction(...)` must require `purchase_offer_delivery.max_days > 0`, transition to `SENT_SHIPMENT`, then create/reset the active deadline from `deadline_type_catalog.code = 'SENT_SHIPMENT_EXPIRATION'`.
 - Seller request bootstrap/create-offer flow currently uses:

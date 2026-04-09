@@ -21,6 +21,7 @@ Expected payload includes:
 
 Agents must parse and use this payload directly for rendering and execution decisions.
 - `permissions.can_send_messages` and `actions[]` are independent DB signals; client behavior must support both being present at the same time.
+- Rating actions such as `BUYER_RATE_SELLER` and `SELLER_RATE_BUYER` may be omitted by the RPC once the current participant already rated; the client must respect the returned `actions[]` list and must not try to re-add them locally.
 
 ## Conditional Confirmation Inputs
 - Client must render `confirmation.inputs[]` by input kind, not by action code.
@@ -108,9 +109,40 @@ Expected item fields in `items[]`:
 
 Service behavior:
 - Seller home must call this RPC for request discovery/grouping.
-- Do not send per-group limits from client; limits are DB configuration in `seller_home_group_preset_item.max_items`.
+- Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
 - Do not hardcode group visibility/order in services.
 - Do not build seller-home request groups from local mocks when this RPC is available.
+- Seller preset resolution must read from shared home-group config for `surface_code = 'seller_home'`, with assignment via `business_home_group_preset`.
+
+## RPC Contract: `get_buyer_home_purchase_requests`
+Current function contract:
+- `public.get_buyer_home_purchase_requests(p_profile_id uuid)`
+- Returns JSON object with `groups[]`.
+
+Expected payload for each group entry:
+- `code`
+- `name`
+- `total`
+- `items[]` (purchase request cards for that group)
+
+Expected item fields in `items[]`:
+- `id`
+- `title`
+- `summary_text`
+- `category_id`
+- `category_name`
+- `category_path`
+- `status`
+- `published_at`
+- `created_at`
+- `views_count`
+
+Service behavior:
+- Buyer home must call this RPC for request discovery/grouping.
+- Buyer preset resolution must read from shared home-group config for `surface_code = 'buyer_home'`, with assignment via `profile_home_group_preset`.
+- Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.
+- Do not hardcode group visibility/order in services.
+- Do not build buyer-home request groups from local mocks when this RPC is available.
 
 ## RPC Contract: `get_or_create_seller_purchase_request_conversation`
 Current function contract:
@@ -140,3 +172,7 @@ Service behavior:
 - If confirmation inputs are present, include their values in executor payload using the configured `payload_key`.
 - Never block screen render due partial metadata; degrade gracefully.
 - Do not add client-side deadline countdown or overdue transition logic; messages, permissions, actions, and transitions must keep coming from DB-backed RPC data.
+
+## Purchase Offer Data Contract
+- Buyer offer-card data must read seller reputation from the DB-backed rating view/summary relation (`business_with_rating`), not from removed `business.rating` or `business.num_ratings` columns.
+- When querying `purchase_offer`, keep the existing shape for UI consumers (`business_name`, `business_rating`, `business_num_ratings`, `business_province`, `offer_currency_code`) even if the underlying relation changes from `business` to `business_with_rating`.

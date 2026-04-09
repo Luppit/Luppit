@@ -74,7 +74,7 @@ export async function getPurchaseOffersByPurchaseRequestId(
     .select(
       `
       *,
-      business:business_id (
+      business:business_with_rating!purchase_offer_business_id_fkey (
         name,
         rating,
         num_ratings,
@@ -131,6 +131,32 @@ export async function getPurchaseOffersCountByPurchaseRequestId(
   const offers = await getPurchaseOffersByPurchaseRequestId(purchaseRequestId);
   if (!offers.ok) return offers;
   return { ok: true, data: offers.data.length };
+}
+
+export async function getPurchaseOffersCountByPurchaseRequestIds(
+  purchaseRequestIds: string[]
+): Promise<{ ok: true; data: Record<string, number> } | { ok: false; error: AppError }> {
+  const ids = Array.from(new Set(purchaseRequestIds.filter((id) => typeof id === "string" && id)));
+  if (ids.length === 0) return { ok: true, data: {} };
+
+  const { data, error } = await supabase
+    .from("purchase_offer")
+    .select("purchase_request_id")
+    .in("purchase_request_id", ids);
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+
+  const counts: Record<string, number> = {};
+  for (const id of ids) counts[id] = 0;
+
+  for (const row of data ?? []) {
+    const requestId =
+      typeof row.purchase_request_id === "string" ? row.purchase_request_id : null;
+    if (!requestId) continue;
+    counts[requestId] = (counts[requestId] ?? 0) + 1;
+  }
+
+  return { ok: true, data: counts };
 }
 
 export async function getCurrentSellerPurchaseOffers(): Promise<

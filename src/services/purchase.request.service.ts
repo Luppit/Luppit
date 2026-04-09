@@ -24,6 +24,8 @@ export type SellerHomePurchaseRequestGroup = {
   total: number;
   items: SellerHomePurchaseRequestItem[];
 };
+export type BuyerHomePurchaseRequestItem = SellerHomePurchaseRequestItem;
+export type BuyerHomePurchaseRequestGroup = SellerHomePurchaseRequestGroup;
 const PURCHASE_REQUEST_SELECT = [
   "id",
   "profile_id",
@@ -175,6 +177,37 @@ export async function getCurrentSellerHomePurchaseRequestGroups(): Promise<
   const groups = groupsRaw
     .map(parseSellerHomePurchaseRequestGroup)
     .filter((group): group is SellerHomePurchaseRequestGroup => group !== null);
+
+  return { ok: true, data: groups };
+}
+
+export async function getCurrentBuyerHomePurchaseRequestGroups(): Promise<
+  { ok: true; data: BuyerHomePurchaseRequestGroup[] } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: true, data: [] };
+
+  const rpcResult: any = await (supabase as any).rpc("get_buyer_home_purchase_requests", {
+    p_profile_id: profile.data.id,
+  });
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  const payload = rpcResult?.data;
+  const groupsRaw: unknown[] =
+    payload && typeof payload === "object" && Array.isArray((payload as any).groups)
+      ? (payload as any).groups
+      : [];
+
+  const groups = groupsRaw
+    .map(parseSellerHomePurchaseRequestGroup)
+    .filter((group): group is BuyerHomePurchaseRequestGroup => group !== null);
 
   return { ok: true, data: groups };
 }
