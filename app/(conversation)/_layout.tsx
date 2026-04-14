@@ -7,7 +7,7 @@ import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
-import { openPopup } from "@/src/services/popup.service";
+import { openPopup, PopupOption } from "@/src/services/popup.service";
 import { createConversationMessages } from "@/src/services/conversation.message.service";
 import {
   ConversationView,
@@ -100,6 +100,19 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
     backgroundColorKey: isPrimary ? "primary" : "backgroudWhite",
     textColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
+  };
+}
+
+function toMenuOptionConfig(action: ConversationViewAction): PopupOption {
+  const { isDanger, isPrimary } = normalizeStyleFlags(action.style_code);
+
+  return {
+    id: action.id,
+    label: action.label || action.code || "",
+    icon: normalizeOptionalIcon(action.icon),
+    backgroundColorKey: "backgroudWhite",
+    textColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
+    iconColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
   };
 }
 
@@ -396,6 +409,20 @@ export default function ConversationLayout() {
     [conversationView?.context, runAction]
   );
 
+  const openConversationMenu = useCallback(
+    (actions: ConversationViewAction[]) => {
+      if (actions.length === 0) return;
+
+      openPopup({
+        options: actions.map((action) => ({
+          ...toMenuOptionConfig(action),
+          onPress: () => handleActionPress(action),
+        })),
+      });
+    },
+    [handleActionPress]
+  );
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
@@ -423,6 +450,9 @@ export default function ConversationLayout() {
   );
   const auxActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
+  );
+  const menuActions = conversationView.actions.filter(
+    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
   const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
@@ -482,7 +512,22 @@ export default function ConversationLayout() {
                 {title}
               </Text>
 
-              <View style={{ width: 40 }} />
+              {menuActions.length > 0 ? (
+                <Pressable
+                  onPress={() => openConversationMenu(menuActions)}
+                  disabled={isExecutingAction}
+                  hitSlop={12}
+                  style={{
+                    width: 40,
+                    alignItems: "flex-end",
+                    opacity: isExecutingAction ? 0.6 : 1,
+                  }}
+                >
+                  <Icon name="ellipsis" size={28} />
+                </Pressable>
+              ) : (
+                <View style={{ width: 40 }} />
+              )}
             </View>
           </View>
 

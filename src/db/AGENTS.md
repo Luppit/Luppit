@@ -106,7 +106,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Resolution flow:
   - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'buyer_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'buyer_home'`
-  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and active lifecycle (`status = 'active'`).
+  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and the buyer-home visible lifecycle set, currently `active` plus `offer_accepted`.
 - Popularity must be computed from `purchase_request_visualization` count per `purchase_request_id` (returned as `views_count` in items).
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
 - Procedure output contract is JSON with `groups[]`; each group includes:
@@ -137,8 +137,17 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `conversation_action`: UI actions (`code`, `label`, `icon`, `ui_slot`, `style_code`) plus:
   - `executor_code` (FK to executor config)
   - `confirmation_template_id` (FK to confirmation template)
+- `ui_slot_catalog`: shared catalog for conversation UI placements used by both executable `actions[]` and passive `slots[]`.
 - `conversation_status_role_rule`: per role + state messaging permissions.
 - `conversation_status_role_action`: per role + state enabled actions and order.
+- Action placement is DB-driven through `conversation_action.ui_slot` (cataloged in `ui_slot_catalog`).
+- Current executable action slots:
+  - `TOP`: visible primary actions in the conversation header area
+  - `AUX`: auxiliary actions near the composer / lower thread area
+  - `MENU`: options shown in the conversation header ellipsis popup
+- Current passive informational slot:
+  - `STATUS`: in-thread status card rendered from `get_conversation_view(...).slots[]`, currently used for active deadline cards
+- If product wants the same behavior available in more than one place, duplicate it as separate `conversation_action` rows/codes mapped to different `ui_slot` values instead of hardcoding dual placement in client code.
 - `conversation_status_role_action.status_code` must reference an existing `conversation_status.code` value. Do not assume an action code (for example `SELLER_CONCRETAR`) is also a valid status code.
 - Rating actions must be hidden by DB action resolution once the same participant has already submitted the matching `conversation_rating` row for that conversation/action.
 - `conversation_transition`: valid state transitions by action + actor role.
@@ -150,6 +159,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `expiration_days` may be null.
   - `due_at_source` defines how `conversation_deadline.due_at` is computed.
   - `active_status_code`, `default_trigger_transition_to`, `buyer_overdue_message`, and `seller_overdue_message` are DB-driven source of truth.
+  - Active deadline-card rendering metadata also lives here: `ui_slot`, `slot_eyebrow_label`, `slot_section_label`, `buyer_active_message`, `seller_active_message`.
 - Current deadline types:
   - `SELLER_CONCRETAR_EXPIRATION`: `SELLER_ACCEPTED -> DELAYED_ACCEPTANCE`, fixed days from catalog.
   - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`, days from `purchase_offer_delivery.max_days`.
@@ -205,6 +215,27 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - appended description when condition provides `description_append`
     - conditional `inputs[]` from `conversation_confirmation_condition_input`.
 - `delivery_catalog` labels are presentation data; matching logic should rely on FK IDs, not client-side string comparisons.
+
+## Conversation Menu Resolution
+- Conversation ellipsis-menu options are not a separate subsystem; they are normal `conversation_action` rows with `ui_slot = 'MENU'`.
+- `public.get_conversation_view(...)` must return `MENU` actions in the same `actions[]` payload alongside `TOP` and `AUX`.
+- The client decides placement from `actions[].ui_slot`; it must not synthesize menu options from other tables.
+- `conversation_status_role_action.sort_order` remains the ordering source of truth for menu option order.
+
+## Conversation Informational Slots
+- Passive status cards are not `conversation_action` rows and must not be modeled as executable actions.
+- `public.get_conversation_view(...)` must return passive UI cards in `slots[]` alongside `actions[]`.
+- Current implementation may use `public.get_conversation_ui_slots(...)` as a helper, but the app contract is `get_conversation_view(...).slots[]`.
+- Active deadline cards must resolve from:
+  - current `conversation.status_code`
+  - current viewer role
+  - unresolved `conversation_deadline`
+  - `deadline_type_catalog` rendering metadata
+- Deadline slot visibility must remain DB-driven:
+  - show only when the conversation has an unresolved active deadline
+  - show only when `deadline_type_catalog.active_status_code = conversation.status_code`
+  - show only when the resolved role-specific active message is non-empty
+- Current deadline cards use `ui_slot = 'STATUS'` and are rendered in-thread as passive items after the existing message list, not in the action areas.
 
 ## Transition Procedure Pattern
 - Procedures referenced by `conversation_action_executor.target` must encapsulate transition logic in DB.

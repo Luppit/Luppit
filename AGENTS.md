@@ -15,8 +15,11 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
 - Never hardcode conversation action behavior when DB metadata exists.
+- Conversation action placement is DB-driven via `conversation_action.ui_slot` / `ui_slot_catalog`; supported action slots now include `TOP`, `AUX`, and `MENU`.
+- Conversation header ellipsis options must be sourced from DB `MENU` actions returned by `get_conversation_view`; do not hardcode menu items in client code.
 - Never hardcode double-rating prevention in client code when DB conversation-action resolution already knows whether the participant has rated.
 - Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.
+- Passive conversation status cards are DB-driven via `get_conversation_view(...).slots[]`; current informational slot `STATUS` is used for active deadline cards resolved from deadline metadata, not from `conversation_action`.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.
 - Never hardcode top-navbar segment chips when DB `segment` configuration exists.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.

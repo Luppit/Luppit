@@ -10,7 +10,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
 - Group visibility/order/limits are DB configuration (`home_group`, `home_group_preset`, `home_group_preset_item`), not client logic.
 - Seller preset assignment is DB-driven via `business_home_group_preset`; buyer preset assignment is DB-driven via `profile_home_group_preset`.
 - Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
-- Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id`.
+- Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set, which currently includes `active` and `offer_accepted`.
 - Empty home state must render when all returned groups have `items.length = 0`.
 
 ## Implementation Rules

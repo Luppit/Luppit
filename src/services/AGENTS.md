@@ -9,6 +9,18 @@ Expected payload includes:
 - `role_code`
 - `permissions`
 - `context`
+- `slots[]`, each slot may include:
+  - `code`
+  - `kind`
+  - `ui_slot`
+  - `sort_order`
+  - `eyebrow_label`
+  - `title`
+  - `icon`
+  - `section_label`
+  - `message`
+  - `due_at`
+  - optional preformatted values such as `formatted_due_at`
 - `actions[]`, each action may include:
   - `executor` object (or null)
   - `confirmation` object (or null), including:
@@ -20,8 +32,18 @@ Expected payload includes:
     - for each input: `component_config` (optional JSON config for rich input renderers)
 
 Agents must parse and use this payload directly for rendering and execution decisions.
-- `permissions.can_send_messages` and `actions[]` are independent DB signals; client behavior must support both being present at the same time.
+- `permissions.can_send_messages`, `actions[]`, and `slots[]` are independent DB signals; client behavior must support them coexisting.
+- `actions[].ui_slot` is a DB-driven placement signal. Current conversation slots are:
+  - `TOP`: prominent action buttons near the header
+  - `AUX`: lower in-thread/composer-adjacent actions
+  - `MENU`: header ellipsis popup options
+- `slots[].ui_slot` is a DB-driven placement signal for passive content. Current passive conversation slot:
+  - `STATUS`: deadline/status card rendered inside the thread
+- Services and screens must not assume only `TOP`/`AUX` exist.
+- Menu-option presses must execute through the same confirmation/executor path as any other conversation action.
 - Rating actions such as `BUYER_RATE_SELLER` and `SELLER_RATE_BUYER` may be omitted by the RPC once the current participant already rated; the client must respect the returned `actions[]` list and must not try to re-add them locally.
+- Deadline/status cards must come from `slots[]`, not from local status/action-code conditionals.
+- `STATUS` slots are rendered after the current message list so they behave like the latest passive system item in the thread.
 
 ## Conditional Confirmation Inputs
 - Client must render `confirmation.inputs[]` by input kind, not by action code.
@@ -140,6 +162,7 @@ Expected item fields in `items[]`:
 Service behavior:
 - Buyer home must call this RPC for request discovery/grouping.
 - Buyer preset resolution must read from shared home-group config for `surface_code = 'buyer_home'`, with assignment via `profile_home_group_preset`.
+- Buyer home currently includes the DB-visible lifecycle set for owned requests, which includes both `active` and `offer_accepted`.
 - Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.
 - Do not hardcode group visibility/order in services.
 - Do not build buyer-home request groups from local mocks when this RPC is available.
@@ -168,6 +191,7 @@ Service behavior:
 ## Action Execution and Safe Fallbacks
 - If an action has no executor, use legacy action execution RPC only as compatibility fallback.
 - If an icon key is unknown, omit icon safely.
+- For popup menu options, apply the same `style_code` color semantics used elsewhere (`primary`, `error`, etc.); do not fall back to plain dark text for `primary` actions.
 - If a field value is null, render `-`.
 - If confirmation inputs are present, include their values in executor payload using the configured `payload_key`.
 - Never block screen render due partial metadata; degrade gracefully.

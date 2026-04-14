@@ -1,12 +1,13 @@
 import Button from "@/src/components/button/Button";
+import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
 import { Text } from "@/src/components/Text";
 import {
   ConversationMessage,
   getConversationMessagesByConversationId,
 } from "@/src/services/conversation.message.service";
-import { useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
-import React, { useCallback, useEffect, useState } from "react";
+import { useTheme } from "@/src/themes";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { useConversationLayout } from "./_layout";
 
@@ -25,6 +26,13 @@ export default function ConversationChatScreen() {
   const scrollViewRef = React.useRef<ScrollView | null>(null);
   const imageMessageWidth = 230;
   const showComposer = conversationView.permissions.can_send_messages;
+  const statusSlots = useMemo(
+    () =>
+      conversationView.slots.filter(
+        (slot) => (slot.ui_slot ?? "").toUpperCase() === "STATUS"
+      ),
+    [conversationView.slots]
+  );
   const scrollToBottom = useCallback((animated = false) => {
     requestAnimationFrame(() => {
       setTimeout(() => {
@@ -211,6 +219,10 @@ export default function ConversationChatScreen() {
           </View>
         );
       })}
+
+      {statusSlots.map((slot) => (
+        <ConversationStatusSlotCard key={slot.code} slot={slot} />
+      ))}
 
       {!showComposer ? auxActions.map((action, index) => {
         const isLastAuxAction = index === auxActions.length - 1;
