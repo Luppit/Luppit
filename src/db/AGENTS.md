@@ -52,13 +52,14 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 ### Requests & Offers
 - `purchase_request`: buyer request.
 - `purchase_request_status`: purchase request lifecycle catalog (`code`, `description`, `is_terminal`).
-- `purchase_request_visualization`: seller views on request.
+- `purchase_request_status_ui`: one-row-per-status UI copy for request cards (`status_code`, `ui_text`).
 - `purchase_offer`: seller offer for request.
 - `purchase_offer_delivery`: delivery terms for offer.
 - `purchase_offer_image`: offer images.
 - `currency`: currency catalog.
 - `delivery_catalog`: delivery method catalog.
 - `purchase_request.status` is lifecycle state and must reference `purchase_request_status.code`.
+- UI-facing request-card status copy must come from `purchase_request_status_ui.ui_text`, not directly from `purchase_request.status`.
 - Current required lifecycle codes:
   - `active`
   - `offer_accepted`
@@ -81,8 +82,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - resolve category scope by `business_category_preference`
   - resolve active preset by `business_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'seller_home'`
-  - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`).
-- Popularity must be computed from `purchase_request_visualization` count per `purchase_request_id` (returned as `views_count` in items).
+  - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`)
+  - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
+- Do not rebuild request-card status text from lifecycle codes in client code.
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
 - Procedure output contract is JSON with `groups[]`; each group includes:
   - `code`
@@ -92,22 +94,27 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Item payload expected in `items[]`:
   - `id`, `title`, `summary_text`
   - `category_id`, `category_name`, `category_path`
-  - `status`, `published_at`, `created_at`
+  - `status`, `status_label`, `published_at`, `created_at`
   - `views_count`
 - Sorting behavior by group code (current convention):
   - `all`: by `published_at desc nulls last`, then `created_at desc`
-  - `popular`: by views (`purchase_request_visualization` count) desc, then recency
+  - `popular`: by `views_count desc`, then recency
   - `newest`: by `created_at desc`
 - If no business is resolved for the input profile, return `{ "groups": [] }`.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
 
 ## Buyer Home Discovery RPC (DB-Driven)
-- Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid)`.
+- Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null)`.
 - Resolution flow:
   - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'buyer_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'buyer_home'`
-  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and the buyer-home visible lifecycle set, currently `active` plus `offer_accepted`.
-- Popularity must be computed from `purchase_request_visualization` count per `purchase_request_id` (returned as `views_count` in items).
+  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and the buyer-home visible lifecycle set, currently `active` plus `offer_accepted`
+  - when provided, apply buyer-home filters in DB:
+    - `p_search_text`: case-insensitive match against request title
+    - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
+    - `p_status_codes`: match against `purchase_request.status`
+  - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
+- Do not rebuild request-card status text from lifecycle codes in client code.
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
 - Procedure output contract is JSON with `groups[]`; each group includes:
   - `code`
@@ -117,11 +124,11 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Item payload expected in `items[]`:
   - `id`, `title`, `summary_text`
   - `category_id`, `category_name`, `category_path`
-  - `status`, `published_at`, `created_at`
+  - `status`, `status_label`, `published_at`, `created_at`
   - `views_count`
 - Sorting behavior by group code (current convention):
   - `all`: by `published_at desc nulls last`, then `created_at desc`
-  - `popular`: by views (`purchase_request_visualization` count) desc, then recency
+  - `popular`: by `views_count desc`, then recency
   - `newest`: by `created_at desc`
 - If no active preset is resolved, return `{ "groups": [] }`.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
@@ -261,6 +268,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Seller request bootstrap/create-offer flow currently uses:
   - `public.get_or_create_seller_purchase_request_conversation(...)`
   - `public.create_seller_offer_from_conversation(...)`
+- `public.get_or_create_seller_purchase_request_conversation(...)` must resolve `buyer_profile_id` from `purchase_request.profile_id`, not from any legacy visualization table.
 - `public.create_seller_offer_from_conversation(...)` must atomically:
   - create `purchase_offer_delivery`, `purchase_offer`, `purchase_offer_image`
   - apply conversation transition/history for seller first offer

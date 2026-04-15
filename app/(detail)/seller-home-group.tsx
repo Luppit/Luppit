@@ -5,6 +5,7 @@ import {
   getCurrentSellerHomePurchaseRequestGroups,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
+import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -43,6 +44,7 @@ export default function SellerHomeGroupScreen() {
   const [items, setItems] = useState<SellerHomePurchaseRequestItem[]>([]);
   const groupCode = useMemo(() => parseStringParam(params.groupCode), [params.groupCode]);
   const openRequestConversation = useCallback(async (item: SellerHomePurchaseRequestItem) => {
+    await registerPurchaseRequestVisualization(item.id);
     const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
 
     if (!conversation?.ok) {
@@ -110,7 +112,7 @@ export default function SellerHomeGroupScreen() {
             title={item.title ?? "Solicitud"}
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
-            statusLabel="Activa"
+            statusLabel={item.status_label ?? item.status}
             offersLabel={formatPublishedLabel(item.published_at ?? item.created_at)}
             onPress={() => void openRequestConversation(item)}
           />

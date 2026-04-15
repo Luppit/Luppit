@@ -100,7 +100,7 @@ export default function BuyerHomeGroupScreen() {
             title={item.title ?? "Solicitud"}
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
-            statusLabel={item.status === "active" ? "Activa" : item.status}
+            statusLabel={item.status_label ?? item.status}
             offersLabel={`${offerCountsByRequestId[item.id] ?? 0} ofertas`}
             onPress={() =>
               router.push({

@@ -3,6 +3,12 @@ import Button from "@/src/components/button/Button";
 import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
+import {
+  BuyerHomeFilters,
+  getBuyerHomeFilters,
+  hasBuyerHomeFilters,
+  subscribeBuyerHomeFilters,
+} from "@/src/services/buyer.home.filters.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import {
@@ -13,12 +19,13 @@ import {
   SellerHomePurchaseRequestGroup,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
+import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
 import { showError, showInfo } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
@@ -41,11 +48,12 @@ function BuyerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
   const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
+  const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
   const loadGroups = useCallback(async () => {
     setIsLoading(true);
-    const result = await getCurrentBuyerHomePurchaseRequestGroups();
+    const result = await getCurrentBuyerHomePurchaseRequestGroups(filters);
     const nextGroups = result.ok ? result.data : [];
     setGroups(nextGroups);
 
@@ -53,6 +61,10 @@ function BuyerHomeContent() {
     const countsResult = await getPurchaseOffersCountByPurchaseRequestIds(requestIds);
     setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
     setIsLoading(false);
+  }, [filters]);
+
+  useEffect(() => {
+    return subscribeBuyerHomeFilters(setFilters);
   }, []);
 
   useFocusEffect(
@@ -66,6 +78,7 @@ function BuyerHomeContent() {
     () => groups.some((group) => group.items.length > 0),
     [groups]
   );
+  const hasActiveFilters = useMemo(() => hasBuyerHomeFilters(filters), [filters]);
 
   if (isLoading) {
     return <Text>Cargando solicitudes...</Text>;
@@ -93,16 +106,20 @@ function BuyerHomeContent() {
           />
         )}
         <Text align="center" variant="body">
-          Cuéntanos qué necesitas y te ayudamos a encontrarlo!
+          {hasActiveFilters
+            ? "No encontramos solicitudes con los filtros aplicados."
+            : "Cuéntanos qué necesitas y te ayudamos a encontrarlo!"}
         </Text>
-        <View style={{ width: "100%" }}>
-          <Button
-            variant="dark"
-            icon="plus"
-            title="Crear nueva solicitud"
-            onPress={() => router.push("/(chat)/chat")}
-          />
-        </View>
+        {!hasActiveFilters ? (
+          <View style={{ width: "100%" }}>
+            <Button
+              variant="dark"
+              icon="plus"
+              title="Crear nueva solicitud"
+              onPress={() => router.push("/(chat)/chat")}
+            />
+          </View>
+        ) : null}
       </View>
     );
   }
@@ -298,7 +315,7 @@ function BuyerHomeRequestCard({
         title={item.title ?? "Solicitud"}
         subtitle={item.category_name ?? "-"}
         views={item.views_count}
-        statusLabel={item.status === "active" ? "Activa" : item.status}
+        statusLabel={item.status_label ?? item.status}
         offersLabel={`${offersCount} ofertas`}
         onPress={() =>
           router.push({
@@ -318,6 +335,7 @@ function SellerHomeRequestCard({ item }: { item: SellerHomePurchaseRequestItem }
   const t = useTheme();
   const publishedLabel = formatPublishedLabel(item.published_at ?? item.created_at);
   const openRequestConversation = useCallback(async () => {
+    await registerPurchaseRequestVisualization(item.id);
     const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
 
     if (!conversation) {

@@ -1,9 +1,11 @@
 import { Icon } from "@/src/components/Icon";
+import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
 import { Text } from "@/src/components/Text";
 import {
   closePopup,
+  PopupFilterConfig,
   PopupOption,
   PopupSummaryAction,
   PopupSummaryConfig,
@@ -11,12 +13,14 @@ import {
 } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   Animated,
   Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -28,18 +32,82 @@ import { createGlobalPopupStyles } from "./styles";
 
 const ANIMATION_DURATION = 220;
 
+function parseDateValue(rawValue: string): Date | null {
+  if (!rawValue) return null;
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function formatDateValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
+  const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [filterSearchValue, setFilterSearchValue] = useState("");
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+  const [selectedFilterChipIds, setSelectedFilterChipIds] = useState<string[]>([]);
+  const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null);
+  const [pickerValue, setPickerValue] = useState<Date>(new Date());
+  const sheetHeightRef = useRef(320);
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+
+  const resetSheetPosition = () => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: ANIMATION_DURATION,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: ANIMATION_DURATION,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const indicatorPanResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => dismissOnBackdropPress,
+    onMoveShouldSetPanResponder: (_event, gestureState) =>
+      dismissOnBackdropPress && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+    onPanResponderGrant: () => {
+      translateY.stopAnimation();
+      opacity.stopAnimation();
+    },
+    onPanResponderMove: (_event, gestureState) => {
+      const nextTranslate = Math.max(gestureState.dy, 0);
+      const closeTarget = Math.max(sheetHeightRef.current + insets.bottom, 320);
+      translateY.setValue(nextTranslate);
+      opacity.setValue(Math.max(0, 1 - nextTranslate / closeTarget));
+    },
+    onPanResponderRelease: (_event, gestureState) => {
+      const dismissThreshold = Math.min(Math.max(sheetHeightRef.current * 0.2, 72), 140);
+      if (gestureState.dy >= dismissThreshold || gestureState.vy >= 1.2) {
+        closePopup();
+        return;
+      }
+      resetSheetPosition();
+    },
+    onPanResponderTerminate: () => {
+      resetSheetPosition();
+    },
+  });
 
   useEffect(() => {
     return subscribePopup(({ config }) => {
@@ -51,7 +119,7 @@ export default function GlobalPopupHost() {
             useNativeDriver: true,
           }),
           Animated.timing(translateY, {
-            toValue: 28,
+            toValue: Math.max(sheetHeightRef.current + insets.bottom, 320),
             duration: ANIMATION_DURATION,
             useNativeDriver: true,
           }),
@@ -59,6 +127,7 @@ export default function GlobalPopupHost() {
           if (finished) {
             setMounted(false);
             setOptions([]);
+            setFilterConfig(null);
             setSummaryConfig(null);
           }
         });
@@ -67,9 +136,20 @@ export default function GlobalPopupHost() {
 
       if (config.type === "summary") {
         setSummaryConfig(config);
+        setFilterConfig(null);
         setOptions([]);
+      } else if (config.type === "filters") {
+        setSummaryConfig(null);
+        setFilterConfig(config);
+        setOptions([]);
+        setFilterSearchValue(config.searchField?.initialValue ?? "");
+        setFilterStartDate(config.dateRangeField?.initialStartValue ?? "");
+        setFilterEndDate(config.dateRangeField?.initialEndValue ?? "");
+        setSelectedFilterChipIds(config.chipGroup?.initialSelectedIds ?? []);
+        setActiveDateField(null);
       } else {
         setSummaryConfig(null);
+        setFilterConfig(null);
         setOptions(config.options);
       }
       setDismissOnBackdropPress(config.dismissOnBackdropPress ?? true);
@@ -89,7 +169,7 @@ export default function GlobalPopupHost() {
         }),
       ]).start();
     });
-  }, [opacity, translateY]);
+  }, [insets.bottom, opacity, translateY]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -110,6 +190,49 @@ export default function GlobalPopupHost() {
   const handleSummaryActionPress = (action: PopupSummaryAction) => {
     closePopup();
     action.onPress?.();
+  };
+
+  const handleFilterChipPress = (chipId: string) => {
+    setSelectedFilterChipIds((current) =>
+      current.includes(chipId)
+        ? current.filter((value) => value !== chipId)
+        : [...current, chipId]
+    );
+  };
+
+  const handleFilterApplyPress = () => {
+    filterConfig?.onApply?.({
+      searchValue: filterSearchValue.trim(),
+      startDate: filterStartDate.trim(),
+      endDate: filterEndDate.trim(),
+      selectedChipIds: selectedFilterChipIds,
+    });
+    closePopup();
+  };
+
+  const handleFilterClearPress = () => {
+    setFilterSearchValue("");
+    setFilterStartDate("");
+    setFilterEndDate("");
+    setSelectedFilterChipIds([]);
+    filterConfig?.onClear?.();
+  };
+
+  const openDatePicker = (field: "start" | "end") => {
+    const currentValue = field === "start" ? filterStartDate : filterEndDate;
+    setPickerValue(parseDateValue(currentValue) ?? new Date());
+    setActiveDateField(field);
+  };
+
+  const applyDatePickerValue = () => {
+    const formatted = formatDateValue(pickerValue);
+    if (activeDateField === "start") {
+      setFilterStartDate(formatted);
+    }
+    if (activeDateField === "end") {
+      setFilterEndDate(formatted);
+    }
+    setActiveDateField(null);
   };
 
   if (!isMounted) return null;
@@ -150,9 +273,147 @@ export default function GlobalPopupHost() {
                       : Math.max(insets.bottom, t.spacing.sm),
                   },
                 ]}
+                onLayout={(event) => {
+                  sheetHeightRef.current = event.nativeEvent.layout.height;
+                }}
               >
-              <View style={s.indicator} />
-              {summaryConfig ? (
+                <View
+                  style={s.indicatorTouchArea}
+                  {...indicatorPanResponder.panHandlers}
+                >
+                  <View style={s.indicator} />
+                </View>
+                {filterConfig ? (
+                  <>
+                    <View style={s.section}>
+                      <View style={s.summaryHeaderBlock}>
+                        <View style={s.summaryHeader}>
+                          <Text variant="subtitle" style={s.summaryTitle}>
+                            {filterConfig.title}
+                          </Text>
+                        </View>
+                        <View style={s.summaryHeaderSeparator} />
+                      </View>
+
+                      {filterConfig.searchField ? (
+                        <View style={s.filterSection}>
+                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                            {filterConfig.searchField.label}
+                          </Text>
+                          <TextField
+                            value={filterSearchValue}
+                            onChangeText={setFilterSearchValue}
+                            placeholder={filterConfig.searchField.placeholder}
+                            baseContainerStyle={{ marginBottom: 0 }}
+                            inputContainerStyle={s.filterInputContainer}
+                            inputStyle={s.filterInput}
+                          />
+                        </View>
+                      ) : null}
+
+                      {filterConfig.dateRangeField ? (
+                        <View style={s.filterSection}>
+                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                            {filterConfig.dateRangeField.label}
+                          </Text>
+                          <View style={s.filterDateRow}>
+                            <Pressable
+                              style={s.filterDateField}
+                              onPress={() => openDatePicker("start")}
+                            >
+                              <Text
+                                variant="body"
+                                style={s.filterDateFieldInput}
+                                color={filterStartDate ? "textDark" : "stateAnulated"}
+                                maxLines={1}
+                              >
+                                {filterStartDate || filterConfig.dateRangeField.startPlaceholder || ""}
+                              </Text>
+                              <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                            </Pressable>
+
+                            <Pressable
+                              style={s.filterDateField}
+                              onPress={() => openDatePicker("end")}
+                            >
+                              <Text
+                                variant="body"
+                                style={s.filterDateFieldInput}
+                                color={filterEndDate ? "textDark" : "stateAnulated"}
+                                maxLines={1}
+                              >
+                                {filterEndDate || filterConfig.dateRangeField.endPlaceholder || ""}
+                              </Text>
+                              <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                            </Pressable>
+                          </View>
+                        </View>
+                      ) : null}
+
+                      {filterConfig.chipGroup ? (
+                        <View style={s.filterSection}>
+                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                            {filterConfig.chipGroup.label}
+                          </Text>
+                          <View style={s.filterChipsRow}>
+                            {filterConfig.chipGroup.options.map((option) => {
+                              const isSelected = selectedFilterChipIds.includes(option.id);
+
+                              return (
+                                <Pressable
+                                  key={option.id}
+                                  onPress={() => handleFilterChipPress(option.id)}
+                                  style={[
+                                    s.filterChip,
+                                    isSelected ? s.filterChipSelected : null,
+                                  ]}
+                                >
+                                  <Text
+                                    variant="body"
+                                    style={[
+                                      s.filterChipLabel,
+                                      isSelected ? s.filterChipLabelSelected : null,
+                                    ]}
+                                  >
+                                    {option.label}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    <View style={s.filterActionsRow}>
+                      <Pressable
+                        style={[s.filterActionButton, s.filterActionButtonSecondary]}
+                        onPress={handleFilterClearPress}
+                      >
+                        <Icon name="eraser" size={18} color={t.colors.textDark} />
+                        <Text
+                          variant="body"
+                          style={[s.filterActionLabel, s.filterActionLabelSecondary]}
+                        >
+                          {filterConfig.clearLabel ?? "Limpiar"}
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[s.filterActionButton, s.filterActionButtonPrimary]}
+                        onPress={handleFilterApplyPress}
+                      >
+                        <Icon name="check" size={18} color={t.colors.backgroudWhite} />
+                        <Text
+                          variant="body"
+                          style={[s.filterActionLabel, s.filterActionLabelPrimary]}
+                        >
+                          {filterConfig.applyLabel ?? "Aplicar"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : summaryConfig ? (
                 <>
                   <View style={s.section}>
                     <View style={s.summaryHeaderBlock}>
@@ -317,12 +578,69 @@ export default function GlobalPopupHost() {
                     </React.Fragment>
                   );
                 })
-              )}
+                )}
               </View>
             </Animated.View>
           </View>
         </KeyboardAvoidingView>
       </View>
+
+      <Modal
+        transparent
+        visible={activeDateField != null}
+        animationType="fade"
+        onRequestClose={() => setActiveDateField(null)}
+      >
+        <Pressable style={s.datePickerBackdrop} onPress={() => setActiveDateField(null)}>
+          <Pressable style={s.datePickerCard} onPress={(event) => event.stopPropagation()}>
+            <View style={s.datePickerHeader}>
+              <Text variant="subtitle">
+                {activeDateField === "start" ? "Selecciona la fecha inicial" : "Selecciona la fecha final"}
+              </Text>
+              <Text variant="body" color="stateAnulated">
+                {formatDateValue(pickerValue)}
+              </Text>
+            </View>
+
+            <DateTimePicker
+              value={pickerValue}
+              mode="date"
+              display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              onChange={(_event, selectedDate) => {
+                if (selectedDate) {
+                  setPickerValue(selectedDate);
+                }
+              }}
+            />
+
+            <View style={s.datePickerActionsRow}>
+              <Pressable
+                style={[s.filterActionButton, s.filterActionButtonSecondary]}
+                onPress={() => setActiveDateField(null)}
+              >
+                <Text
+                  variant="body"
+                  style={[s.filterActionLabel, s.filterActionLabelSecondary]}
+                >
+                  Cancelar
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={[s.filterActionButton, s.filterActionButtonPrimary]}
+                onPress={applyDatePickerValue}
+              >
+                <Text
+                  variant="body"
+                  style={[s.filterActionLabel, s.filterActionLabelPrimary]}
+                >
+                  Confirmar
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         transparent

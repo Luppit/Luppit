@@ -52,6 +52,7 @@ Applies to conversation screens and conversation UI behavior.
   - executor type: `server_rpc`
   - confirmation template: `BUYER_ACCEPT_OFFER_CONFIRMATION`
   - server-side effect: besides conversation transition to `OFFER_ACCEPTED`, it also updates the linked `purchase_request.status` to `offer_accepted`.
+- Seller-request bootstrap continues to resolve the buyer side from `purchase_request.profile_id`; conversation setup must not depend on legacy visualization ownership.
 - Conversation rating actions are currently configured so the DB may return them only when the current actor has not rated yet:
   - `BUYER_RATE_SELLER`
   - `SELLER_RATE_BUYER`

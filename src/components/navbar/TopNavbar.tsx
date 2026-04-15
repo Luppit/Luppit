@@ -2,11 +2,26 @@ import { TextField } from "@/src/components/inputField/InputField";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { getSession } from "@/src/lib/supabase";
+import {
+  clearBuyerHomeFilters,
+  getBuyerHomeFilters,
+  hasBuyerHomeFilters,
+  setBuyerHomeFilters,
+  subscribeBuyerHomeFilters,
+} from "@/src/services/buyer.home.filters.service";
+import { openPopup } from "@/src/services/popup.service";
 import { getProfileByUserId } from "@/src/services/profile.service";
+import {
+  BuyerHomePurchaseRequestGroup,
+  getCurrentBuyerHomePurchaseRequestGroups,
+  getPurchaseRequestStatusUiOptions,
+  PurchaseRequestStatusUiOption,
+} from "@/src/services/purchase.request.service";
 import { getSegments, Segment } from "@/src/services/segment.service";
+import { usePathname } from "expo-router";
 import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
@@ -20,9 +35,52 @@ const segmentSvgModules: Record<string, number> = {
   herramientas: require("../../../assets/segments/herramientas.svg"),
 };
 
-function SharedTopNavbarContent() {
+const BUYER_FILTER_STATUS_FALLBACKS: PurchaseRequestStatusUiOption[] = [
+  { statusCode: "active", label: "Activa" },
+  { statusCode: "offer_accepted", label: "Oferta aceptada" },
+];
+
+function mergeBuyerStatusOptions(
+  ...sources: PurchaseRequestStatusUiOption[][]
+): PurchaseRequestStatusUiOption[] {
+  const map = new Map<string, PurchaseRequestStatusUiOption>();
+
+  [...sources, BUYER_FILTER_STATUS_FALLBACKS].forEach((items) => {
+    items.forEach((item) => {
+      const statusCode = item.statusCode?.trim();
+      const label = item.label?.trim();
+      if (!statusCode || !label || map.has(statusCode)) return;
+      map.set(statusCode, { statusCode, label });
+    });
+  });
+
+  return Array.from(map.values());
+}
+
+function buildFallbackBuyerStatusOptions(
+  groups: BuyerHomePurchaseRequestGroup[]
+): PurchaseRequestStatusUiOption[] {
+  const map = new Map<string, PurchaseRequestStatusUiOption>();
+
+  groups.forEach((group) => {
+    group.items.forEach((item) => {
+      const label = item.status_label?.trim();
+      const statusCode = item.status?.trim();
+      if (!label || !statusCode || map.has(statusCode)) return;
+      map.set(statusCode, {
+        statusCode,
+        label,
+      });
+    });
+  });
+
+  return Array.from(map.values());
+}
+
+function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const t = useTheme();
   const s = useMemo(() => createTopNavbarStyles(t), [t]);
+  const pathname = usePathname();
   const segmentIconUris = useMemo(() => {
     const uris: Record<string, string> = {};
     for (const [svgName, moduleRef] of Object.entries(segmentSvgModules)) {
@@ -33,8 +91,15 @@ function SharedTopNavbarContent() {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchValue, setSearchValue] = useState("");
+  const [homeFilters, setHomeFilters] = useState(getBuyerHomeFilters());
   const [profileName, setProfileName] = useState("Mi perfil");
+  const [buyerStatusOptions, setBuyerStatusOptions] = useState<PurchaseRequestStatusUiOption[]>([]);
   const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
+  const isHomeRoute = pathname === "/" || pathname === "/index";
+
+  useEffect(() => {
+    return subscribeBuyerHomeFilters(setHomeFilters);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -85,6 +150,90 @@ function SharedTopNavbarContent() {
     };
   }, []);
 
+  useEffect(() => {
+    if (role !== "buyer") return;
+
+    let active = true;
+
+    const loadBuyerStatuses = async () => {
+      const statusResult = await getPurchaseRequestStatusUiOptions();
+      if (!active) return;
+
+      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups();
+      if (!active) return;
+
+      const groupedOptions = groupsResult.ok
+        ? buildFallbackBuyerStatusOptions(groupsResult.data)
+        : [];
+
+      setBuyerStatusOptions(
+        mergeBuyerStatusOptions(statusResult.ok ? statusResult.data : [], groupedOptions)
+      );
+    };
+
+    void loadBuyerStatuses();
+
+    return () => {
+      active = false;
+    };
+  }, [role]);
+
+  const openFiltersPopup = useCallback(async () => {
+    if (role === "buyer") {
+      let statusOptions = buyerStatusOptions;
+
+      const statusResult = await getPurchaseRequestStatusUiOptions();
+      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups();
+      const groupedOptions = groupsResult.ok
+        ? buildFallbackBuyerStatusOptions(groupsResult.data)
+        : [];
+
+      statusOptions = mergeBuyerStatusOptions(
+        statusResult.ok ? statusResult.data : [],
+        groupedOptions,
+        statusOptions
+      );
+      setBuyerStatusOptions(statusOptions);
+
+      openPopup({
+        type: "filters",
+        title: "Filtros",
+        searchField: {
+          label: "Nombre de la solicitud",
+          placeholder: "Buscar",
+          initialValue: homeFilters.searchValue,
+        },
+        dateRangeField: {
+          label: "Rango de fechas",
+          startPlaceholder: "Desde",
+          endPlaceholder: "Hasta",
+          initialStartValue: homeFilters.startDate,
+          initialEndValue: homeFilters.endDate,
+        },
+        chipGroup: {
+          label: "Estado de la solicitud",
+          options: statusOptions.map((status) => ({
+            id: status.statusCode,
+            label: status.label,
+          })),
+          initialSelectedIds: homeFilters.selectedChipIds,
+        },
+        clearLabel: "Limpiar",
+        applyLabel: "Aplicar",
+        onClear: clearBuyerHomeFilters,
+        onApply: setBuyerHomeFilters,
+      });
+      return;
+    }
+
+    openPopup({
+      type: "filters",
+      title: "Filtros",
+      clearLabel: "Limpiar",
+      applyLabel: "Aplicar",
+    });
+  }, [buyerStatusOptions, homeFilters, role]);
+
   return (
     <View style={s.container}>
       <Pressable onPress={() => console.log("open profile switcher")}>
@@ -95,14 +244,37 @@ function SharedTopNavbarContent() {
         </View>
       </Pressable>
 
-      <TextField
-        value={searchValue}
-        onChangeText={setSearchValue}
-        placeholder="Busca en Luppit"
-        leftIcon="search"
-        baseContainerStyle={{ marginBottom: 0 }}
-        inputContainerStyle={s.searchInputContainer}
-      />
+      {isHomeRoute ? (
+        <>
+          <Pressable style={s.searchTrigger} onPress={() => void openFiltersPopup()}>
+            <Icon name="search" size={20} color={t.colors.stateAnulated} />
+            <Text variant="body" style={s.searchTriggerText}>
+              Buscar en Luppit
+            </Text>
+          </Pressable>
+
+          {role === "buyer" && hasBuyerHomeFilters(homeFilters) ? (
+            <View style={s.activeFilterChip}>
+              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
+              <Text variant="body" style={s.activeFilterChipLabel}>
+                Filtros (1)
+              </Text>
+              <Pressable style={s.activeFilterChipClose} onPress={clearBuyerHomeFilters}>
+                <Icon name="x" size={16} color={t.colors.textDark} />
+              </Pressable>
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <TextField
+          value={searchValue}
+          onChangeText={setSearchValue}
+          placeholder="Busca en Luppit"
+          leftIcon="search"
+          baseContainerStyle={{ marginBottom: 0 }}
+          inputContainerStyle={s.searchInputContainer}
+        />
+      )}
 
       <ScrollView
         horizontal
@@ -164,8 +336,8 @@ function SharedTopNavbarContent() {
 export default function TopNavbar() {
   return (
     <RoleGate
-      buyer={<SharedTopNavbarContent />}
-      seller={<SharedTopNavbarContent />}
+      buyer={<SharedTopNavbarContent role="buyer" />}
+      seller={<SharedTopNavbarContent role="seller" />}
       loading={null}
     />
   );

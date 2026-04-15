@@ -186,49 +186,6 @@ export type Database = {
           },
         ]
       }
-      business_seller_home_group_preset: {
-        Row: {
-          business_id: string
-          created_at: string
-          id: string
-          preset_id: string
-        }
-        Insert: {
-          business_id: string
-          created_at?: string
-          id?: string
-          preset_id: string
-        }
-        Update: {
-          business_id?: string
-          created_at?: string
-          id?: string
-          preset_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_seller_home_group_preset_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: true
-            referencedRelation: "business"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "business_seller_home_group_preset_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: true
-            referencedRelation: "business_with_rating"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "business_seller_home_group_preset_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "seller_home_group_preset"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       category: {
         Row: {
           id: string
@@ -1225,6 +1182,7 @@ export type Database = {
       deadline_type_catalog: {
         Row: {
           active_status_code: string | null
+          buyer_active_message: string | null
           buyer_overdue_message: string | null
           code: string
           created_at: string
@@ -1232,10 +1190,15 @@ export type Database = {
           description: string | null
           due_at_source: string | null
           expiration_days: number | null
+          seller_active_message: string | null
           seller_overdue_message: string | null
+          slot_eyebrow_label: string | null
+          slot_section_label: string | null
+          ui_slot: string | null
         }
         Insert: {
           active_status_code?: string | null
+          buyer_active_message?: string | null
           buyer_overdue_message?: string | null
           code: string
           created_at?: string
@@ -1243,10 +1206,15 @@ export type Database = {
           description?: string | null
           due_at_source?: string | null
           expiration_days?: number | null
+          seller_active_message?: string | null
           seller_overdue_message?: string | null
+          slot_eyebrow_label?: string | null
+          slot_section_label?: string | null
+          ui_slot?: string | null
         }
         Update: {
           active_status_code?: string | null
+          buyer_active_message?: string | null
           buyer_overdue_message?: string | null
           code?: string
           created_at?: string
@@ -1254,7 +1222,11 @@ export type Database = {
           description?: string | null
           due_at_source?: string | null
           expiration_days?: number | null
+          seller_active_message?: string | null
           seller_overdue_message?: string | null
+          slot_eyebrow_label?: string | null
+          slot_section_label?: string | null
+          ui_slot?: string | null
         }
         Relationships: [
           {
@@ -1269,6 +1241,13 @@ export type Database = {
             columns: ["default_trigger_transition_to"]
             isOneToOne: false
             referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "deadline_type_catalog_ui_slot_fkey"
+            columns: ["ui_slot"]
+            isOneToOne: false
+            referencedRelation: "ui_slot_catalog"
             referencedColumns: ["code"]
           },
         ]
@@ -1942,46 +1921,35 @@ export type Database = {
         }
         Relationships: []
       }
-      purchase_request_visualization: {
+      purchase_request_status_ui: {
         Row: {
           created_at: string
           id: string
-          profile_id: string | null
-          purchase_request_id: string | null
+          status_code: string
+          ui_text: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
-          profile_id?: string | null
-          purchase_request_id?: string | null
+          status_code: string
+          ui_text: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
-          profile_id?: string | null
-          purchase_request_id?: string | null
+          status_code?: string
+          ui_text?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "offer_visualization_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profile"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "offer_visualization_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profile_with_rating"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "purchase_request_visualization_purchase_request_id_fkey"
-            columns: ["purchase_request_id"]
-            isOneToOne: false
-            referencedRelation: "purchase_request"
-            referencedColumns: ["id"]
+            foreignKeyName: "purchase_request_status_ui_status_code_fkey"
+            columns: ["status_code"]
+            isOneToOne: true
+            referencedRelation: "purchase_request_status"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -2124,99 +2092,6 @@ export type Database = {
         }
         Relationships: []
       }
-      seller_home_group: {
-        Row: {
-          code: string
-          created_at: string
-          description: string | null
-          is_active: boolean
-          name: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          description?: string | null
-          is_active?: boolean
-          name: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          description?: string | null
-          is_active?: boolean
-          name?: string
-        }
-        Relationships: []
-      }
-      seller_home_group_preset: {
-        Row: {
-          code: string
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean
-          name: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-        }
-        Relationships: []
-      }
-      seller_home_group_preset_item: {
-        Row: {
-          created_at: string
-          group_code: string
-          id: string
-          max_items: number
-          preset_id: string
-          sort_order: number
-        }
-        Insert: {
-          created_at?: string
-          group_code: string
-          id?: string
-          max_items: number
-          preset_id: string
-          sort_order?: number
-        }
-        Update: {
-          created_at?: string
-          group_code?: string
-          id?: string
-          max_items?: number
-          preset_id?: string
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "seller_home_group_preset_item_group_code_fkey"
-            columns: ["group_code"]
-            isOneToOne: false
-            referencedRelation: "seller_home_group"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "seller_home_group_preset_item_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "seller_home_group_preset"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       ui_slot_catalog: {
         Row: {
           code: string
@@ -2323,7 +2198,13 @@ export type Database = {
             Returns: Json
           }
       get_buyer_home_purchase_requests: {
-        Args: { p_profile_id: string }
+        Args: {
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
         Returns: Json
       }
       get_category_children: {
@@ -2383,6 +2264,10 @@ export type Database = {
           sort_order: number
           status_code: string
         }[]
+      }
+      get_conversation_ui_slots: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
       }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }

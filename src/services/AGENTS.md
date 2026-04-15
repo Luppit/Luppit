@@ -125,12 +125,14 @@ Expected item fields in `items[]`:
 - `category_name`
 - `category_path`
 - `status`
+- `status_label`
 - `published_at`
 - `created_at`
 - `views_count`
 
 Service behavior:
 - Seller home must call this RPC for request discovery/grouping.
+- Seller home cards must render `status_label` when present and treat `status` as the raw lifecycle code.
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
 - Do not hardcode group visibility/order in services.
 - Do not build seller-home request groups from local mocks when this RPC is available.
@@ -138,7 +140,7 @@ Service behavior:
 
 ## RPC Contract: `get_buyer_home_purchase_requests`
 Current function contract:
-- `public.get_buyer_home_purchase_requests(p_profile_id uuid)`
+- `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null)`
 - Returns JSON object with `groups[]`.
 
 Expected payload for each group entry:
@@ -155,6 +157,7 @@ Expected item fields in `items[]`:
 - `category_name`
 - `category_path`
 - `status`
+- `status_label`
 - `published_at`
 - `created_at`
 - `views_count`
@@ -163,9 +166,15 @@ Service behavior:
 - Buyer home must call this RPC for request discovery/grouping.
 - Buyer preset resolution must read from shared home-group config for `surface_code = 'buyer_home'`, with assignment via `profile_home_group_preset`.
 - Buyer home currently includes the DB-visible lifecycle set for owned requests, which includes both `active` and `offer_accepted`.
+- Buyer-home filters map to RPC params:
+  - request-name text -> `p_search_text`
+  - date range -> `p_start_date` / `p_end_date`
+  - selected status chips -> `p_status_codes`
+- Buyer home cards must render `status_label` when present and treat `status` as the raw lifecycle code for downstream logic.
 - Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.
 - Do not hardcode group visibility/order in services.
 - Do not build buyer-home request groups from local mocks when this RPC is available.
+- During rollout, client services may keep a compatibility fallback for older deployments that still expose the legacy single-argument buyer-home RPC signature, but that fallback must preserve the RPC payload shape and remain temporary.
 
 ## RPC Contract: `get_or_create_seller_purchase_request_conversation`
 Current function contract:
@@ -174,6 +183,7 @@ Current function contract:
 Service behavior:
 - Seller home request open flow must call this RPC (not direct table insert/select in client services).
 - RPC is source of truth to reuse existing seller/request conversation or bootstrap one when missing.
+- Buyer ownership for the bootstrapped conversation must come from `purchase_request.profile_id`.
 
 ## RPC Contract: `create_seller_offer_from_conversation`
 Current function contract:
