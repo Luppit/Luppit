@@ -133,6 +133,7 @@ Expected item fields in `items[]`:
 Service behavior:
 - Seller home must call this RPC for request discovery/grouping.
 - Seller home cards must render `status_label` when present and treat `status` as the raw lifecycle code.
+- Seller home cards must render the RPC-provided `views_count` directly; do not fetch or recalculate visualization totals separately in the screen layer.
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
 - Do not hardcode group visibility/order in services.
 - Do not build seller-home request groups from local mocks when this RPC is available.
@@ -171,6 +172,7 @@ Service behavior:
   - date range -> `p_start_date` / `p_end_date`
   - selected status chips -> `p_status_codes`
 - Buyer home cards must render `status_label` when present and treat `status` as the raw lifecycle code for downstream logic.
+- Buyer home cards and buyer group listings must render the RPC-provided `views_count` directly; a missing/zero eye count should be investigated in the RPC payload before changing UI code.
 - Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.
 - Do not hardcode group visibility/order in services.
 - Do not build buyer-home request groups from local mocks when this RPC is available.
@@ -184,6 +186,8 @@ Service behavior:
 - Seller home request open flow must call this RPC (not direct table insert/select in client services).
 - RPC is source of truth to reuse existing seller/request conversation or bootstrap one when missing.
 - Buyer ownership for the bootstrapped conversation must come from `purchase_request.profile_id`.
+- Seller-open visualization tracking is also owned by this RPC: it should insert a `purchase_request_visualization` row for (`p_profile_id`, `p_purchase_request_id`) with conflict-safe idempotency (`do nothing` on the one-row-per-profile/request unique constraint).
+- If an existing seller/request conversation is reused, the RPC should self-heal `conversation.buyer_profile_id` so it matches `purchase_request.profile_id` before returning it.
 
 ## RPC Contract: `create_seller_offer_from_conversation`
 Current function contract:
@@ -198,6 +202,41 @@ Service behavior:
   - one `TEXT` message with offer summary
   - then `IMAGE` messages for uploaded images (in original upload order).
 
+## RPC Contract: `get_seller_offer_edit_payload`
+Current function contract:
+- `public.get_seller_offer_edit_payload(p_conversation_id uuid, p_profile_id uuid)`
+
+Expected payload includes:
+- `purchase_request_id`
+- `purchase_offer_id`
+- `description`
+- `price`
+- `currency_id`
+- `primary_delivery_catalog_id`
+- `pickup_after_days`
+- `shipping_price`
+- `shipping_max_days`
+- `files[]` (optional; when empty, client may backfill from `purchase_offer_image`)
+
+Service behavior:
+- Seller offer edit mode should prefer this RPC for preload data.
+- Compatibility fallback may read `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` directly when the RPC is missing or incomplete.
+- Preloaded files may carry extra client metadata such as existing image `id`, `storagePath`, and `isExisting` so the update flow can keep/delete images without losing identity.
+
+## RPC Contract: `update_seller_offer_from_conversation`
+Current function contract:
+- `public.update_seller_offer_from_conversation(...)`
+- Required inputs include seller/profile context, updated offer payload, kept offer-image ids, new offer image paths, and the final ordered conversation image paths to re-post in chat.
+
+Service behavior:
+- Offer edit save must use this RPC for DB writes, system message creation, and refreshed offer-summary chat messages.
+- Client should send:
+  - kept `purchase_offer_image.id` values for existing images that remain attached to the offer
+  - new `offers` bucket paths only for newly added images
+  - final ordered `conversations` bucket paths for the images that should be re-posted into chat after the update
+- Current edit-save flow uploads only new images to the `offers` bucket, but uploads the full current file list to the `conversations` bucket so the update RPC can append the refreshed image messages in order.
+- Offer upload helpers must normalize MIME types before calling Supabase Storage; do not pass malformed picker MIME strings through unchanged.
+
 ## Action Execution and Safe Fallbacks
 - If an action has no executor, use legacy action execution RPC only as compatibility fallback.
 - If an icon key is unknown, omit icon safely.
@@ -210,3 +249,4 @@ Service behavior:
 ## Purchase Offer Data Contract
 - Buyer offer-card data must read seller reputation from the DB-backed rating view/summary relation (`business_with_rating`), not from removed `business.rating` or `business.num_ratings` columns.
 - When querying `purchase_offer`, keep the existing shape for UI consumers (`business_name`, `business_rating`, `business_num_ratings`, `business_province`, `offer_currency_code`) even if the underlying relation changes from `business` to `business_with_rating`.
+- Editable offer drafts and update payloads may reuse the same file model as `FilePicker`, extended with optional metadata for persisted images (`id`, `storagePath`, `isExisting`).

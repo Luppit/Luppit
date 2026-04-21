@@ -14,8 +14,10 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Seller home discovery remains category-driven via `business_category_preference`; buyer home discovery remains profile-owned via `purchase_request.profile_id`.
 - Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
 - Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
+- Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
+- Keep seller discard / buyer reject / seller cancel-offer / seller edit-offer flows DB-driven through conversation state, action metadata, and RPCs; do not recreate those flows as client-only state.
 - Never hardcode conversation action behavior when DB metadata exists.
 - Conversation action placement is DB-driven via `conversation_action.ui_slot` / `ui_slot_catalog`; supported action slots now include `TOP`, `AUX`, and `MENU`.
 - Conversation header ellipsis options must be sourced from DB `MENU` actions returned by `get_conversation_view`; do not hardcode menu items in client code.

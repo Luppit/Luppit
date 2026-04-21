@@ -31,6 +31,7 @@ Applies to conversation screens and conversation UI behavior.
 - Execute server actions via configured executor target (`execution_type='server_rpc'`).
 - For `execution_type='client_command'`, resolve behavior by `executor.target`.
 - Current required client command: `executor.target='modal.offer'` must open `/(modal)/offer` with `purchaseRequestId` + `conversationId`.
+- Current required edit client command: `executor.target='modal.offer.edit'` must open `/(modal)/offer` in edit mode using `conversationId` as the source of truth; `purchaseRequestId` may be passed when already present but is optional.
 - `MENU` action presses must reuse the same action execution path as `TOP`/`AUX` actions, including confirmations and executor handling.
 - Respect `requires_refresh` to decide whether to reload conversation view/messages.
 - Do not locally suppress or persist rating-action visibility; after execution, refresh and trust the DB-returned `actions[]`.
@@ -52,6 +53,30 @@ Applies to conversation screens and conversation UI behavior.
   - executor type: `server_rpc`
   - confirmation template: `BUYER_ACCEPT_OFFER_CONFIRMATION`
   - server-side effect: besides conversation transition to `OFFER_ACCEPTED`, it also updates the linked `purchase_request.status` to `offer_accepted`.
+- Seller discard request is currently configured as:
+  - `conversation_action.code = 'SELLER_DISCARD_REQUEST'`
+  - executor target: `public.seller_discard_request_conversation`
+  - executor type: `server_rpc`
+  - confirmation template: `SELLER_DISCARD_REQUEST_CONFIRMATION`
+  - server-side effect: transitions the seller/request conversation from `REQUEST_OPENED` to `REQUEST_DISCARDED` without changing `purchase_request.status`.
+- Buyer reject offer is currently configured as:
+  - `conversation_action.code = 'BUYER_REJECT_OFFER'`
+  - executor target: `public.buyer_reject_offer`
+  - executor type: `server_rpc`
+  - confirmation template: `BUYER_REJECT_OFFER_CONFIRMATION`
+  - server-side effect: transitions the conversation from `OFFER_MADE` to `OFFER_REJECTED` without changing `purchase_request.status`.
+- Seller cancel offer is currently configured as:
+  - seller `Cancelar` action in `OFFER_MADE`
+  - executor target: `public.seller_cancel_offer`
+  - executor type: `server_rpc`
+  - confirmation template: `SELLER_CANCEL_OFFER_CONFIRMATION`
+  - server-side effect: removes the current offer artifacts and resets the conversation to `REQUEST_OPENED`.
+- Seller modify offer is currently configured as:
+  - seller `Modificar` action in `OFFER_MADE`
+  - executor target: `modal.offer.edit`
+  - executor type: `client_command`
+  - no confirmation template
+  - client behavior: opens the offer modal in edit mode, preloads the existing offer by conversation, and saves through `update_seller_offer_from_conversation(...)`.
 - Seller-request bootstrap continues to resolve the buyer side from `purchase_request.profile_id`; conversation setup must not depend on legacy visualization ownership.
 - Conversation rating actions are currently configured so the DB may return them only when the current actor has not rated yet:
   - `BUYER_RATE_SELLER`
@@ -59,8 +84,9 @@ Applies to conversation screens and conversation UI behavior.
   - executor target: `public.submit_conversation_rating`
 - Current delayed conversation flows:
   - `SELLER_CONCRETAR` transitions `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then the active deadline may expire to `DELAYED_ACCEPTANCE`.
-  - `seller_finalize_transaction(...)` transitions to `SENT_SHIPMENT`, then the active deadline may expire to `DELAYED_SHIPMENT` using `purchase_offer_delivery.max_days`.
+  - `seller_finalize_transaction(...)` validates OTP against `conversation_transaction_code`, transitions to `SENT_SHIPMENT`, creates `SENT_SHIPMENT_EXPIRATION` only for shipping deliveries (`purchase_offer_delivery.max_days`), and auto-completes store pickup (`purchase_offer_delivery.after_days`) by calling `buyer_confirm_received(...)`.
 - Those active deadlines may also surface a passive `STATUS` slot card in `get_conversation_view(...).slots[]` while the deadline is unresolved and the conversation remains in the configured active status.
 - `DELAYED_ACCEPTANCE` may have messaging permissions enabled and may also expose AUX or TOP actions from DB metadata.
 - `OFFER_MADE` may expose duplicated actions in both `TOP` and `MENU` slots when DB configuration wants both entry points.
   - The client must not suppress the composer just because an AUX action exists.
+- Offer edit mode in `/(modal)/offer` currently hydrates from `get_seller_offer_edit_payload(...)` when available and may fall back to direct reads of `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` when the RPC is missing or returns no files.

@@ -250,6 +250,25 @@ export default function ConversationLayout() {
               conversationId,
             },
           });
+        } else if (action.executor.target === "modal.offer.edit") {
+          if (!conversationId) {
+            showError(
+              "No se pudo abrir la edición",
+              "La conversación no está disponible."
+            );
+            setIsExecutingAction(false);
+            return;
+          }
+
+          router.push({
+            pathname: "/(modal)/offer",
+            params: {
+              title: "Modificar oferta",
+              conversationId,
+              mode: "edit",
+              ...(purchaseRequestId ? { purchaseRequestId } : null),
+            },
+          });
         } else if (action.executor.target !== "popup.close") {
           showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
         }
@@ -280,7 +299,13 @@ export default function ConversationLayout() {
         showSuccess("Acción completada");
       }
     },
-    [conversationId, profileId, isExecutingAction, purchaseRequestId, refreshConversation]
+    [
+      conversationId,
+      profileId,
+      isExecutingAction,
+      purchaseRequestId,
+      refreshConversation,
+    ]
   );
 
   const handleActionPress = useCallback(

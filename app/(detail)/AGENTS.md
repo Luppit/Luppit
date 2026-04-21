@@ -6,6 +6,7 @@ Applies to purchase-request detail screens and selected-offer timeline behavior.
 ## Purchase Request Detail: DB-Driven Contract (Mandatory)
 - Purchase-request detail may be opened from grouped buyer-home RPC items; the route must continue to work when the incoming serialized `purchaseRequest` payload contains the UI-required purchase-request fields but not extra enrichment.
 - Grouped home payloads may now include `status_label` for card presentation, but detail-screen logic must continue using raw `purchase_request.status`.
+- Purchase-request detail visualization count must reflect `purchase_request_visualization` rows for that request; do not infer it from stale card params or local counters.
 - `purchase_request.status` controls offer list mode:
   - `active`: render all offers and the count label (`Ofertas (n)`).
   - `offer_accepted`: render only the accepted offer and label `Oferta seleccionada`.
