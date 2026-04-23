@@ -62,7 +62,52 @@ export type PopupSummaryConfig = {
   dismissOnBackdropPress?: boolean;
 };
 
-export type PopupConfig = PopupMenuConfig | PopupSummaryConfig;
+export type PopupFilterValues = {
+  searchValue: string;
+  startDate: string;
+  endDate: string;
+  selectedChipIds: string[];
+};
+
+export type PopupFilterFieldConfig = {
+  label: string;
+  placeholder?: string;
+  initialValue?: string;
+};
+
+export type PopupFilterDateRangeConfig = {
+  label: string;
+  startPlaceholder?: string;
+  endPlaceholder?: string;
+  initialStartValue?: string;
+  initialEndValue?: string;
+};
+
+export type PopupFilterChipOption = {
+  id: string;
+  label: string;
+};
+
+export type PopupFilterChipGroupConfig = {
+  label: string;
+  options: PopupFilterChipOption[];
+  initialSelectedIds?: string[];
+};
+
+export type PopupFilterConfig = {
+  type: "filters";
+  title: string;
+  searchField?: PopupFilterFieldConfig;
+  dateRangeField?: PopupFilterDateRangeConfig;
+  chipGroup?: PopupFilterChipGroupConfig;
+  applyLabel?: string;
+  clearLabel?: string;
+  dismissOnBackdropPress?: boolean;
+  onApply?: (values: PopupFilterValues) => void;
+  onClear?: () => void;
+};
+
+export type PopupConfig = PopupMenuConfig | PopupSummaryConfig | PopupFilterConfig;
 
 type PopupState = {
   config: PopupConfig | null;

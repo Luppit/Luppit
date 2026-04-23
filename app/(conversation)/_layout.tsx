@@ -2,11 +2,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import ConversationActionButtons, {
   ConversationActionButtonConfig,
 } from "@/src/components/conversation/ConversationActionButtons";
+import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
-import { openPopup } from "@/src/services/popup.service";
+import { openPopup, PopupOption } from "@/src/services/popup.service";
 import { createConversationMessages } from "@/src/services/conversation.message.service";
 import {
   ConversationView,
@@ -15,7 +16,7 @@ import {
   executeConversationActionByExecutor,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
-import { useTheme } from "@/src/themes";
+import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
@@ -33,6 +34,7 @@ type ConversationLayoutContextValue = {
   profileId: string;
   conversationView: ConversationView;
   auxActions: ConversationViewAction[];
+  showComposer: boolean;
   onActionPress: (action: ConversationViewAction) => void;
   isExecutingAction: boolean;
   refreshConversation: () => Promise<void>;
@@ -99,6 +101,31 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
     textColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
   };
+}
+
+function toMenuOptionConfig(action: ConversationViewAction): PopupOption {
+  const { isDanger, isPrimary } = normalizeStyleFlags(action.style_code);
+
+  return {
+    id: action.id,
+    label: action.label || action.code || "",
+    icon: normalizeOptionalIcon(action.icon),
+    backgroundColorKey: "backgroudWhite",
+    textColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
+    iconColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
+  };
+}
+
+function getAuxActionTextColor(styleCode: string | null, theme: Theme) {
+  const { isDanger, isPrimary } = normalizeStyleFlags(styleCode);
+
+  if (isDanger) return theme.colors.error;
+  if (isPrimary) return theme.colors.primary;
+  return theme.colors.textDark;
+}
+
+function isBlackAuxAction(styleCode: string | null) {
+  return normalizeText(styleCode).includes("black");
 }
 
 function interpolateTemplate(
@@ -223,6 +250,25 @@ export default function ConversationLayout() {
               conversationId,
             },
           });
+        } else if (action.executor.target === "modal.offer.edit") {
+          if (!conversationId) {
+            showError(
+              "No se pudo abrir la edición",
+              "La conversación no está disponible."
+            );
+            setIsExecutingAction(false);
+            return;
+          }
+
+          router.push({
+            pathname: "/(modal)/offer",
+            params: {
+              title: "Modificar oferta",
+              conversationId,
+              mode: "edit",
+              ...(purchaseRequestId ? { purchaseRequestId } : null),
+            },
+          });
         } else if (action.executor.target !== "popup.close") {
           showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
         }
@@ -253,7 +299,13 @@ export default function ConversationLayout() {
         showSuccess("Acción completada");
       }
     },
-    [conversationId, profileId, isExecutingAction, purchaseRequestId, refreshConversation]
+    [
+      conversationId,
+      profileId,
+      isExecutingAction,
+      purchaseRequestId,
+      refreshConversation,
+    ]
   );
 
   const handleActionPress = useCallback(
@@ -382,6 +434,20 @@ export default function ConversationLayout() {
     [conversationView?.context, runAction]
   );
 
+  const openConversationMenu = useCallback(
+    (actions: ConversationViewAction[]) => {
+      if (actions.length === 0) return;
+
+      openPopup({
+        options: actions.map((action) => ({
+          ...toMenuOptionConfig(action),
+          onPress: () => handleActionPress(action),
+        })),
+      });
+    },
+    [handleActionPress]
+  );
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
@@ -410,8 +476,10 @@ export default function ConversationLayout() {
   const auxActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
   );
-  const hasAuxActions = auxActions.length > 0;
-  const showComposer = conversationView.permissions.can_send_messages && !hasAuxActions;
+  const menuActions = conversationView.actions.filter(
+    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
+  );
+  const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
   const actionButtonsOverlaySpace = showActionButtons ? 76 + t.spacing.md : 0;
   const title = routeTitle ?? "Conversación";
@@ -421,6 +489,7 @@ export default function ConversationLayout() {
     profileId,
     conversationView,
     auxActions,
+    showComposer,
     onActionPress: handleActionPress,
     isExecutingAction,
     refreshConversation,
@@ -468,7 +537,22 @@ export default function ConversationLayout() {
                 {title}
               </Text>
 
-              <View style={{ width: 40 }} />
+              {menuActions.length > 0 ? (
+                <Pressable
+                  onPress={() => openConversationMenu(menuActions)}
+                  disabled={isExecutingAction}
+                  hitSlop={12}
+                  style={{
+                    width: 40,
+                    alignItems: "flex-end",
+                    opacity: isExecutingAction ? 0.6 : 1,
+                  }}
+                >
+                  <Icon name="ellipsis" size={28} />
+                </Pressable>
+              ) : (
+                <View style={{ width: 40 }} />
+              )}
             </View>
           </View>
 
@@ -509,13 +593,57 @@ export default function ConversationLayout() {
           </View>
 
           {showComposer ? (
-            <View
-              style={{
-                paddingHorizontal: t.spacing.md,
-                paddingTop: t.spacing.sm,
-                paddingBottom: Math.max(insets.bottom, t.spacing.sm),
-              }}
-            >
+            <>
+              {auxActions.length > 0 ? (
+                <View
+                  style={{
+                    paddingHorizontal: t.spacing.md,
+                    paddingTop: t.spacing.sm,
+                    paddingBottom: t.spacing.sm,
+                    gap: t.spacing.sm,
+                  }}
+                >
+                  {auxActions.map((action) =>
+                    isBlackAuxAction(action.style_code) ? (
+                      <Button
+                        key={action.id}
+                        title={action.label}
+                        onPress={() => handleActionPress(action)}
+                        disabled={isExecutingAction}
+                        variant="dark"
+                      />
+                    ) : (
+                      <Pressable
+                        key={action.id}
+                        onPress={() => handleActionPress(action)}
+                        disabled={isExecutingAction}
+                        hitSlop={8}
+                        style={{
+                          alignSelf: "center",
+                          paddingVertical: t.spacing.xs,
+                          opacity: isExecutingAction ? 0.6 : 1,
+                        }}
+                      >
+                        <Text
+                          variant="body"
+                          align="center"
+                          style={{ color: getAuxActionTextColor(action.style_code, t) }}
+                        >
+                          {action.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  )}
+                </View>
+              ) : null}
+
+              <View
+                style={{
+                  paddingHorizontal: t.spacing.md,
+                  paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
+                  paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+                }}
+              >
               <InputChat
                 onSend={async ({ text, images }) => {
                   const created = await createConversationMessages({
@@ -528,7 +656,8 @@ export default function ConversationLayout() {
                   }
                 }}
               />
-            </View>
+              </View>
+            </>
           ) : null}
         </View>
       </KeyboardAvoidingView>

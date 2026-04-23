@@ -6,7 +6,9 @@ export type OtpValidatorStyles = {
   label: TextStyle;
   helperText: TextStyle;
   inputRow: ViewStyle;
+  inputRowStretch: ViewStyle;
   inputBox: ViewStyle;
+  inputBoxStretch: ViewStyle;
   inputBoxFocused: ViewStyle;
   inputText: TextStyle;
 };
@@ -15,6 +17,7 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
   return {
     container: {
       gap: t.spacing.sm,
+      alignItems: "center",
     },
     label: {
       color: t.colors.textDark,
@@ -30,6 +33,11 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       justifyContent: "center",
       gap: t.spacing.sm,
     },
+    inputRowStretch: {
+      width: "78%",
+      maxWidth: 272,
+      alignSelf: "center",
+    },
     inputBox: {
       width: 52,
       height: 56,
@@ -39,6 +47,10 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: t.colors.backgroudWhite,
+    },
+    inputBoxStretch: {
+      flex: 1,
+      width: undefined,
     },
     inputBoxFocused: {
       borderColor: t.colors.primary,

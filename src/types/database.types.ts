@@ -36,8 +36,6 @@ export type Database = {
           id_document: string | null
           location_id: string | null
           name: string | null
-          num_ratings: number | null
-          rating: number | null
         }
         Insert: {
           created_at?: string
@@ -45,8 +43,6 @@ export type Database = {
           id_document?: string | null
           location_id?: string | null
           name?: string | null
-          num_ratings?: number | null
-          rating?: number | null
         }
         Update: {
           created_at?: string
@@ -54,8 +50,6 @@ export type Database = {
           id_document?: string | null
           location_id?: string | null
           name?: string | null
-          num_ratings?: number | null
-          rating?: number | null
         }
         Relationships: [
           {
@@ -63,6 +57,131 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_category_preference: {
+        Row: {
+          business_id: string
+          category_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          business_id: string
+          category_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          business_id?: string
+          category_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_category_preference_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_category_preference_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_category_preference_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "category"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_home_group_preset: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          preset_id: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          preset_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          preset_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_home_group_preset_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_home_group_preset_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_home_group_preset_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "home_group_preset"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_rating_summary: {
+        Row: {
+          business_id: string
+          created_at: string
+          num_ratings: number
+          rating: number
+          updated_at: string
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          num_ratings: number
+          rating: number
+          updated_at?: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          num_ratings?: number
+          rating?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_rating_summary_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_rating_summary_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "business_with_rating"
             referencedColumns: ["id"]
           },
         ]
@@ -166,6 +285,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversation_buyer_profile_id_fkey"
+            columns: ["buyer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "conversation_purchase_offer_id_fkey"
             columns: ["purchase_offer_id"]
             isOneToOne: true
@@ -184,6 +310,13 @@ export type Database = {
             columns: ["seller_profile_id"]
             isOneToOne: false
             referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_seller_profile_id_fkey"
+            columns: ["seller_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
           },
           {
@@ -310,6 +443,56 @@ export type Database = {
           },
         ]
       }
+      conversation_confirmation_condition_input: {
+        Row: {
+          component_config: Json | null
+          condition_id: string
+          created_at: string
+          helper_text: string | null
+          id: string
+          input_kind: string
+          is_required: boolean
+          label: string
+          otp_length: number
+          payload_key: string
+          sort_order: number
+        }
+        Insert: {
+          component_config?: Json | null
+          condition_id: string
+          created_at?: string
+          helper_text?: string | null
+          id?: string
+          input_kind: string
+          is_required?: boolean
+          label: string
+          otp_length?: number
+          payload_key: string
+          sort_order?: number
+        }
+        Update: {
+          component_config?: Json | null
+          condition_id?: string
+          created_at?: string
+          helper_text?: string | null
+          id?: string
+          input_kind?: string
+          is_required?: boolean
+          label?: string
+          otp_length?: number
+          payload_key?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_condition_input_condition_id_fkey"
+            columns: ["condition_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template_condition"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_confirmation_field: {
         Row: {
           id: string
@@ -344,8 +527,10 @@ export type Database = {
       }
       conversation_confirmation_template: {
         Row: {
+          cancel_icon: string | null
           cancel_label: string
           code: string
+          confirm_icon: string | null
           confirm_label: string
           confirm_style_code: string | null
           created_at: string
@@ -354,8 +539,10 @@ export type Database = {
           title: string
         }
         Insert: {
+          cancel_icon?: string | null
           cancel_label?: string
           code: string
+          confirm_icon?: string | null
           confirm_label?: string
           confirm_style_code?: string | null
           created_at?: string
@@ -364,8 +551,10 @@ export type Database = {
           title: string
         }
         Update: {
+          cancel_icon?: string | null
           cancel_label?: string
           code?: string
+          confirm_icon?: string | null
           confirm_label?: string
           confirm_style_code?: string | null
           created_at?: string
@@ -380,6 +569,55 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "action_style_catalog"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      conversation_confirmation_template_condition: {
+        Row: {
+          actor_role_id: string | null
+          created_at: string
+          delivery_cat_id: string | null
+          description_append: string | null
+          id: string
+          template_id: string
+        }
+        Insert: {
+          actor_role_id?: string | null
+          created_at?: string
+          delivery_cat_id?: string | null
+          description_append?: string | null
+          id?: string
+          template_id: string
+        }
+        Update: {
+          actor_role_id?: string | null
+          created_at?: string
+          delivery_cat_id?: string | null
+          description_append?: string | null
+          id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_confirmation_template_conditi_delivery_cat_id_fkey"
+            columns: ["delivery_cat_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_confirmation_template_condition_actor_role_id_fkey"
+            columns: ["actor_role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_confirmation_template_condition_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_confirmation_template"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -434,6 +672,7 @@ export type Database = {
           message_kind: string | null
           sender_profile_id: string | null
           text: string | null
+          visible_to_role_id: string | null
         }
         Insert: {
           conversation_id?: string | null
@@ -443,6 +682,7 @@ export type Database = {
           message_kind?: string | null
           sender_profile_id?: string | null
           text?: string | null
+          visible_to_role_id?: string | null
         }
         Update: {
           conversation_id?: string | null
@@ -452,6 +692,7 @@ export type Database = {
           message_kind?: string | null
           sender_profile_id?: string | null
           text?: string | null
+          visible_to_role_id?: string | null
         }
         Relationships: [
           {
@@ -475,6 +716,20 @@ export type Database = {
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "conversation_message_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_message_visible_to_role_id_fkey"
+            columns: ["visible_to_role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
         ]
       }
       conversation_message_kind: {
@@ -492,23 +747,118 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_rating: {
+        Row: {
+          action_code: string
+          comment: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          rated_business_id: string | null
+          rated_profile_id: string
+          rater_profile_id: string
+          stars: number
+          tags: Json
+          updated_at: string
+        }
+        Insert: {
+          action_code: string
+          comment?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          rated_business_id?: string | null
+          rated_profile_id: string
+          rater_profile_id: string
+          stars: number
+          tags?: Json
+          updated_at?: string
+        }
+        Update: {
+          action_code?: string
+          comment?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          rated_business_id?: string | null
+          rated_profile_id?: string
+          rater_profile_id?: string
+          stars?: number
+          tags?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_rating_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rated_business_id_fkey"
+            columns: ["rated_business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rated_business_id_fkey"
+            columns: ["rated_business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rated_profile_id_fkey"
+            columns: ["rated_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rated_profile_id_fkey"
+            columns: ["rated_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rater_profile_id_fkey"
+            columns: ["rater_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_rating_rater_profile_id_fkey"
+            columns: ["rater_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_status: {
         Row: {
           code: string
           created_at: string
           description: string | null
+          icon: string | null
           is_terminal: boolean | null
         }
         Insert: {
           code: string
           created_at?: string
           description?: string | null
+          icon?: string | null
           is_terminal?: boolean | null
         }
         Update: {
           code?: string
           created_at?: string
           description?: string | null
+          icon?: string | null
           is_terminal?: boolean | null
         }
         Relationships: []
@@ -557,6 +907,13 @@ export type Database = {
             columns: ["actor_profile_id"]
             isOneToOne: false
             referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_status_history_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
           },
           {
@@ -676,6 +1033,72 @@ export type Database = {
           },
         ]
       }
+      conversation_transaction_code: {
+        Row: {
+          code_hash: string
+          code_last4: string
+          consumed_at: string | null
+          consumed_by_profile_id: string | null
+          conversation_id: string
+          created_at: string
+          created_by_profile_id: string
+        }
+        Insert: {
+          code_hash: string
+          code_last4: string
+          consumed_at?: string | null
+          consumed_by_profile_id?: string | null
+          conversation_id: string
+          created_at?: string
+          created_by_profile_id: string
+        }
+        Update: {
+          code_hash?: string
+          code_last4?: string
+          consumed_at?: string | null
+          consumed_by_profile_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          created_by_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_transaction_code_consumed_by_profile_id_fkey"
+            columns: ["consumed_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transaction_code_consumed_by_profile_id_fkey"
+            columns: ["consumed_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transaction_code_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transaction_code_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_transaction_code_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_transition: {
         Row: {
           action_id: string | null
@@ -758,21 +1181,76 @@ export type Database = {
       }
       deadline_type_catalog: {
         Row: {
+          active_status_code: string | null
+          buyer_active_message: string | null
+          buyer_overdue_message: string | null
           code: string
           created_at: string
+          default_trigger_transition_to: string | null
           description: string | null
+          due_at_source: string | null
+          expiration_days: number | null
+          seller_active_message: string | null
+          seller_overdue_message: string | null
+          slot_eyebrow_label: string | null
+          slot_section_label: string | null
+          ui_slot: string | null
         }
         Insert: {
+          active_status_code?: string | null
+          buyer_active_message?: string | null
+          buyer_overdue_message?: string | null
           code: string
           created_at?: string
+          default_trigger_transition_to?: string | null
           description?: string | null
+          due_at_source?: string | null
+          expiration_days?: number | null
+          seller_active_message?: string | null
+          seller_overdue_message?: string | null
+          slot_eyebrow_label?: string | null
+          slot_section_label?: string | null
+          ui_slot?: string | null
         }
         Update: {
+          active_status_code?: string | null
+          buyer_active_message?: string | null
+          buyer_overdue_message?: string | null
           code?: string
           created_at?: string
+          default_trigger_transition_to?: string | null
           description?: string | null
+          due_at_source?: string | null
+          expiration_days?: number | null
+          seller_active_message?: string | null
+          seller_overdue_message?: string | null
+          slot_eyebrow_label?: string | null
+          slot_section_label?: string | null
+          ui_slot?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "deadline_type_catalog_active_status_code_fkey"
+            columns: ["active_status_code"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "deadline_type_catalog_default_trigger_transition_to_fkey"
+            columns: ["default_trigger_transition_to"]
+            isOneToOne: false
+            referencedRelation: "conversation_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "deadline_type_catalog_ui_slot_fkey"
+            columns: ["ui_slot"]
+            isOneToOne: false
+            referencedRelation: "ui_slot_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       delivery_catalog: {
         Row: {
@@ -794,6 +1272,108 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      home_group: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          surface_code: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          surface_code: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          surface_code?: string
+        }
+        Relationships: []
+      }
+      home_group_preset: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          surface_code: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          surface_code: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          surface_code?: string
+        }
+        Relationships: []
+      }
+      home_group_preset_item: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          max_items: number
+          preset_id: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          max_items: number
+          preset_id: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          max_items?: number
+          preset_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_group_preset_item_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "home_group"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "home_group_preset_item_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "home_group_preset"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       location: {
         Row: {
@@ -821,21 +1401,30 @@ export type Database = {
       }
       menu_item: {
         Row: {
+          code: string | null
           created_at: string
           icon: string
           id: string
+          is_active: boolean
+          label: string | null
           route: string
         }
         Insert: {
+          code?: string | null
           created_at?: string
           icon: string
           id?: string
+          is_active?: boolean
+          label?: string | null
           route: string
         }
         Update: {
+          code?: string | null
           created_at?: string
           icon?: string
           id?: string
+          is_active?: boolean
+          label?: string | null
           route?: string
         }
         Relationships: []
@@ -858,6 +1447,9 @@ export type Database = {
       profile: {
         Row: {
           created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
           id: string
           id_document: string
           name: string
@@ -866,6 +1458,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
+          email_opt_in?: boolean
+          email_opt_in_at?: string | null
           id?: string
           id_document: string
           name: string
@@ -874,6 +1469,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
+          email_opt_in?: boolean
+          email_opt_in_at?: string | null
           id?: string
           id_document?: string
           name?: string
@@ -910,10 +1508,67 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "profile_business_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "profile_business_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_business_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_home_group_preset: {
+        Row: {
+          created_at: string
+          id: string
+          preset_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          preset_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          preset_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_home_group_preset_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "home_group_preset"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_home_group_preset_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_home_group_preset_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
           },
         ]
@@ -949,6 +1604,52 @@ export type Database = {
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "profile_notification_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_rating_summary: {
+        Row: {
+          created_at: string
+          num_ratings: number
+          profile_id: string
+          rating: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          num_ratings: number
+          profile_id: string
+          rating: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          num_ratings?: number
+          profile_id?: string
+          rating?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_rating_summary_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_rating_summary_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profile_role: {
@@ -973,6 +1674,13 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_role_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
           },
           {
@@ -1021,6 +1729,13 @@ export type Database = {
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_offer_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
             referencedColumns: ["id"]
           },
           {
@@ -1171,41 +1886,79 @@ export type Database = {
             referencedRelation: "request_draft"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      purchase_request_visualization: {
-        Row: {
-          created_at: string
-          id: string
-          profile_id: string | null
-          purchase_request_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          profile_id?: string | null
-          purchase_request_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          profile_id?: string | null
-          purchase_request_id?: string | null
-        }
-        Relationships: [
           {
-            foreignKeyName: "offer_visualization_profile_id_fkey"
+            foreignKeyName: "purchase_request_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profile"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "purchase_request_visualization_purchase_request_id_fkey"
-            columns: ["purchase_request_id"]
+            foreignKeyName: "purchase_request_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: "purchase_request"
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_status_fkey"
+            columns: ["status"]
+            isOneToOne: false
+            referencedRelation: "purchase_request_status"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      purchase_request_status: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          is_terminal: boolean
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          is_terminal?: boolean
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          is_terminal?: boolean
+        }
+        Relationships: []
+      }
+      purchase_request_status_ui: {
+        Row: {
+          created_at: string
+          id: string
+          status_code: string
+          ui_text: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          status_code: string
+          ui_text: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          status_code?: string
+          ui_text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_status_ui_status_code_fkey"
+            columns: ["status_code"]
+            isOneToOne: true
+            referencedRelation: "purchase_request_status"
+            referencedColumns: ["code"]
           },
         ]
       }
@@ -1249,6 +2002,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "request_draft_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "request_draft_purchase_request_id_fkey"
             columns: ["purchase_request_id"]
             isOneToOne: false
@@ -1281,18 +2041,24 @@ export type Database = {
       role_menu: {
         Row: {
           created_at: string
+          is_active: boolean
           menu_item_id: string
           role_id: string
+          sort_order: number
         }
         Insert: {
           created_at?: string
+          is_active?: boolean
           menu_item_id?: string
           role_id?: string
+          sort_order?: number
         }
         Update: {
           created_at?: string
+          is_active?: boolean
           menu_item_id?: string
           role_id?: string
+          sort_order?: number
         }
         Relationships: [
           {
@@ -1310,6 +2076,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      segment: {
+        Row: {
+          created_at: string
+          id: string
+          is_disabled: boolean
+          name: string
+          svg_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_disabled?: boolean
+          name: string
+          svg_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_disabled?: boolean
+          name?: string
+          svg_name?: string
+        }
+        Relationships: []
       }
       ui_slot_catalog: {
         Row: {
@@ -1331,9 +2121,101 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      business_with_rating: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          id_document: string | null
+          location_id: string | null
+          name: string | null
+          num_ratings: number | null
+          rating: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_with_rating: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          id_document: string | null
+          name: string | null
+          num_ratings: number | null
+          phone: string | null
+          rating: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      buyer_accept_offer: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_confirm_received: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      create_seller_offer_from_conversation:
+        | {
+            Args: {
+              p_conversation_id: string
+              p_currency_id: string
+              p_description: string
+              p_image_paths?: string[]
+              p_pickup_after_days?: number
+              p_price: number
+              p_primary_delivery_catalog_id: string
+              p_profile_id: string
+              p_shipping_max_days?: number
+              p_shipping_price?: number
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_conversation_id: string
+              p_conversation_image_paths?: string[]
+              p_currency_id: string
+              p_description: string
+              p_offer_image_paths?: string[]
+              p_pickup_after_days?: number
+              p_price: number
+              p_primary_delivery_catalog_id: string
+              p_profile_id: string
+              p_shipping_max_days?: number
+              p_shipping_price?: number
+            }
+            Returns: Json
+          }
+      get_buyer_home_purchase_requests: {
+        Args: {
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
+        Returns: Json
+      }
       get_category_children: {
         Args: { category_id_input: string }
         Returns: {
@@ -1369,6 +2251,7 @@ export type Database = {
           message_kind: string | null
           sender_profile_id: string | null
           text: string | null
+          visible_to_role_id: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -1377,13 +2260,73 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_conversation_timeline: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          icon: string
+          is_completed: boolean
+          is_next: boolean
+          label: string
+          pre_label: string
+          reached_at: string
+          reached_at_label: string
+          sort_order: number
+          status_code: string
+        }[]
+      }
+      get_conversation_ui_slots: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_navbar_items_by_profile: {
+        Args: { p_profile_id: string }
+        Returns: {
+          icon: string
+          label: string
+          menu_code: string
+          role_name: string
+          route: string
+          sort_order: number
+        }[]
+      }
+      get_or_create_seller_purchase_request_conversation: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      get_seller_home_purchase_requests: {
+        Args: { p_profile_id: string }
         Returns: Json
       }
       is_category_leaf: {
         Args: { category_id_input: string }
         Returns: boolean
+      }
+      process_expired_conversation_deadlines: { Args: never; Returns: Json }
+      refresh_business_rating_summary: {
+        Args: { p_business_id: string }
+        Returns: undefined
+      }
+      refresh_profile_rating_summary: {
+        Args: { p_profile_id: string }
+        Returns: undefined
       }
       search_category: {
         Args: { search_text: string }
@@ -1392,6 +2335,41 @@ export type Database = {
           name: string
           path: unknown
         }[]
+      }
+      seller_concretar_request: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_discard_request_conversation: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_finalize_transaction: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_mark_offer_made: {
+        Args: {
+          p_conversation_id: string
+          p_profile_id: string
+          p_purchase_offer_id: string
+        }
+        Returns: Json
       }
       send_conversation_message:
         | {
@@ -1408,6 +2386,7 @@ export type Database = {
               message_kind: string | null
               sender_profile_id: string | null
               text: string | null
+              visible_to_role_id: string | null
             }
             SetofOptions: {
               from: "*"
@@ -1432,6 +2411,7 @@ export type Database = {
               message_kind: string | null
               sender_profile_id: string | null
               text: string | null
+              visible_to_role_id: string | null
             }
             SetofOptions: {
               from: "*"
@@ -1440,6 +2420,15 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      submit_conversation_rating: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
     }

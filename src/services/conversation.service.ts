@@ -63,6 +63,25 @@ export type ConversationViewAction = {
   confirmation: ConversationActionConfirmation | null;
 };
 
+export type ConversationViewSlot = {
+  code: string;
+  kind: string | null;
+  ui_slot: string | null;
+  sort_order: number | null;
+  eyebrow_label: string | null;
+  title: string | null;
+  icon: string | null;
+  section_label: string | null;
+  message: string | null;
+  due_at: string | null;
+  formatted_due_at: string | null;
+  due_at_epoch: number | null;
+  seconds_remaining: number | null;
+  is_overdue: boolean;
+  deadline_type: string | null;
+  trigger_transition_to: string | null;
+};
+
 export type ConversationView = {
   conversation: {
     id: string;
@@ -76,6 +95,7 @@ export type ConversationView = {
   permissions: ConversationViewPermission;
   context: Record<string, unknown>;
   actions: ConversationViewAction[];
+  slots: ConversationViewSlot[];
 };
 
 export type ExecuteConversationActionInput = {
@@ -241,6 +261,43 @@ function parseConversationViewAction(raw: unknown): ConversationViewAction | nul
   };
 }
 
+function parseNullableNumber(raw: unknown): number | null {
+  return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+}
+
+function parseConversationViewSlot(raw: unknown): ConversationViewSlot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const code = typeof value.code === "string" ? value.code : "";
+  if (!code) return null;
+
+  return {
+    code,
+    kind: typeof value.kind === "string" ? value.kind : null,
+    ui_slot: typeof value.ui_slot === "string" ? value.ui_slot : null,
+    sort_order: parseNullableNumber(value.sort_order),
+    eyebrow_label:
+      typeof value.eyebrow_label === "string" ? value.eyebrow_label : null,
+    title: typeof value.title === "string" ? value.title : null,
+    icon: typeof value.icon === "string" ? value.icon : null,
+    section_label:
+      typeof value.section_label === "string" ? value.section_label : null,
+    message: typeof value.message === "string" ? value.message : null,
+    due_at: typeof value.due_at === "string" ? value.due_at : null,
+    formatted_due_at:
+      typeof value.formatted_due_at === "string" ? value.formatted_due_at : null,
+    due_at_epoch: parseNullableNumber(value.due_at_epoch),
+    seconds_remaining: parseNullableNumber(value.seconds_remaining),
+    is_overdue: value.is_overdue === true,
+    deadline_type:
+      typeof value.deadline_type === "string" ? value.deadline_type : null,
+    trigger_transition_to:
+      typeof value.trigger_transition_to === "string"
+        ? value.trigger_transition_to
+        : null,
+  };
+}
+
 function parseConversationView(raw: unknown): ConversationView | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -260,6 +317,11 @@ function parseConversationView(raw: unknown): ConversationView | null {
   const actions = rawActions
     .map((action) => parseConversationViewAction(action))
     .filter((action): action is ConversationViewAction => Boolean(action));
+  const rawSlots = Array.isArray(value.slots) ? value.slots : [];
+  const slots = rawSlots
+    .map((slot) => parseConversationViewSlot(slot))
+    .filter((slot): slot is ConversationViewSlot => Boolean(slot))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   return {
     conversation: {
@@ -301,6 +363,7 @@ function parseConversationView(raw: unknown): ConversationView | null {
         ? (value.context as Record<string, unknown>)
         : {},
     actions,
+    slots,
   };
 }
 

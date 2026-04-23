@@ -13,6 +13,10 @@ import {
 import {
   createPurchaseOffer,
   CreatePurchaseOfferInput,
+  EditablePurchaseOfferDraft,
+  getEditablePurchaseOfferDraftByConversationId,
+  updatePurchaseOffer,
+  UpdatePurchaseOfferInput,
 } from "@/src/services/purchase.offer.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
@@ -62,6 +66,7 @@ export default function OfferScreen() {
     purchaseRequest?: string | string[];
     purchaseRequestId?: string | string[];
     conversationId?: string | string[];
+    mode?: string | string[];
   }>();
   const initialPurchaseRequest = parsePurchaseRequestParam(params.purchaseRequest);
   const purchaseRequestId = Array.isArray(params.purchaseRequestId)
@@ -70,6 +75,8 @@ export default function OfferScreen() {
   const conversationId = Array.isArray(params.conversationId)
     ? params.conversationId[0]
     : params.conversationId;
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const isEditMode = mode === "edit";
   const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest>(
     initialPurchaseRequest ?? purchaseRequestExample
   );
@@ -90,6 +97,10 @@ export default function OfferScreen() {
   const [shippingMaxTime, setShippingMaxTime] = useState("");
   const [shippingMaxTimeUnit, setShippingMaxTimeUnit] =
     useState<DeliveryTimeOption>("horas");
+  const [editDraft, setEditDraft] = useState<EditablePurchaseOfferDraft | null>(null);
+  const [editDraftLoading, setEditDraftLoading] = useState(isEditMode);
+  const [didApplyEditDraft, setDidApplyEditDraft] = useState(false);
+  const resolvedPurchaseRequestId = purchaseRequestId ?? editDraft?.purchaseRequestId ?? null;
   const pickupCatalog = useMemo(
     () =>
       deliveryCatalog.find((item) => {
@@ -139,7 +150,7 @@ export default function OfferScreen() {
       return;
     }
 
-    if (!purchaseRequestId) {
+    if (!resolvedPurchaseRequestId) {
       setRequestLoading(false);
       return;
     }
@@ -148,7 +159,7 @@ export default function OfferScreen() {
 
     const loadPurchaseRequest = async () => {
       setRequestLoading(true);
-      const result = await getPurchaseRequestById(purchaseRequestId);
+      const result = await getPurchaseRequestById(resolvedPurchaseRequestId);
       if (!active) return;
 
       if (result?.ok) {
@@ -165,7 +176,7 @@ export default function OfferScreen() {
     return () => {
       active = false;
     };
-  }, [initialPurchaseRequest, purchaseRequestId]);
+  }, [initialPurchaseRequest, resolvedPurchaseRequestId]);
 
   useEffect(() => {
     void loadCatalogs();
@@ -176,6 +187,87 @@ export default function OfferScreen() {
       void loadCatalogs();
     }, [loadCatalogs])
   );
+
+  useEffect(() => {
+    if (!isEditMode || !conversationId) {
+      setEditDraftLoading(false);
+      return;
+    }
+
+    let active = true;
+
+    const loadEditDraft = async () => {
+      setEditDraftLoading(true);
+      const result = await getEditablePurchaseOfferDraftByConversationId(conversationId);
+      if (!active) return;
+
+      if (result?.ok) {
+        setEditDraft(result.data);
+      } else if (result?.ok === false) {
+        showError("No se pudo cargar la oferta", result.error.message);
+      } else {
+        showError("No se pudo cargar la oferta", "No encontramos una oferta para editar.");
+      }
+
+      setEditDraftLoading(false);
+    };
+
+    void loadEditDraft();
+
+    return () => {
+      active = false;
+    };
+  }, [conversationId, isEditMode]);
+
+  useEffect(() => {
+    if (!isEditMode || !editDraft || didApplyEditDraft) return;
+    if (deliveryCatalog.length === 0) return;
+
+    const nextDeliveryMethods: string[] = [];
+    if (pickupCatalog && (editDraft.pickupAfterDays ?? 0) > 0) {
+      nextDeliveryMethods.push(pickupCatalog.id);
+    }
+    if (shippingCatalog && ((editDraft.shippingMaxDays ?? 0) > 0 || (editDraft.shippingPrice ?? 0) > 0)) {
+      nextDeliveryMethods.push(shippingCatalog.id);
+    }
+    if (
+      nextDeliveryMethods.length === 0 &&
+      editDraft.primaryDeliveryCatalogId &&
+      deliveryCatalog.some((item) => item.id === editDraft.primaryDeliveryCatalogId)
+    ) {
+      nextDeliveryMethods.push(editDraft.primaryDeliveryCatalogId);
+    }
+
+    setDescription(editDraft.description);
+    setPrice(
+      Number.isFinite(editDraft.price) && editDraft.price > 0
+        ? String(Math.trunc(editDraft.price))
+        : ""
+    );
+    setCurrencyId(editDraft.currencyId);
+    setFiles(editDraft.files as SelectedFile[]);
+    setDeliveryMethods(nextDeliveryMethods);
+    setPickupDelay(
+      (editDraft.pickupAfterDays ?? 0) > 0 ? String(editDraft.pickupAfterDays) : ""
+    );
+    setPickupDelayUnit("dias");
+    setShippingCost(
+      (editDraft.shippingPrice ?? 0) > 0 ? String(Math.trunc(editDraft.shippingPrice ?? 0)) : ""
+    );
+    setShippingCostCurrencyId(editDraft.currencyId);
+    setShippingMaxTime(
+      (editDraft.shippingMaxDays ?? 0) > 0 ? String(editDraft.shippingMaxDays) : ""
+    );
+    setShippingMaxTimeUnit("dias");
+    setDidApplyEditDraft(true);
+  }, [
+    deliveryCatalog,
+    didApplyEditDraft,
+    editDraft,
+    isEditMode,
+    pickupCatalog,
+    shippingCatalog,
+  ]);
 
   useEffect(() => {
     const firstCurrencyId = currencyToggleOptions[0]?.value ?? "";
@@ -230,11 +322,55 @@ export default function OfferScreen() {
       return displayName;
     })
     .join(" ");
-  const handlePublishOffer = useCallback(async () => {
+
+  const handleConfirmOffer = useCallback(async () => {
     const primaryDeliveryCatalogId =
       (shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
         ? shippingCatalog.id
         : deliveryMethods[0]) ?? "";
+
+    if (isEditMode) {
+      if (!conversationId || !editDraft?.purchaseOfferId) {
+        showError("No se pudo guardar", "No encontramos la conversación de esta oferta.");
+        return;
+      }
+
+      const payload: UpdatePurchaseOfferInput = {
+        purchaseRequestId: purchaseRequest.id,
+        purchaseOfferId: editDraft.purchaseOfferId,
+        conversationId,
+        description,
+        price: Number(price),
+        currencyId,
+        primaryDeliveryCatalogId,
+        files,
+        deliveryMethods,
+        pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
+        pickupDelayUnit,
+        shippingCost: Number(shippingCost || 0),
+        shippingMaxTime: toDays(
+          Number(shippingMaxTime || 0),
+          shippingMaxTimeUnit
+        ),
+        shippingMaxTimeUnit,
+      };
+
+      const result = await updatePurchaseOffer(payload);
+      if (!result.ok) {
+        showError("No se pudo guardar la oferta", result.error.message);
+        return;
+      }
+
+      showSuccess("Oferta actualizada");
+      router.replace({
+        pathname: "/(conversation)/offer",
+        params: {
+          conversationId,
+          title: purchaseRequest.title ?? "Conversación",
+        },
+      });
+      return;
+    }
 
     const payload: CreatePurchaseOfferInput = {
       purchaseRequestId: purchaseRequest.id,
@@ -268,21 +404,24 @@ export default function OfferScreen() {
     currencyId,
     deliveryMethods,
     description,
+    editDraft?.purchaseOfferId,
     files,
+    isEditMode,
     pickupDelay,
     pickupDelayUnit,
     price,
     purchaseRequest.id,
+    purchaseRequest.title,
     shippingCatalog,
     shippingCost,
     shippingMaxTime,
     shippingMaxTimeUnit,
   ]);
 
-  if (requestLoading) {
+  if (requestLoading || editDraftLoading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Text>Cargando solicitud...</Text>
+        <Text>{isEditMode ? "Cargando oferta..." : "Cargando solicitud..."}</Text>
       </View>
     );
   }
@@ -434,14 +573,18 @@ export default function OfferScreen() {
         {canSubmitOffer ? (
           <Button
             variant="dark"
-            title="Enviar oferta"
+            title={isEditMode ? "Guardar cambios" : "Enviar oferta"}
             onPress={() =>
               openPopup({
                 type: "summary",
-                title: "Revisa la oferta antes de publicarla",
+                title: isEditMode
+                  ? "Revisa la oferta antes de guardar"
+                  : "Revisa la oferta antes de publicarla",
                 icon: "file-text",
                 description:
-                  "Revisa la información antes de publicarla. Asegúrate de que la descripción y los detalles de la oferta sean correctos.",
+                  isEditMode
+                    ? "Revisa la información antes de guardar los cambios."
+                    : "Revisa la información antes de publicarla. Asegúrate de que la descripción y los detalles de la oferta sean correctos.",
                 rows: [
                   { label: "Descripción", value: description },
                   { label: "Precio", value: priceLabel },
@@ -459,12 +602,12 @@ export default function OfferScreen() {
                   },
                   {
                     id: "publish",
-                    label: "Publicar oferta",
+                    label: isEditMode ? "Guardar cambios" : "Publicar oferta",
                     icon: "check",
                     backgroundColorKey: "primary",
                     textColorKey: "backgroudWhite",
                     iconColorKey: "backgroudWhite",
-                    onPress: () => void handlePublishOffer(),
+                    onPress: () => void handleConfirmOffer(),
                   },
                 ],
               })

@@ -28,6 +28,9 @@ type OfferFile = {
   mime?: string | null;
   size?: number | null;
   isImage?: boolean;
+  id?: string | null;
+  storagePath?: string | null;
+  isExisting?: boolean;
 };
 
 export type CreatePurchaseOfferInput = {
@@ -52,6 +55,38 @@ export type CreatePurchaseOfferResult = {
   images: PurchaseOfferImage[];
 };
 
+export type UpdatePurchaseOfferInput = {
+  purchaseRequestId: string;
+  purchaseOfferId: string;
+  conversationId: string;
+  description: string;
+  price: number;
+  currencyId: string;
+  primaryDeliveryCatalogId: string;
+  files: OfferFile[];
+  deliveryMethods: string[];
+  pickupDelay?: number | null;
+  pickupDelayUnit?: DeliveryUnit;
+  shippingCost?: number | null;
+  shippingMaxTime?: number | null;
+  shippingMaxTimeUnit?: DeliveryUnit;
+};
+
+export type UpdatePurchaseOfferResult = CreatePurchaseOfferResult;
+
+export type EditablePurchaseOfferDraft = {
+  purchaseRequestId: string;
+  purchaseOfferId: string;
+  description: string;
+  price: number;
+  currencyId: string;
+  primaryDeliveryCatalogId: string | null;
+  pickupAfterDays: number | null;
+  shippingPrice: number | null;
+  shippingMaxDays: number | null;
+  files: OfferFile[];
+};
+
 const purchaseOffersByRequestCache = new Map<string, PurchaseOfferCardData[]>();
 
 export function getCachedPurchaseOffersByPurchaseRequestId(
@@ -74,7 +109,7 @@ export async function getPurchaseOffersByPurchaseRequestId(
     .select(
       `
       *,
-      business:business_id (
+      business:business_with_rating!purchase_offer_business_id_fkey (
         name,
         rating,
         num_ratings,
@@ -131,6 +166,32 @@ export async function getPurchaseOffersCountByPurchaseRequestId(
   const offers = await getPurchaseOffersByPurchaseRequestId(purchaseRequestId);
   if (!offers.ok) return offers;
   return { ok: true, data: offers.data.length };
+}
+
+export async function getPurchaseOffersCountByPurchaseRequestIds(
+  purchaseRequestIds: string[]
+): Promise<{ ok: true; data: Record<string, number> } | { ok: false; error: AppError }> {
+  const ids = Array.from(new Set(purchaseRequestIds.filter((id) => typeof id === "string" && id)));
+  if (ids.length === 0) return { ok: true, data: {} };
+
+  const { data, error } = await supabase
+    .from("purchase_offer")
+    .select("purchase_request_id")
+    .in("purchase_request_id", ids);
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+
+  const counts: Record<string, number> = {};
+  for (const id of ids) counts[id] = 0;
+
+  for (const row of data ?? []) {
+    const requestId =
+      typeof row.purchase_request_id === "string" ? row.purchase_request_id : null;
+    if (!requestId) continue;
+    counts[requestId] = (counts[requestId] ?? 0) + 1;
+  }
+
+  return { ok: true, data: counts };
 }
 
 export async function getCurrentSellerPurchaseOffers(): Promise<
@@ -305,6 +366,313 @@ function getFileExtension(file: OfferFile, fallback = "jpg") {
   return fallback;
 }
 
+function isValidMimeType(value: string | null | undefined) {
+  if (!value) return false;
+  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(value);
+}
+
+function getMimeTypeFromExtension(extension: string) {
+  switch (extension.toLowerCase()) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "webp":
+      return "image/webp";
+    case "gif":
+      return "image/gif";
+    case "heic":
+      return "image/heic";
+    case "heif":
+      return "image/heif";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return "application/octet-stream";
+  }
+}
+
+function resolveUploadContentType(
+  file: OfferFile,
+  extension: string,
+  fetchedContentType?: string | null
+) {
+  const normalizedFileMime = file.mime?.split(";")[0]?.trim() ?? null;
+  if (isValidMimeType(normalizedFileMime)) return normalizedFileMime;
+
+  const normalizedFetchedMime = fetchedContentType?.split(";")[0]?.trim() ?? null;
+  if (isValidMimeType(normalizedFetchedMime)) return normalizedFetchedMime;
+
+  return getMimeTypeFromExtension(extension);
+}
+
+function getFileNameFromPath(path: string | null | undefined) {
+  if (!path) return null;
+  const normalized = path.split("?")[0] ?? path;
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] ?? null;
+}
+
+function toAbsoluteStorageUrl(rawUrl: string | null | undefined) {
+  if (!rawUrl) return null;
+  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
+
+  const supabaseBaseUrl =
+    process.env.EXPO_PUBLIC_SUPABASE_URL ?? (supabase as any).supabaseUrl ?? "";
+  if (!supabaseBaseUrl) return rawUrl;
+
+  const normalizedBase = supabaseBaseUrl.replace(/\/$/, "");
+  const normalizedRaw = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+
+  if (normalizedRaw.startsWith("/storage/v1/")) {
+    return `${normalizedBase}${normalizedRaw}`;
+  }
+
+  return `${normalizedBase}/storage/v1${normalizedRaw}`;
+}
+
+async function getOfferImagePreviewFiles(
+  images: { id?: string | null; path: string }[]
+): Promise<OfferFile[]> {
+  const files: OfferFile[] = [];
+
+  for (const image of images) {
+    const imagePath = image.path;
+    const signed = await supabase.storage.from("offers").createSignedUrl(imagePath, 60 * 60);
+    const signedData: any = signed.data;
+    const rawSignedUrl = signed.error
+      ? null
+      : signedData?.signedUrl ?? signedData?.signedURL ?? null;
+    const fallbackPublic = supabase.storage.from("offers").getPublicUrl(imagePath);
+    const previewUri =
+      toAbsoluteStorageUrl(rawSignedUrl) ?? fallbackPublic.data.publicUrl ?? imagePath;
+
+    files.push({
+      uri: previewUri,
+      name: getFileNameFromPath(imagePath),
+      mime: null,
+      size: null,
+      isImage: true,
+      id: image.id ?? null,
+      storagePath: imagePath,
+      isExisting: true,
+    });
+  }
+
+  return files;
+}
+
+async function getPurchaseOfferImagePreviewFiles(
+  purchaseOfferId: string
+): Promise<{ ok: true; data: OfferFile[] } | { ok: false; error: AppError }> {
+  const imageResult = await supabase
+    .from("purchase_offer_image")
+    .select("id, path")
+    .eq("purchase_offer_id", purchaseOfferId)
+    .order("created_at", { ascending: true });
+
+  if (imageResult.error) {
+    return { ok: false, error: fromSupabaseError(imageResult.error) };
+  }
+
+  const imageRows = (imageResult.data ?? [])
+    .map((row) => {
+      const path = typeof row.path === "string" ? row.path : null;
+      if (!path) return null;
+
+      return {
+        id: typeof row.id === "string" ? row.id : null,
+        path,
+      };
+    })
+    .filter((row): row is { id?: string | null; path: string } => Boolean(row));
+
+  const files = await getOfferImagePreviewFiles(imageRows);
+  return { ok: true, data: files };
+}
+
+function isMissingOfferEditRpcError(error: any) {
+  if (!error || error.code !== "PGRST202") return false;
+  const message = typeof error.message === "string" ? error.message : "";
+  return message.includes("get_seller_offer_edit_payload");
+}
+
+function parseNumberValue(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function parseEditablePurchaseOfferDraft(
+  raw: unknown
+): EditablePurchaseOfferDraft | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  const purchaseRequestId =
+    typeof value.purchase_request_id === "string" ? value.purchase_request_id : "";
+  const purchaseOfferId =
+    typeof value.purchase_offer_id === "string" ? value.purchase_offer_id : "";
+  const description = typeof value.description === "string" ? value.description : "";
+  const currencyId = typeof value.currency_id === "string" ? value.currency_id : "";
+  const price = parseNumberValue(value.price);
+
+  if (!purchaseRequestId || !purchaseOfferId || !currencyId || price == null) {
+    return null;
+  }
+
+  const rawFiles = Array.isArray(value.files) ? value.files : [];
+  const files = rawFiles
+    .map((file) => {
+      if (!file || typeof file !== "object") return null;
+      const parsed = file as Record<string, unknown>;
+      const uri = typeof parsed.uri === "string" ? parsed.uri : "";
+      if (!uri) return null;
+      const mime = typeof parsed.mime === "string" ? parsed.mime : null;
+      const isImage =
+        parsed.isImage === true ||
+        parsed.is_image === true ||
+        (typeof mime === "string" && mime.startsWith("image/"));
+      return {
+        uri,
+        name: typeof parsed.name === "string" ? parsed.name : null,
+        mime,
+        size: parseNumberValue(parsed.size),
+        isImage,
+        id: typeof parsed.id === "string" ? parsed.id : null,
+        storagePath:
+          typeof parsed.storagePath === "string"
+            ? parsed.storagePath
+            : typeof parsed.storage_path === "string"
+              ? parsed.storage_path
+              : typeof parsed.path === "string"
+                ? parsed.path
+                : null,
+        isExisting: parsed.isExisting === true || parsed.is_existing === true,
+      } satisfies OfferFile;
+    })
+    .filter((file): file is OfferFile => Boolean(file));
+
+  return {
+    purchaseRequestId,
+    purchaseOfferId,
+    description,
+    price,
+    currencyId,
+    primaryDeliveryCatalogId:
+      typeof value.primary_delivery_catalog_id === "string"
+        ? value.primary_delivery_catalog_id
+        : null,
+    pickupAfterDays: parseNumberValue(value.pickup_after_days),
+    shippingPrice: parseNumberValue(value.shipping_price),
+    shippingMaxDays: parseNumberValue(value.shipping_max_days),
+    files,
+  };
+}
+
+export async function getEditablePurchaseOfferDraftByConversationId(
+  conversationId: string
+): Promise<{ ok: true; data: EditablePurchaseOfferDraft } | { ok: false; error: AppError } | null> {
+  if (!conversationId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc("get_seller_offer_edit_payload", {
+    p_conversation_id: conversationId,
+    p_profile_id: profile.data.id,
+  });
+
+  if (!rpcResult?.error) {
+    const parsed = parseEditablePurchaseOfferDraft(rpcResult?.data);
+    if (parsed) {
+      if (parsed.files.length > 0) {
+        return { ok: true, data: parsed };
+      }
+
+      const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
+      if (!imageFiles.ok) return imageFiles;
+
+      return {
+        ok: true,
+        data: {
+          ...parsed,
+          files: imageFiles.data,
+        },
+      };
+    }
+  } else if (!isMissingOfferEditRpcError(rpcResult.error)) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  const conversationResult = await supabase
+    .from("conversation")
+    .select("id, purchase_request_id, purchase_offer_id, seller_profile_id")
+    .eq("id", conversationId)
+    .maybeSingle();
+
+  if (conversationResult.error) {
+    return { ok: false, error: fromSupabaseError(conversationResult.error) };
+  }
+
+  const conversation = conversationResult.data;
+  if (!conversation?.id || conversation.seller_profile_id !== profile.data.id) {
+    return null;
+  }
+
+  const purchaseOfferId =
+    typeof conversation.purchase_offer_id === "string" ? conversation.purchase_offer_id : null;
+  const purchaseRequestId =
+    typeof conversation.purchase_request_id === "string" ? conversation.purchase_request_id : null;
+
+  if (!purchaseOfferId || !purchaseRequestId) return null;
+
+  const offerResult = await supabase
+    .from("purchase_offer")
+    .select("*")
+    .eq("id", purchaseOfferId)
+    .maybeSingle();
+
+  if (offerResult.error) return { ok: false, error: fromSupabaseError(offerResult.error) };
+  if (!offerResult.data) return null;
+
+  const deliveryId =
+    typeof offerResult.data.delivery_id === "string" ? offerResult.data.delivery_id : null;
+
+  const [deliveryResult, imageResult] = await Promise.all([
+    deliveryId
+      ? supabase.from("purchase_offer_delivery").select("*").eq("id", deliveryId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    getPurchaseOfferImagePreviewFiles(purchaseOfferId),
+  ]);
+
+  if (deliveryResult.error) {
+    return { ok: false, error: fromSupabaseError(deliveryResult.error) };
+  }
+  if (!imageResult.ok) {
+    return imageResult;
+  }
+
+  return {
+    ok: true,
+    data: {
+      purchaseRequestId,
+      purchaseOfferId,
+      description: offerResult.data.description?.trim() ?? "",
+      price: Number(offerResult.data.price ?? 0),
+      currencyId: offerResult.data.currency_id ?? "",
+      primaryDeliveryCatalogId: deliveryResult.data?.delivery_cat_id ?? null,
+      pickupAfterDays: parseNumberValue(deliveryResult.data?.after_days),
+      shippingPrice: parseNumberValue(deliveryResult.data?.price),
+      shippingMaxDays: parseNumberValue(deliveryResult.data?.max_days),
+      files: imageResult.data,
+    },
+  };
+}
+
 async function uploadImageToBucket(
   bucket: "offers" | "conversations",
   storagePrefix: string,
@@ -316,9 +684,14 @@ async function uploadImageToBucket(
 
   const response = await fetch(file.uri);
   const body = await response.arrayBuffer();
+  const contentType = resolveUploadContentType(
+    file,
+    extension,
+    response.headers.get("content-type")
+  );
 
   const { error } = await supabase.storage.from(bucket).upload(filePath, body, {
-    contentType: file.mime ?? undefined,
+    contentType,
     upsert: false,
   });
 
@@ -406,6 +779,128 @@ export async function createPurchaseOffer(
       p_shipping_price: shippingPrice,
       p_offer_image_paths: uploadedOfferImagePaths,
       p_conversation_image_paths: uploadedConversationImagePaths,
+    }
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  const payload =
+    rpcResult?.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+      ? (rpcResult.data as Record<string, unknown>)
+      : null;
+  if (!payload) return { ok: false, error: fromAppError("unknown") };
+
+  const offerRaw =
+    payload.offer && typeof payload.offer === "object"
+      ? (payload.offer as Record<string, unknown>)
+      : null;
+  const deliveryRaw =
+    payload.delivery && typeof payload.delivery === "object"
+      ? (payload.delivery as Record<string, unknown>)
+      : null;
+  if (!offerRaw || !deliveryRaw) return { ok: false, error: fromAppError("unknown") };
+
+  const images = Array.isArray(payload.images)
+    ? (payload.images as PurchaseOfferImage[])
+    : [];
+
+  return {
+    ok: true,
+    data: {
+      offer: offerRaw as PurchaseOffer,
+      delivery: deliveryRaw as PurchaseOfferDelivery,
+      images,
+    },
+  };
+}
+
+export async function updatePurchaseOffer(
+  input: UpdatePurchaseOfferInput
+): Promise<{ ok: true; data: UpdatePurchaseOfferResult } | { ok: false; error: AppError }> {
+  if (!input.purchaseRequestId || !input.purchaseOfferId || !input.conversationId) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+  if (!input.description.trim()) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+  if (!input.currencyId || !input.primaryDeliveryCatalogId) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+  if (input.price <= 0 || input.files.length === 0 || input.deliveryMethods.length === 0) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const hasPickup = (input.pickupDelay ?? 0) > 0;
+  const hasShipping = (input.shippingMaxTime ?? 0) > 0 || (input.shippingCost ?? 0) > 0;
+
+  const pickupAfterDays = hasPickup ? input.pickupDelay ?? null : null;
+  const shippingMaxDays =
+    hasShipping && (input.shippingMaxTime ?? 0) > 0
+      ? input.shippingMaxTime ?? null
+      : null;
+  const shippingPrice =
+    hasShipping && (input.shippingCost ?? 0) > 0
+      ? input.shippingCost ?? null
+      : null;
+
+  const existingFiles = input.files.filter((file) => file.isExisting === true);
+  const keepOfferImageIds = existingFiles
+    .map((file) => (typeof file.id === "string" && file.id.length > 0 ? file.id : null))
+    .filter((id): id is string => Boolean(id));
+
+  const offerUploadStoragePrefix = `${input.purchaseRequestId}/${input.conversationId}`;
+  const conversationUploadStoragePrefix = input.conversationId;
+  const newOfferImagePaths: string[] = [];
+  const conversationImagePaths: string[] = [];
+
+  for (let i = 0; i < input.files.length; i += 1) {
+    const file = input.files[i];
+
+    if (file.isExisting !== true) {
+      const offerUpload = await uploadImageToBucket(
+        "offers",
+        offerUploadStoragePrefix,
+        file,
+        i
+      );
+      if (!offerUpload.ok) return offerUpload;
+      newOfferImagePaths.push(offerUpload.data);
+    }
+
+    const conversationUpload = await uploadImageToBucket(
+      "conversations",
+      conversationUploadStoragePrefix,
+      file,
+      i
+    );
+    if (!conversationUpload.ok) return conversationUpload;
+    conversationImagePaths.push(conversationUpload.data);
+  }
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "update_seller_offer_from_conversation",
+    {
+      p_conversation_id: input.conversationId,
+      p_profile_id: profile.data.id,
+      p_description: input.description.trim(),
+      p_price: input.price,
+      p_currency_id: input.currencyId,
+      p_primary_delivery_catalog_id: input.primaryDeliveryCatalogId,
+      p_pickup_after_days: pickupAfterDays,
+      p_shipping_max_days: shippingMaxDays,
+      p_shipping_price: shippingPrice,
+      p_keep_offer_image_ids: keepOfferImageIds,
+      p_new_offer_image_paths: newOfferImagePaths,
+      p_conversation_image_paths: conversationImagePaths,
     }
   );
 

@@ -13,6 +13,9 @@ export type SelectedFile = {
   mime?: string | null;
   size?: number | null;
   isImage: boolean;
+  id?: string | null;
+  storagePath?: string | null;
+  isExisting?: boolean;
 };
 
 export type FilePickerMode = "images" | "files";
