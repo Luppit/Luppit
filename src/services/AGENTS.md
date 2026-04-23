@@ -92,6 +92,25 @@ Expected payload includes ordered rows with:
 
 Agents must use this payload directly for navbar rendering decisions.
 
+## Profile Email Setup Service Contract
+- `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` are the source of truth for whether the user finished email setup.
+- Current service contract in `profile.service.ts`:
+  - `getCurrentProfileEmailSetupStatus()` returns:
+    - `email`
+    - `emailOptIn`
+    - `emailOptInAt`
+    - `isComplete`
+  - `requestCurrentProfileEmailSetupVerification(...)` sends a 4-digit verification OTP through DB RPC `public.send_email_verification_otp(p_profile_id uuid, p_email text)`.
+  - `resendCurrentProfileEmailSetupVerification(...)` reuses the same DB RPC and invalidates any previous active verification OTP for the same profile/email.
+  - `verifyCurrentProfileEmailSetup(...)` verifies through DB RPC `public.verify_email_verification_otp(p_profile_id uuid, p_email text, p_code text, p_email_opt_in boolean)` and must not do a second client-side profile update after success.
+  - `updateCurrentProfileEmailSetup(...)` remains a direct authenticated-profile update helper, but email-setup completion flow should prefer the send/verify RPC path over a plain profile write.
+- Email setup is complete only when:
+  - email is non-empty
+  - `email_opt_in = true`
+  - `email_opt_in_at is not null`
+- Do not create a separate client-only setup flag for this flow.
+- The email-setup modal UI may keep local step/input state, but sending/verifying the OTP and final profile completion are DB-driven operations.
+
 ## Table Contract: `segment`
 Current query contract:
 - Read from `public.segment` with fields:
@@ -177,6 +196,13 @@ Service behavior:
 - Do not hardcode group visibility/order in services.
 - Do not build buyer-home request groups from local mocks when this RPC is available.
 - During rollout, client services may keep a compatibility fallback for older deployments that still expose the legacy single-argument buyer-home RPC signature, but that fallback must preserve the RPC payload shape and remain temporary.
+
+## Buyer/Seller Home Email Gate
+- Buyer and seller home screens must resolve current email setup status before loading home groups.
+- If email setup is incomplete:
+  - do not call buyer/seller home group RPCs
+  - render the account-setup-required state instead.
+- The CTA from that blocked state should route to the dedicated email setup modal rather than implementing inline editing inside home.
 
 ## RPC Contract: `get_or_create_seller_purchase_request_conversation`
 Current function contract:

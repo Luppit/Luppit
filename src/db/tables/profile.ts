@@ -9,4 +9,7 @@ export const COL_PROFILE = {
   name: "name",
   id_document: "id_document",
   phone: "phone",
+  email: "email",
+  email_opt_in: "email_opt_in",
+  email_opt_in_at: "email_opt_in_at",
 } as const satisfies { [K in keyof Row<"profile"> & string]: K };

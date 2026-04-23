@@ -11,6 +11,11 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `profile_rating_summary`: aggregated profile reputation snapshot (`rating`, `num_ratings`).
 - `business_with_rating`: compatibility/read view that exposes business base fields plus rating summary fields.
 - `profile_with_rating`: compatibility/read view that exposes profile base fields plus rating summary fields.
+- `profile`: authenticated user profile. Email setup is now part of the operational contract:
+  - `email`
+  - `email_opt_in`
+  - `email_opt_in_at`
+  - email setup is considered complete only when all three resolve to a non-empty email + `true` opt-in + non-null opt-in timestamp.
 - `profile_business`: profile-business mapping.
 - `business_category_preference`: business-to-category preference mapping used for seller request discovery.
 - `location`: geographic data.
@@ -220,9 +225,26 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - supports `input_kind` (`otp`, `rating`)
   - payload contract (`payload_key`, `otp_length`, `is_required`, `sort_order`)
   - `component_config` (`jsonb`) for richer UI inputs (e.g. rating stars/chips/comments)
-- `conversation_transaction_code`:
-  - per-conversation secure OTP/code record (`code_hash`)
-  - ownership and usage tracking (`created_by_profile_id`, `consumed_by_profile_id`, `consumed_at`)
+- `otp_type_catalog`:
+  - OTP purpose catalog. Current codes:
+    - `conversation_transaction`
+    - `email_verification`
+- `otp_code`:
+  - generalized OTP store shared by conversation and email-verification flows
+  - current key fields:
+    - `otp_type_code`
+    - `target_profile_id`
+    - `conversation_id`
+    - `email`
+    - `code_hash`
+    - `created_by_profile_id`
+    - `created_at`
+    - `expires_at`
+    - `consumed_at`
+    - `consumed_by_profile_id`
+    - `invalidated_at`
+  - plaintext codes are never stored; validation must compare the submitted code against `code_hash`
+  - one active OTP per scope is enforced by partial unique indexes, not by hardcoded client assumptions
 
 ## Conditional Confirmation Resolution
 - Confirmation behavior must remain DB-driven:
@@ -238,6 +260,63 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - appended description when condition provides `description_append`
     - conditional `inputs[]` from `conversation_confirmation_condition_input`.
 - `delivery_catalog` labels are presentation data; matching logic should rely on FK IDs, not client-side string comparisons.
+
+## Delivery-Specific OTP and Deadline Rules
+- `purchase_offer_delivery.max_days` is the shipping signal. `purchase_offer_delivery.after_days` is the store-pickup signal.
+- `public.seller_concretar_request(...)` must preserve the original shipping behavior:
+  - always transition to `SELLER_ACCEPTED`
+  - always create/reset `SELLER_CONCRETAR_EXPIRATION`
+  - never require or generate buyer OTP for shipping-only flows.
+- `public.seller_concretar_request(...)` must treat store pickup separately:
+  - generate a new 4-digit OTP
+  - invalidate any previous active `otp_code` rows for `otp_type_code = 'conversation_transaction'` and the same conversation
+  - store only its hash in `otp_code`
+  - optionally trigger delivery email only when buyer profile email setup is complete (`email`, `email_opt_in`, `email_opt_in_at`)
+  - do not make shipping flows depend on OTP generation or delivery.
+- `public.seller_finalize_transaction(...)` must preserve shipping behavior:
+  - do not require OTP for shipping
+  - create/reset `SENT_SHIPMENT_EXPIRATION` using `purchase_offer_delivery.max_days`
+  - do not auto-complete the conversation.
+- `public.seller_finalize_transaction(...)` must treat store pickup separately:
+  - require OTP / transaction code input
+  - validate the submitted 4-digit code against the active `otp_code` row for `otp_type_code = 'conversation_transaction'`
+  - reject consumed, invalidated, or expired OTP rows
+  - mark the code as consumed
+  - do not create `SENT_SHIPMENT_EXPIRATION`
+  - auto-call `public.buyer_confirm_received(...)` after successful OTP validation because the buyer is already receiving the product in store.
+
+## OTP Email Delivery Integration
+- Pickup OTP email delivery is DB-triggered through a Supabase Edge Function (`/functions/v1/send_otp_delivery`) called from SQL via `pg_net`.
+- Email verification OTP delivery is DB-triggered through a Supabase Edge Function (`/functions/v1/send_otp_verification`) called from SQL via `pg_net`.
+- `pg_net` + Vault are separate from Edge Function secrets:
+  - Postgres-side caller secrets belong in `vault.decrypted_secrets`
+  - Edge-function runtime secrets (for example `RESEND_API_KEY`) stay in Edge Function secrets.
+- Current DB-to-Edge invocation pattern uses Vault secrets named:
+  - `project_url`
+  - `anon_key`
+- The Edge Function payload contract for pickup OTP delivery is:
+  - `email`
+  - `otp`
+- The Edge Function payload contract for email-verification OTP delivery is:
+  - `email`
+  - `otp`
+- Do not assume `pg_net` calls are synchronous; requests are queued and start after transaction commit.
+
+## Email Verification OTP Flow
+- Current DB-driven email verification flow uses:
+  - `public.send_email_verification_otp(p_profile_id uuid, p_email text)`
+  - `public.verify_email_verification_otp(p_profile_id uuid, p_email text, p_code text, p_email_opt_in boolean default true)`
+- `public.send_email_verification_otp(...)` must:
+  - normalize the target email
+  - generate a new 4-digit OTP
+  - invalidate any previous active `otp_code` rows for the same `target_profile_id` + `email` with `otp_type_code = 'email_verification'`
+  - insert a fresh `otp_code` row with expiry
+  - queue the email through `send_otp_verification`
+- `public.verify_email_verification_otp(...)` must:
+  - validate the submitted 4-digit OTP against the latest active `otp_code` row for `otp_type_code = 'email_verification'`
+  - reject consumed, invalidated, or expired OTP rows
+  - mark the OTP row as consumed atomically
+  - update `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` in the same transaction instead of requiring a second client-side profile update
 
 ## Conversation Menu Resolution
 - Conversation ellipsis-menu options are not a separate subsystem; they are normal `conversation_action` rows with `ui_slot = 'MENU'`.
@@ -282,10 +361,11 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `public.buyer_reject_offer(...)` must transition `OFFER_MADE -> OFFER_REJECTED`, write history, and add the buyer reject system message without changing `purchase_request.status`.
 - `public.seller_cancel_offer(...)` must validate seller ownership in `OFFER_MADE`, delete the linked offer artifacts, reset the conversation to `REQUEST_OPENED`, and leave the thread reusable for a new offer.
 - `public.submit_conversation_rating(...)` must validate actor membership, validate the structured `rating` payload, write/update `conversation_rating`, refresh rating summaries, and only apply a conversation transition when a matching DB transition exists.
-- `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED`, create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'`, and generate+store a secure transaction code hash in `conversation_transaction_code` (resetting consumed fields on reissue).
-- `public.seller_finalize_transaction(...)` must validate the provided OTP against `conversation_transaction_code.code_hash` and mark it consumed atomically before transitioning to `SENT_SHIPMENT`.
-- `public.seller_finalize_transaction(...)` should treat `purchase_offer_delivery.max_days` as shipping-only metadata and must not require it for store pickup (`purchase_offer_delivery.after_days`).
-- `public.seller_finalize_transaction(...)` must only create/reset the active deadline from `deadline_type_catalog.code = 'SENT_SHIPMENT_EXPIRATION'` for shipping deliveries; store pickup should resolve the prior active deadline and finish by calling `public.buyer_confirm_received(...)`.
+- `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED` and create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'` for both delivery types.
+- `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_days`), not for shipping (`purchase_offer_delivery.max_days`).
+- `public.seller_concretar_request(...)` may trigger pickup OTP delivery email only when the buyer profile has completed email setup (`email`, `email_opt_in`, `email_opt_in_at`).
+- `public.seller_finalize_transaction(...)` must not require OTP for shipping deliveries; shipping should transition to `SENT_SHIPMENT` and create/reset `SENT_SHIPMENT_EXPIRATION`.
+- `public.seller_finalize_transaction(...)` must require and validate the provided 4-digit OTP against the active `otp_code` row with `otp_type_code = 'conversation_transaction'` only for store pickup, mark it consumed atomically, skip `SENT_SHIPMENT_EXPIRATION`, and finish by calling `public.buyer_confirm_received(...)`.
 - Seller request bootstrap/create-offer flow currently uses:
   - `public.get_or_create_seller_purchase_request_conversation(...)`
   - `public.create_seller_offer_from_conversation(...)`

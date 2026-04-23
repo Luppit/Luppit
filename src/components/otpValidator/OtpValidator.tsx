@@ -8,6 +8,7 @@ type OtpValidatorProps = {
   label: string;
   helperText?: string | null;
   otpLength?: number;
+  stretch?: boolean;
   onChange?: (value: string) => void;
 };
 
@@ -15,6 +16,7 @@ export default function OtpValidator({
   label,
   helperText,
   otpLength = 4,
+  stretch = false,
   onChange,
 }: OtpValidatorProps) {
   const t = useTheme();
@@ -67,12 +69,13 @@ export default function OtpValidator({
 
   return (
     <View style={s.container}>
-      <View style={s.inputRow}>
+      <View style={[s.inputRow, stretch ? s.inputRowStretch : null]}>
         {Array.from({ length: otpLength }).map((_, index) => (
           <Pressable
             key={index}
             style={[
               s.inputBox,
+              stretch ? s.inputBoxStretch : null,
               focusedIndex === index ? s.inputBoxFocused : null,
             ]}
             onPress={() => focus(index)}

@@ -1447,6 +1447,9 @@ export type Database = {
       profile: {
         Row: {
           created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
           id: string
           id_document: string
           name: string
@@ -1455,6 +1458,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          email?: string | null
+          email_opt_in?: boolean
+          email_opt_in_at?: string | null
           id?: string
           id_document: string
           name: string
@@ -1463,6 +1469,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          email?: string | null
+          email_opt_in?: boolean
+          email_opt_in_at?: string | null
           id?: string
           id_document?: string
           name?: string

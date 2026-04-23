@@ -4,6 +4,10 @@ import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import {
+  getCurrentProfileEmailSetupStatus,
+  ProfileEmailSetupStatus,
+} from "@/src/services/profile.service";
+import {
   BuyerHomeFilters,
   getBuyerHomeFilters,
   hasBuyerHomeFilters,
@@ -46,6 +50,7 @@ function BuyerHomeContent() {
   const t = useTheme();
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const [isLoading, setIsLoading] = useState(true);
+  const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
   const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
@@ -53,6 +58,23 @@ function BuyerHomeContent() {
 
   const loadGroups = useCallback(async () => {
     setIsLoading(true);
+    const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    if (!emailSetupResult.ok) {
+      setEmailSetupStatus(null);
+      setGroups([]);
+      setOfferCountsByRequestId({});
+      setIsLoading(false);
+      return;
+    }
+
+    setEmailSetupStatus(emailSetupResult.data);
+    if (!emailSetupResult.data.isComplete) {
+      setGroups([]);
+      setOfferCountsByRequestId({});
+      setIsLoading(false);
+      return;
+    }
+
     const result = await getCurrentBuyerHomePurchaseRequestGroups(filters);
     const nextGroups = result.ok ? result.data : [];
     setGroups(nextGroups);
@@ -82,6 +104,10 @@ function BuyerHomeContent() {
 
   if (isLoading) {
     return <Text>Cargando solicitudes...</Text>;
+  }
+
+  if (emailSetupStatus && !emailSetupStatus.isComplete) {
+    return <AccountSetupRequiredState />;
   }
 
   if (!hasAnyItems) {
@@ -164,11 +190,27 @@ function SellerHomeContent() {
   const t = useTheme();
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const [isLoading, setIsLoading] = useState(true);
+  const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<SellerHomePurchaseRequestGroup[]>([]);
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
   const loadGroups = useCallback(async () => {
     setIsLoading(true);
+    const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    if (!emailSetupResult.ok) {
+      setEmailSetupStatus(null);
+      setGroups([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setEmailSetupStatus(emailSetupResult.data);
+    if (!emailSetupResult.data.isComplete) {
+      setGroups([]);
+      setIsLoading(false);
+      return;
+    }
+
     const result = await getCurrentSellerHomePurchaseRequestGroups();
     setGroups(result.ok ? result.data : []);
     setIsLoading(false);
@@ -188,6 +230,10 @@ function SellerHomeContent() {
 
   if (isLoading) {
     return <Text>Cargando solicitudes...</Text>;
+  }
+
+  if (emailSetupStatus && !emailSetupStatus.isComplete) {
+    return <AccountSetupRequiredState />;
   }
 
   if (!hasAnyItems) {
@@ -246,6 +292,49 @@ function SellerHomeContent() {
         />
       ))}
     </ScrollView>
+  );
+}
+
+function AccountSetupRequiredState() {
+  const t = useTheme();
+  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        gap: t.spacing.md,
+        paddingHorizontal: t.spacing.lg,
+        paddingBottom: 96,
+      }}
+    >
+      {emptyBoxAsset?.uri ? (
+        <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
+      ) : (
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={{ width: 84, height: 84 }}
+          resizeMode="contain"
+        />
+      )}
+      <Text align="center" variant="body">
+        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar.
+      </Text>
+      <View style={{ width: "100%" }}>
+        <Button
+          variant="dark"
+          title="Completar configuración"
+          onPress={() =>
+            router.push({
+              pathname: "/(modal)/email-setup",
+              params: { title: "Verificar correo" },
+            })
+          }
+        />
+      </View>
+    </View>
   );
 }
 

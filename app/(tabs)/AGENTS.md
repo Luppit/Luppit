@@ -18,6 +18,10 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
 - Buyer empty-state behavior depends on filter state:
   - with no active filters, show the default creation CTA
   - with active filters, show a no-results message and hide the creation CTA
+- Buyer and seller home screens must gate on email setup before loading groups:
+  - resolve profile email setup through `profile.service.ts`
+  - if incomplete, do not call home-group RPCs
+  - render the blocked account-setup state instead.
 
 ## Implementation Rules
 - Do not hardcode buyer/seller home groups such as `Ver todas`, `Populares`, or `Nuevas` in product logic.
@@ -37,3 +41,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
   - carousels can be full-bleed within seller-home screen context
   - first card must align with the group header text at initial position
   - after interaction, horizontal scrolling behavior is standard.
+- The blocked email-setup state belongs to the home screen layer, but the source of truth does not:
+  - completion logic comes from profile email fields / profile service
+  - the CTA should open the dedicated email setup modal (`/(modal)/email-setup`)
+  - do not duplicate email form state inside the home screen itself.
