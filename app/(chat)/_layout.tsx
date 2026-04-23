@@ -15,7 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 function ChatLayoutContent() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { title, sendMessage, messages } = useChatSession();
+  const { title, sendMessage, messages, canCompose, isSendingMessage, isExecutingControl } =
+    useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -48,7 +49,12 @@ function ChatLayoutContent() {
           title={title}
           onClose={() => {
             Keyboard.dismiss();
-            router.back();
+            if (router.canGoBack()) {
+              router.back();
+              return;
+            }
+
+            router.replace("/(tabs)");
           }}
           topInset={insets.top}
           isSurfaceVisible={Boolean(title?.trim())}
@@ -61,22 +67,27 @@ function ChatLayoutContent() {
           <Slot />
         </View>
 
-        <View
-          style={{
-            paddingHorizontal: t.spacing.md,
-            paddingTop: t.spacing.sm,
-            paddingBottom: isKeyboardVisible
-              ? t.spacing.md
-              : Math.max(insets.bottom, t.spacing.sm),
-          }}
-        >
-          <InputChat
-            autoFocus={messages.length === 0}
-            onSend={({ text }) => {
-              sendMessage(text);
+        {canCompose ? (
+          <View
+            style={{
+              paddingHorizontal: t.spacing.md,
+              paddingTop: t.spacing.sm,
+              paddingBottom: isKeyboardVisible
+                ? t.spacing.md
+                : Math.max(insets.bottom, t.spacing.sm),
             }}
-          />
-        </View>
+          >
+            <InputChat
+              autoFocus={messages.length === 0}
+              disabled={isSendingMessage || isExecutingControl}
+              showAttachmentButton={false}
+              maxImages={0}
+              onSend={({ text }) => {
+                void sendMessage(text);
+              }}
+            />
+          </View>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );

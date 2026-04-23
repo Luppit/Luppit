@@ -92,6 +92,35 @@ Expected payload includes ordered rows with:
 
 Agents must use this payload directly for navbar rendering decisions.
 
+## Edge Function Contract: `ai-completar`
+Current buyer request-assistant chat contract:
+- Runtime endpoint is `POST /functions/v1/ai-completar`.
+- Required headers:
+  - `Authorization: Bearer <supabase_access_token>`
+  - `apikey: <supabase_anon_key>`
+  - `Content-Type: application/json`
+- Optional request identity fields are supported and should be passed through when available:
+  - header `Idempotency-Key`
+  - header `x-request-id`
+  - body `client_request_id`
+  - body `idempotency_key`
+- Current buyer-chat request body uses:
+  - `prompt`
+  - `draft_id`
+  - `ui_action`
+  - `client_request_id`
+  - `idempotency_key`
+- Supported buyer-chat control actions:
+  - `SHOW_SUMMARY`
+  - `CONTINUE`
+  - `PUBLISH`
+- Buyer chat should treat `mensaje_usuario` as the source-of-truth assistant copy and may receive:
+  - `tipo_interaccion = 'BUILD' | 'CONTROL' | 'FAQ_LUPPIT' | 'OUT_OF_SCOPE'`
+  - `ui_state = 'normal' | 'review' | 'published'`
+  - `pending_action = 'ASK_SHOW_SUMMARY' | null`
+- The `draft_id` returned by a successful response is the source of truth for subsequent calls.
+- Current buyer-chat rollout is text-only even though the Edge Function supports image payloads; do not assume `images` are being sent from this surface today.
+
 ## Profile Email Setup Service Contract
 - `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` are the source of truth for whether the user finished email setup.
 - Current service contract in `profile.service.ts`:

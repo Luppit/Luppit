@@ -5,11 +5,9 @@ import { useCallback, useRef, useState } from "react";
 import type { TextInputKeyPressEvent } from "react-native";
 import {
     Image,
-    NativeSyntheticEvent,
     Pressable,
     ScrollView,
     TextInput,
-    TextInputSubmitEditingEventData,
     View,
 } from "react-native";
 import { createInputChatStyles } from "./styles";
@@ -27,6 +25,7 @@ export type InputChatProps = {
   placeholder?: string;
   maxChars?: number;
   maxImages?: number;
+  showAttachmentButton?: boolean;
   disabled?: boolean;
   autoFocus?: boolean;
   clearOnSend?: boolean;
@@ -43,6 +42,7 @@ export default function InputChat({
   placeholder = "Describe lo que necesitas",
   maxChars = 8000,
   maxImages = 10,
+  showAttachmentButton = true,
   disabled = false,
   autoFocus = false,
   clearOnSend = true,
@@ -151,14 +151,6 @@ export default function InputChat({
     }
   }, [text, images, disabled, sending, clearOnSend, onSend, updateImages]);
 
-  const handleSubmitEditing = useCallback(
-    (e: NativeSyntheticEvent<TextInputSubmitEditingEventData>) => {
-      e.preventDefault();
-      handleSend();
-    },
-    [handleSend],
-  );
-
   const handleKeyPress = useCallback(
     (e: TextInputKeyPressEvent) => {
       if (e.nativeEvent.key === "Enter") {
@@ -224,14 +216,16 @@ export default function InputChat({
           />
 
           <View style={styles.buttonsContainer}>
-            <Pressable style={styles.iconButton}>
-              <Paperclip
-                size={18}
-                color={t.colors.IconColorGray}
-                onPress={handlePickImages}
-                hitSlop={8}
-              />
-            </Pressable>
+            {showAttachmentButton ? (
+              <Pressable style={styles.iconButton}>
+                <Paperclip
+                  size={18}
+                  color={t.colors.IconColorGray}
+                  onPress={handlePickImages}
+                  hitSlop={8}
+                />
+              </Pressable>
+            ) : null}
 
             <Pressable style={styles.sendButton}>
               <ArrowUp

@@ -31,6 +31,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
 
 ## Scoped Guidance Map
+- Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
 - Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
 - Home tabs and buyer/seller home behavior: `app/(tabs)/AGENTS.md`
