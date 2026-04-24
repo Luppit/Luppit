@@ -15,11 +15,11 @@ export default function ModalTopBar({ title }: ModalTopBarProps) {
   return (
     <View
       style={{
-        height: 68,
+        height: 56,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: t.colors.backgroudWhite,
+        backgroundColor: t.colors.background,
       }}
     >
       <View style={{ width: 40 }} />

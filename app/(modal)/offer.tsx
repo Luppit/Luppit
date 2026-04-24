@@ -28,7 +28,7 @@ import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
-import { router, useGlobalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -60,9 +60,20 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 
+function buildFallbackPurchaseRequest(
+  purchaseRequestId: string | null | undefined
+): PurchaseRequest {
+  if (!purchaseRequestId) return purchaseRequestExample;
+
+  return {
+    ...purchaseRequestExample,
+    id: purchaseRequestId,
+  };
+}
+
 export default function OfferScreen() {
   const t = useTheme();
-  const params = useGlobalSearchParams<{
+  const params = useLocalSearchParams<{
     purchaseRequest?: string | string[];
     purchaseRequestId?: string | string[];
     conversationId?: string | string[];
@@ -78,9 +89,11 @@ export default function OfferScreen() {
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const isEditMode = mode === "edit";
   const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest>(
-    initialPurchaseRequest ?? purchaseRequestExample
+    initialPurchaseRequest ?? buildFallbackPurchaseRequest(purchaseRequestId)
   );
-  const [requestLoading, setRequestLoading] = useState(!initialPurchaseRequest && !!purchaseRequestId);
+  const [requestLoading, setRequestLoading] = useState(
+    !initialPurchaseRequest && isEditMode && !!purchaseRequestId
+  );
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -150,6 +163,12 @@ export default function OfferScreen() {
       return;
     }
 
+    if (!isEditMode) {
+      setPurchaseRequest(buildFallbackPurchaseRequest(resolvedPurchaseRequestId));
+      setRequestLoading(false);
+      return;
+    }
+
     if (!resolvedPurchaseRequestId) {
       setRequestLoading(false);
       return;
@@ -176,7 +195,7 @@ export default function OfferScreen() {
     return () => {
       active = false;
     };
-  }, [initialPurchaseRequest, resolvedPurchaseRequestId]);
+  }, [initialPurchaseRequest, isEditMode, resolvedPurchaseRequestId]);
 
   useEffect(() => {
     void loadCatalogs();

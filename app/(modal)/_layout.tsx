@@ -17,13 +17,7 @@ export default function ModalLayout() {
         style={{
           paddingTop: insets.top,
           paddingHorizontal: t.spacing.md,
-          paddingBottom: t.spacing.sm,
-          backgroundColor: t.colors.backgroudWhite,
-          shadowColor: t.colors.shadow,
-          shadowOpacity: 0.08,
-          shadowOffset: { width: 0, height: 3 },
-          shadowRadius: 8,
-          elevation: 4,
+          backgroundColor: t.colors.background,
         }}
       >
         <ModalTopBar title={title} />

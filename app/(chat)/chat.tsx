@@ -125,7 +125,7 @@ export default function ChatScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
-        paddingVertical: t.spacing.md,
+        paddingTop: t.spacing.sm,
         gap: t.spacing.sm,
         paddingBottom: t.spacing.lg,
       }}

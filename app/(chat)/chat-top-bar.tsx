@@ -23,20 +23,16 @@ export default function ChatTopBar({
   isSurfaceVisible = false,
 }: ChatTopBarProps) {
   const t = useTheme();
+  const barHeight = 56;
   const s = useMemo(
     () => ({
       container: {
-        height: 68 + topInset,
+        height: barHeight + topInset,
         paddingTop: topInset,
-        backgroundColor: isSurfaceVisible ? t.colors.backgroudWhite : "transparent",
-        shadowColor: t.colors.shadow,
-        shadowOpacity: isSurfaceVisible ? 0.08 : 0,
-        shadowOffset: { width: 0, height: 3 },
-        shadowRadius: isSurfaceVisible ? 8 : 0,
-        elevation: isSurfaceVisible ? 4 : 0,
+        backgroundColor: isSurfaceVisible ? t.colors.background : "transparent",
       },
       bar: {
-        height: 68,
+        height: barHeight,
         justifyContent: "center" as const,
       },
       titleWrap: {
@@ -52,7 +48,7 @@ export default function ChatTopBar({
         right: t.spacing.md,
       },
     }),
-    [isSurfaceVisible, t, topInset]
+    [barHeight, isSurfaceVisible, t, topInset]
   );
 
   return (
