@@ -192,7 +192,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - Active deadline-card rendering metadata also lives here: `ui_slot`, `slot_eyebrow_label`, `slot_section_label`, `buyer_active_message`, `seller_active_message`.
 - Current deadline types:
   - `SELLER_CONCRETAR_EXPIRATION`: `SELLER_ACCEPTED -> DELAYED_ACCEPTANCE`, fixed days from catalog.
-  - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`; shipping delivery policies use days from `purchase_offer_delivery.max_days`. Store pickup policies (`purchase_offer_delivery.after_days`) do not create this deadline.
+  - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`; shipping delivery policies should use exact timing from `purchase_offer_delivery.max_value` + `max_unit` when present, falling back to legacy `max_days`. Store pickup policies (`after_value`/`after_unit` or legacy `after_days`) do not create this deadline.
 - Seller request bootstrap states in current flow:
   - `REQUEST_OPENED`: seller opened request chat before first offer.
   - `REQUEST_DISCARDED`: seller discarded request chat.
@@ -272,7 +272,11 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `delivery_catalog` labels are presentation data; matching logic should rely on FK IDs, not client-side string comparisons.
 
 ## Delivery-Specific OTP and Deadline Rules
-- `purchase_offer_delivery.max_days` is the shipping signal. `purchase_offer_delivery.after_days` is the store-pickup signal.
+- `purchase_offer_delivery.max_days` is the legacy shipping signal and `purchase_offer_delivery.after_days` is the legacy store-pickup signal.
+- Exact offer timing is stored as value + unit:
+  - shipping: `max_value` + `max_unit`
+  - store pickup: `after_value` + `after_unit`
+- Supported timing units are `hours` and `days`. Do not convert hours to rounded days as the source of truth; keep legacy `*_days` populated only as compatibility/fallback values.
 - `public.seller_concretar_request(...)` must preserve the original shipping behavior:
   - always transition to `SELLER_ACCEPTED`
   - always create/reset `SELLER_CONCRETAR_EXPIRATION`
@@ -285,7 +289,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - do not make shipping flows depend on OTP generation or delivery.
 - `public.seller_finalize_transaction(...)` must preserve shipping behavior:
   - do not require OTP for shipping
-  - create/reset `SENT_SHIPMENT_EXPIRATION` using `purchase_offer_delivery.max_days`
+  - create/reset `SENT_SHIPMENT_EXPIRATION` using `purchase_offer_delivery.max_value` + `max_unit` when present, falling back to `max_days`
   - do not auto-complete the conversation.
 - `public.seller_finalize_transaction(...)` must treat store pickup separately:
   - require OTP / transaction code input
@@ -372,9 +376,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `public.seller_cancel_offer(...)` must validate seller ownership in `OFFER_MADE`, delete the linked offer artifacts, reset the conversation to `REQUEST_OPENED`, and leave the thread reusable for a new offer.
 - `public.submit_conversation_rating(...)` must validate actor membership, validate the structured `rating` payload, write/update `conversation_rating`, refresh rating summaries, and only apply a conversation transition when a matching DB transition exists.
 - `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED` and create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'` for both delivery types.
-- `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_days`), not for shipping (`purchase_offer_delivery.max_days`).
+- `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_value`/`after_unit`, fallback `after_days`), not for shipping (`purchase_offer_delivery.max_value`/`max_unit`, fallback `max_days`).
 - `public.seller_concretar_request(...)` may trigger pickup OTP delivery email only when the buyer profile has completed email setup (`email`, `email_opt_in`, `email_opt_in_at`).
-- `public.seller_finalize_transaction(...)` must not require OTP for shipping deliveries; shipping should transition to `SENT_SHIPMENT` and create/reset `SENT_SHIPMENT_EXPIRATION`.
+- `public.seller_finalize_transaction(...)` must not require OTP for shipping deliveries; shipping should transition to `SENT_SHIPMENT` and create/reset `SENT_SHIPMENT_EXPIRATION` using exact `max_value`/`max_unit` timing when available.
 - `public.seller_finalize_transaction(...)` must require and validate the provided 4-digit OTP against the active `otp_code` row with `otp_type_code = 'conversation_transaction'` only for store pickup, mark it consumed atomically, skip `SENT_SHIPMENT_EXPIRATION`, and finish by calling `public.buyer_confirm_received(...)`.
 - Seller request bootstrap/create-offer flow currently uses:
   - `public.get_or_create_seller_purchase_request_conversation(...)`
@@ -386,7 +390,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - apply conversation transition/history for seller first offer
   - create chat messages in order: one `TEXT` summary first, then `IMAGE` messages.
 - For offer-publish chat images, `conversation_message.image_path` must reference files uploaded to the `conversations` storage bucket (same contract as chat image upload), not offer-only storage paths.
-- `public.get_seller_offer_edit_payload(...)` should be the DB-backed preload source for seller offer edit mode and may return `files[]` directly when the deployment supports it.
+- `public.get_seller_offer_edit_payload_v2(...)` should be the preferred DB-backed preload source for seller offer edit mode when available because it returns exact timing fields; `public.get_seller_offer_edit_payload(...)` remains the legacy fallback and may return `files[]` directly when the deployment supports it.
 - `public.update_seller_offer_from_conversation(...)` must atomically:
   - validate seller ownership and current `OFFER_MADE` state
   - update `purchase_offer_delivery` and `purchase_offer`

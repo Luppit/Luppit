@@ -1881,26 +1881,38 @@ export type Database = {
       purchase_offer_delivery: {
         Row: {
           after_days: number | null
+          after_unit: string | null
+          after_value: number | null
           created_at: string
           delivery_cat_id: string | null
           id: string
           max_days: number | null
+          max_unit: string | null
+          max_value: number | null
           price: number | null
         }
         Insert: {
           after_days?: number | null
+          after_unit?: string | null
+          after_value?: number | null
           created_at?: string
           delivery_cat_id?: string | null
           id?: string
           max_days?: number | null
+          max_unit?: string | null
+          max_value?: number | null
           price?: number | null
         }
         Update: {
           after_days?: number | null
+          after_unit?: string | null
+          after_value?: number | null
           created_at?: string
           delivery_cat_id?: string | null
           id?: string
           max_days?: number | null
+          max_unit?: string | null
+          max_value?: number | null
           price?: number | null
         }
         Relationships: [
@@ -2612,6 +2624,10 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_seller_offer_edit_payload_v2: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       is_category_leaf: {
         Args: { category_id_input: string }
         Returns: boolean
@@ -2645,6 +2661,17 @@ export type Database = {
           name: string
           path: unknown
         }[]
+      }
+      set_purchase_offer_delivery_timing: {
+        Args: {
+          p_conversation_id: string
+          p_pickup_after_unit?: string
+          p_pickup_after_value?: number
+          p_profile_id: string
+          p_shipping_max_unit?: string
+          p_shipping_max_value?: number
+        }
+        Returns: Json
       }
       seller_cancel_offer: {
         Args: {

@@ -29,6 +29,13 @@ export type GlobalPopupStyles = {
   filterActionLabel: TextStyle;
   filterActionLabelPrimary: TextStyle;
   filterActionLabelSecondary: TextStyle;
+  sortOptionsList: ViewStyle;
+  sortOptionButton: ViewStyle;
+  sortOptionLabel: TextStyle;
+  sortRadioOuter: ViewStyle;
+  sortRadioOuterSelected: ViewStyle;
+  sortRadioInner: ViewStyle;
+  sortSeparator: ViewStyle;
   summaryHeaderBlock: ViewStyle;
   summaryHeader: ViewStyle;
   summaryHeaderSeparator: ViewStyle;
@@ -208,6 +215,42 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     filterActionLabelSecondary: {
       color: t.colors.textDark,
+    },
+    sortOptionsList: {
+      backgroundColor: t.colors.backgroudWhite,
+    },
+    sortOptionButton: {
+      minHeight: 56,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+    },
+    sortOptionLabel: {
+      flex: 1,
+      color: t.colors.textDark,
+    },
+    sortRadioOuter: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: t.colors.stateAnulated,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    sortRadioOuterSelected: {
+      borderColor: t.colors.textDark,
+    },
+    sortRadioInner: {
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: t.colors.textDark,
+    },
+    sortSeparator: {
+      borderTopWidth: 1,
+      borderTopColor: t.colors.border,
+      marginLeft: 40,
     },
     summaryHeaderBlock: {
       gap: t.spacing.xs,

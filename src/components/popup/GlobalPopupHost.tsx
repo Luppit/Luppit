@@ -7,6 +7,7 @@ import {
   closePopup,
   PopupFilterConfig,
   PopupOption,
+  PopupSortConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
   subscribePopup,
@@ -52,6 +53,7 @@ export default function GlobalPopupHost() {
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
@@ -64,6 +66,7 @@ export default function GlobalPopupHost() {
   const [selectedFilterChipGroupIds, setSelectedFilterChipGroupIds] = useState<
     Record<string, string[]>
   >({});
+  const [selectedSortOptionId, setSelectedSortOptionId] = useState("");
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -131,6 +134,7 @@ export default function GlobalPopupHost() {
             setMounted(false);
             setOptions([]);
             setFilterConfig(null);
+            setSortConfig(null);
             setSummaryConfig(null);
           }
         });
@@ -140,10 +144,12 @@ export default function GlobalPopupHost() {
       if (config.type === "summary") {
         setSummaryConfig(config);
         setFilterConfig(null);
+        setSortConfig(null);
         setOptions([]);
       } else if (config.type === "filters") {
         setSummaryConfig(null);
         setFilterConfig(config);
+        setSortConfig(null);
         setOptions([]);
         setFilterSearchValue(config.searchField?.initialValue ?? "");
         setFilterStartDate(config.dateRangeField?.initialStartValue ?? "");
@@ -158,9 +164,16 @@ export default function GlobalPopupHost() {
           }, {})
         );
         setActiveDateField(null);
+      } else if (config.type === "sort") {
+        setSummaryConfig(null);
+        setFilterConfig(null);
+        setSortConfig(config);
+        setOptions([]);
+        setSelectedSortOptionId(config.initialSelectedId ?? config.options[0]?.id ?? "");
       } else {
         setSummaryConfig(null);
         setFilterConfig(null);
+        setSortConfig(null);
         setOptions(config.options);
       }
       setDismissOnBackdropPress(config.dismissOnBackdropPress ?? true);
@@ -196,6 +209,12 @@ export default function GlobalPopupHost() {
   const handleOptionPress = (option: PopupOption) => {
     closePopup();
     option.onPress?.();
+  };
+
+  const handleSortOptionPress = (optionId: string) => {
+    setSelectedSortOptionId(optionId);
+    sortConfig?.onSelect?.(optionId);
+    closePopup();
   };
 
   const handleSummaryActionPress = (action: PopupSummaryAction) => {
@@ -487,6 +506,47 @@ export default function GlobalPopupHost() {
                       </Pressable>
                     </View>
                   </>
+                ) : sortConfig ? (
+                  <View style={s.section}>
+                    <View style={s.summaryHeaderBlock}>
+                      <View style={s.summaryHeader}>
+                        <Text variant="subtitle" style={s.summaryTitle}>
+                          {sortConfig.title}
+                        </Text>
+                      </View>
+                      <View style={s.summaryHeaderSeparator} />
+                    </View>
+
+                    <View style={s.sortOptionsList}>
+                      {sortConfig.options.map((option, index) => {
+                        const isSelected = selectedSortOptionId === option.id;
+
+                        return (
+                          <React.Fragment key={option.id}>
+                            {index > 0 ? <View style={s.sortSeparator} /> : null}
+                            <Pressable
+                              style={s.sortOptionButton}
+                              onPress={() => handleSortOptionPress(option.id)}
+                              accessibilityRole="radio"
+                              accessibilityState={{ checked: isSelected }}
+                            >
+                              <View
+                                style={[
+                                  s.sortRadioOuter,
+                                  isSelected ? s.sortRadioOuterSelected : null,
+                                ]}
+                              >
+                                {isSelected ? <View style={s.sortRadioInner} /> : null}
+                              </View>
+                              <Text variant="body" style={s.sortOptionLabel}>
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          </React.Fragment>
+                        );
+                      })}
+                    </View>
+                  </View>
                 ) : summaryConfig ? (
                 <>
                   <View style={s.section}>

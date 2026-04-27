@@ -264,13 +264,25 @@ Current function contract:
 
 Service behavior:
 - Offer publish from seller conversation should use this RPC for DB writes/transition, not multiple direct table writes from client.
+- Offer delivery timing must preserve the seller's selected unit. Send the raw value + unit through the delivery timing sync path, and send legacy `*_days` params only as compatibility fallbacks.
 - RPC must create conversation chat messages in this order:
   - one `TEXT` message with offer summary
   - then `IMAGE` messages for uploaded images (in original upload order).
 
+## RPC Contract: `set_purchase_offer_delivery_timing`
+Current function contract:
+- `public.set_purchase_offer_delivery_timing(p_conversation_id uuid, p_profile_id uuid, p_pickup_after_value numeric default null, p_pickup_after_unit text default null, p_shipping_max_value numeric default null, p_shipping_max_unit text default null)`
+
+Service behavior:
+- After creating or updating an offer, sync exact delivery timing through this RPC when available.
+- Supported DB unit values are `hours` and `days`; UI may use localized option values but services must translate before calling DB.
+- Do not round hours into days as the source of truth. Legacy `pickup_after_days` / `shipping_max_days` values may remain populated only for older SQL compatibility.
+- If this RPC is absent in an older deployment, the service may continue with the legacy day-based RPC contract as a temporary compatibility fallback.
+
 ## RPC Contract: `get_seller_offer_edit_payload`
 Current function contract:
 - `public.get_seller_offer_edit_payload(p_conversation_id uuid, p_profile_id uuid)`
+- Newer deployments may expose `public.get_seller_offer_edit_payload_v2(p_conversation_id uuid, p_profile_id uuid)` with exact delivery timing fields. Prefer v2 when available, then fall back to the legacy RPC.
 
 Expected payload includes:
 - `purchase_request_id`
@@ -280,12 +292,16 @@ Expected payload includes:
 - `currency_id`
 - `primary_delivery_catalog_id`
 - `pickup_after_days`
+- `pickup_after_value`
+- `pickup_after_unit`
 - `shipping_price`
 - `shipping_max_days`
+- `shipping_max_value`
+- `shipping_max_unit`
 - `files[]` (optional; when empty, client may backfill from `purchase_offer_image`)
 
 Service behavior:
-- Seller offer edit mode should prefer this RPC for preload data.
+- Seller offer edit mode should preserve `hours` vs `days` from the preload payload. Legacy day fields should hydrate as `days` only when exact value/unit fields are absent.
 - Compatibility fallback may read `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` directly when the RPC is missing or incomplete.
 - Preloaded files may carry extra client metadata such as existing image `id`, `storagePath`, and `isExisting` so the update flow can keep/delete images without losing identity.
 
@@ -296,6 +312,7 @@ Current function contract:
 
 Service behavior:
 - Offer edit save must use this RPC for DB writes, system message creation, and refreshed offer-summary chat messages.
+- Offer edit save must also preserve exact delivery timing through `set_purchase_offer_delivery_timing(...)` when available.
 - Client should send:
   - kept `purchase_offer_image.id` values for existing images that remain attached to the offer
   - new `offers` bucket paths only for newly added images

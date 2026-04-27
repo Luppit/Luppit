@@ -110,7 +110,25 @@ export type PopupFilterConfig = {
   onClear?: () => void;
 };
 
-export type PopupConfig = PopupMenuConfig | PopupSummaryConfig | PopupFilterConfig;
+export type PopupSortOption = {
+  id: string;
+  label: string;
+};
+
+export type PopupSortConfig = {
+  type: "sort";
+  title: string;
+  options: PopupSortOption[];
+  initialSelectedId?: string;
+  dismissOnBackdropPress?: boolean;
+  onSelect?: (optionId: string) => void;
+};
+
+export type PopupConfig =
+  | PopupMenuConfig
+  | PopupSummaryConfig
+  | PopupFilterConfig
+  | PopupSortConfig;
 
 type PopupState = {
   config: PopupConfig | null;

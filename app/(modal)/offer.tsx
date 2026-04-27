@@ -243,10 +243,14 @@ export default function OfferScreen() {
     if (deliveryCatalog.length === 0) return;
 
     const nextDeliveryMethods: string[] = [];
-    if (pickupCatalog && (editDraft.pickupAfterDays ?? 0) > 0) {
+    if (pickupCatalog && ((editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0)) {
       nextDeliveryMethods.push(pickupCatalog.id);
     }
-    if (shippingCatalog && ((editDraft.shippingMaxDays ?? 0) > 0 || (editDraft.shippingPrice ?? 0) > 0)) {
+    if (
+      shippingCatalog &&
+      ((editDraft.shippingMaxValue ?? editDraft.shippingMaxDays ?? 0) > 0 ||
+        (editDraft.shippingPrice ?? 0) > 0)
+    ) {
       nextDeliveryMethods.push(shippingCatalog.id);
     }
     if (
@@ -267,17 +271,21 @@ export default function OfferScreen() {
     setFiles(editDraft.files as SelectedFile[]);
     setDeliveryMethods(nextDeliveryMethods);
     setPickupDelay(
-      (editDraft.pickupAfterDays ?? 0) > 0 ? String(editDraft.pickupAfterDays) : ""
+      (editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0
+        ? String(editDraft.pickupAfterValue ?? editDraft.pickupAfterDays)
+        : ""
     );
-    setPickupDelayUnit("dias");
+    setPickupDelayUnit(editDraft.pickupAfterUnit ?? "dias");
     setShippingCost(
       (editDraft.shippingPrice ?? 0) > 0 ? String(Math.trunc(editDraft.shippingPrice ?? 0)) : ""
     );
     setShippingCostCurrencyId(editDraft.currencyId);
     setShippingMaxTime(
-      (editDraft.shippingMaxDays ?? 0) > 0 ? String(editDraft.shippingMaxDays) : ""
+      (editDraft.shippingMaxValue ?? editDraft.shippingMaxDays ?? 0) > 0
+        ? String(editDraft.shippingMaxValue ?? editDraft.shippingMaxDays)
+        : ""
     );
-    setShippingMaxTimeUnit("dias");
+    setShippingMaxTimeUnit(editDraft.shippingMaxUnit ?? "dias");
     setDidApplyEditDraft(true);
   }, [
     deliveryCatalog,
@@ -306,12 +314,6 @@ export default function OfferScreen() {
 
   const handlePriceChange = (text: string) => {
     setPrice(text.replace(/\D/g, ""));
-  };
-
-  const toDays = (value: number | null | undefined, unit: DeliveryTimeOption) => {
-    if (!value || value <= 0) return null;
-    if (unit === "dias") return value;
-    return Math.ceil(value / 24);
   };
 
   const selectedCurrency = currencies.find((currency) => currency.id === currencyId) ?? null;
@@ -364,13 +366,10 @@ export default function OfferScreen() {
         primaryDeliveryCatalogId,
         files,
         deliveryMethods,
-        pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
+        pickupDelay: Number(pickupDelay || 0),
         pickupDelayUnit,
         shippingCost: Number(shippingCost || 0),
-        shippingMaxTime: toDays(
-          Number(shippingMaxTime || 0),
-          shippingMaxTimeUnit
-        ),
+        shippingMaxTime: Number(shippingMaxTime || 0),
         shippingMaxTimeUnit,
       };
 
@@ -400,13 +399,10 @@ export default function OfferScreen() {
       primaryDeliveryCatalogId,
       files,
       deliveryMethods,
-      pickupDelay: toDays(Number(pickupDelay || 0), pickupDelayUnit),
+      pickupDelay: Number(pickupDelay || 0),
       pickupDelayUnit,
       shippingCost: Number(shippingCost || 0),
-      shippingMaxTime: toDays(
-        Number(shippingMaxTime || 0),
-        shippingMaxTimeUnit
-      ),
+      shippingMaxTime: Number(shippingMaxTime || 0),
       shippingMaxTimeUnit,
     };
 

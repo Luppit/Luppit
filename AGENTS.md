@@ -7,6 +7,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 ## Global Principles
 - Prefer the smallest change that fully solves the task.
 - Preserve the existing architecture and naming patterns.
+- Do not change established app architecture or shared UI behavior without asking permission first.
 - Reuse current services, RPCs, and tables before adding new abstractions.
 - Keep UI behavior DB-driven when DB configuration exists.
 - Keep buyer/seller ratings DB-driven via normalized rating tables/views; do not reintroduce rating-as-source-of-truth columns on `business`.
@@ -28,7 +29,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.
 - Never hardcode top-navbar segment chips when DB `segment` configuration exists.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
-- Keep delivery-specific OTP behavior DB-driven: shipping (`purchase_offer_delivery.max_days`) and store pickup (`purchase_offer_delivery.after_days`) are different flows and must not share the same OTP/deadline assumptions.
+- Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
 
 ## Scoped Guidance Map
