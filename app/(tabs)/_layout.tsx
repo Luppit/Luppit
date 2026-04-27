@@ -2,7 +2,7 @@ import Navbar from "@/src/components/navbar/Navbar";
 import TopNavbar from "@/src/components/navbar/TopNavbar";
 import { RoleProvider } from "@/src/components/role/RoleContext";
 import { colors, spacing } from "@/src/themes";
-import { Redirect, Slot } from "expo-router";
+import { Redirect, Slot, usePathname } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,8 +10,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getSession, onAuthChange } from "@/src/lib/supabase";
 
 export default function TabsLayout() {
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);
+  const isStandaloneTabScreen = pathname === "/offers" || pathname === "/ofertas";
 
   useEffect(() => {
     let unsub = () => {};
@@ -36,12 +38,12 @@ export default function TabsLayout() {
   return (
     <SafeAreaView style={{ ...layoutStyles.container, ...layoutStyles.view }}>
       <RoleProvider>
-        <TopNavbar />
+        {isStandaloneTabScreen ? null : <TopNavbar />}
         <View style={layoutStyles.container}>
           <Slot />
         </View>
       </RoleProvider>
-      <Navbar />
+      {isStandaloneTabScreen ? null : <Navbar />}
     </SafeAreaView>
   );
 }

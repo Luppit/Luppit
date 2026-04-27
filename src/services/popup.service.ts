@@ -67,6 +67,7 @@ export type PopupFilterValues = {
   startDate: string;
   endDate: string;
   selectedChipIds: string[];
+  selectedChipGroupIds?: Record<string, string[]>;
 };
 
 export type PopupFilterFieldConfig = {
@@ -89,6 +90,7 @@ export type PopupFilterChipOption = {
 };
 
 export type PopupFilterChipGroupConfig = {
+  id?: string;
   label: string;
   options: PopupFilterChipOption[];
   initialSelectedIds?: string[];
@@ -100,6 +102,7 @@ export type PopupFilterConfig = {
   searchField?: PopupFilterFieldConfig;
   dateRangeField?: PopupFilterDateRangeConfig;
   chipGroup?: PopupFilterChipGroupConfig;
+  chipGroups?: PopupFilterChipGroupConfig[];
   applyLabel?: string;
   clearLabel?: string;
   dismissOnBackdropPress?: boolean;
@@ -107,7 +110,25 @@ export type PopupFilterConfig = {
   onClear?: () => void;
 };
 
-export type PopupConfig = PopupMenuConfig | PopupSummaryConfig | PopupFilterConfig;
+export type PopupSortOption = {
+  id: string;
+  label: string;
+};
+
+export type PopupSortConfig = {
+  type: "sort";
+  title: string;
+  options: PopupSortOption[];
+  initialSelectedId?: string;
+  dismissOnBackdropPress?: boolean;
+  onSelect?: (optionId: string) => void;
+};
+
+export type PopupConfig =
+  | PopupMenuConfig
+  | PopupSummaryConfig
+  | PopupFilterConfig
+  | PopupSortConfig;
 
 type PopupState = {
   config: PopupConfig | null;

@@ -7,6 +7,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 ## Global Principles
 - Prefer the smallest change that fully solves the task.
 - Preserve the existing architecture and naming patterns.
+- Do not change established app architecture or shared UI behavior without asking permission first.
 - Reuse current services, RPCs, and tables before adding new abstractions.
 - Keep UI behavior DB-driven when DB configuration exists.
 - Keep buyer/seller ratings DB-driven via normalized rating tables/views; do not reintroduce rating-as-source-of-truth columns on `business`.
@@ -14,6 +15,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Seller home discovery remains category-driven via `business_category_preference`; buyer home discovery remains profile-owned via `purchase_request.profile_id`.
 - Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
 - Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
+- Keep seller-home filtering DB-driven via `public.get_seller_home_purchase_requests(...)`; do not rebuild seller-home search/date/category/interaction filtering as a separate source of truth in screen components once the RPC supports it.
 - Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
@@ -27,10 +29,11 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.
 - Never hardcode top-navbar segment chips when DB `segment` configuration exists.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
-- Keep delivery-specific OTP behavior DB-driven: shipping (`purchase_offer_delivery.max_days`) and store pickup (`purchase_offer_delivery.after_days`) are different flows and must not share the same OTP/deadline assumptions.
+- Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
 
 ## Scoped Guidance Map
+- Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
 - Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
 - Home tabs and buyer/seller home behavior: `app/(tabs)/AGENTS.md`

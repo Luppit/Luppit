@@ -1,6 +1,7 @@
 import Button from "@/src/components/button/Button";
 import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
 import { Text } from "@/src/components/Text";
+import { getProfileById } from "@/src/services/profile.service";
 import {
   ConversationMessage,
   getConversationMessagesByConversationId,
@@ -23,6 +24,7 @@ export default function ConversationChatScreen() {
     isExecutingAction,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [senderNameById, setSenderNameById] = useState<Record<string, string>>({});
   const scrollViewRef = React.useRef<ScrollView | null>(null);
   const imageMessageWidth = 230;
   const showComposer = conversationView.permissions.can_send_messages;
@@ -63,6 +65,55 @@ export default function ConversationChatScreen() {
   useEffect(() => {
     void loadMessages();
   }, [messageRefreshTick, loadMessages]);
+
+  useEffect(() => {
+    const senderIds = Array.from(
+      new Set(
+        messages
+          .map((message) => message.sender_profile_id)
+          .filter(
+            (senderId): senderId is string =>
+              Boolean(senderId) && senderId !== profileId
+          )
+      )
+    );
+
+    if (senderIds.length === 0) {
+      setSenderNameById({});
+      return;
+    }
+
+    let active = true;
+
+    const loadSenderNames = async () => {
+      const entries = await Promise.all(
+        senderIds.map(async (senderId) => {
+          const profileResult = await getProfileById(senderId);
+          if (!profileResult || profileResult.ok === false) return null;
+
+          const name = profileResult.data.name?.trim();
+          if (!name) return null;
+          return [senderId, name] as const;
+        })
+      );
+
+      if (!active) return;
+
+      setSenderNameById(
+        entries.reduce<Record<string, string>>((acc, entry) => {
+          if (!entry) return acc;
+          acc[entry[0]] = entry[1];
+          return acc;
+        }, {})
+      );
+    };
+
+    void loadSenderNames();
+
+    return () => {
+      active = false;
+    };
+  }, [messages, profileId]);
 
   const formatTime = (date: string) =>
     new Date(date).toLocaleTimeString("en-US", {
@@ -109,13 +160,20 @@ export default function ConversationChatScreen() {
   const isBlackAuxAction = (styleCode: string | null) =>
     (styleCode ?? "").toLowerCase().trim().includes("black");
 
+  const fallbackSenderLabel = useMemo(() => {
+    const roleCode = conversationView.role_code.toLowerCase();
+    if (roleCode.includes("buyer")) return "Vendedor";
+    if (roleCode.includes("seller")) return "Comprador";
+    return "Contacto";
+  }, [conversationView.role_code]);
+
   return (
     <ScrollView
       ref={scrollViewRef}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{
-        paddingVertical: t.spacing.md,
+        paddingTop: t.spacing.sm,
         gap: t.spacing.md,
         paddingBottom: t.spacing.xl,
       }}
@@ -133,6 +191,11 @@ export default function ConversationChatScreen() {
           null;
         const isSystemMessage = messageKind === "SYSTEM";
         const isImageMessage = messageKind === "IMAGE" || Boolean(imageUri);
+        const isOwnMessage = message.sender_profile_id === profileId;
+        const senderName =
+          message.sender_profile_id != null
+            ? senderNameById[message.sender_profile_id] ?? fallbackSenderLabel
+            : fallbackSenderLabel;
 
         if (isSystemMessage) {
           return (
@@ -170,52 +233,79 @@ export default function ConversationChatScreen() {
           <View
             key={message.id}
             style={{
-              alignSelf:
-                message.sender_profile_id === profileId
-                  ? "flex-end"
-                  : "flex-start",
+              alignSelf: isOwnMessage ? "flex-end" : "flex-start",
               maxWidth: "88%",
-              borderWidth: message.sender_profile_id === profileId ? 0 : 1,
-              borderColor: t.colors.border,
-              borderRadius: t.borders.md,
-              padding: t.spacing.md,
-              backgroundColor:
-                message.sender_profile_id === profileId
-                  ? t.colors.primaryLight
-                  : t.colors.backgroudWhite,
               gap: t.spacing.xs,
             }}
           >
-            {isImageMessage && imageUri ? (
-              <Image
-                source={{ uri: imageUri }}
+            {isOwnMessage ? (
+              <View
                 style={{
-                  width: imageMessageWidth,
-                  height: 170,
-                  borderRadius: t.borders.sm,
+                  alignItems: "flex-end",
+                  paddingHorizontal: t.spacing.xs,
                 }}
-                resizeMode="cover"
-                onError={(error) => {
-                  console.log("conversation image render error", {
-                    imageUri,
-                    error,
-                  });
+              >
+                <Text variant="caption" color="textDark" align="right">
+                  {formatTime(message.created_at)}
+                </Text>
+              </View>
+            ) : null}
+
+            {!isOwnMessage ? (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: t.spacing.xs,
+                  paddingHorizontal: t.spacing.xs,
                 }}
-              />
+              >
+                <Text variant="caption" color="textMedium">
+                  {senderName}
+                </Text>
+                <Text variant="caption" color="stateAnulated">
+                  {formatTime(message.created_at)}
+                </Text>
+              </View>
             ) : null}
-            {message.text ? (
-              <Text variant="body" color="textDark">
-                {message.text}
-              </Text>
-            ) : null}
-            <Text
-              variant="caption"
-              color="stateAnulated"
-              align="right"
-              style={{ marginTop: 2 }}
+
+            <View
+              style={{
+                borderWidth: isOwnMessage ? 0 : 1,
+                borderColor: t.colors.border,
+                borderRadius: t.borders.md,
+                paddingHorizontal: t.spacing.md,
+                paddingTop: t.spacing.md,
+                paddingBottom: t.spacing.md,
+                backgroundColor: isOwnMessage
+                  ? t.colors.primaryLight
+                  : t.colors.backgroudWhite,
+                gap: t.spacing.xs,
+              }}
             >
-              {formatTime(message.created_at)}
-            </Text>
+              {isImageMessage && imageUri ? (
+                <Image
+                  source={{ uri: imageUri }}
+                  style={{
+                    width: imageMessageWidth,
+                    height: 170,
+                    borderRadius: t.borders.sm,
+                  }}
+                  resizeMode="cover"
+                  onError={(error) => {
+                    console.log("conversation image render error", {
+                      imageUri,
+                      error,
+                    });
+                  }}
+                />
+              ) : null}
+              {message.text ? (
+                <Text variant="body" color="textDark">
+                  {message.text}
+                </Text>
+              ) : null}
+            </View>
           </View>
         );
       })}

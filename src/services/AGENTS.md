@@ -92,6 +92,35 @@ Expected payload includes ordered rows with:
 
 Agents must use this payload directly for navbar rendering decisions.
 
+## Edge Function Contract: `ai-completar`
+Current buyer request-assistant chat contract:
+- Runtime endpoint is `POST /functions/v1/ai-completar`.
+- Required headers:
+  - `Authorization: Bearer <supabase_access_token>`
+  - `apikey: <supabase_anon_key>`
+  - `Content-Type: application/json`
+- Optional request identity fields are supported and should be passed through when available:
+  - header `Idempotency-Key`
+  - header `x-request-id`
+  - body `client_request_id`
+  - body `idempotency_key`
+- Current buyer-chat request body uses:
+  - `prompt`
+  - `draft_id`
+  - `ui_action`
+  - `client_request_id`
+  - `idempotency_key`
+- Supported buyer-chat control actions:
+  - `SHOW_SUMMARY`
+  - `CONTINUE`
+  - `PUBLISH`
+- Buyer chat should treat `mensaje_usuario` as the source-of-truth assistant copy and may receive:
+  - `tipo_interaccion = 'BUILD' | 'CONTROL' | 'FAQ_LUPPIT' | 'OUT_OF_SCOPE'`
+  - `ui_state = 'normal' | 'review' | 'published'`
+  - `pending_action = 'ASK_SHOW_SUMMARY' | null`
+- The `draft_id` returned by a successful response is the source of truth for subsequent calls.
+- Current buyer-chat rollout is text-only even though the Edge Function supports image payloads; do not assume `images` are being sent from this surface today.
+
 ## Profile Email Setup Service Contract
 - `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` are the source of truth for whether the user finished email setup.
 - Current service contract in `profile.service.ts`:
@@ -127,7 +156,7 @@ Service behavior:
 
 ## RPC Contract: `get_seller_home_purchase_requests`
 Current function contract:
-- `public.get_seller_home_purchase_requests(p_profile_id uuid)`
+- `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`
 - Returns JSON object with `groups[]`.
 
 Expected payload for each group entry:
@@ -148,9 +177,20 @@ Expected item fields in `items[]`:
 - `published_at`
 - `created_at`
 - `views_count`
+- `seller_interaction_state`
 
 Service behavior:
 - Seller home must call this RPC for request discovery/grouping.
+- Seller-home filters map to RPC params:
+  - request-name text -> `p_search_text`
+  - date range -> `p_start_date` / `p_end_date`
+  - selected category chips -> `p_category_ids`
+  - selected interaction-state chips -> `p_seller_interaction_states`
+- Seller filter category options currently come from the unfiltered seller-home RPC response by deduplicating item `category_id` / `category_name`; do not call or invent a separate category-options RPC unless product/DB contract changes.
+- Seller interaction states are seller-specific conversation states:
+  - `new`: no seller conversation exists for this seller/request
+  - `opened`: a seller conversation exists and is not discarded
+  - `discarded`: the seller conversation status is `REQUEST_DISCARDED`
 - Seller home cards must render `status_label` when present and treat `status` as the raw lifecycle code.
 - Seller home cards must render the RPC-provided `views_count` directly; do not fetch or recalculate visualization totals separately in the screen layer.
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
@@ -224,13 +264,25 @@ Current function contract:
 
 Service behavior:
 - Offer publish from seller conversation should use this RPC for DB writes/transition, not multiple direct table writes from client.
+- Offer delivery timing must preserve the seller's selected unit. Send the raw value + unit through the delivery timing sync path, and send legacy `*_days` params only as compatibility fallbacks.
 - RPC must create conversation chat messages in this order:
   - one `TEXT` message with offer summary
   - then `IMAGE` messages for uploaded images (in original upload order).
 
+## RPC Contract: `set_purchase_offer_delivery_timing`
+Current function contract:
+- `public.set_purchase_offer_delivery_timing(p_conversation_id uuid, p_profile_id uuid, p_pickup_after_value numeric default null, p_pickup_after_unit text default null, p_shipping_max_value numeric default null, p_shipping_max_unit text default null)`
+
+Service behavior:
+- After creating or updating an offer, sync exact delivery timing through this RPC when available.
+- Supported DB unit values are `hours` and `days`; UI may use localized option values but services must translate before calling DB.
+- Do not round hours into days as the source of truth. Legacy `pickup_after_days` / `shipping_max_days` values may remain populated only for older SQL compatibility.
+- If this RPC is absent in an older deployment, the service may continue with the legacy day-based RPC contract as a temporary compatibility fallback.
+
 ## RPC Contract: `get_seller_offer_edit_payload`
 Current function contract:
 - `public.get_seller_offer_edit_payload(p_conversation_id uuid, p_profile_id uuid)`
+- Newer deployments may expose `public.get_seller_offer_edit_payload_v2(p_conversation_id uuid, p_profile_id uuid)` with exact delivery timing fields. Prefer v2 when available, then fall back to the legacy RPC.
 
 Expected payload includes:
 - `purchase_request_id`
@@ -240,12 +292,16 @@ Expected payload includes:
 - `currency_id`
 - `primary_delivery_catalog_id`
 - `pickup_after_days`
+- `pickup_after_value`
+- `pickup_after_unit`
 - `shipping_price`
 - `shipping_max_days`
+- `shipping_max_value`
+- `shipping_max_unit`
 - `files[]` (optional; when empty, client may backfill from `purchase_offer_image`)
 
 Service behavior:
-- Seller offer edit mode should prefer this RPC for preload data.
+- Seller offer edit mode should preserve `hours` vs `days` from the preload payload. Legacy day fields should hydrate as `days` only when exact value/unit fields are absent.
 - Compatibility fallback may read `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` directly when the RPC is missing or incomplete.
 - Preloaded files may carry extra client metadata such as existing image `id`, `storagePath`, and `isExisting` so the update flow can keep/delete images without losing identity.
 
@@ -256,6 +312,7 @@ Current function contract:
 
 Service behavior:
 - Offer edit save must use this RPC for DB writes, system message creation, and refreshed offer-summary chat messages.
+- Offer edit save must also preserve exact delivery timing through `set_purchase_offer_delivery_timing(...)` when available.
 - Client should send:
   - kept `purchase_offer_image.id` values for existing images that remain attached to the offer
   - new `offers` bucket paths only for newly added images

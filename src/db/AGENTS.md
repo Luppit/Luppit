@@ -84,13 +84,22 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Aggregated rating values must be read from summary tables/views, not recalculated in client code and not stored as source-of-truth columns on `business`.
 
 ## Seller Home Discovery RPC (DB-Driven)
-- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid)`.
+- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`.
 - Resolution flow:
   - resolve business by `profile_business` using `p_profile_id`
   - resolve category scope by `business_category_preference`
   - resolve active preset by `business_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'seller_home'`
   - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`)
+  - when provided, apply seller-home filters in DB:
+    - `p_search_text`: case-insensitive match against request title
+    - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
+    - `p_category_ids`: narrow the existing `business_category_preference` category scope
+    - `p_seller_interaction_states`: match seller-specific request state (`new`, `opened`, `discarded`)
+  - resolve `seller_interaction_state` from the latest conversation for that seller/request:
+    - `new`: no conversation row exists for the seller/request
+    - `opened`: a conversation exists and is not `REQUEST_DISCARDED`
+    - `discarded`: latest seller/request conversation is `REQUEST_DISCARDED`
   - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
   - resolve `views_count` from `purchase_request_visualization` aggregated by `purchase_request_id`.
 - Do not rebuild request-card status text from lifecycle codes in client code.
@@ -105,6 +114,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `category_id`, `category_name`, `category_path`
   - `status`, `status_label`, `published_at`, `created_at`
   - `views_count`
+  - `seller_interaction_state`
 - Sorting behavior by group code (current convention):
   - `all`: by `published_at desc nulls last`, then `created_at desc`
   - `popular`: by `views_count desc`, then recency
@@ -182,7 +192,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - Active deadline-card rendering metadata also lives here: `ui_slot`, `slot_eyebrow_label`, `slot_section_label`, `buyer_active_message`, `seller_active_message`.
 - Current deadline types:
   - `SELLER_CONCRETAR_EXPIRATION`: `SELLER_ACCEPTED -> DELAYED_ACCEPTANCE`, fixed days from catalog.
-  - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`; shipping delivery policies use days from `purchase_offer_delivery.max_days`. Store pickup policies (`purchase_offer_delivery.after_days`) do not create this deadline.
+  - `SENT_SHIPMENT_EXPIRATION`: `SENT_SHIPMENT -> DELAYED_SHIPMENT`; shipping delivery policies should use exact timing from `purchase_offer_delivery.max_value` + `max_unit` when present, falling back to legacy `max_days`. Store pickup policies (`after_value`/`after_unit` or legacy `after_days`) do not create this deadline.
 - Seller request bootstrap states in current flow:
   - `REQUEST_OPENED`: seller opened request chat before first offer.
   - `REQUEST_DISCARDED`: seller discarded request chat.
@@ -262,7 +272,11 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `delivery_catalog` labels are presentation data; matching logic should rely on FK IDs, not client-side string comparisons.
 
 ## Delivery-Specific OTP and Deadline Rules
-- `purchase_offer_delivery.max_days` is the shipping signal. `purchase_offer_delivery.after_days` is the store-pickup signal.
+- `purchase_offer_delivery.max_days` is the legacy shipping signal and `purchase_offer_delivery.after_days` is the legacy store-pickup signal.
+- Exact offer timing is stored as value + unit:
+  - shipping: `max_value` + `max_unit`
+  - store pickup: `after_value` + `after_unit`
+- Supported timing units are `hours` and `days`. Do not convert hours to rounded days as the source of truth; keep legacy `*_days` populated only as compatibility/fallback values.
 - `public.seller_concretar_request(...)` must preserve the original shipping behavior:
   - always transition to `SELLER_ACCEPTED`
   - always create/reset `SELLER_CONCRETAR_EXPIRATION`
@@ -275,7 +289,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - do not make shipping flows depend on OTP generation or delivery.
 - `public.seller_finalize_transaction(...)` must preserve shipping behavior:
   - do not require OTP for shipping
-  - create/reset `SENT_SHIPMENT_EXPIRATION` using `purchase_offer_delivery.max_days`
+  - create/reset `SENT_SHIPMENT_EXPIRATION` using `purchase_offer_delivery.max_value` + `max_unit` when present, falling back to `max_days`
   - do not auto-complete the conversation.
 - `public.seller_finalize_transaction(...)` must treat store pickup separately:
   - require OTP / transaction code input
@@ -362,9 +376,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `public.seller_cancel_offer(...)` must validate seller ownership in `OFFER_MADE`, delete the linked offer artifacts, reset the conversation to `REQUEST_OPENED`, and leave the thread reusable for a new offer.
 - `public.submit_conversation_rating(...)` must validate actor membership, validate the structured `rating` payload, write/update `conversation_rating`, refresh rating summaries, and only apply a conversation transition when a matching DB transition exists.
 - `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED` and create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'` for both delivery types.
-- `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_days`), not for shipping (`purchase_offer_delivery.max_days`).
+- `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_value`/`after_unit`, fallback `after_days`), not for shipping (`purchase_offer_delivery.max_value`/`max_unit`, fallback `max_days`).
 - `public.seller_concretar_request(...)` may trigger pickup OTP delivery email only when the buyer profile has completed email setup (`email`, `email_opt_in`, `email_opt_in_at`).
-- `public.seller_finalize_transaction(...)` must not require OTP for shipping deliveries; shipping should transition to `SENT_SHIPMENT` and create/reset `SENT_SHIPMENT_EXPIRATION`.
+- `public.seller_finalize_transaction(...)` must not require OTP for shipping deliveries; shipping should transition to `SENT_SHIPMENT` and create/reset `SENT_SHIPMENT_EXPIRATION` using exact `max_value`/`max_unit` timing when available.
 - `public.seller_finalize_transaction(...)` must require and validate the provided 4-digit OTP against the active `otp_code` row with `otp_type_code = 'conversation_transaction'` only for store pickup, mark it consumed atomically, skip `SENT_SHIPMENT_EXPIRATION`, and finish by calling `public.buyer_confirm_received(...)`.
 - Seller request bootstrap/create-offer flow currently uses:
   - `public.get_or_create_seller_purchase_request_conversation(...)`
@@ -376,7 +390,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - apply conversation transition/history for seller first offer
   - create chat messages in order: one `TEXT` summary first, then `IMAGE` messages.
 - For offer-publish chat images, `conversation_message.image_path` must reference files uploaded to the `conversations` storage bucket (same contract as chat image upload), not offer-only storage paths.
-- `public.get_seller_offer_edit_payload(...)` should be the DB-backed preload source for seller offer edit mode and may return `files[]` directly when the deployment supports it.
+- `public.get_seller_offer_edit_payload_v2(...)` should be the preferred DB-backed preload source for seller offer edit mode when available because it returns exact timing fields; `public.get_seller_offer_edit_payload(...)` remains the legacy fallback and may return `files[]` directly when the deployment supports it.
 - `public.update_seller_offer_from_conversation(...)` must atomically:
   - validate seller ownership and current `OFFER_MADE` state
   - update `purchase_offer_delivery` and `purchase_offer`

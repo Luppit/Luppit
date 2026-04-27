@@ -7,6 +7,7 @@ import {
   closePopup,
   PopupFilterConfig,
   PopupOption,
+  PopupSortConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
   subscribePopup,
@@ -52,6 +53,7 @@ export default function GlobalPopupHost() {
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
+  const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
@@ -61,6 +63,10 @@ export default function GlobalPopupHost() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [selectedFilterChipIds, setSelectedFilterChipIds] = useState<string[]>([]);
+  const [selectedFilterChipGroupIds, setSelectedFilterChipGroupIds] = useState<
+    Record<string, string[]>
+  >({});
+  const [selectedSortOptionId, setSelectedSortOptionId] = useState("");
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -128,6 +134,7 @@ export default function GlobalPopupHost() {
             setMounted(false);
             setOptions([]);
             setFilterConfig(null);
+            setSortConfig(null);
             setSummaryConfig(null);
           }
         });
@@ -137,19 +144,36 @@ export default function GlobalPopupHost() {
       if (config.type === "summary") {
         setSummaryConfig(config);
         setFilterConfig(null);
+        setSortConfig(null);
         setOptions([]);
       } else if (config.type === "filters") {
         setSummaryConfig(null);
         setFilterConfig(config);
+        setSortConfig(null);
         setOptions([]);
         setFilterSearchValue(config.searchField?.initialValue ?? "");
         setFilterStartDate(config.dateRangeField?.initialStartValue ?? "");
         setFilterEndDate(config.dateRangeField?.initialEndValue ?? "");
         setSelectedFilterChipIds(config.chipGroup?.initialSelectedIds ?? []);
+        setSelectedFilterChipGroupIds(
+          (config.chipGroups ?? []).reduce<Record<string, string[]>>((acc, group) => {
+            const groupId = group.id?.trim();
+            if (!groupId) return acc;
+            acc[groupId] = group.initialSelectedIds ?? [];
+            return acc;
+          }, {})
+        );
         setActiveDateField(null);
+      } else if (config.type === "sort") {
+        setSummaryConfig(null);
+        setFilterConfig(null);
+        setSortConfig(config);
+        setOptions([]);
+        setSelectedSortOptionId(config.initialSelectedId ?? config.options[0]?.id ?? "");
       } else {
         setSummaryConfig(null);
         setFilterConfig(null);
+        setSortConfig(null);
         setOptions(config.options);
       }
       setDismissOnBackdropPress(config.dismissOnBackdropPress ?? true);
@@ -187,12 +211,19 @@ export default function GlobalPopupHost() {
     option.onPress?.();
   };
 
+  const handleSortOptionPress = (optionId: string) => {
+    setSelectedSortOptionId(optionId);
+    sortConfig?.onSelect?.(optionId);
+    closePopup();
+  };
+
   const handleSummaryActionPress = (action: PopupSummaryAction) => {
     closePopup();
     action.onPress?.();
   };
 
   const handleFilterChipPress = (chipId: string) => {
+    Keyboard.dismiss();
     setSelectedFilterChipIds((current) =>
       current.includes(chipId)
         ? current.filter((value) => value !== chipId)
@@ -200,25 +231,45 @@ export default function GlobalPopupHost() {
     );
   };
 
+  const handleFilterChipGroupPress = (groupId: string, chipId: string) => {
+    Keyboard.dismiss();
+    setSelectedFilterChipGroupIds((current) => {
+      const groupValues = current[groupId] ?? [];
+      const nextGroupValues = groupValues.includes(chipId)
+        ? groupValues.filter((value) => value !== chipId)
+        : [...groupValues, chipId];
+
+      return {
+        ...current,
+        [groupId]: nextGroupValues,
+      };
+    });
+  };
+
   const handleFilterApplyPress = () => {
+    Keyboard.dismiss();
     filterConfig?.onApply?.({
       searchValue: filterSearchValue.trim(),
       startDate: filterStartDate.trim(),
       endDate: filterEndDate.trim(),
       selectedChipIds: selectedFilterChipIds,
+      selectedChipGroupIds: selectedFilterChipGroupIds,
     });
     closePopup();
   };
 
   const handleFilterClearPress = () => {
+    Keyboard.dismiss();
     setFilterSearchValue("");
     setFilterStartDate("");
     setFilterEndDate("");
     setSelectedFilterChipIds([]);
+    setSelectedFilterChipGroupIds({});
     filterConfig?.onClear?.();
   };
 
   const openDatePicker = (field: "start" | "end") => {
+    Keyboard.dismiss();
     const currentValue = field === "start" ? filterStartDate : filterEndDate;
     setPickerValue(parseDateValue(currentValue) ?? new Date());
     setActiveDateField(field);
@@ -273,6 +324,7 @@ export default function GlobalPopupHost() {
                       : Math.max(insets.bottom, t.spacing.sm),
                   },
                 ]}
+                onTouchStart={Keyboard.dismiss}
                 onLayout={(event) => {
                   sheetHeightRef.current = event.nativeEvent.layout.height;
                 }}
@@ -383,6 +435,47 @@ export default function GlobalPopupHost() {
                           </View>
                         </View>
                       ) : null}
+
+                      {filterConfig.chipGroups?.map((group) => {
+                        const groupId = group.id?.trim();
+                        if (!groupId) return null;
+
+                        return (
+                          <View key={groupId} style={s.filterSection}>
+                            <Text variant="subtitleRegular" style={s.filterLabel}>
+                              {group.label}
+                            </Text>
+                            <View style={s.filterChipsRow}>
+                              {group.options.map((option) => {
+                                const isSelected = (selectedFilterChipGroupIds[groupId] ?? []).includes(
+                                  option.id
+                                );
+
+                                return (
+                                  <Pressable
+                                    key={option.id}
+                                    onPress={() => handleFilterChipGroupPress(groupId, option.id)}
+                                    style={[
+                                      s.filterChip,
+                                      isSelected ? s.filterChipSelected : null,
+                                    ]}
+                                  >
+                                    <Text
+                                      variant="body"
+                                      style={[
+                                        s.filterChipLabel,
+                                        isSelected ? s.filterChipLabelSelected : null,
+                                      ]}
+                                    >
+                                      {option.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
 
                     <View style={s.filterActionsRow}>
@@ -413,6 +506,47 @@ export default function GlobalPopupHost() {
                       </Pressable>
                     </View>
                   </>
+                ) : sortConfig ? (
+                  <View style={s.section}>
+                    <View style={s.summaryHeaderBlock}>
+                      <View style={s.summaryHeader}>
+                        <Text variant="subtitle" style={s.summaryTitle}>
+                          {sortConfig.title}
+                        </Text>
+                      </View>
+                      <View style={s.summaryHeaderSeparator} />
+                    </View>
+
+                    <View style={s.sortOptionsList}>
+                      {sortConfig.options.map((option, index) => {
+                        const isSelected = selectedSortOptionId === option.id;
+
+                        return (
+                          <React.Fragment key={option.id}>
+                            {index > 0 ? <View style={s.sortSeparator} /> : null}
+                            <Pressable
+                              style={s.sortOptionButton}
+                              onPress={() => handleSortOptionPress(option.id)}
+                              accessibilityRole="radio"
+                              accessibilityState={{ checked: isSelected }}
+                            >
+                              <View
+                                style={[
+                                  s.sortRadioOuter,
+                                  isSelected ? s.sortRadioOuterSelected : null,
+                                ]}
+                              >
+                                {isSelected ? <View style={s.sortRadioInner} /> : null}
+                              </View>
+                              <Text variant="body" style={s.sortOptionLabel}>
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          </React.Fragment>
+                        );
+                      })}
+                    </View>
+                  </View>
                 ) : summaryConfig ? (
                 <>
                   <View style={s.section}>
@@ -606,6 +740,9 @@ export default function GlobalPopupHost() {
               value={pickerValue}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              style={s.datePicker}
+              themeVariant="light"
+              textColor={t.colors.textDark}
               onChange={(_event, selectedDate) => {
                 if (selectedDate) {
                   setPickerValue(selectedDate);

@@ -1,5 +1,9 @@
 import { Row } from "../db/types";
 import { BuyerHomeFilters } from "./buyer.home.filters.service";
+import {
+  SellerHomeFilters,
+  SellerHomeInteractionState,
+} from "./seller.home.filters.service";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
@@ -22,6 +26,7 @@ export type SellerHomePurchaseRequestItem = {
   published_at: string | null;
   created_at: string;
   views_count: number;
+  seller_interaction_state?: SellerHomeInteractionState | null;
 };
 
 export type SellerHomePurchaseRequestGroup = {
@@ -32,6 +37,10 @@ export type SellerHomePurchaseRequestGroup = {
 };
 export type BuyerHomePurchaseRequestItem = SellerHomePurchaseRequestItem;
 export type BuyerHomePurchaseRequestGroup = SellerHomePurchaseRequestGroup;
+export type SellerHomeFilterCategoryOption = {
+  id: string;
+  label: string;
+};
 const PURCHASE_REQUEST_SELECT = [
   "id",
   "profile_id",
@@ -110,6 +119,11 @@ export async function getCurrentUserPurchaseRequest(): Promise<
   return { ok: true, data: request.data };
 }
 
+function parseSellerHomeInteractionState(raw: unknown): SellerHomeInteractionState | null {
+  if (raw !== "new" && raw !== "opened" && raw !== "discarded") return null;
+  return raw;
+}
+
 function parseSellerHomePurchaseRequestItem(
   raw: unknown
 ): SellerHomePurchaseRequestItem | null {
@@ -132,6 +146,7 @@ function parseSellerHomePurchaseRequestItem(
     published_at: typeof value.published_at === "string" ? value.published_at : null,
     created_at: createdAt,
     views_count: typeof value.views_count === "number" ? value.views_count : 0,
+    seller_interaction_state: parseSellerHomeInteractionState(value.seller_interaction_state),
   };
 }
 
@@ -168,6 +183,19 @@ function extractBuyerHomePurchaseRequestGroups(
   return groupsRaw
     .map(parseSellerHomePurchaseRequestGroup)
     .filter((group): group is BuyerHomePurchaseRequestGroup => group !== null);
+}
+
+function extractSellerHomePurchaseRequestGroups(
+  payload: unknown
+): SellerHomePurchaseRequestGroup[] {
+  const groupsRaw: unknown[] =
+    payload && typeof payload === "object" && Array.isArray((payload as any).groups)
+      ? (payload as any).groups
+      : [];
+
+  return groupsRaw
+    .map(parseSellerHomePurchaseRequestGroup)
+    .filter((group): group is SellerHomePurchaseRequestGroup => group !== null);
 }
 
 function getBuyerHomeItemDate(item: BuyerHomePurchaseRequestItem): string {
@@ -216,10 +244,90 @@ function applyBuyerHomeFiltersToGroups(
   });
 }
 
+function inferLegacySellerInteractionState(
+  groupCode: string,
+  item: SellerHomePurchaseRequestItem
+): SellerHomeInteractionState | null {
+  if (item.seller_interaction_state) return item.seller_interaction_state;
+  if (groupCode === "discarded") return "discarded";
+  return null;
+}
+
+function applySellerHomeFiltersToGroups(
+  groups: SellerHomePurchaseRequestGroup[],
+  filters?: SellerHomeFilters
+): SellerHomePurchaseRequestGroup[] {
+  if (!filters) return groups;
+
+  const searchValue = filters.searchValue.trim().toLocaleLowerCase();
+  const startDate = filters.startDate.trim();
+  const endDate = filters.endDate.trim();
+  const selectedCategoryIds = new Set(filters.selectedCategoryIds.map((value) => value.trim()));
+  const selectedInteractionStates = new Set(
+    filters.selectedInteractionStates.map((value) => value.trim())
+  );
+  const hasFilters = Boolean(
+    searchValue ||
+      startDate ||
+      endDate ||
+      selectedCategoryIds.size > 0 ||
+      selectedInteractionStates.size > 0
+  );
+
+  if (!hasFilters) return groups;
+
+  return groups.map((group) => {
+    const items = group.items.filter((item) => {
+      const title = item.title?.toLocaleLowerCase() ?? "";
+      const itemDate = getBuyerHomeItemDate(item);
+      const interactionState = inferLegacySellerInteractionState(group.code, item);
+
+      if (searchValue && !title.includes(searchValue)) return false;
+      if (startDate && (!itemDate || itemDate < startDate)) return false;
+      if (endDate && (!itemDate || itemDate > endDate)) return false;
+      if (
+        selectedCategoryIds.size > 0 &&
+        (!item.category_id || !selectedCategoryIds.has(item.category_id))
+      ) {
+        return false;
+      }
+      if (
+        selectedInteractionStates.size > 0 &&
+        interactionState &&
+        !selectedInteractionStates.has(interactionState)
+      ) {
+        return false;
+      }
+      if (
+        selectedInteractionStates.size > 0 &&
+        !interactionState &&
+        !selectedInteractionStates.has("new") &&
+        !selectedInteractionStates.has("opened")
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return {
+      ...group,
+      total: items.length,
+      items,
+    };
+  });
+}
+
 function isBuyerHomeLegacyRpcError(error: any) {
   if (!error || error.code !== "PGRST202") return false;
   const message = typeof error.message === "string" ? error.message : "";
   return message.includes("get_buyer_home_purchase_requests");
+}
+
+function isSellerHomeLegacyRpcError(error: any) {
+  if (!error || error.code !== "PGRST202") return false;
+  const message = typeof error.message === "string" ? error.message : "";
+  return message.includes("get_seller_home_purchase_requests");
 }
 
 function mapPurchaseRequestStatusUiOption(
@@ -237,7 +345,26 @@ function mapPurchaseRequestStatusUiOption(
   };
 }
 
-export async function getCurrentSellerHomePurchaseRequestGroups(): Promise<
+function buildFallbackSellerCategoryOptions(
+  groups: SellerHomePurchaseRequestGroup[]
+): SellerHomeFilterCategoryOption[] {
+  const map = new Map<string, SellerHomeFilterCategoryOption>();
+
+  groups.forEach((group) => {
+    group.items.forEach((item) => {
+      const id = item.category_id?.trim();
+      const label = item.category_name?.trim();
+      if (!id || !label || map.has(id)) return;
+      map.set(id, { id, label });
+    });
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es"));
+}
+
+export async function getCurrentSellerHomePurchaseRequestGroups(
+  filters?: SellerHomeFilters
+): Promise<
   { ok: true; data: SellerHomePurchaseRequestGroup[] } | { ok: false; error: AppError }
 > {
   const session = await getSession();
@@ -247,25 +374,49 @@ export async function getCurrentSellerHomePurchaseRequestGroups(): Promise<
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
-  const rpcResult: any = await (supabase as any).rpc("get_seller_home_purchase_requests", {
+  const rpcArgs = {
     p_profile_id: profile.data.id,
-  });
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_category_ids:
+      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+        ? filters.selectedCategoryIds
+        : null,
+    p_seller_interaction_states:
+      filters?.selectedInteractionStates && filters.selectedInteractionStates.length > 0
+        ? filters.selectedInteractionStates
+        : null,
+  };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "get_seller_home_purchase_requests",
+    rpcArgs
+  );
+
+  if (rpcResult?.error && isSellerHomeLegacyRpcError(rpcResult.error)) {
+    const legacyRpcResult: any = await (supabase as any).rpc("get_seller_home_purchase_requests", {
+      p_profile_id: profile.data.id,
+    });
+
+    if (legacyRpcResult?.error) {
+      return { ok: false, error: fromSupabaseError(legacyRpcResult.error) };
+    }
+
+    return {
+      ok: true,
+      data: applySellerHomeFiltersToGroups(
+        extractSellerHomePurchaseRequestGroups(legacyRpcResult?.data),
+        filters
+      ),
+    };
+  }
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const payload = rpcResult?.data;
-  const groupsRaw: unknown[] =
-    payload && typeof payload === "object" && Array.isArray((payload as any).groups)
-      ? (payload as any).groups
-      : [];
-
-  const groups = groupsRaw
-    .map(parseSellerHomePurchaseRequestGroup)
-    .filter((group): group is SellerHomePurchaseRequestGroup => group !== null);
-
-  return { ok: true, data: groups };
+  return { ok: true, data: extractSellerHomePurchaseRequestGroups(rpcResult?.data) };
 }
 
 export async function getCurrentBuyerHomePurchaseRequestGroups(
@@ -316,6 +467,18 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
   }
 
   return { ok: true, data: extractBuyerHomePurchaseRequestGroups(rpcResult?.data) };
+}
+
+export async function getCurrentSellerHomeFilterCategoryOptions(): Promise<
+  { ok: true; data: SellerHomeFilterCategoryOption[] } | { ok: false; error: AppError }
+> {
+  const groupsResult = await getCurrentSellerHomePurchaseRequestGroups();
+  if (!groupsResult.ok) return groupsResult;
+
+  return {
+    ok: true,
+    data: buildFallbackSellerCategoryOptions(groupsResult.data),
+  };
 }
 
 export async function getPurchaseRequestStatusUiOptions(): Promise<

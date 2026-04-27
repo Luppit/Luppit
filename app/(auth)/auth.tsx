@@ -1,12 +1,15 @@
 import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
 import { borders, colors, spacing } from "@/src/themes";
-import { Image } from "expo-image";
+import { Asset } from "expo-asset";
 import { Link, router } from "expo-router";
 import React from "react";
 import { StyleSheet, View } from "react-native";
+import { SvgUri } from "react-native-svg";
 
 export default function auth() {
+  const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
+
   return (
     <View
       style={{
@@ -14,7 +17,9 @@ export default function auth() {
         ...styles.container,
       }}
     >
-      <Image source={imageRoute} style={styles.image}></Image>
+      {logoAsset.uri ? (
+        <SvgUri uri={logoAsset.uri} width={120} height={120} />
+      ) : null}
       <Text variant="title" style={{ marginBottom: spacing.xs }}>
         ¡Luppit te da la bienvenida!
       </Text>
@@ -62,14 +67,7 @@ export default function auth() {
   );
 }
 
-const imageRoute = require("@/assets/images/icon.png");
-
 const styles = StyleSheet.create({
-  image: {
-    width: 120,
-    height: 120,
-    marginBottom: spacing.lg,
-  },
   container: {
     paddingHorizontal: spacing.md,
     flex: 1,

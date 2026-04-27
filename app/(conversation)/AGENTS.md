@@ -84,9 +84,10 @@ Applies to conversation screens and conversation UI behavior.
   - executor target: `public.submit_conversation_rating`
 - Current delayed conversation flows:
   - `SELLER_CONCRETAR` transitions `OFFER_ACCEPTED -> SELLER_ACCEPTED`, then the active deadline may expire to `DELAYED_ACCEPTANCE`.
-  - `seller_finalize_transaction(...)` validates a 4-digit OTP against `otp_code` rows with `otp_type_code = 'conversation_transaction'`, transitions to `SENT_SHIPMENT`, creates `SENT_SHIPMENT_EXPIRATION` only for shipping deliveries (`purchase_offer_delivery.max_days`), and auto-completes store pickup (`purchase_offer_delivery.after_days`) by calling `buyer_confirm_received(...)`.
+  - `seller_finalize_transaction(...)` validates a 4-digit OTP against `otp_code` rows with `otp_type_code = 'conversation_transaction'`, transitions to `SENT_SHIPMENT`, creates `SENT_SHIPMENT_EXPIRATION` only for shipping deliveries (`purchase_offer_delivery.max_value`/`max_unit`, fallback `max_days`), and auto-completes store pickup (`purchase_offer_delivery.after_value`/`after_unit`, fallback `after_days`) by calling `buyer_confirm_received(...)`.
 - Those active deadlines may also surface a passive `STATUS` slot card in `get_conversation_view(...).slots[]` while the deadline is unresolved and the conversation remains in the configured active status.
 - `DELAYED_ACCEPTANCE` may have messaging permissions enabled and may also expose AUX or TOP actions from DB metadata.
 - `OFFER_MADE` may expose duplicated actions in both `TOP` and `MENU` slots when DB configuration wants both entry points.
   - The client must not suppress the composer just because an AUX action exists.
-- Offer edit mode in `/(modal)/offer` currently hydrates from `get_seller_offer_edit_payload(...)` when available and may fall back to direct reads of `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` when the RPC is missing or returns no files.
+- Offer create/edit mode in `/(modal)/offer` must preserve delivery timing units (`hours`/`days`) instead of converting hours to rounded days before saving.
+- Offer edit mode in `/(modal)/offer` currently hydrates exact timing from `get_seller_offer_edit_payload_v2(...)` when available, falls back to `get_seller_offer_edit_payload(...)`, and may fall back to direct reads of `conversation`, `purchase_offer`, `purchase_offer_delivery`, and `purchase_offer_image` when RPC data is missing or returns no files.

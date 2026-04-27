@@ -13,6 +13,12 @@ import {
   hasBuyerHomeFilters,
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
+import {
+  getSellerHomeFilters,
+  hasSellerHomeFilters,
+  SellerHomeFilters,
+  subscribeSellerHomeFilters,
+} from "@/src/services/seller.home.filters.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import {
@@ -192,6 +198,7 @@ function SellerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<SellerHomePurchaseRequestGroup[]>([]);
+  const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
   const loadGroups = useCallback(async () => {
@@ -211,9 +218,13 @@ function SellerHomeContent() {
       return;
     }
 
-    const result = await getCurrentSellerHomePurchaseRequestGroups();
+    const result = await getCurrentSellerHomePurchaseRequestGroups(filters);
     setGroups(result.ok ? result.data : []);
     setIsLoading(false);
+  }, [filters]);
+
+  useEffect(() => {
+    return subscribeSellerHomeFilters(setFilters);
   }, []);
 
   useFocusEffect(
@@ -227,6 +238,7 @@ function SellerHomeContent() {
     () => groups.some((group) => group.items.length > 0),
     [groups]
   );
+  const hasActiveFilters = useMemo(() => hasSellerHomeFilters(filters), [filters]);
 
   if (isLoading) {
     return <Text>Cargando solicitudes...</Text>;
@@ -258,8 +270,9 @@ function SellerHomeContent() {
           />
         )}
         <Text align="center" variant="body">
-          Aún no hay solicitudes en ninguna categoría, pero tranquilo: ¡las
-          oportunidades están por llegar!
+          {hasActiveFilters
+            ? "No encontramos solicitudes con los filtros aplicados."
+            : "Aún no hay solicitudes en ninguna categoría, pero tranquilo: ¡las oportunidades están por llegar!"}
         </Text>
       </View>
     );

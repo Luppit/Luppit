@@ -481,7 +481,8 @@ export default function ConversationLayout() {
   );
   const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
-  const actionButtonsOverlaySpace = showActionButtons ? 76 + t.spacing.md : 0;
+  const headerBarHeight = 56;
+  const actionButtonsOverlaySpace = showActionButtons ? 64 + t.spacing.md : 0;
   const title = routeTitle ?? "Conversación";
 
   const providerValue: ConversationLayoutContextValue = {
@@ -508,18 +509,12 @@ export default function ConversationLayout() {
             style={{
               paddingTop: insets.top,
               paddingHorizontal: t.spacing.md,
-              paddingBottom: t.spacing.sm,
-              backgroundColor: t.colors.backgroudWhite,
-              shadowColor: t.colors.shadow,
-              shadowOpacity: 0.08,
-              shadowOffset: { width: 0, height: 3 },
-              shadowRadius: 8,
-              elevation: 4,
+              backgroundColor: t.colors.background,
             }}
           >
             <View
               style={{
-                height: 68,
+                height: headerBarHeight,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -560,7 +555,7 @@ export default function ConversationLayout() {
             <View
               style={{
                 position: "absolute",
-                top: insets.top + 68 + 2,
+                top: insets.top + headerBarHeight - t.spacing.xs,
                 left: 0,
                 right: 0,
                 zIndex: 10,
