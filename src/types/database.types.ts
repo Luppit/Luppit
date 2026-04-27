@@ -1036,7 +1036,6 @@ export type Database = {
       conversation_transaction_code: {
         Row: {
           code_hash: string
-          code_last4: string
           consumed_at: string | null
           consumed_by_profile_id: string | null
           conversation_id: string
@@ -1045,7 +1044,6 @@ export type Database = {
         }
         Insert: {
           code_hash: string
-          code_last4: string
           consumed_at?: string | null
           consumed_by_profile_id?: string | null
           conversation_id: string
@@ -1054,7 +1052,6 @@ export type Database = {
         }
         Update: {
           code_hash?: string
-          code_last4?: string
           consumed_at?: string | null
           consumed_by_profile_id?: string | null
           conversation_id?: string
@@ -1441,6 +1438,126 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+        }
+        Relationships: []
+      }
+      otp_code: {
+        Row: {
+          code_hash: string
+          consumed_at: string | null
+          consumed_by_profile_id: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by_profile_id: string
+          email: string | null
+          expires_at: string
+          id: string
+          invalidated_at: string | null
+          otp_type_code: string
+          target_profile_id: string | null
+        }
+        Insert: {
+          code_hash: string
+          consumed_at?: string | null
+          consumed_by_profile_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by_profile_id: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          invalidated_at?: string | null
+          otp_type_code: string
+          target_profile_id?: string | null
+        }
+        Update: {
+          code_hash?: string
+          consumed_at?: string | null
+          consumed_by_profile_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by_profile_id?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          invalidated_at?: string | null
+          otp_type_code?: string
+          target_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "otp_code_consumed_by_profile_id_fkey"
+            columns: ["consumed_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_consumed_by_profile_id_fkey"
+            columns: ["consumed_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_otp_type_code_fkey"
+            columns: ["otp_type_code"]
+            isOneToOne: false
+            referencedRelation: "otp_type_catalog"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "otp_code_target_profile_id_fkey"
+            columns: ["target_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_code_target_profile_id_fkey"
+            columns: ["target_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      otp_type_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
         }
         Relationships: []
       }
@@ -1962,8 +2079,53 @@ export type Database = {
           },
         ]
       }
+      purchase_request_visualization: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          purchase_request_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          purchase_request_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          purchase_request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_visualization_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_visualization_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_visualization_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_draft: {
         Row: {
+          client_request_hash: string | null
+          client_request_id: string | null
           data: Json | null
           id: string
           pending_action: string | null
@@ -1974,6 +2136,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          client_request_hash?: string | null
+          client_request_id?: string | null
           data?: Json | null
           id?: string
           pending_action?: string | null
@@ -1984,6 +2148,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          client_request_hash?: string | null
+          client_request_id?: string | null
           data?: Json | null
           id?: string
           pending_action?: string | null
@@ -2013,6 +2179,100 @@ export type Database = {
             columns: ["purchase_request_id"]
             isOneToOne: false
             referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_draft_message: {
+        Row: {
+          content: string
+          created_at: string
+          draft_id: string
+          id: string
+          metadata: Json
+          profile_id: string
+          role: string
+          sequence_id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          draft_id: string
+          id?: string
+          metadata?: Json
+          profile_id: string
+          role: string
+          sequence_id?: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          draft_id?: string
+          id?: string
+          metadata?: Json
+          profile_id?: string
+          role?: string
+          sequence_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_draft_message_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "request_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_draft_message_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_draft_message_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_rate_limit: {
+        Row: {
+          bucket: string
+          profile_id: string
+          request_count: number
+          updated_at: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          profile_id: string
+          request_count?: number
+          updated_at?: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          profile_id?: string
+          request_count?: number
+          updated_at?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_rate_limit_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_rate_limit_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
           },
         ]
@@ -2174,6 +2434,28 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_reject_offer: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      check_ai_completar_rate_limit: {
+        Args: {
+          p_bucket?: string
+          p_max_requests?: number
+          p_profile_id: string
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after_seconds: number
+        }[]
+      }
       create_seller_offer_from_conversation:
         | {
             Args: {
@@ -2311,8 +2593,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      get_seller_home_purchase_requests: {
+      get_seller_home_filter_options: {
         Args: { p_profile_id: string }
+        Returns: Json
+      }
+      get_seller_home_purchase_requests: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_seller_interaction_states?: string[]
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      get_seller_offer_edit_payload: {
+        Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
       is_category_leaf: {
@@ -2320,6 +2617,19 @@ export type Database = {
         Returns: boolean
       }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
+      publish_purchase_request: {
+        Args: {
+          p_category_id: string
+          p_category_name: string
+          p_category_path: string
+          p_contract: Json
+          p_draft_id: string
+          p_profile_id: string
+          p_summary_text: string
+          p_title: string
+        }
+        Returns: string
+      }
       refresh_business_rating_summary: {
         Args: { p_business_id: string }
         Returns: undefined
@@ -2335,6 +2645,15 @@ export type Database = {
           name: string
           path: unknown
         }[]
+      }
+      seller_cancel_offer: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
       }
       seller_concretar_request: {
         Args: {
@@ -2420,6 +2739,10 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      send_email_verification_otp: {
+        Args: { p_email: string; p_profile_id: string }
+        Returns: Json
+      }
       submit_conversation_rating: {
         Args: {
           p_action_code: string
@@ -2431,6 +2754,37 @@ export type Database = {
       }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
+      update_seller_offer_from_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_description: string
+          p_keep_offer_image_ids?: string[]
+          p_new_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_price: number
+          p_primary_delivery_catalog_id: string
+          p_profile_id: string
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
+      verify_email_verification_otp:
+        | {
+            Args: { p_code: string; p_email: string; p_profile_id: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_code: string
+              p_email: string
+              p_email_opt_in?: boolean
+              p_profile_id: string
+            }
+            Returns: Json
+          }
     }
     Enums: {
       [_ in never]: never

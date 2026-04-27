@@ -4,12 +4,13 @@
 Applies to tab screens, with special focus on home behavior for buyer/seller.
 
 ## Buyer/Seller Home: DB-Driven Contract (Mandatory)
-- Seller home request discovery must come from `public.get_seller_home_purchase_requests(p_profile_id uuid)`.
+- Seller home request discovery must come from `public.get_seller_home_purchase_requests(...)`.
 - Buyer home request discovery must come from `public.get_buyer_home_purchase_requests(p_profile_id uuid)`.
 - UI must render section groups from RPC `groups[]` payload (`code`, `name`, `total`, `items[]`) in DB-provided order.
 - Group visibility/order/limits are DB configuration (`home_group`, `home_group_preset`, `home_group_preset_item`), not client logic.
 - Seller preset assignment is DB-driven via `business_home_group_preset`; buyer preset assignment is DB-driven via `profile_home_group_preset`.
 - Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
+- Seller home filters (request-name text, date range, category selection, seller interaction state) must drive the same seller RPC, not a separate local grouping source.
 - Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set, which currently includes `active` and `offer_accepted`.
 - Buyer home filters (request-name text, date range, status selection) must drive the same buyer RPC, not a separate local grouping source.
 - Home-card status chip text is DB-driven by RPC item field `status_label`; `status` remains the raw lifecycle code and must not be shown directly in the card UI.
@@ -18,6 +19,9 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
 - Buyer empty-state behavior depends on filter state:
   - with no active filters, show the default creation CTA
   - with active filters, show a no-results message and hide the creation CTA
+- Seller empty-state behavior depends on filter state:
+  - with no active filters, show the default no-opportunities message
+  - with active filters, show a no-results message
 - Buyer and seller home screens must gate on email setup before loading groups:
   - resolve profile email setup through `profile.service.ts`
   - if incomplete, do not call home-group RPCs
@@ -37,6 +41,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
 - Seller request-card open side effects, including one-row-per-profile visualization tracking, belong in `public.get_or_create_seller_purchase_request_conversation(...)`; do not rely on a separate client insert as the source of truth.
 - Buyer grouped home/group screens may enrich RPC items with offer counts client-side for `ProductCard` footer text, but must not replace RPC-driven grouping/order/visibility logic.
 - Buyer home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
+- Seller home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
+- Seller home group listing screens intentionally reload unfiltered group contents by `groupCode`; do not inherit active top-navbar seller filters there unless product requirements explicitly change.
 - Carousel geometry convention for seller home:
   - carousels can be full-bleed within seller-home screen context
   - first card must align with the group header text at initial position

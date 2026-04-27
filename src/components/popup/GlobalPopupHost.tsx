@@ -61,6 +61,9 @@ export default function GlobalPopupHost() {
   const [filterStartDate, setFilterStartDate] = useState("");
   const [filterEndDate, setFilterEndDate] = useState("");
   const [selectedFilterChipIds, setSelectedFilterChipIds] = useState<string[]>([]);
+  const [selectedFilterChipGroupIds, setSelectedFilterChipGroupIds] = useState<
+    Record<string, string[]>
+  >({});
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -146,6 +149,14 @@ export default function GlobalPopupHost() {
         setFilterStartDate(config.dateRangeField?.initialStartValue ?? "");
         setFilterEndDate(config.dateRangeField?.initialEndValue ?? "");
         setSelectedFilterChipIds(config.chipGroup?.initialSelectedIds ?? []);
+        setSelectedFilterChipGroupIds(
+          (config.chipGroups ?? []).reduce<Record<string, string[]>>((acc, group) => {
+            const groupId = group.id?.trim();
+            if (!groupId) return acc;
+            acc[groupId] = group.initialSelectedIds ?? [];
+            return acc;
+          }, {})
+        );
         setActiveDateField(null);
       } else {
         setSummaryConfig(null);
@@ -193,6 +204,7 @@ export default function GlobalPopupHost() {
   };
 
   const handleFilterChipPress = (chipId: string) => {
+    Keyboard.dismiss();
     setSelectedFilterChipIds((current) =>
       current.includes(chipId)
         ? current.filter((value) => value !== chipId)
@@ -200,25 +212,45 @@ export default function GlobalPopupHost() {
     );
   };
 
+  const handleFilterChipGroupPress = (groupId: string, chipId: string) => {
+    Keyboard.dismiss();
+    setSelectedFilterChipGroupIds((current) => {
+      const groupValues = current[groupId] ?? [];
+      const nextGroupValues = groupValues.includes(chipId)
+        ? groupValues.filter((value) => value !== chipId)
+        : [...groupValues, chipId];
+
+      return {
+        ...current,
+        [groupId]: nextGroupValues,
+      };
+    });
+  };
+
   const handleFilterApplyPress = () => {
+    Keyboard.dismiss();
     filterConfig?.onApply?.({
       searchValue: filterSearchValue.trim(),
       startDate: filterStartDate.trim(),
       endDate: filterEndDate.trim(),
       selectedChipIds: selectedFilterChipIds,
+      selectedChipGroupIds: selectedFilterChipGroupIds,
     });
     closePopup();
   };
 
   const handleFilterClearPress = () => {
+    Keyboard.dismiss();
     setFilterSearchValue("");
     setFilterStartDate("");
     setFilterEndDate("");
     setSelectedFilterChipIds([]);
+    setSelectedFilterChipGroupIds({});
     filterConfig?.onClear?.();
   };
 
   const openDatePicker = (field: "start" | "end") => {
+    Keyboard.dismiss();
     const currentValue = field === "start" ? filterStartDate : filterEndDate;
     setPickerValue(parseDateValue(currentValue) ?? new Date());
     setActiveDateField(field);
@@ -273,6 +305,7 @@ export default function GlobalPopupHost() {
                       : Math.max(insets.bottom, t.spacing.sm),
                   },
                 ]}
+                onTouchStart={Keyboard.dismiss}
                 onLayout={(event) => {
                   sheetHeightRef.current = event.nativeEvent.layout.height;
                 }}
@@ -383,6 +416,47 @@ export default function GlobalPopupHost() {
                           </View>
                         </View>
                       ) : null}
+
+                      {filterConfig.chipGroups?.map((group) => {
+                        const groupId = group.id?.trim();
+                        if (!groupId) return null;
+
+                        return (
+                          <View key={groupId} style={s.filterSection}>
+                            <Text variant="subtitleRegular" style={s.filterLabel}>
+                              {group.label}
+                            </Text>
+                            <View style={s.filterChipsRow}>
+                              {group.options.map((option) => {
+                                const isSelected = (selectedFilterChipGroupIds[groupId] ?? []).includes(
+                                  option.id
+                                );
+
+                                return (
+                                  <Pressable
+                                    key={option.id}
+                                    onPress={() => handleFilterChipGroupPress(groupId, option.id)}
+                                    style={[
+                                      s.filterChip,
+                                      isSelected ? s.filterChipSelected : null,
+                                    ]}
+                                  >
+                                    <Text
+                                      variant="body"
+                                      style={[
+                                        s.filterChipLabel,
+                                        isSelected ? s.filterChipLabelSelected : null,
+                                      ]}
+                                    >
+                                      {option.label}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
 
                     <View style={s.filterActionsRow}>
@@ -606,6 +680,9 @@ export default function GlobalPopupHost() {
               value={pickerValue}
               mode="date"
               display={Platform.OS === "ios" ? "spinner" : "calendar"}
+              style={s.datePicker}
+              themeVariant="light"
+              textColor={t.colors.textDark}
               onChange={(_event, selectedDate) => {
                 if (selectedDate) {
                   setPickerValue(selectedDate);

@@ -156,7 +156,7 @@ Service behavior:
 
 ## RPC Contract: `get_seller_home_purchase_requests`
 Current function contract:
-- `public.get_seller_home_purchase_requests(p_profile_id uuid)`
+- `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`
 - Returns JSON object with `groups[]`.
 
 Expected payload for each group entry:
@@ -177,9 +177,20 @@ Expected item fields in `items[]`:
 - `published_at`
 - `created_at`
 - `views_count`
+- `seller_interaction_state`
 
 Service behavior:
 - Seller home must call this RPC for request discovery/grouping.
+- Seller-home filters map to RPC params:
+  - request-name text -> `p_search_text`
+  - date range -> `p_start_date` / `p_end_date`
+  - selected category chips -> `p_category_ids`
+  - selected interaction-state chips -> `p_seller_interaction_states`
+- Seller filter category options currently come from the unfiltered seller-home RPC response by deduplicating item `category_id` / `category_name`; do not call or invent a separate category-options RPC unless product/DB contract changes.
+- Seller interaction states are seller-specific conversation states:
+  - `new`: no seller conversation exists for this seller/request
+  - `opened`: a seller conversation exists and is not discarded
+  - `discarded`: the seller conversation status is `REQUEST_DISCARDED`
 - Seller home cards must render `status_label` when present and treat `status` as the raw lifecycle code.
 - Seller home cards must render the RPC-provided `views_count` directly; do not fetch or recalculate visualization totals separately in the screen layer.
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.

@@ -50,6 +50,7 @@ export type GlobalPopupStyles = {
   datePickerBackdrop: ViewStyle;
   datePickerCard: ViewStyle;
   datePickerHeader: ViewStyle;
+  datePicker: ViewStyle;
   datePickerActionsRow: ViewStyle;
   summaryActionsRow: ViewStyle;
   summaryActionButton: ViewStyle;
@@ -307,6 +308,10 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     datePickerHeader: {
       gap: t.spacing.xs,
+    },
+    datePicker: {
+      height: 216,
+      alignSelf: "stretch",
     },
     datePickerActionsRow: {
       flexDirection: "row",

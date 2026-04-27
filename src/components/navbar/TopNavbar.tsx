@@ -9,13 +9,23 @@ import {
   setBuyerHomeFilters,
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
+import {
+  clearSellerHomeFilters,
+  getSellerHomeFilters,
+  hasSellerHomeFilters,
+  SellerHomeInteractionState,
+  setSellerHomeFilters,
+  subscribeSellerHomeFilters,
+} from "@/src/services/seller.home.filters.service";
 import { openPopup } from "@/src/services/popup.service";
 import { getProfileByUserId } from "@/src/services/profile.service";
 import {
   BuyerHomePurchaseRequestGroup,
   getCurrentBuyerHomePurchaseRequestGroups,
+  getCurrentSellerHomeFilterCategoryOptions,
   getPurchaseRequestStatusUiOptions,
   PurchaseRequestStatusUiOption,
+  SellerHomeFilterCategoryOption,
 } from "@/src/services/purchase.request.service";
 import { getSegments, Segment } from "@/src/services/segment.service";
 import { usePathname } from "expo-router";
@@ -38,6 +48,15 @@ const segmentSvgModules: Record<string, number> = {
 const BUYER_FILTER_STATUS_FALLBACKS: PurchaseRequestStatusUiOption[] = [
   { statusCode: "active", label: "Activa" },
   { statusCode: "offer_accepted", label: "Oferta aceptada" },
+];
+
+const SELLER_INTERACTION_OPTIONS: {
+  id: SellerHomeInteractionState;
+  label: string;
+}[] = [
+  { id: "new", label: "Sin abrir" },
+  { id: "opened", label: "En gestión" },
+  { id: "discarded", label: "Descartadas" },
 ];
 
 function mergeBuyerStatusOptions(
@@ -92,13 +111,21 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [homeFilters, setHomeFilters] = useState(getBuyerHomeFilters());
+  const [sellerHomeFilters, setSellerHomeFiltersState] = useState(getSellerHomeFilters());
   const [profileName, setProfileName] = useState("Mi perfil");
   const [buyerStatusOptions, setBuyerStatusOptions] = useState<PurchaseRequestStatusUiOption[]>([]);
+  const [sellerCategoryOptions, setSellerCategoryOptions] = useState<
+    SellerHomeFilterCategoryOption[]
+  >([]);
   const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
   const isHomeRoute = pathname === "/" || pathname === "/index";
 
   useEffect(() => {
     return subscribeBuyerHomeFilters(setHomeFilters);
+  }, []);
+
+  useEffect(() => {
+    return subscribeSellerHomeFilters(setSellerHomeFiltersState);
   }, []);
 
   useEffect(() => {
@@ -178,6 +205,25 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     };
   }, [role]);
 
+  useEffect(() => {
+    if (role !== "seller") return;
+
+    let active = true;
+
+    const loadSellerCategories = async () => {
+      const categoryResult = await getCurrentSellerHomeFilterCategoryOptions();
+      if (!active || !categoryResult.ok) return;
+
+      setSellerCategoryOptions(categoryResult.data);
+    };
+
+    void loadSellerCategories();
+
+    return () => {
+      active = false;
+    };
+  }, [role]);
+
   const openFiltersPopup = useCallback(async () => {
     if (role === "buyer") {
       let statusOptions = buyerStatusOptions;
@@ -226,13 +272,58 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       return;
     }
 
+    const categoryResult = await getCurrentSellerHomeFilterCategoryOptions();
+    const nextCategoryOptions = categoryResult.ok ? categoryResult.data : sellerCategoryOptions;
+    setSellerCategoryOptions(nextCategoryOptions);
+
     openPopup({
       type: "filters",
       title: "Filtros",
+      searchField: {
+        label: "Nombre de la solicitud",
+        placeholder: "Buscar",
+        initialValue: sellerHomeFilters.searchValue,
+      },
+      dateRangeField: {
+        label: "Rango de fechas",
+        startPlaceholder: "Desde",
+        endPlaceholder: "Hasta",
+        initialStartValue: sellerHomeFilters.startDate,
+        initialEndValue: sellerHomeFilters.endDate,
+      },
+      chipGroups: [
+        {
+          id: "categories",
+          label: "Categoría",
+          options: nextCategoryOptions.map((category) => ({
+            id: category.id,
+            label: category.label,
+          })),
+          initialSelectedIds: sellerHomeFilters.selectedCategoryIds,
+        },
+        {
+          id: "interactionStates",
+          label: "Estado en tu negocio",
+          options: SELLER_INTERACTION_OPTIONS,
+          initialSelectedIds: sellerHomeFilters.selectedInteractionStates,
+        },
+      ],
       clearLabel: "Limpiar",
       applyLabel: "Aplicar",
+      onClear: clearSellerHomeFilters,
+      onApply: (values) => {
+        const selectedGroups = values.selectedChipGroupIds ?? {};
+        setSellerHomeFilters({
+          searchValue: values.searchValue,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          selectedCategoryIds: selectedGroups.categories ?? [],
+          selectedInteractionStates: (selectedGroups.interactionStates ??
+            []) as SellerHomeInteractionState[],
+        });
+      },
     });
-  }, [buyerStatusOptions, homeFilters, role]);
+  }, [buyerStatusOptions, homeFilters, role, sellerCategoryOptions, sellerHomeFilters]);
 
   return (
     <View style={s.container}>
@@ -260,6 +351,18 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
                 Filtros (1)
               </Text>
               <Pressable style={s.activeFilterChipClose} onPress={clearBuyerHomeFilters}>
+                <Icon name="x" size={16} color={t.colors.textDark} />
+              </Pressable>
+            </View>
+          ) : null}
+
+          {role === "seller" && hasSellerHomeFilters(sellerHomeFilters) ? (
+            <View style={s.activeFilterChip}>
+              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
+              <Text variant="body" style={s.activeFilterChipLabel}>
+                Filtros (1)
+              </Text>
+              <Pressable style={s.activeFilterChipClose} onPress={clearSellerHomeFilters}>
                 <Icon name="x" size={16} color={t.colors.textDark} />
               </Pressable>
             </View>

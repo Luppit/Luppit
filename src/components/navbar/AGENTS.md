@@ -23,13 +23,21 @@ Applies to navbar UI components and rendering behavior.
 - The large home search control is a visual trigger, not a free-typing search field, on buyer/seller home routes.
 - Current home trigger behavior:
   - buyer: opens a `Filtros` popup for buyer-home filtering
-  - seller: opens an empty/placeholder filters popup until seller-specific filters are defined
+  - seller: opens a `Filtros` popup for seller-home filtering
 - Buyer filter popup content should follow existing popup/theme patterns and currently includes:
   - request-name field
   - date-range fields
   - status chips
+- Seller filter popup content should follow existing popup/theme patterns and currently includes:
+  - request-name field
+  - date-range fields
+  - seller category chips
+  - seller interaction-state chips
 - Buyer status filter options should prefer `purchase_request_status_ui` and may fall back safely to buyer-home RPC `status/status_label` values when needed for resilience.
+- Seller category filter chips are currently derived from the unfiltered seller-home RPC item payload (`category_id` / `category_name`) and deduplicated client-side; this means only categories represented in visible returned home items are shown.
+- Seller interaction-state chips use stable client labels (`Sin abrir`, `En gestión`, `Descartadas`) mapped to DB-filter values (`new`, `opened`, `discarded`); do not use raw purchase-request lifecycle status for this seller filter.
 - When buyer-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
+- When seller-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
 
 ## Implementation Rules
 - Do not define static buyer/seller navbar lists in app code.
@@ -38,3 +46,4 @@ Applies to navbar UI components and rendering behavior.
 - Load navbar config after session/profile resolution and render DB order (`sort_order`).
 - Keep client behavior presentation-only (active state, press handling, accessibility).
 - Do not convert the home search trigger back into a standalone local text input on home routes unless product requirements change.
+- Do not change shared popup sheet layout/keyboard behavior just to add buyer/seller filter fields; pass filter config into `GlobalPopupHost` and keep popup visual behavior consistent unless the product explicitly asks for a popup redesign.

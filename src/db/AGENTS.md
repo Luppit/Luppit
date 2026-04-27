@@ -84,13 +84,22 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Aggregated rating values must be read from summary tables/views, not recalculated in client code and not stored as source-of-truth columns on `business`.
 
 ## Seller Home Discovery RPC (DB-Driven)
-- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid)`.
+- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`.
 - Resolution flow:
   - resolve business by `profile_business` using `p_profile_id`
   - resolve category scope by `business_category_preference`
   - resolve active preset by `business_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'seller_home'`
   - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`)
+  - when provided, apply seller-home filters in DB:
+    - `p_search_text`: case-insensitive match against request title
+    - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
+    - `p_category_ids`: narrow the existing `business_category_preference` category scope
+    - `p_seller_interaction_states`: match seller-specific request state (`new`, `opened`, `discarded`)
+  - resolve `seller_interaction_state` from the latest conversation for that seller/request:
+    - `new`: no conversation row exists for the seller/request
+    - `opened`: a conversation exists and is not `REQUEST_DISCARDED`
+    - `discarded`: latest seller/request conversation is `REQUEST_DISCARDED`
   - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
   - resolve `views_count` from `purchase_request_visualization` aggregated by `purchase_request_id`.
 - Do not rebuild request-card status text from lifecycle codes in client code.
@@ -105,6 +114,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `category_id`, `category_name`, `category_path`
   - `status`, `status_label`, `published_at`, `created_at`
   - `views_count`
+  - `seller_interaction_state`
 - Sorting behavior by group code (current convention):
   - `all`: by `published_at desc nulls last`, then `created_at desc`
   - `popular`: by `views_count desc`, then recency
