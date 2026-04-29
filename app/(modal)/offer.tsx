@@ -174,6 +174,12 @@ export default function OfferScreen() {
       return;
     }
 
+    setPurchaseRequest((current) =>
+      current.id === resolvedPurchaseRequestId
+        ? current
+        : buildFallbackPurchaseRequest(resolvedPurchaseRequestId)
+    );
+
     let active = true;
 
     const loadPurchaseRequest = async () => {
@@ -183,8 +189,6 @@ export default function OfferScreen() {
 
       if (result?.ok) {
         setPurchaseRequest(result.data);
-      } else {
-        showError("No se pudo cargar la solicitud", "Intenta abrir la oferta de nuevo.");
       }
 
       setRequestLoading(false);
@@ -242,23 +246,23 @@ export default function OfferScreen() {
     if (!isEditMode || !editDraft || didApplyEditDraft) return;
     if (deliveryCatalog.length === 0) return;
 
-    const nextDeliveryMethods: string[] = [];
-    if (pickupCatalog && ((editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0)) {
-      nextDeliveryMethods.push(pickupCatalog.id);
-    }
+    let nextDeliveryMethodId: string | null = null;
     if (
+      editDraft.primaryDeliveryCatalogId &&
+      deliveryCatalog.some((item) => item.id === editDraft.primaryDeliveryCatalogId)
+    ) {
+      nextDeliveryMethodId = editDraft.primaryDeliveryCatalogId;
+    } else if (
+      pickupCatalog &&
+      ((editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0)
+    ) {
+      nextDeliveryMethodId = pickupCatalog.id;
+    } else if (
       shippingCatalog &&
       ((editDraft.shippingMaxValue ?? editDraft.shippingMaxDays ?? 0) > 0 ||
         (editDraft.shippingPrice ?? 0) > 0)
     ) {
-      nextDeliveryMethods.push(shippingCatalog.id);
-    }
-    if (
-      nextDeliveryMethods.length === 0 &&
-      editDraft.primaryDeliveryCatalogId &&
-      deliveryCatalog.some((item) => item.id === editDraft.primaryDeliveryCatalogId)
-    ) {
-      nextDeliveryMethods.push(editDraft.primaryDeliveryCatalogId);
+      nextDeliveryMethodId = shippingCatalog.id;
     }
 
     setDescription(editDraft.description);
@@ -269,7 +273,7 @@ export default function OfferScreen() {
     );
     setCurrencyId(editDraft.currencyId);
     setFiles(editDraft.files as SelectedFile[]);
-    setDeliveryMethods(nextDeliveryMethods);
+    setDeliveryMethods(nextDeliveryMethodId ? [nextDeliveryMethodId] : []);
     setPickupDelay(
       (editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0
         ? String(editDraft.pickupAfterValue ?? editDraft.pickupAfterDays)
@@ -316,6 +320,10 @@ export default function OfferScreen() {
     setPrice(text.replace(/\D/g, ""));
   };
 
+  const handleDeliveryMethodsChange = useCallback((selectedIds: string[]) => {
+    setDeliveryMethods(selectedIds.slice(-1));
+  }, []);
+
   const selectedCurrency = currencies.find((currency) => currency.id === currencyId) ?? null;
   const selectedShippingCurrency =
     currencies.find((currency) => currency.id === shippingCostCurrencyId) ?? null;
@@ -345,19 +353,28 @@ export default function OfferScreen() {
     .join(" ");
 
   const handleConfirmOffer = useCallback(async () => {
-    const primaryDeliveryCatalogId =
-      (shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
-        ? shippingCatalog.id
-        : deliveryMethods[0]) ?? "";
+    const primaryDeliveryCatalogId = deliveryMethods[0] ?? "";
+    const selectedDeliveryMethods = primaryDeliveryCatalogId
+      ? [primaryDeliveryCatalogId]
+      : [];
+    const isPickupSelected = Boolean(
+      pickupCatalog && primaryDeliveryCatalogId === pickupCatalog.id
+    );
+    const isShippingSelected = Boolean(
+      shippingCatalog && primaryDeliveryCatalogId === shippingCatalog.id
+    );
+    const pickupDelayValue = isPickupSelected ? Number(pickupDelay || 0) : 0;
+    const shippingCostValue = isShippingSelected ? Number(shippingCost || 0) : 0;
+    const shippingMaxTimeValue = isShippingSelected ? Number(shippingMaxTime || 0) : 0;
 
     if (isEditMode) {
-      if (!conversationId || !editDraft?.purchaseOfferId) {
+      if (!conversationId || !editDraft?.purchaseOfferId || !editDraft.purchaseRequestId) {
         showError("No se pudo guardar", "No encontramos la conversación de esta oferta.");
         return;
       }
 
       const payload: UpdatePurchaseOfferInput = {
-        purchaseRequestId: purchaseRequest.id,
+        purchaseRequestId: editDraft.purchaseRequestId,
         purchaseOfferId: editDraft.purchaseOfferId,
         conversationId,
         description,
@@ -365,11 +382,11 @@ export default function OfferScreen() {
         currencyId,
         primaryDeliveryCatalogId,
         files,
-        deliveryMethods,
-        pickupDelay: Number(pickupDelay || 0),
+        deliveryMethods: selectedDeliveryMethods,
+        pickupDelay: pickupDelayValue,
         pickupDelayUnit,
-        shippingCost: Number(shippingCost || 0),
-        shippingMaxTime: Number(shippingMaxTime || 0),
+        shippingCost: shippingCostValue,
+        shippingMaxTime: shippingMaxTimeValue,
         shippingMaxTimeUnit,
       };
 
@@ -398,11 +415,11 @@ export default function OfferScreen() {
       currencyId,
       primaryDeliveryCatalogId,
       files,
-      deliveryMethods,
-      pickupDelay: Number(pickupDelay || 0),
+      deliveryMethods: selectedDeliveryMethods,
+      pickupDelay: pickupDelayValue,
       pickupDelayUnit,
-      shippingCost: Number(shippingCost || 0),
-      shippingMaxTime: Number(shippingMaxTime || 0),
+      shippingCost: shippingCostValue,
+      shippingMaxTime: shippingMaxTimeValue,
       shippingMaxTimeUnit,
     };
 
@@ -420,10 +437,12 @@ export default function OfferScreen() {
     deliveryMethods,
     description,
     editDraft?.purchaseOfferId,
+    editDraft?.purchaseRequestId,
     files,
     isEditMode,
     pickupDelay,
     pickupDelayUnit,
+    pickupCatalog,
     price,
     purchaseRequest.id,
     purchaseRequest.title,
@@ -505,10 +524,10 @@ export default function OfferScreen() {
           <OptionsChecklistCard
             icon="truck"
             title="Método de entrega"
-            description="Selecciona todas las opciones que brindarás para esta oferta."
-            allowMultiple
+            description="Selecciona la opción que brindarás para esta oferta."
+            allowMultiple={false}
             value={deliveryMethods}
-            onChange={setDeliveryMethods}
+            onChange={handleDeliveryMethodsChange}
             options={deliveryCatalog.map((delivery) => ({
               id: delivery.id,
               label: delivery.display_name ?? "-",

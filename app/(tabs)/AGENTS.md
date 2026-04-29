@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Scope
-Applies to tab screens, with special focus on home behavior for buyer/seller.
+Applies to tab screens, with special focus on home behavior for buyer/seller and the buyer profile tab.
 
 ## Buyer/Seller Home: DB-Driven Contract (Mandatory)
 - Seller home request discovery must come from `public.get_seller_home_purchase_requests(...)`.
@@ -51,3 +51,42 @@ Applies to tab screens, with special focus on home behavior for buyer/seller.
   - completion logic comes from profile email fields / profile service
   - the CTA should open the dedicated email setup modal (`/(modal)/email-setup`)
   - do not duplicate email form state inside the home screen itself.
+
+## Buyer Profile & Account Settings
+- Buyer profile is a focused account surface; hide the shared top navbar on `/profile` and keep the bottom navbar.
+- Phone number is the read-only login identity. Show it as account information only; do not add phone edit flows unless auth/login requirements change.
+- Buyer profile stats must use real DB-backed data:
+  - created requests from buyer-owned `purchase_request` rows
+  - offers received from offers attached to those requests
+  - buyer rating from `profile_rating_summary`, not recalculated in client code
+- Editable buyer profile fields:
+  - `name` and `id_document` may update through `profile.service.ts`
+  - email must update through the existing OTP verification modal (`/(modal)/email-setup`), not through a plain profile update
+- Account settings should keep rows simple and actionable; rows that change data should show a navigation arrow and route to the dedicated edit/verification flow.
+- Buyer home preset settings:
+  - `Vista de inicio` reads active `buyer_home` presets from `home_group_preset`
+  - current assignment comes from `profile_home_group_preset`, falling back to active `default`
+  - preview cards must render DB group names/order and `home_group_preset_item.max_items`
+  - previewing a preset must not mutate DB; only `Guardar cambios` updates `profile_home_group_preset`
+  - do not hardcode preset names, descriptions, group names, order, or limits in the UI.
+
+## Seller Offers Listing
+- The seller `Ofertas` tab is a standalone listing surface, not the classic home layout:
+  - hide the home top navbar and bottom navbar on this route
+  - render the existing back-button + centered-title layout pattern
+  - keep title copy as `Todas mis ofertas` unless product copy changes.
+- Seller offers data should come from `public.get_current_seller_purchase_offers(...)` once that RPC is available.
+- Seller offers search/filter/sort must map to the offers RPC parameters instead of remaining a separate client-only filtering source:
+  - text search -> `p_search_text`
+  - offer creation date range -> `p_start_date` / `p_end_date`
+  - category chips -> `p_category_ids`
+  - currency chips -> `p_currency_ids`
+  - sort radio -> `p_sort_code`
+- Seller offers popup controls must reuse the existing `GlobalPopupHost` visual contract. Do not introduce a custom popup title alignment, missing separator, or alternate sheet spacing for this screen.
+- When seller-offers filters or non-default sort are active, show dismissible applied chips matching the home filter chip pattern.
+- Price sorting for seller offers must be currency-specific; never sort COL and USD offers together as one numeric list.
+- Supported seller-offer price sort codes are:
+  - `price_col_low_to_high`
+  - `price_col_high_to_low`
+  - `price_usd_low_to_high`
+  - `price_usd_high_to_low`

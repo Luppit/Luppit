@@ -139,6 +139,31 @@ Current buyer request-assistant chat contract:
   - `email_opt_in_at is not null`
 - Do not create a separate client-only setup flag for this flow.
 - The email-setup modal UI may keep local step/input state, but sending/verifying the OTP and final profile completion are DB-driven operations.
+- Email changes for profiles that already have an email must still use the same send/verify OTP flow. Do not update only `profile.email` directly, because `profile_email_opt_in_requires_email_check` requires `email`, `email_opt_in`, and `email_opt_in_at` to stay consistent.
+
+## Buyer Profile Service Contract
+- Buyer profile overview data belongs in `profile.service.ts` unless a broader account/profile service split is introduced intentionally.
+- Profile overview should resolve:
+  - current authenticated `profile`
+  - buyer request count from `purchase_request.profile_id`
+  - buyer received-offer count from offers attached to the buyer's requests
+  - buyer rating from `profile_rating_summary`
+  - current buyer home preset from `profile_home_group_preset`, falling back to active `home_group_preset.code = 'default'` under `surface_code = 'buyer_home'`
+- Editable profile fields currently supported by direct profile update are only `name` and `id_document`.
+- Do not expose phone editing through profile services; phone is the login identity.
+- Do not expose plain email editing through profile services; verified email changes must go through the email OTP RPC flow.
+
+## Buyer Home Preset Settings Service Contract
+- `getCurrentBuyerHomePresetOptions()` should read active `home_group_preset` rows for `surface_code = 'buyer_home'`.
+- Preset options should include DB-driven preview metadata from:
+  - `home_group_preset_item.sort_order`
+  - `home_group_preset_item.max_items`
+  - `home_group.name`
+  - `home_group.description`
+- Current preset selection should come from `profile_home_group_preset`, with fallback to active `default`.
+- `updateCurrentBuyerHomePreset(presetId)` must validate the selected preset is active and belongs to `surface_code = 'buyer_home'` before saving.
+- Saving buyer preset settings should upsert `profile_home_group_preset` on the unique `profile_id` assignment. Do not write seller preset assignment tables from buyer profile UI.
+- Preview data is metadata-only; do not call buyer-home request discovery RPCs just to render the preset chooser unless a future DB preview contract is added.
 
 ## Table Contract: `segment`
 Current query contract:
@@ -333,3 +358,42 @@ Service behavior:
 - Buyer offer-card data must read seller reputation from the DB-backed rating view/summary relation (`business_with_rating`), not from removed `business.rating` or `business.num_ratings` columns.
 - When querying `purchase_offer`, keep the existing shape for UI consumers (`business_name`, `business_rating`, `business_num_ratings`, `business_province`, `offer_currency_code`) even if the underlying relation changes from `business` to `business_with_rating`.
 - Editable offer drafts and update payloads may reuse the same file model as `FilePicker`, extended with optional metadata for persisted images (`id`, `storagePath`, `isExisting`).
+
+## RPC Contract: `get_current_seller_purchase_offers`
+Current intended function contract:
+- `public.get_current_seller_purchase_offers(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_currency_ids uuid[] default null, p_sort_code text default 'newly_listed')`
+- Returns seller-owned `purchase_offer` rows enriched for the seller offers listing.
+
+Expected row fields:
+- `id`
+- `created_at`
+- `business_id`
+- `currency_id`
+- `delivery_id`
+- `description`
+- `price`
+- `purchase_request_id`
+- `request_title`
+- `request_category_id`
+- `request_category_name`
+- `request_profile_name`
+- `offer_currency_code`
+
+Service behavior:
+- Resolve seller business through `profile_business` using the authenticated profile id.
+- Resolve `request_profile_name` from the request owner (`purchase_request.profile_id`), not from visualization ownership.
+- Seller offers filters map to RPC params:
+  - offer/request/buyer/category/currency text -> `p_search_text`
+  - offer creation date range -> `p_start_date` / `p_end_date`
+  - selected category chips -> `p_category_ids`
+  - selected currency chips -> `p_currency_ids`
+- Seller offers sort maps to `p_sort_code`.
+- Supported sort codes:
+  - `newly_listed` and `offer_created_newest`: `purchase_offer.created_at desc`
+  - `offer_created_oldest`: `purchase_offer.created_at asc`
+  - `price_col_low_to_high`: COL offers first, price asc within COL, then non-COL by recency
+  - `price_col_high_to_low`: COL offers first, price desc within COL, then non-COL by recency
+  - `price_usd_low_to_high`: USD offers first, price asc within USD, then non-USD by recency
+  - `price_usd_high_to_low`: USD offers first, price desc within USD, then non-USD by recency
+- Do not sort mixed currencies as one numeric price list.
+- Compatibility client-side filtering/sorting may exist only during rollout before the RPC is available; remove it once the service calls this RPC with filter/sort params.

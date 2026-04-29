@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Scope
-Applies to purchase-request detail screens and selected-offer timeline behavior.
+Applies to purchase-request detail screens, selected-offer timeline behavior, and account-setting detail screens.
 
 ## Purchase Request Detail: DB-Driven Contract (Mandatory)
 - Purchase-request detail may be opened from grouped buyer-home RPC items; the route must continue to work when the incoming serialized `purchaseRequest` payload contains the UI-required purchase-request fields but not extra enrichment.
@@ -26,3 +26,13 @@ Applies to purchase-request detail screens and selected-offer timeline behavior.
 - Do not hardcode pending prefix text when `pre_label` is provided by DB.
 - If icon key is unknown, apply safe icon fallback (`circle-help`) without breaking render.
 - Timeline styling is presentation-only; product logic (which steps exist, completion, next step) is DB-resolved.
+
+## Account Settings Detail Screens
+- Account settings detail routes are not purchase-request detail routes; hide the purchase-request ellipsis/menu on these routes.
+- `/(detail)/account-settings` should display profile/account fields from `profile.service.ts` and route edits to dedicated flows.
+- `/(detail)/home-preset` is the buyer home preset chooser:
+  - load options from active `buyer_home` preset metadata
+  - render a visual blueprint from DB group names/order/max-items
+  - keep selection local until the user taps `Guardar cambios`
+  - save through the profile service upsert into `profile_home_group_preset`.
+- Do not make preset preview destructive by temporarily changing the user's actual assignment.

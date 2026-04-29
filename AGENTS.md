@@ -8,6 +8,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Prefer the smallest change that fully solves the task.
 - Preserve the existing architecture and naming patterns.
 - Do not change established app architecture or shared UI behavior without asking permission first.
+- Reuse shared UI component behavior exactly; for example, popup sheets must keep the established header, separator, spacing, and applied-chip conventions unless the user explicitly approves a redesign.
 - Reuse current services, RPCs, and tables before adding new abstractions.
 - Keep UI behavior DB-driven when DB configuration exists.
 - Keep buyer/seller ratings DB-driven via normalized rating tables/views; do not reintroduce rating-as-source-of-truth columns on `business`.
@@ -16,6 +17,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
 - Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
 - Keep seller-home filtering DB-driven via `public.get_seller_home_purchase_requests(...)`; do not rebuild seller-home search/date/category/interaction filtering as a separate source of truth in screen components once the RPC supports it.
+- Keep seller-offers listing search/filter/sort DB-driven via `public.get_current_seller_purchase_offers(...)` once available; do not keep a separate client-side source of truth after the RPC supports the needed parameters.
 - Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
@@ -31,12 +33,13 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
 - Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
+- Keep buyer profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, and buyer home preset assignment comes from `profile_home_group_preset`.
 
 ## Scoped Guidance Map
 - Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
 - Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
-- Home tabs and buyer/seller home behavior: `app/(tabs)/AGENTS.md`
+- Home tabs, buyer/seller home behavior, and profile tab behavior: `app/(tabs)/AGENTS.md`
 - Navbar UI behavior: `src/components/navbar/AGENTS.md`
 - RPC/runtime contracts and execution behavior: `src/services/AGENTS.md`
 - Data model and SQL transition/procedure constraints: `src/db/AGENTS.md`

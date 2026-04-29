@@ -8,9 +8,10 @@ import { Pressable, View } from "react-native";
 
 type DetailTopBarProps = {
   title?: string;
+  hideMenu?: boolean;
 };
 
-export default function DetailTopBar({ title }: DetailTopBarProps) {
+export default function DetailTopBar({ title, hideMenu = false }: DetailTopBarProps) {
   const t = useTheme();
 
   return (
@@ -35,50 +36,54 @@ export default function DetailTopBar({ title }: DetailTopBarProps) {
         {title ?? ""}
       </Text>
 
-      <Pressable
-        onPress={() =>
-          openPopup({
-            options: [
-              {
-                id: "favorite",
-                label: "Añadir como favorito",
-                icon: "star",
-                textColorKey: "textDark",
-                iconColorKey: "textDark",
-                onPress: () => console.log("detail popup: favorite"),
-              },
-              {
-                id: "category-info",
-                label: "Información sobre categorías",
-                icon: "circle-help",
-                textColorKey: "textDark",
-                iconColorKey: "textDark",
-                onPress: () => console.log("detail popup: category info"),
-              },
-              {
-                id: "share",
-                label: "Compartir",
-                icon: "share-2",
-                textColorKey: "textDark",
-                iconColorKey: "textDark",
-                onPress: () => console.log("detail popup: share"),
-              },
-              {
-                id: "cancel-request",
-                label: "Cancelar solicitud",
-                icon: "trash-2",
-                textColorKey: "error",
-                iconColorKey: "error",
-                onPress: () => console.log("detail popup: cancel request"),
-              },
-            ],
-          })
-        }
-        hitSlop={12}
-        style={{ width: 40, alignItems: "flex-end" }}
-      >
-        <Icon name="ellipsis" size={28} />
-      </Pressable>
+      {hideMenu ? (
+        <View style={{ width: 40 }} />
+      ) : (
+        <Pressable
+          onPress={() =>
+            openPopup({
+              options: [
+                {
+                  id: "favorite",
+                  label: "Añadir como favorito",
+                  icon: "star",
+                  textColorKey: "textDark",
+                  iconColorKey: "textDark",
+                  onPress: () => console.log("detail popup: favorite"),
+                },
+                {
+                  id: "category-info",
+                  label: "Información sobre categorías",
+                  icon: "circle-help",
+                  textColorKey: "textDark",
+                  iconColorKey: "textDark",
+                  onPress: () => console.log("detail popup: category info"),
+                },
+                {
+                  id: "share",
+                  label: "Compartir",
+                  icon: "share-2",
+                  textColorKey: "textDark",
+                  iconColorKey: "textDark",
+                  onPress: () => console.log("detail popup: share"),
+                },
+                {
+                  id: "cancel-request",
+                  label: "Cancelar solicitud",
+                  icon: "trash-2",
+                  textColorKey: "error",
+                  iconColorKey: "error",
+                  onPress: () => console.log("detail popup: cancel request"),
+                },
+              ],
+            })
+          }
+          hitSlop={12}
+          style={{ width: 40, alignItems: "flex-end" }}
+        >
+          <Icon name="ellipsis" size={28} />
+        </Pressable>
+      )}
     </View>
   );
 }
