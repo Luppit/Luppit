@@ -582,7 +582,7 @@ function createOffersScreenStyles(t: Theme) {
     },
     offersList: {
       gap: t.spacing.md,
-      paddingBottom: t.spacing.xl,
+      paddingBottom: 112,
     },
   });
 }

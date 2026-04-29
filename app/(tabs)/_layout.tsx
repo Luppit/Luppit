@@ -13,7 +13,8 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);
-  const isStandaloneTabScreen = pathname === "/offers" || pathname === "/ofertas";
+  const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
+  const hidesTopNavbar = isOffersTabScreen || pathname === "/profile";
 
   useEffect(() => {
     let unsub = () => {};
@@ -38,12 +39,12 @@ export default function TabsLayout() {
   return (
     <SafeAreaView style={{ ...layoutStyles.container, ...layoutStyles.view }}>
       <RoleProvider>
-        {isStandaloneTabScreen ? null : <TopNavbar />}
+        {hidesTopNavbar ? null : <TopNavbar />}
         <View style={layoutStyles.container}>
           <Slot />
         </View>
       </RoleProvider>
-      {isStandaloneTabScreen ? null : <Navbar />}
+      <Navbar />
     </SafeAreaView>
   );
 }

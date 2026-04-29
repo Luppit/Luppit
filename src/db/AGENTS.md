@@ -16,6 +16,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `email_opt_in`
   - `email_opt_in_at`
   - email setup is considered complete only when all three resolve to a non-empty email + `true` opt-in + non-null opt-in timestamp.
+  - email updates should be verified through email OTP flow and update all three email fields atomically.
 - `profile_business`: profile-business mapping.
 - `business_category_preference`: business-to-category preference mapping used for seller request discovery.
 - `location`: geographic data.
@@ -52,6 +53,8 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Default assignment convention:
   - businesses without explicit seller assignment should resolve preset code `default` under `surface_code = 'seller_home'`
   - profiles without explicit buyer assignment should resolve preset code `default` under `surface_code = 'buyer_home'`
+- Buyer profile preset chooser uses `home_group_preset` + `home_group_preset_item` + `home_group` metadata for non-destructive previews. It must not temporarily update `profile_home_group_preset` just to preview a preset.
+- Buyer preset assignment writes only `profile_home_group_preset`; seller preset assignment writes only `business_home_group_preset`.
 - Legacy seller-only home-group tables should not be reintroduced as the runtime source of truth once shared home-group config exists.
 
 ### Requests & Offers
@@ -73,6 +76,8 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - unique (`profile_id`, `purchase_request_id`)
 - Buyer grouped home discovery must come from `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home groups from legacy single-request visualization lookup in client code.
 - Offer cards in purchase-request detail must include DB-backed business + location + currency metadata from `business_with_rating` (or equivalent DB-backed summary join), together with `purchase_offer.price`.
+- Seller offers listing/search/sort should be served by `public.get_current_seller_purchase_offers(...)` once deployed; do not make the app maintain long-term client-only filtering for seller-owned offers.
+- Seller offer price sorting must be currency-specific. Use separate COL and USD sort codes instead of mixing both currencies in one numeric order.
 - `business.rating` and `business.num_ratings` are legacy-removed fields and must not be used as runtime source of truth.
 
 ### Ratings
@@ -82,6 +87,13 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - seller rates buyer with `SELLER_RATE_BUYER`
 - Seller ratings may also roll up to `business_rating_summary` through the seller business linked from `purchase_offer.business_id`.
 - Aggregated rating values must be read from summary tables/views, not recalculated in client code and not stored as source-of-truth columns on `business`.
+- Buyer profile rating shown in account/profile UI should read from `profile_rating_summary` by `profile_id`.
+
+### Profile Email Constraints
+- `profile_email_format_check` requires `profile.email` to be null or normalized to a valid email-like value.
+- `profile_email_opt_in_requires_email_check` requires `email_opt_in = true` to have both a non-empty `email` and non-null `email_opt_in_at`.
+- Because these checks are immediate, email verification procedures must update `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` in the same profile update statement.
+- If a normalized email is already used by another profile, the unique email index/constraint should reject it; DB functions may raise a clearer `email_already_in_use` error before profile update.
 
 ## Seller Home Discovery RPC (DB-Driven)
 - Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`.
@@ -155,6 +167,33 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `newest`: by `created_at desc`
 - If no active preset is resolved, return `{ "groups": [] }`.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
+
+## Seller Offers Listing RPC (DB-Driven)
+- Runtime source of truth is `public.get_current_seller_purchase_offers(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_currency_ids uuid[] default null, p_sort_code text default 'newly_listed')`.
+- Resolution flow:
+  - resolve business by `profile_business` using `p_profile_id`
+  - resolve offers from `purchase_offer.business_id`
+  - enrich each offer with request title/category from `purchase_request`
+  - enrich each offer with buyer/profile display name from the request owner (`purchase_request.profile_id`), not from visualization ownership
+  - enrich each offer with `currency.currency_code`
+  - when provided, apply seller-offer filters in DB:
+    - `p_search_text`: case-insensitive match against offer description, request title, request category name, buyer profile name, or currency code
+    - `p_start_date` / `p_end_date`: compare against `purchase_offer.created_at::date`
+    - `p_category_ids`: match `purchase_request.category_id`
+    - `p_currency_ids`: match `purchase_offer.currency_id`
+- Expected row payload:
+  - `id`, `created_at`, `business_id`, `currency_id`, `delivery_id`
+  - `description`, `price`, `purchase_request_id`
+  - `request_title`, `request_category_id`, `request_category_name`
+  - `request_profile_name`, `offer_currency_code`
+- Supported sort codes:
+  - `newly_listed` / `offer_created_newest`: `purchase_offer.created_at desc`
+  - `offer_created_oldest`: `purchase_offer.created_at asc`
+  - `price_col_low_to_high`: COL offers first, price asc within COL, then non-COL by recency
+  - `price_col_high_to_low`: COL offers first, price desc within COL, then non-COL by recency
+  - `price_usd_low_to_high`: USD offers first, price asc within USD, then non-USD by recency
+  - `price_usd_high_to_low`: USD offers first, price desc within USD, then non-USD by recency
+- Do not sort COL and USD together as a single numeric price list.
 
 ### Conversation Core
 - `conversation`: buyer-seller conversation linked to offer/request.
