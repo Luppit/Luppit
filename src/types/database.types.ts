@@ -104,49 +104,6 @@ export type Database = {
           },
         ]
       }
-      business_home_group_preset: {
-        Row: {
-          business_id: string
-          created_at: string
-          id: string
-          preset_id: string
-        }
-        Insert: {
-          business_id: string
-          created_at?: string
-          id?: string
-          preset_id: string
-        }
-        Update: {
-          business_id?: string
-          created_at?: string
-          id?: string
-          preset_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "business_home_group_preset_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: true
-            referencedRelation: "business"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "business_home_group_preset_business_id_fkey"
-            columns: ["business_id"]
-            isOneToOne: true
-            referencedRelation: "business_with_rating"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "business_home_group_preset_preset_id_fkey"
-            columns: ["preset_id"]
-            isOneToOne: false
-            referencedRelation: "home_group_preset"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       business_rating_summary: {
         Row: {
           business_id: string
@@ -2038,6 +1995,59 @@ export type Database = {
           },
         ]
       }
+      purchase_request_favorite: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          purchase_request_id: string
+          role_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          purchase_request_id: string
+          role_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          purchase_request_id?: string
+          role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_request_favorite_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_favorite_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_favorite_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_favorite_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "role"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_request_status: {
         Row: {
           code: string
@@ -2428,6 +2438,14 @@ export type Database = {
       }
     }
     Functions: {
+      add_buyer_purchase_request_favorite: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
+      add_seller_purchase_request_favorite: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       buyer_accept_offer: {
         Args: {
           p_action_code?: string
@@ -2510,6 +2528,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_buyer_purchase_request_favorites: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
+        Returns: Json
+      }
       get_category_children: {
         Args: { category_id_input: string }
         Returns: {
@@ -2576,6 +2606,32 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_current_seller_purchase_offers: {
+        Args: {
+          p_category_ids?: string[]
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          created_at: string
+          currency_id: string
+          delivery_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+          request_category_id: string
+          request_category_name: string
+          request_profile_name: string
+          request_title: string
+        }[]
+      }
       get_navbar_items_by_profile: {
         Args: { p_profile_id: string }
         Returns: {
@@ -2605,6 +2661,19 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_purchase_request_favorites: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_role_name: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
+        Returns: Json
+      }
       get_seller_home_filter_options: {
         Args: { p_profile_id: string }
         Returns: Json
@@ -2626,6 +2695,18 @@ export type Database = {
       }
       get_seller_offer_edit_payload_v2: {
         Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_seller_purchase_request_favorites: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
         Returns: Json
       }
       is_category_leaf: {
@@ -2654,6 +2735,14 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: undefined
       }
+      remove_buyer_purchase_request_favorite: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
+      remove_seller_purchase_request_favorite: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       search_category: {
         Args: { search_text: string }
         Returns: {
@@ -2661,17 +2750,6 @@ export type Database = {
           name: string
           path: unknown
         }[]
-      }
-      set_purchase_offer_delivery_timing: {
-        Args: {
-          p_conversation_id: string
-          p_pickup_after_unit?: string
-          p_pickup_after_value?: number
-          p_profile_id: string
-          p_shipping_max_unit?: string
-          p_shipping_max_value?: number
-        }
-        Returns: Json
       }
       seller_cancel_offer: {
         Args: {
@@ -2768,6 +2846,21 @@ export type Database = {
           }
       send_email_verification_otp: {
         Args: { p_email: string; p_profile_id: string }
+        Returns: Json
+      }
+      set_current_business_category_preferences: {
+        Args: { p_category_ids?: string[]; p_profile_id: string }
+        Returns: Json
+      }
+      set_purchase_offer_delivery_timing: {
+        Args: {
+          p_conversation_id: string
+          p_pickup_after_unit?: string
+          p_pickup_after_value?: number
+          p_profile_id: string
+          p_shipping_max_unit?: string
+          p_shipping_max_value?: number
+        }
         Returns: Json
       }
       submit_conversation_rating: {

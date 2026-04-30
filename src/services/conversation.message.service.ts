@@ -253,5 +253,6 @@ export async function createConversationMessages(
     created.push(inserted.data as ConversationMessage);
   }
 
-  return { ok: true, data: created };
+  const createdWithUrls = await withSignedImageUrls(created);
+  return { ok: true, data: createdWithUrls };
 }

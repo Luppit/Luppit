@@ -17,6 +17,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   Animated,
+  ActivityIndicator,
   Image,
   Keyboard,
   KeyboardAvoidingView,
@@ -68,10 +69,14 @@ export default function GlobalPopupHost() {
   >({});
   const [selectedSortOptionId, setSelectedSortOptionId] = useState("");
   const [activeDateField, setActiveDateField] = useState<"start" | "end" | null>(null);
+  const [pendingSummaryActionId, setPendingSummaryActionId] = useState<string | null>(
+    null
+  );
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -89,9 +94,9 @@ export default function GlobalPopupHost() {
   };
 
   const indicatorPanResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => dismissOnBackdropPress,
+    onStartShouldSetPanResponder: () => canDismissPopup,
     onMoveShouldSetPanResponder: (_event, gestureState) =>
-      dismissOnBackdropPress && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      canDismissPopup && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
     onPanResponderGrant: () => {
       translateY.stopAnimation();
       opacity.stopAnimation();
@@ -104,7 +109,10 @@ export default function GlobalPopupHost() {
     },
     onPanResponderRelease: (_event, gestureState) => {
       const dismissThreshold = Math.min(Math.max(sheetHeightRef.current * 0.2, 72), 140);
-      if (gestureState.dy >= dismissThreshold || gestureState.vy >= 1.2) {
+      if (
+        canDismissPopup &&
+        (gestureState.dy >= dismissThreshold || gestureState.vy >= 1.2)
+      ) {
         closePopup();
         return;
       }
@@ -136,6 +144,7 @@ export default function GlobalPopupHost() {
             setFilterConfig(null);
             setSortConfig(null);
             setSummaryConfig(null);
+            setPendingSummaryActionId(null);
           }
         });
         return;
@@ -177,6 +186,7 @@ export default function GlobalPopupHost() {
         setOptions(config.options);
       }
       setDismissOnBackdropPress(config.dismissOnBackdropPress ?? true);
+      setPendingSummaryActionId(null);
       setMounted(true);
       opacity.setValue(0);
       translateY.setValue(28);
@@ -217,9 +227,19 @@ export default function GlobalPopupHost() {
     closePopup();
   };
 
-  const handleSummaryActionPress = (action: PopupSummaryAction) => {
-    closePopup();
-    action.onPress?.();
+  const handleSummaryActionPress = async (action: PopupSummaryAction) => {
+    if (pendingSummaryActionId) return;
+
+    setPendingSummaryActionId(action.id);
+    try {
+      const result = action.onPress?.();
+      if (result && typeof (result as Promise<void>).then === "function") {
+        await result;
+      }
+      closePopup();
+    } finally {
+      setPendingSummaryActionId(null);
+    }
   };
 
   const handleFilterChipPress = (chipId: string) => {
@@ -294,13 +314,13 @@ export default function GlobalPopupHost() {
       statusBarTranslucent
       visible={isMounted}
       animationType="none"
-      onRequestClose={closePopup}
+      onRequestClose={canDismissPopup ? closePopup : undefined}
     >
       <View style={StyleSheet.absoluteFillObject}>
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity }]}>
           <Pressable
             style={[s.backdrop, { opacity: 0.34 }]}
-            onPress={dismissOnBackdropPress ? closePopup : undefined}
+            onPress={canDismissPopup ? closePopup : undefined}
           />
         </Animated.View>
 
@@ -657,18 +677,24 @@ export default function GlobalPopupHost() {
                             ? t.colors[action.backgroundColorKey]
                             : t.colors.backgroudWhite;
                         const isSingle = summaryConfig.actions?.length === 1;
+                        const isPending = pendingSummaryActionId === action.id;
+                        const isDisabled = pendingSummaryActionId != null;
 
                         return (
                           <Pressable
                             key={action.id}
+                            disabled={isDisabled}
                             style={[
                               s.summaryActionButton,
                               isSingle ? s.summaryActionButtonSingle : null,
                               { backgroundColor },
+                              isDisabled && !isPending ? { opacity: 0.55 } : null,
                             ]}
                             onPress={() => handleSummaryActionPress(action)}
                           >
-                            {action.icon ? (
+                            {isPending ? (
+                              <ActivityIndicator size="small" color={iconColor} />
+                            ) : action.icon ? (
                               <Icon name={action.icon} size={20} color={iconColor} />
                             ) : null}
                             <Text variant="body" style={[s.summaryActionLabel, { color: textColor }]}>

@@ -1,16 +1,21 @@
 import { Icon } from "@/src/components/Icon";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import {
   BuyerProfileOverview,
+  Profile,
+  SellerProfileOverview,
   getCurrentBuyerProfileOverview,
+  getCurrentSellerProfileOverview,
 } from "@/src/services/profile.service";
+import { Roles } from "@/src/services/role.service";
+import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +23,46 @@ import {
 } from "react-native";
 
 export default function AccountSettingsScreen() {
+  const [role, setRole] = useState<Roles | null>(null);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    const resolveRole = async () => {
+      const result = await getCurrentUserRole();
+      if (!active) return;
+
+      if (!result.ok) {
+        showError("No se pudo cargar la configuración", result.error.message);
+        setRole(null);
+        setIsRoleLoading(false);
+        return;
+      }
+
+      setRole(result.data);
+      setIsRoleLoading(false);
+    };
+
+    void resolveRole();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (isRoleLoading) {
+    return <LoadingState label="Cargando configuración..." />;
+  }
+
+  return role === Roles.SELLER ? (
+    <SellerAccountSettingsContent />
+  ) : (
+    <BuyerAccountSettingsContent />
+  );
+}
+
+function BuyerAccountSettingsContent() {
   const t = useTheme();
   const s = useMemo(() => createAccountSettingsStyles(t), [t]);
   const [overview, setOverview] = useState<BuyerProfileOverview | null>(null);
@@ -48,12 +93,7 @@ export default function AccountSettingsScreen() {
   const preset = overview?.buyerHomePreset;
 
   if (isLoading) {
-    return (
-      <View style={s.loadingBox}>
-        <ActivityIndicator color={t.colors.primary} />
-        <Text color="stateAnulated">Cargando configuración...</Text>
-      </View>
-    );
+    return <LoadingState label="Cargando configuración..." style={s.loadingBox} />;
   }
 
   return (
@@ -61,46 +101,7 @@ export default function AccountSettingsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <SettingsSection title="Datos personales">
-        <SettingsRow
-          label="Nombre"
-          value={profile?.name || "Sin nombre"}
-          onPress={() =>
-            router.push({
-              pathname: "/(modal)/profile-field-edit",
-              params: {
-                title: "Editar nombre",
-                field: "name",
-                value: profile?.name ?? "",
-              },
-            })
-          }
-        />
-        <SettingsRow
-          label="Documento de identificación"
-          value={profile?.id_document || "Sin documento"}
-          onPress={() =>
-            router.push({
-              pathname: "/(modal)/profile-field-edit",
-              params: {
-                title: "Editar documento",
-                field: "id_document",
-                value: profile?.id_document ?? "",
-              },
-            })
-          }
-        />
-        <SettingsRow
-          label="Correo"
-          value={profile?.email || "Sin correo verificado"}
-          onPress={() =>
-            router.push({
-              pathname: "/(modal)/email-setup",
-              params: { title: "Cambiar correo" },
-            })
-          }
-        />
-      </SettingsSection>
+      <PersonalSettingsSection profile={profile} />
 
       <SettingsSection title="Preferencias">
         <SettingsRow
@@ -110,12 +111,122 @@ export default function AccountSettingsScreen() {
           onPress={() =>
             router.push({
               pathname: "/(detail)/home-preset",
-              params: { title: "Vista de inicio", hideMenu: "true" },
+              params: {
+                title: "Vista de inicio",
+                hideMenu: "true",
+                surface: "buyer_home",
+              },
             })
           }
         />
       </SettingsSection>
     </ScrollView>
+  );
+}
+
+function SellerAccountSettingsContent() {
+  const t = useTheme();
+  const s = useMemo(() => createAccountSettingsStyles(t), [t]);
+  const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadOverview = useCallback(async () => {
+    setIsLoading(true);
+    const result = await getCurrentSellerProfileOverview();
+    if (!result.ok) {
+      setOverview(null);
+      setIsLoading(false);
+      showError("No se pudo cargar la configuración", result.error.message);
+      return;
+    }
+
+    setOverview(result.data);
+    setIsLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadOverview();
+      return () => {};
+    }, [loadOverview])
+  );
+
+  if (isLoading) {
+    return <LoadingState label="Cargando configuración..." style={s.loadingBox} />;
+  }
+
+  const preset = overview?.sellerHomePreset;
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={s.content}
+    >
+      <PersonalSettingsSection profile={overview?.profile} />
+
+      <SettingsSection title="Preferencias">
+        <SettingsRow
+          label="Vista de inicio"
+          value={preset?.name || "Default"}
+          description={preset?.description ?? null}
+          onPress={() =>
+            router.push({
+              pathname: "/(detail)/home-preset",
+              params: {
+                title: "Vista de inicio",
+                hideMenu: "true",
+                surface: "seller_home",
+              },
+            })
+          }
+        />
+      </SettingsSection>
+    </ScrollView>
+  );
+}
+
+function PersonalSettingsSection({ profile }: { profile?: Profile | null }) {
+  return (
+    <SettingsSection title="Datos personales">
+      <SettingsRow
+        label="Nombre"
+        value={profile?.name || "Sin nombre"}
+        onPress={() =>
+          router.push({
+            pathname: "/(modal)/profile-field-edit",
+            params: {
+              title: "Editar nombre",
+              field: "name",
+              value: profile?.name ?? "",
+            },
+          })
+        }
+      />
+      <SettingsRow
+        label="Documento de identificación"
+        value={profile?.id_document || "Sin documento"}
+        onPress={() =>
+          router.push({
+            pathname: "/(modal)/profile-field-edit",
+            params: {
+              title: "Editar documento",
+              field: "id_document",
+              value: profile?.id_document ?? "",
+            },
+          })
+        }
+      />
+      <SettingsRow
+        label="Correo"
+        value={profile?.email || "Sin correo verificado"}
+        onPress={() =>
+          router.push({
+            pathname: "/(modal)/email-setup",
+            params: { title: "Cambiar correo" },
+          })
+        }
+      />
+    </SettingsSection>
   );
 }
 

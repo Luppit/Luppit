@@ -36,25 +36,23 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `home_group`: shared group catalog for home sections, keyed by `surface_code` (currently `seller_home`, `buyer_home`).
 - `home_group_preset`: shared preset catalog for home surfaces, keyed by `surface_code`.
 - `home_group_preset_item`: enabled groups per preset + `sort_order` + `max_items` (group-level limit).
-- `business_home_group_preset`: assigned preset per seller business.
-- `profile_home_group_preset`: assigned preset per buyer profile.
+- `profile_home_group_preset`: assigned preset per buyer/seller profile.
 - Group limits must come from `home_group_preset_item.max_items`; do not pass limits as procedure parameters.
 - Key constraints (must be preserved):
   - `business_category_preference`: unique (`business_id`, `category_id`)
   - `home_group`: unique (`surface_code`, `code`)
   - `home_group_preset`: unique (`surface_code`, `code`)
   - `home_group_preset_item`: unique (`preset_id`, `group_id`)
-  - `business_home_group_preset`: unique (`business_id`)
   - `profile_home_group_preset`: unique (`profile_id`)
 - `home_group_preset_item.max_items` is required DB config (`not null`, `> 0`) and is the only source of per-group limits.
 - Seeded reference codes currently expected:
   - group codes: `all`, `popular`, `newest`, `discarded`
   - preset codes: `default`, `minimalist`
 - Default assignment convention:
-  - businesses without explicit seller assignment should resolve preset code `default` under `surface_code = 'seller_home'`
-  - profiles without explicit buyer assignment should resolve preset code `default` under `surface_code = 'buyer_home'`
-- Buyer profile preset chooser uses `home_group_preset` + `home_group_preset_item` + `home_group` metadata for non-destructive previews. It must not temporarily update `profile_home_group_preset` just to preview a preset.
-- Buyer preset assignment writes only `profile_home_group_preset`; seller preset assignment writes only `business_home_group_preset`.
+  - seller profiles without explicit assignment should resolve preset code `default` under `surface_code = 'seller_home'`
+  - buyer profiles without explicit assignment should resolve preset code `default` under `surface_code = 'buyer_home'`
+- Buyer/seller profile preset chooser uses `home_group_preset` + `home_group_preset_item` + `home_group` metadata for non-destructive previews. It must not temporarily update `profile_home_group_preset` just to preview a preset.
+- Buyer/seller preset assignment writes only `profile_home_group_preset`.
 - Legacy seller-only home-group tables should not be reintroduced as the runtime source of truth once shared home-group config exists.
 
 ### Requests & Offers
@@ -62,6 +60,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `purchase_request_status`: purchase request lifecycle catalog (`code`, `description`, `is_terminal`).
 - `purchase_request_status_ui`: one-row-per-status UI copy for request cards (`status_code`, `ui_text`).
 - `purchase_request_visualization`: one row per viewer profile and purchase request used for home/detail visualization counts.
+- `purchase_request_favorite`: role-specific saved purchase requests for buyer/seller favorite surfaces.
 - `purchase_offer`: seller offer for request.
 - `purchase_offer_delivery`: delivery terms for offer.
 - `purchase_offer_image`: offer images.
@@ -74,6 +73,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `offer_accepted`
 - `purchase_request_visualization` uniqueness must stay one-row-per-profile-per-request:
   - unique (`profile_id`, `purchase_request_id`)
+- `purchase_request_favorite` must stay role-specific through `role_id` referencing `public.role(id)`, with uniqueness:
+  - unique (`profile_id`, `purchase_request_id`, `role_id`)
+- Do not store favorite role as free-text when the normalized `role` table is available.
 - Buyer grouped home discovery must come from `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home groups from legacy single-request visualization lookup in client code.
 - Offer cards in purchase-request detail must include DB-backed business + location + currency metadata from `business_with_rating` (or equivalent DB-backed summary join), together with `purchase_offer.price`.
 - Seller offers listing/search/sort should be served by `public.get_current_seller_purchase_offers(...)` once deployed; do not make the app maintain long-term client-only filtering for seller-owned offers.
@@ -100,7 +102,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Resolution flow:
   - resolve business by `profile_business` using `p_profile_id`
   - resolve category scope by `business_category_preference`
-  - resolve active preset by `business_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
+  - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'seller_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'seller_home'`
   - resolve request items from `purchase_request` filtered by configured categories and active lifecycle (`status = 'active'`)
   - when provided, apply seller-home filters in DB:
@@ -167,6 +169,49 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `newest`: by `created_at desc`
 - If no active preset is resolved, return `{ "groups": [] }`.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
+
+## Purchase Request Favorites (DB-Driven)
+- Runtime source of truth is `purchase_request_favorite` plus role-specific RPCs; do not create client-only favorite lists.
+- Favorite ownership is profile + request + role:
+  - `profile_id` references `profile(id)`
+  - `purchase_request_id` references `purchase_request(id)`
+  - `role_id` references `role(id)`
+  - unique (`profile_id`, `purchase_request_id`, `role_id`)
+- Buyer favorite visibility:
+  - add/remove/query must validate the authenticated profile owns the buyer role.
+  - buyer favorites should only include buyer-owned requests (`purchase_request.profile_id = p_profile_id`) in buyer-visible lifecycle states (`active`, `offer_accepted`).
+- Seller favorite visibility:
+  - add/remove/query must validate the authenticated profile owns the seller role.
+  - seller favorites should only include active requests visible through seller business category preferences (`profile_business` + `business_category_preference`).
+- Favorite mutation RPCs:
+  - `public.add_buyer_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+  - `public.remove_buyer_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+  - `public.add_seller_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+  - `public.remove_seller_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+- Add RPCs should be idempotent and return JSON with at least `success`, `favorite_id`, `already_exists`, and `role_name`.
+- Remove RPCs should be idempotent and return JSON with at least `success`, `favorite_id`, `removed`, and `role_name`.
+- Favorite list RPCs:
+  - `public.get_buyer_purchase_request_favorites(...)`
+  - `public.get_seller_purchase_request_favorites(...)`
+- Favorite list RPCs should accept:
+  - `p_profile_id uuid`
+  - `p_search_text text default null`
+  - `p_start_date date default null`
+  - `p_end_date date default null`
+  - `p_category_ids uuid[] default null`
+  - `p_status_codes text[] default null`
+  - `p_sort_code text default 'favorited_newest'`
+- Expected list payload is JSON `{ "items": [...] }`; each item should include:
+  - `favorite_id`, `favorited_at`
+  - request card fields (`id`, `title`, `summary_text`, `category_id`, `category_name`, `category_path`, `status`, `status_label`, `published_at`, `created_at`, `views_count`)
+  - `offers_count`
+- Supported favorite sort codes:
+  - `favorited_newest`
+  - `favorited_oldest`
+  - `request_newest`
+  - `request_oldest`
+  - `most_viewed`
+  - `most_offers`
 
 ## Seller Offers Listing RPC (DB-Driven)
 - Runtime source of truth is `public.get_current_seller_purchase_offers(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_currency_ids uuid[] default null, p_sort_code text default 'newly_listed')`.

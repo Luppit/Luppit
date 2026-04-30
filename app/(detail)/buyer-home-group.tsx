@@ -1,4 +1,5 @@
 import ProductCard from "@/src/components/productCard/ProductCard";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import {
@@ -78,7 +79,7 @@ export default function BuyerHomeGroupScreen() {
   );
 
   if (isLoading) {
-    return <Text>Cargando solicitudes...</Text>;
+    return <LoadingState label="Cargando solicitudes..." />;
   }
 
   if (items.length === 0) {

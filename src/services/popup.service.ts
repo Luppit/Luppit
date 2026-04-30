@@ -35,7 +35,7 @@ export type PopupSummaryAction = {
   backgroundColorKey?: ThemeColorKey;
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;
-  onPress?: () => void;
+  onPress?: () => void | Promise<void>;
 };
 
 export type PopupSummaryInput = {

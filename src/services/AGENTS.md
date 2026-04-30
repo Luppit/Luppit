@@ -153,16 +153,18 @@ Current buyer request-assistant chat contract:
 - Do not expose phone editing through profile services; phone is the login identity.
 - Do not expose plain email editing through profile services; verified email changes must go through the email OTP RPC flow.
 
-## Buyer Home Preset Settings Service Contract
+## Buyer/Seller Home Preset Settings Service Contract
 - `getCurrentBuyerHomePresetOptions()` should read active `home_group_preset` rows for `surface_code = 'buyer_home'`.
+- `getCurrentSellerHomePresetOptions()` should read active `home_group_preset` rows for `surface_code = 'seller_home'`.
 - Preset options should include DB-driven preview metadata from:
   - `home_group_preset_item.sort_order`
   - `home_group_preset_item.max_items`
   - `home_group.name`
   - `home_group.description`
-- Current preset selection should come from `profile_home_group_preset`, with fallback to active `default`.
+- Current preset selection should come from `profile_home_group_preset`, with fallback to active `default` for the current surface.
 - `updateCurrentBuyerHomePreset(presetId)` must validate the selected preset is active and belongs to `surface_code = 'buyer_home'` before saving.
-- Saving buyer preset settings should upsert `profile_home_group_preset` on the unique `profile_id` assignment. Do not write seller preset assignment tables from buyer profile UI.
+- `updateCurrentSellerHomePreset(presetId)` must validate the selected preset is active and belongs to `surface_code = 'seller_home'` before saving.
+- Saving buyer/seller preset settings should upsert `profile_home_group_preset` on the unique `profile_id` assignment.
 - Preview data is metadata-only; do not call buyer-home request discovery RPCs just to render the preset chooser unless a future DB preview contract is added.
 
 ## Table Contract: `segment`
@@ -221,7 +223,7 @@ Service behavior:
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
 - Do not hardcode group visibility/order in services.
 - Do not build seller-home request groups from local mocks when this RPC is available.
-- Seller preset resolution must read from shared home-group config for `surface_code = 'seller_home'`, with assignment via `business_home_group_preset`.
+- Seller preset resolution must read from shared home-group config for `surface_code = 'seller_home'`, with profile assignment via `profile_home_group_preset` and fallback only to the active `seller_home` default preset.
 
 ## RPC Contract: `get_buyer_home_purchase_requests`
 Current function contract:
@@ -268,6 +270,51 @@ Service behavior:
   - do not call buyer/seller home group RPCs
   - render the account-setup-required state instead.
 - The CTA from that blocked state should route to the dedicated email setup modal rather than implementing inline editing inside home.
+
+## RPC Contract: Purchase Request Favorites
+Current favorite mutation contracts:
+- `public.add_buyer_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+- `public.remove_buyer_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+- `public.add_seller_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+- `public.remove_seller_purchase_request_favorite(p_profile_id uuid, p_purchase_request_id uuid)`
+
+Expected mutation payload:
+- `success`
+- `favorite_id`
+- `role_name`
+- add RPCs also return `already_exists`
+- remove RPCs also return `removed`
+
+Favorite list contracts:
+- `public.get_buyer_purchase_request_favorites(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_status_codes text[] default null, p_sort_code text default 'favorited_newest')`
+- `public.get_seller_purchase_request_favorites(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_status_codes text[] default null, p_sort_code text default 'favorited_newest')`
+- Returns JSON object with `items[]`.
+
+Expected favorite item fields:
+- `favorite_id`, `favorited_at`
+- `id`, `title`, `summary_text`
+- `category_id`, `category_name`, `category_path`
+- `status`, `status_label`, `published_at`, `created_at`
+- `views_count`, `offers_count`
+
+Service behavior:
+- Favorite service wrappers belong with purchase-request services unless a broader favorite service split is introduced intentionally.
+- Services must resolve the current authenticated profile before calling favorite RPCs; do not let UI pass arbitrary profile ids.
+- Buyer and seller favorite wrappers must call their role-specific RPCs, because favorites are role-specific in DB.
+- Favorite query filters map directly to RPC params:
+  - text -> `p_search_text`
+  - favorited date range -> `p_start_date` / `p_end_date`
+  - selected category chips -> `p_category_ids`
+  - selected status chips -> `p_status_codes`
+  - selected sort -> `p_sort_code`
+- Supported favorite sort codes:
+  - `favorited_newest`
+  - `favorited_oldest`
+  - `request_newest`
+  - `request_oldest`
+  - `most_viewed`
+  - `most_offers`
+- Do not implement long-term client-side favorites filtering/sorting once the RPC accepts these params.
 
 ## RPC Contract: `get_or_create_seller_purchase_request_conversation`
 Current function contract:

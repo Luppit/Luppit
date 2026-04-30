@@ -1,6 +1,7 @@
 import Button from "@/src/components/button/Button";
 import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
 import { Icon } from "@/src/components/Icon";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { getProfileById } from "@/src/services/profile.service";
 import {
@@ -67,8 +68,11 @@ export default function ConversationChatScreen() {
     auxActions,
     onActionPress,
     isExecutingAction,
+    optimisticMessages,
+    clearOptimisticMessages,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [senderNameById, setSenderNameById] = useState<Record<string, string>>({});
   const [previewImages, setPreviewImages] = useState<ConversationImagePreview[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
@@ -83,11 +87,26 @@ export default function ConversationChatScreen() {
       ),
     [conversationView.slots]
   );
+  const visibleMessages = useMemo(() => {
+    const seenIds = new Set<string>();
+
+    return [...messages, ...optimisticMessages]
+      .filter((message) => {
+        if (seenIds.has(message.id)) return false;
+        seenIds.add(message.id);
+        return true;
+      })
+      .sort(
+        (first, second) =>
+          new Date(first.created_at).getTime() - new Date(second.created_at).getTime()
+      );
+  }, [messages, optimisticMessages]);
+
   const renderItems = useMemo<ConversationRenderItem[]>(() => {
     const items: ConversationRenderItem[] = [];
 
-    for (let i = 0; i < messages.length; i += 1) {
-      const message = messages[i];
+    for (let i = 0; i < visibleMessages.length; i += 1) {
+      const message = visibleMessages[i];
 
       if (!isImageOnlyMessage(message)) {
         items.push({ type: "message", message });
@@ -100,8 +119,8 @@ export default function ConversationChatScreen() {
       ];
 
       let nextIndex = i + 1;
-      while (nextIndex < messages.length) {
-        const nextMessage = messages[nextIndex];
+      while (nextIndex < visibleMessages.length) {
+        const nextMessage = visibleMessages[nextIndex];
         const previousMessage = groupedMessages[groupedMessages.length - 1];
         if (
           !isImageOnlyMessage(nextMessage) ||
@@ -131,7 +150,7 @@ export default function ConversationChatScreen() {
     }
 
     return items;
-  }, [messages]);
+  }, [visibleMessages]);
   const activePreviewImage = previewImages[previewIndex] ?? null;
   const scrollToBottom = useCallback((animated = false) => {
     requestAnimationFrame(() => {
@@ -142,17 +161,24 @@ export default function ConversationChatScreen() {
   }, []);
 
   const loadMessages = useCallback(async () => {
+    setIsLoadingMessages(true);
     const result =
       await getConversationMessagesByConversationId(conversationId);
-    if (!result.ok) return;
+    if (!result.ok) {
+      setIsLoadingMessages(false);
+      return;
+    }
+
     setMessages(result.data);
+    clearOptimisticMessages(result.data.map((message) => message.id));
+    setIsLoadingMessages(false);
     if (result.data.length > 0) {
       scrollToBottom(false);
       setTimeout(() => {
         scrollToBottom(false);
       }, 120);
     }
-  }, [conversationId, scrollToBottom]);
+  }, [conversationId, scrollToBottom, clearOptimisticMessages]);
 
   useFocusEffect(
     useCallback(() => {
@@ -167,7 +193,7 @@ export default function ConversationChatScreen() {
   useEffect(() => {
     const senderIds = Array.from(
       new Set(
-        messages
+        visibleMessages
           .map((message) => message.sender_profile_id)
           .filter(
             (senderId): senderId is string =>
@@ -211,7 +237,7 @@ export default function ConversationChatScreen() {
     return () => {
       active = false;
     };
-  }, [messages, profileId]);
+  }, [visibleMessages, profileId]);
 
   const formatTime = (date: string) =>
     new Date(date).toLocaleTimeString("en-US", {
@@ -567,10 +593,18 @@ export default function ConversationChatScreen() {
         }}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
-          if (messages.length === 0) return;
+          if (visibleMessages.length === 0) return;
           scrollToBottom(false);
         }}
       >
+        {isLoadingMessages && visibleMessages.length === 0 ? (
+          <LoadingState
+            label="Cargando mensajes..."
+            variant="inline"
+            style={{ minHeight: 160 }}
+          />
+        ) : null}
+
         {renderItems.map((item) =>
           item.type === "imageGroup"
             ? renderConversationMessage(item.messages[0], item.images)

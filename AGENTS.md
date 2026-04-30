@@ -17,6 +17,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
 - Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
 - Keep seller-home filtering DB-driven via `public.get_seller_home_purchase_requests(...)`; do not rebuild seller-home search/date/category/interaction filtering as a separate source of truth in screen components once the RPC supports it.
+- Keep purchase-request favorites DB-driven via `purchase_request_favorite` and buyer/seller favorite RPCs; favorites are role-specific through `role_id`, not text flags or client-only state.
 - Keep seller-offers listing search/filter/sort DB-driven via `public.get_current_seller_purchase_offers(...)` once available; do not keep a separate client-side source of truth after the RPC supports the needed parameters.
 - Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
@@ -34,6 +35,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
 - Keep buyer profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, and buyer home preset assignment comes from `profile_home_group_preset`.
+- Keep buyer/seller home preset assignment profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
 
 ## Scoped Guidance Map
 - Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`

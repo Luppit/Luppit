@@ -5,10 +5,14 @@ import ConversationActionButtons, {
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 import { openPopup, PopupOption } from "@/src/services/popup.service";
-import { createConversationMessages } from "@/src/services/conversation.message.service";
+import {
+  ConversationMessage,
+  createConversationMessages,
+} from "@/src/services/conversation.message.service";
 import {
   ConversationView,
   ConversationViewAction,
@@ -19,7 +23,14 @@ import {
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -39,6 +50,8 @@ type ConversationLayoutContextValue = {
   isExecutingAction: boolean;
   refreshConversation: () => Promise<void>;
   messageRefreshTick: number;
+  optimisticMessages: ConversationMessage[];
+  clearOptimisticMessages: (messageIds: string[]) => void;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -128,6 +141,10 @@ function isBlackAuxAction(styleCode: string | null) {
   return normalizeText(styleCode).includes("black");
 }
 
+function createOptimisticMessageId(index: number) {
+  return `optimistic-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
+}
+
 function interpolateTemplate(
   template: string,
   context: Record<string, unknown>
@@ -174,6 +191,9 @@ export default function ConversationLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
+    []
+  );
 
   const conversationId = useMemo(
     () => parseStringParam(params.conversationId),
@@ -181,6 +201,60 @@ export default function ConversationLayout() {
   );
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
+
+  useEffect(() => {
+    setOptimisticMessages([]);
+  }, [conversationId]);
+
+  const clearOptimisticMessages = useCallback((messageIds: string[]) => {
+    if (messageIds.length === 0) return;
+
+    const idSet = new Set(messageIds);
+    setOptimisticMessages((current) =>
+      current.filter((message) => !idSet.has(message.id))
+    );
+  }, []);
+
+  const buildOptimisticMessages = useCallback(
+    (text: string, images: { uri: string }[]) => {
+      if (!conversationId || !profileId) return [];
+
+      const now = Date.now();
+      const nextMessages: ConversationMessage[] = [];
+      const trimmed = text.trim();
+
+      if (trimmed) {
+        nextMessages.push({
+          id: createOptimisticMessageId(nextMessages.length),
+          conversation_id: conversationId,
+          sender_profile_id: profileId,
+          text: trimmed,
+          message_kind: "TEXT",
+          image_path: null,
+          image_url: null,
+          visible_to_role_id: null,
+          created_at: new Date(now).toISOString(),
+        });
+      }
+
+      images.forEach((image) => {
+        nextMessages.push({
+          id: createOptimisticMessageId(nextMessages.length),
+          conversation_id: conversationId,
+          sender_profile_id: profileId,
+          text: null,
+          message_kind: "IMAGE",
+          image_path: null,
+          image_url: image.uri,
+          visible_to_role_id: null,
+          created_at: new Date(now + nextMessages.length).toISOString(),
+        });
+      });
+
+      return nextMessages;
+    },
+    [conversationId, profileId]
+  );
 
   const refreshConversation = useCallback(async () => {
     if (!conversationId) return;
@@ -451,18 +525,7 @@ export default function ConversationLayout() {
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: t.colors.background,
-        }}
-      >
-        <Text>Cargando conversación...</Text>
-      </View>
-    );
+    return <LoadingState label="Cargando conversación..." />;
   }
 
   const topActions = conversationView.actions
@@ -495,6 +558,8 @@ export default function ConversationLayout() {
     isExecutingAction,
     refreshConversation,
     messageRefreshTick,
+    optimisticMessages,
+    clearOptimisticMessages,
   };
 
   return (
@@ -639,18 +704,54 @@ export default function ConversationLayout() {
                   paddingBottom: Math.max(insets.bottom, t.spacing.sm),
                 }}
               >
-              <InputChat
-                onSend={async ({ text, images }) => {
-                  const created = await createConversationMessages({
-                    conversationId,
-                    text,
-                    images,
-                  });
-                  if (created.ok) {
-                    setMessageRefreshTick((prev) => prev + 1);
-                  }
-                }}
-              />
+                <InputChat
+                  clearOnSendStart
+                  onSend={({ text, images }) => {
+                    const outgoingMessages = buildOptimisticMessages(text, images);
+                    if (outgoingMessages.length === 0) return;
+
+                    const outgoingMessageIds = outgoingMessages.map(
+                      (message) => message.id
+                    );
+                    setOptimisticMessages((current) => [
+                      ...current,
+                      ...outgoingMessages,
+                    ]);
+
+                    void (async () => {
+                      try {
+                        const created = await createConversationMessages({
+                          conversationId,
+                          text,
+                          images,
+                        });
+
+                        if (!created.ok) {
+                          clearOptimisticMessages(outgoingMessageIds);
+                          showError(
+                            "No se pudo enviar el mensaje",
+                            created.error.message
+                          );
+                          return;
+                        }
+
+                        setOptimisticMessages((current) => [
+                          ...current.filter(
+                            (message) => !outgoingMessageIds.includes(message.id)
+                          ),
+                          ...created.data,
+                        ]);
+                        setMessageRefreshTick((prev) => prev + 1);
+                      } catch {
+                        clearOptimisticMessages(outgoingMessageIds);
+                        showError(
+                          "No se pudo enviar el mensaje",
+                          "Ocurrió un error, intenta de nuevo."
+                        );
+                      }
+                    })();
+                  }}
+                />
               </View>
             </>
           ) : null}
