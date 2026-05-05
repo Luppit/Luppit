@@ -141,14 +141,21 @@ Current buyer request-assistant chat contract:
 - The email-setup modal UI may keep local step/input state, but sending/verifying the OTP and final profile completion are DB-driven operations.
 - Email changes for profiles that already have an email must still use the same send/verify OTP flow. Do not update only `profile.email` directly, because `profile_email_opt_in_requires_email_check` requires `email`, `email_opt_in`, and `email_opt_in_at` to stay consistent.
 
-## Buyer Profile Service Contract
-- Buyer profile overview data belongs in `profile.service.ts` unless a broader account/profile service split is introduced intentionally.
-- Profile overview should resolve:
+## Buyer/Seller Profile Service Contract
+- Buyer and seller profile overview data belongs in `profile.service.ts` unless a broader account/profile service split is introduced intentionally.
+- Buyer profile overview should resolve:
   - current authenticated `profile`
   - buyer request count from `purchase_request.profile_id`
   - buyer received-offer count from offers attached to the buyer's requests
   - buyer rating from `profile_rating_summary`
   - current buyer home preset from `profile_home_group_preset`, falling back to active `home_group_preset.code = 'default'` under `surface_code = 'buyer_home'`
+- Seller profile overview should resolve:
+  - current authenticated `profile`
+  - seller business membership from `profile_business`
+  - business display fields from `business`
+  - business rating from `business_rating_summary`
+  - business category preferences from `business_category_preference` joined to `category`
+  - current seller home preset from `profile_home_group_preset`, falling back to active `home_group_preset.code = 'default'` under `surface_code = 'seller_home'`
 - Editable profile fields currently supported by direct profile update are only `name` and `id_document`.
 - Do not expose phone editing through profile services; phone is the login identity.
 - Do not expose plain email editing through profile services; verified email changes must go through the email OTP RPC flow.
@@ -166,6 +173,25 @@ Current buyer request-assistant chat contract:
 - `updateCurrentSellerHomePreset(presetId)` must validate the selected preset is active and belongs to `surface_code = 'seller_home'` before saving.
 - Saving buyer/seller preset settings should upsert `profile_home_group_preset` on the unique `profile_id` assignment.
 - Preview data is metadata-only; do not call buyer-home request discovery RPCs just to render the preset chooser unless a future DB preview contract is added.
+- Do not read from or write to business-level seller preset assignment tables; seller preset selection is profile-scoped.
+
+## Business Category Preference Service Contract
+- `getCurrentBusinessCategoryOptions()` should load selectable categories from `category` and format labels/path data for the business information page.
+- Seller business overview should expose the currently selected category preferences from `business_category_preference` joined to `category`.
+- `updateCurrentBusinessCategoryPreferences(categoryIds)` should resolve the current authenticated profile and call `public.set_current_business_category_preferences(...)`; UI code should not pass arbitrary profile ids.
+- Saving category preferences replaces the selected set for the current seller business. Keep unsaved add/remove state in the screen layer until `Guardar cambios`.
+- Business category editing belongs to the business profile detail route, not the seller main profile screen.
+
+## RPC Contract: `set_current_business_category_preferences`
+Current function contract:
+- `public.set_current_business_category_preferences(p_profile_id uuid, p_category_ids uuid[] default '{}'::uuid[])`
+
+Expected behavior:
+- Resolve the current seller business through `profile_business` using `p_profile_id`.
+- Validate all requested category ids exist in `category`.
+- Replace rows in `business_category_preference` for the resolved business with the provided category id set.
+- Return JSON with at least `business_id` and `category_ids`.
+- If no business is resolved for the profile, raise a clear business-not-found style error for the service to surface.
 
 ## Table Contract: `segment`
 Current query contract:

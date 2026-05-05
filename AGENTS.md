@@ -34,8 +34,9 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
 - Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
 - Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
-- Keep buyer profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, and buyer home preset assignment comes from `profile_home_group_preset`.
+- Keep buyer/seller profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, seller business rating comes from `business_rating_summary`, and buyer/seller home preset assignment comes from `profile_home_group_preset`.
 - Keep buyer/seller home preset assignment profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
+- Keep seller business category preferences DB-driven via `business_category_preference` and `set_current_business_category_preferences`; category editing belongs on the business information detail page, not as a seller main-profile metric card.
 
 ## Scoped Guidance Map
 - Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
