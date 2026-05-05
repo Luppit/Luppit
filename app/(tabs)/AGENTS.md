@@ -117,3 +117,16 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Expected favorite item payload includes request card fields plus `favorite_id`, `favorited_at`, and `offers_count`.
 - Buyer favorite rows open `/(detail)/purchase-request`; seller favorite rows open `/(conversation)/offer` through `get_or_create_seller_purchase_request_conversation(...)`.
 - Favorites popup controls must reuse `GlobalPopupHost` visual behavior and applied chips, matching seller offers.
+
+## Chats Tab
+- The `Chats` tab is a standalone list surface like `Favoritas` and seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
+- Buyer and seller chat-list data must come from `public.get_current_profile_conversations(...)` through `conversation.service.ts`; do not direct-query `conversation` / `conversation_message` from the screen.
+- Chat-list search/filter inputs map to RPC params:
+  - text search -> `p_search_text`
+  - last-message date range -> `p_start_date` / `p_end_date`
+  - category chips -> `p_category_ids`
+- Do not add status filtering to the chats popup unless the RPC contract changes.
+- Expected chat-list item payload includes `conversation_id`, `display_name`, request/category/status metadata, `last_message_text`, `last_message_kind`, `last_message_at`, `unopened_count`, and `has_unopened`.
+- Chat rows open `/(conversation)/offer` with `conversationId` and `display_name` as the title.
+- Unopened chats must render before opened chats, then sort by `last_message_at desc`. The app may preserve this ordering client-side, but the RPC is also expected to return that order.
+- The unopened indicator must use the app theme primary color (`t.colors.primary`), not a hardcoded blue. Avatar, text, spacing, search trigger, popup, and applied-chip styling must reuse the existing theme and the `Favoritas`/`Ofertas` standalone-list pattern.

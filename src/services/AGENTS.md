@@ -62,6 +62,38 @@ System visibility rules in RPC:
 - System messages with `visible_to_role_id` are visible only when it matches the current viewer side role in the conversation.
 - Viewer role resolution is DB-driven using authenticated profile + conversation participant side + `profile_role -> role`.
 
+Open-state side effect:
+- This is the only procedure that should mark messages opened.
+- When called by a buyer or seller participant, it must mark visible, non-system messages from the other participant as `opened` for the current viewer side and set the matching `*_opened_at` timestamp.
+- System messages are excluded from open-state tracking and should keep buyer/seller open-state fields null.
+
+## RPC Contract: `get_current_profile_conversations`
+Current function contract:
+- `public.get_current_profile_conversations(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null)`
+- Returns JSON object with `items[]`.
+
+Expected item fields:
+- `conversation_id`
+- `purchase_request_id`, `purchase_offer_id`
+- `display_name`
+- `business_name`
+- `request_title`
+- `request_category_id`, `request_category_name`
+- `status_code`, `status_label`
+- `last_message_text`, `last_message_kind`, `last_message_at`
+- `unopened_count`
+- `has_unopened`
+
+Service behavior:
+- Resolve current authenticated profile in `conversation.service.ts` before calling the RPC; screens must not pass arbitrary profile ids.
+- Chat-list filters map to RPC params:
+  - text search -> `p_search_text`
+  - last-message date range -> `p_start_date` / `p_end_date`
+  - category chips -> `p_category_ids`
+- Do not include status filtering unless the RPC contract changes.
+- Returned rows should be ordered by `has_unopened desc`, then `last_message_at desc`.
+- `get_current_profile_conversations(...)` must not mark messages opened; only `get_conversation_messages(...)` has that side effect.
+
 ## RPC Contract: `get_conversation_timeline`
 Current function contract:
 - `public.get_conversation_timeline(p_conversation_id uuid)`
@@ -366,6 +398,7 @@ Service behavior:
 - RPC must create conversation chat messages in this order:
   - one `TEXT` message with offer summary
   - then `IMAGE` messages for uploaded images (in original upload order).
+- Seller-created offer summary/image messages should initialize seller open state as `opened` and buyer open state as `unopened`; these are non-system messages.
 
 ## RPC Contract: `set_purchase_offer_delivery_timing`
 Current function contract:
@@ -416,6 +449,7 @@ Service behavior:
   - new `offers` bucket paths only for newly added images
   - final ordered `conversations` bucket paths for the images that should be re-posted into chat after the update
 - Current edit-save flow uploads only new images to the `offers` bucket, but uploads the full current file list to the `conversations` bucket so the update RPC can append the refreshed image messages in order.
+- Offer edit system messages should not participate in open-state tracking. Refreshed seller summary/image messages should initialize seller open state as `opened` and buyer open state as `unopened`.
 - Offer upload helpers must normalize MIME types before calling Supabase Storage; do not pass malformed picker MIME strings through unchanged.
 
 ## Action Execution and Safe Fallbacks

@@ -120,6 +120,31 @@ export type ConversationStatusTimelineItem = {
   is_completed: boolean;
 };
 
+export type ConversationListFilters = {
+  searchValue: string;
+  startDate: string;
+  endDate: string;
+  selectedCategoryIds: string[];
+};
+
+export type ConversationListItem = {
+  conversation_id: string;
+  purchase_request_id: string | null;
+  purchase_offer_id: string | null;
+  display_name: string;
+  business_name: string | null;
+  request_title: string | null;
+  request_category_id: string | null;
+  request_category_name: string | null;
+  status_code: string | null;
+  status_label: string | null;
+  last_message_text: string | null;
+  last_message_kind: string | null;
+  last_message_at: string;
+  unopened_count: number;
+  has_unopened: boolean;
+};
+
 function parseConversationActionExecutor(raw: unknown): ConversationActionExecutor | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -367,6 +392,69 @@ function parseConversationView(raw: unknown): ConversationView | null {
   };
 }
 
+function parseConversationListItem(raw: unknown): ConversationListItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const conversationId =
+    typeof value.conversation_id === "string"
+      ? value.conversation_id
+      : typeof value.id === "string"
+        ? value.id
+        : "";
+  const displayName =
+    typeof value.display_name === "string"
+      ? value.display_name.trim()
+      : typeof value.business_name === "string"
+        ? value.business_name.trim()
+        : "";
+  const lastMessageAt =
+    typeof value.last_message_at === "string"
+      ? value.last_message_at
+      : typeof value.created_at === "string"
+        ? value.created_at
+        : "";
+
+  if (!conversationId || !displayName || !lastMessageAt) return null;
+
+  return {
+    conversation_id: conversationId,
+    purchase_request_id:
+      typeof value.purchase_request_id === "string" ? value.purchase_request_id : null,
+    purchase_offer_id:
+      typeof value.purchase_offer_id === "string" ? value.purchase_offer_id : null,
+    display_name: displayName,
+    business_name:
+      typeof value.business_name === "string" ? value.business_name : null,
+    request_title:
+      typeof value.request_title === "string" ? value.request_title : null,
+    request_category_id:
+      typeof value.request_category_id === "string"
+        ? value.request_category_id
+        : null,
+    request_category_name:
+      typeof value.request_category_name === "string"
+        ? value.request_category_name
+        : null,
+    status_code: typeof value.status_code === "string" ? value.status_code : null,
+    status_label: typeof value.status_label === "string" ? value.status_label : null,
+    last_message_text:
+      typeof value.last_message_text === "string" ? value.last_message_text : null,
+    last_message_kind:
+      typeof value.last_message_kind === "string" ? value.last_message_kind : null,
+    last_message_at: lastMessageAt,
+    unopened_count:
+      typeof value.unopened_count === "number" && Number.isFinite(value.unopened_count)
+        ? value.unopened_count
+        : 0,
+    has_unopened:
+      typeof value.has_unopened === "boolean"
+        ? value.has_unopened
+        : typeof value.unopened_count === "number"
+          ? value.unopened_count > 0
+          : false,
+  };
+}
+
 export async function getConversationByPurchaseOfferId(
   purchaseOfferId: string
 ): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {
@@ -529,6 +617,53 @@ export async function getConversationView(
   if (!parsed) return { ok: false, error: fromAppError("unknown") };
 
   return { ok: true, data: parsed };
+}
+
+export async function getCurrentProfileConversations(
+  filters?: ConversationListFilters
+): Promise<{ ok: true; data: ConversationListItem[] } | { ok: false; error: AppError }> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const searchValue = filters?.searchValue.trim() || null;
+  const startDate = filters?.startDate.trim() || null;
+  const endDate = filters?.endDate.trim() || null;
+  const categoryIds =
+    filters?.selectedCategoryIds.filter((id) => id.trim().length > 0) ?? [];
+  const rpcResult: any = await (supabase as any).rpc("get_current_profile_conversations", {
+    p_profile_id: profile.data.id,
+    p_search_text: searchValue,
+    p_start_date: startDate,
+    p_end_date: endDate,
+    p_category_ids: categoryIds.length > 0 ? categoryIds : null,
+  });
+
+  if (rpcResult.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
+
+  const rawItems = Array.isArray(rpcResult.data)
+    ? rpcResult.data
+    : rpcResult.data &&
+        typeof rpcResult.data === "object" &&
+        Array.isArray((rpcResult.data as Record<string, unknown>).items)
+      ? ((rpcResult.data as Record<string, unknown>).items as unknown[])
+      : [];
+  const items = rawItems
+    .map((item: unknown) => parseConversationListItem(item))
+    .filter((item: ConversationListItem | null): item is ConversationListItem =>
+      Boolean(item)
+    )
+    .sort(
+      (first: ConversationListItem, second: ConversationListItem) =>
+        Number(second.has_unopened) - Number(first.has_unopened) ||
+        new Date(second.last_message_at).getTime() -
+          new Date(first.last_message_at).getTime()
+    );
+
+  return { ok: true, data: items };
 }
 
 export async function getCurrentUserConversationView(
