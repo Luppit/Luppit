@@ -1,4 +1,5 @@
 import ProductCard from "@/src/components/productCard/ProductCard";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import {
@@ -90,7 +91,7 @@ export default function SellerHomeGroupScreen() {
   );
 
   if (isLoading) {
-    return <Text>Cargando solicitudes...</Text>;
+    return <LoadingState label="Cargando solicitudes..." />;
   }
 
   if (items.length === 0) {

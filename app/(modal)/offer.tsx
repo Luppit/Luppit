@@ -24,6 +24,7 @@ import {
   PurchaseRequest,
 } from "@/src/services/purchase.request.service";
 import { Text } from "@/src/components/Text";
+import LoadingState from "@/src/components/loading/LoadingState";
 import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
@@ -454,26 +455,27 @@ export default function OfferScreen() {
 
   if (requestLoading || editDraftLoading) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <Text>{isEditMode ? "Cargando oferta..." : "Cargando solicitud..."}</Text>
-      </View>
+      <LoadingState
+        label={isEditMode ? "Cargando oferta..." : "Cargando solicitud..."}
+      />
     );
   }
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <ScrollView
-        keyboardDismissMode="interactive"
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingTop: t.spacing.md,
-          paddingBottom: t.spacing.xl,
-          gap: t.spacing.md,
-          flexGrow: 1,
-        }}
-      >
+    <View style={{ flex: 1 }}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <ScrollView
+          keyboardDismissMode="interactive"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingTop: t.spacing.md,
+            paddingBottom: t.spacing.xl,
+            gap: t.spacing.md,
+            flexGrow: 1,
+          }}
+        >
         <ExpandableInfoCard
           title="Validado por Luppit"
           description="Luppit validará constantemente la información de la oferta, para asegurarnos de que ofreces el producto exacto de la solicitud."
@@ -506,9 +508,11 @@ export default function OfferScreen() {
             inputMode="numeric"
           />
         ) : (
-          <Text color="stateAnulated">
-            {catalogLoading ? "Cargando monedas..." : "No hay monedas disponibles."}
-          </Text>
+          catalogLoading ? (
+            <LoadingState label="Cargando monedas..." variant="inline" />
+          ) : (
+            <Text color="stateAnulated">No hay monedas disponibles.</Text>
+          )
         )}
 
         <FilePicker
@@ -597,11 +601,13 @@ export default function OfferScreen() {
             }))}
           />
         ) : (
-          <Text color="stateAnulated">
-            {catalogLoading
-              ? "Cargando métodos de entrega..."
-              : "No hay métodos de entrega disponibles."}
-          </Text>
+          catalogLoading ? (
+            <LoadingState label="Cargando métodos de entrega..." variant="inline" />
+          ) : (
+            <Text color="stateAnulated">
+              No hay métodos de entrega disponibles.
+            </Text>
+          )
         )}
 
         {canSubmitOffer ? (
@@ -641,14 +647,15 @@ export default function OfferScreen() {
                     backgroundColorKey: "primary",
                     textColorKey: "backgroudWhite",
                     iconColorKey: "backgroudWhite",
-                    onPress: () => void handleConfirmOffer(),
+                    onPress: handleConfirmOffer,
                   },
                 ],
               })
             }
           />
         ) : null}
-      </ScrollView>
-    </TouchableWithoutFeedback>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </View>
   );
 }

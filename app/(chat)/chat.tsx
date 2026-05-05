@@ -1,11 +1,12 @@
 import {
   useChatSession,
 } from "./chat-session.context";
+import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import React from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import { Image, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 function AssistantTextBlock({ text }: { text: string }) {
@@ -20,11 +21,13 @@ function PublishRequestCard({
   title,
   description,
   disabled,
+  loading,
   onPublish,
 }: {
   title: string;
   description: string;
   disabled: boolean;
+  loading: boolean;
   onPublish: () => void;
 }) {
   const t = useTheme();
@@ -55,27 +58,14 @@ function PublishRequestCard({
         <Text variant="body">{description}</Text>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
+      <Button
+        title="Publicar solicitud"
+        icon="check"
+        variant="dark"
         disabled={disabled}
+        loading={loading}
         onPress={onPublish}
-        style={({ pressed }) => ({
-          minHeight: 44,
-          borderRadius: 999,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: disabled ? t.colors.border : t.colors.primary,
-          opacity: pressed && !disabled ? 0.92 : 1,
-          paddingHorizontal: t.spacing.md,
-        })}
-      >
-        <Text
-          variant="body"
-          style={{ color: t.colors.backgroudWhite }}
-        >
-          ✓ Publicar solicitud
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -158,6 +148,7 @@ export default function ChatScreen() {
             title={summary?.titulo ?? "Solicitud"}
             description={summaryText ?? "Sin descripción"}
             disabled={!canPublish || isExecutingControl}
+            loading={isExecutingControl}
             onPublish={() => void publishDraft()}
           />
           {status === "published" ? (

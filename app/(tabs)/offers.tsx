@@ -1,4 +1,5 @@
 import RoleGate from "@/src/components/role/RoleGate";
+import LoadingState from "@/src/components/loading/LoadingState";
 import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
 import { Text } from "@/src/components/Text";
 import { Icon } from "@/src/components/Icon";
@@ -129,7 +130,7 @@ export default function OffersScreen() {
     <View style={s.screen}>
       <OffersTopBar title="Todas mis ofertas" />
       <RoleGate
-        loading={<Text>Cargando contenido...</Text>}
+        loading={<LoadingState label="Cargando contenido..." />}
         buyer={<Text variant="title">Offers Buyer</Text>}
         seller={<SellerOffersContent />}
       />
@@ -363,7 +364,7 @@ function SellerOffersContent() {
 
   const content = (() => {
     if (isLoading) {
-      return <Text>Cargando ofertas...</Text>;
+      return <LoadingState label="Cargando ofertas..." />;
     }
 
     if (offers.length === 0) {

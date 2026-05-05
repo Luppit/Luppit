@@ -1,6 +1,7 @@
 import Button from "@/src/components/button/Button";
 import HintModal from "@/src/components/hintModal/HintModal";
 import { Icon } from "@/src/components/Icon";
+import LoadingState from "@/src/components/loading/LoadingState";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import { Text } from "@/src/components/Text";
 import {
@@ -439,7 +440,8 @@ export default function EmailSetupScreen() {
 
                 <Button
                   variant="dark"
-                  title={isSendingCode ? "Enviando..." : "Enviar código"}
+                  title="Enviar código"
+                  loading={isSendingCode}
                   disabled={!canSendCode}
                   onPress={() => {
                     void handleSendCode();
@@ -493,7 +495,8 @@ export default function EmailSetupScreen() {
 
                 <Button
                   variant="dark"
-                  title={isVerifying ? "Verificando..." : "Verificar correo"}
+                  title="Verificar correo"
+                  loading={isVerifying}
                   disabled={!canVerifyCode}
                   onPress={() => {
                     void handleVerifyCode();
@@ -531,11 +534,11 @@ export default function EmailSetupScreen() {
             )}
 
             {isLoading ? (
-              <View style={styles.loadingRow}>
-                <Text variant="caption" color="stateAnulated" align="center">
-                  Cargando configuración...
-                </Text>
-              </View>
+              <LoadingState
+                label="Cargando configuración..."
+                variant="inline"
+                style={styles.loadingRow}
+              />
             ) : null}
           </View>
 

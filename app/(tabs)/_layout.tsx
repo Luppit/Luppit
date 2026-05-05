@@ -14,7 +14,8 @@ export default function TabsLayout() {
   const [ready, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);
   const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
-  const hidesTopNavbar = isOffersTabScreen || pathname === "/profile";
+  const isFavoritesTabScreen = pathname === "/favorites";
+  const hidesTopNavbar = isOffersTabScreen || isFavoritesTabScreen || pathname === "/profile";
 
   useEffect(() => {
     let unsub = () => {};

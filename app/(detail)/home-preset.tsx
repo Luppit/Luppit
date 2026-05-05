@@ -1,19 +1,22 @@
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import {
-  BuyerHomePresetOption,
-  BuyerHomePresetPreviewGroup,
+  HomePresetOption,
+  HomePresetPreviewGroup,
+  HomePresetSurface,
   getCurrentBuyerHomePresetOptions,
+  getCurrentSellerHomePresetOptions,
   updateCurrentBuyerHomePreset,
+  updateCurrentSellerHomePreset,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -26,7 +29,12 @@ export default function HomePresetScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createHomePresetStyles(t, insets.bottom), [t, insets.bottom]);
-  const [options, setOptions] = useState<BuyerHomePresetOption[]>([]);
+  const params = useLocalSearchParams<{ surface?: string | string[] }>();
+  const surfaceParam = Array.isArray(params.surface) ? params.surface[0] : params.surface;
+  const surface: HomePresetSurface = isHomePresetSurface(surfaceParam)
+    ? surfaceParam
+    : "buyer_home";
+  const [options, setOptions] = useState<HomePresetOption[]>([]);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [currentPresetId, setCurrentPresetId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +42,10 @@ export default function HomePresetScreen() {
 
   const loadOptions = useCallback(async () => {
     setIsLoading(true);
-    const result = await getCurrentBuyerHomePresetOptions();
+    const result =
+      surface === "seller_home"
+        ? await getCurrentSellerHomePresetOptions()
+        : await getCurrentBuyerHomePresetOptions();
 
     if (!result.ok) {
       setOptions([]);
@@ -50,7 +61,7 @@ export default function HomePresetScreen() {
     setCurrentPresetId(current?.id ?? null);
     setSelectedPresetId(current?.id ?? null);
     setIsLoading(false);
-  }, []);
+  }, [surface]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,7 +77,10 @@ export default function HomePresetScreen() {
     if (!selectedPresetId || !canSave) return;
 
     setIsSaving(true);
-    const result = await updateCurrentBuyerHomePreset(selectedPresetId);
+    const result =
+      surface === "seller_home"
+        ? await updateCurrentSellerHomePreset(selectedPresetId)
+        : await updateCurrentBuyerHomePreset(selectedPresetId);
     setIsSaving(false);
 
     if (!result.ok) {
@@ -79,12 +93,7 @@ export default function HomePresetScreen() {
   };
 
   if (isLoading) {
-    return (
-      <View style={s.loadingBox}>
-        <ActivityIndicator color={t.colors.primary} />
-        <Text color="stateAnulated">Cargando vistas...</Text>
-      </View>
-    );
+    return <LoadingState label="Cargando vistas..." style={s.loadingBox} />;
   }
 
   return (
@@ -114,7 +123,8 @@ export default function HomePresetScreen() {
 
       <View style={s.footer}>
         <Button
-          title={isSaving ? "Guardando..." : "Guardar cambios"}
+          title="Guardar cambios"
+          loading={isSaving}
           disabled={!canSave}
           onPress={() => void savePreset()}
         />
@@ -123,12 +133,16 @@ export default function HomePresetScreen() {
   );
 }
 
+function isHomePresetSurface(value: unknown): value is HomePresetSurface {
+  return value === "buyer_home" || value === "seller_home";
+}
+
 function PresetOptionCard({
   option,
   selected,
   onPress,
 }: {
-  option: BuyerHomePresetOption;
+  option: HomePresetOption;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -162,7 +176,7 @@ function PresetOptionCard({
   );
 }
 
-function PresetBlueprint({ groups }: { groups: BuyerHomePresetPreviewGroup[] }) {
+function PresetBlueprint({ groups }: { groups: HomePresetPreviewGroup[] }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createHomePresetStyles(t, insets.bottom), [t, insets.bottom]);
@@ -184,7 +198,7 @@ function PresetBlueprint({ groups }: { groups: BuyerHomePresetPreviewGroup[] }) 
   );
 }
 
-function PresetBlueprintGroup({ group }: { group: BuyerHomePresetPreviewGroup }) {
+function PresetBlueprintGroup({ group }: { group: HomePresetPreviewGroup }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createHomePresetStyles(t, insets.bottom), [t, insets.bottom]);

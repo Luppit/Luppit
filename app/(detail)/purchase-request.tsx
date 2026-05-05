@@ -1,5 +1,6 @@
 import HintModal from "@/src/components/hintModal/HintModal";
 import { Icon } from "@/src/components/Icon";
+import LoadingState from "@/src/components/loading/LoadingState";
 import OfferCard, {
   OfferCardTimelineItem,
 } from "@/src/components/offerCard/OfferCard";
@@ -272,13 +273,17 @@ export default function PurchaseRequestDetailScreen() {
           </View>
 
           {offersLoading ? (
-            <View style={{ marginTop: t.spacing.lg }}>
-              <Text color="stateAnulated">Cargando ofertas...</Text>
-            </View>
+            <LoadingState
+              label="Cargando ofertas..."
+              variant="inline"
+              style={{ marginTop: t.spacing.lg }}
+            />
           ) : isAcceptedRequest && selectedOfferLoading ? (
-            <View style={{ marginTop: t.spacing.lg }}>
-              <Text color="stateAnulated">Cargando oferta seleccionada...</Text>
-            </View>
+            <LoadingState
+              label="Cargando oferta seleccionada..."
+              variant="inline"
+              style={{ marginTop: t.spacing.lg }}
+            />
           ) : displayedOffersCount === 0 ? (
             <View
               style={{

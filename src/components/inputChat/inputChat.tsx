@@ -29,6 +29,7 @@ export type InputChatProps = {
   disabled?: boolean;
   autoFocus?: boolean;
   clearOnSend?: boolean;
+  clearOnSendStart?: boolean;
   showImagePreview?: boolean;
   onSend: (payload: {
     text: string;
@@ -46,6 +47,7 @@ export default function InputChat({
   disabled = false,
   autoFocus = false,
   clearOnSend = true,
+  clearOnSendStart = false,
   showImagePreview = true,
   onSend,
   onPickImages,
@@ -73,6 +75,13 @@ export default function InputChat({
     },
     [onImagesChange],
   );
+
+  const clearInput = useCallback(() => {
+    setText("");
+    updateImages(() => []);
+    inputRef.current?.clear();
+    setInputHeight(MIN_INPUT_HEIGHT);
+  }, [updateImages]);
 
   const removeImageAt = useCallback(
     (index: number) => {
@@ -138,18 +147,28 @@ export default function InputChat({
 
     try {
       setSending(true);
+      if (clearOnSend && clearOnSendStart) {
+        clearInput();
+      }
+
       await Promise.resolve(onSend({ text: trimmed, images }));
 
-      if (clearOnSend) {
-        setText("");
-        updateImages(() => []);
-        inputRef.current?.clear();
-        setInputHeight(MIN_INPUT_HEIGHT);
+      if (clearOnSend && !clearOnSendStart) {
+        clearInput();
       }
     } finally {
       setSending(false);
     }
-  }, [text, images, disabled, sending, clearOnSend, onSend, updateImages]);
+  }, [
+    text,
+    images,
+    disabled,
+    sending,
+    clearOnSend,
+    clearOnSendStart,
+    clearInput,
+    onSend,
+  ]);
 
   const handleKeyPress = useCallback(
     (e: TextInputKeyPressEvent) => {

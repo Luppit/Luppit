@@ -21,21 +21,56 @@ export type BuyerHomePresetSummary = {
     name: string;
     description: string | null;
 };
-export type BuyerHomePresetPreviewGroup = {
+export type HomePresetSurface = "buyer_home" | "seller_home";
+export type HomePresetSummary = BuyerHomePresetSummary;
+export type HomePresetPreviewGroup = {
     code: string;
     name: string;
     description: string | null;
     maxItems: number;
     sortOrder: number;
 };
-export type BuyerHomePresetOption = BuyerHomePresetSummary & {
+export type BuyerHomePresetPreviewGroup = HomePresetPreviewGroup;
+export type HomePresetOption = HomePresetSummary & {
     isCurrent: boolean;
-    groups: BuyerHomePresetPreviewGroup[];
+    groups: HomePresetPreviewGroup[];
 };
+export type BuyerHomePresetOption = HomePresetOption;
 export type BuyerProfileOverview = {
     profile: Profile;
     stats: BuyerProfileStats;
     buyerHomePreset: BuyerHomePresetSummary | null;
+};
+export type SellerBusinessCategoryPreference = {
+    id: string;
+    categoryId: string;
+    categoryName: string;
+    categoryPath: string | null;
+};
+export type BusinessCategoryOption = {
+    id: string;
+    name: string;
+    path: string | null;
+};
+export type SellerBusinessLocation = {
+    province: string | null;
+    canton: string | null;
+    district: string | null;
+};
+export type SellerBusinessOverview = {
+    id: string;
+    name: string | null;
+    idDocument: string | null;
+    createdAt: string;
+    rating: number | null;
+    numRatings: number;
+    location: SellerBusinessLocation | null;
+    categoryPreferences: SellerBusinessCategoryPreference[];
+};
+export type SellerProfileOverview = {
+    profile: Profile;
+    business: SellerBusinessOverview | null;
+    sellerHomePreset: HomePresetSummary | null;
 };
 export type ProfileEditableField = "name" | "id_document";
 
@@ -57,6 +92,18 @@ function mapProfileEmailSetupStatus(profile: Profile | null): ProfileEmailSetupS
         emailOptInAt,
         isComplete: Boolean(email) && emailOptIn && emailOptInAt !== null,
     };
+}
+
+function formatCategoryPath(path: unknown): string | null {
+    if (typeof path === "string") return path;
+    if (Array.isArray(path)) {
+        const parts = path
+            .map((part) => (typeof part === "string" ? part.trim() : ""))
+            .filter(Boolean);
+        return parts.length > 0 ? parts.join(" / ") : null;
+    }
+
+    return null;
 }
 
 async function getCurrentAuthenticatedProfile(): Promise<
@@ -123,8 +170,11 @@ export async function getProfileByUserId(userId: string): Promise<{ok: true; dat
     return { ok: true, data: data as Profile };
 }
 
-async function getBuyerHomePresetSummary(profileId: string): Promise<
-    { ok: true; data: BuyerHomePresetSummary | null } | { ok: false; error: AppError }
+async function getProfileHomePresetSummary(
+    profileId: string,
+    surface: HomePresetSurface
+): Promise<
+    { ok: true; data: HomePresetSummary | null } | { ok: false; error: AppError }
 > {
     const assignmentResult = await supabase
         .from("profile_home_group_preset")
@@ -136,15 +186,25 @@ async function getBuyerHomePresetSummary(profileId: string): Promise<
         return { ok: false, error: fromSupabaseError(assignmentResult.error) };
     }
 
-    const baseQuery = supabase
-        .from("home_group_preset")
-        .select("id,code,name,description")
-        .eq("surface_code", "buyer_home")
-        .eq("is_active", true);
+    const getPresetById = (presetId: string) =>
+        supabase
+            .from("home_group_preset")
+            .select("id,code,name,description")
+            .eq("surface_code", surface)
+            .eq("is_active", true)
+            .eq("id", presetId)
+            .maybeSingle();
 
-    const presetResult = assignmentResult.data?.preset_id
-        ? await baseQuery.eq("id", assignmentResult.data.preset_id).maybeSingle()
-        : await baseQuery.eq("code", "default").maybeSingle();
+    const assignedPresetId = assignmentResult.data?.preset_id ?? null;
+    const presetResult = assignedPresetId
+        ? await getPresetById(assignedPresetId)
+        : await supabase
+            .from("home_group_preset")
+            .select("id,code,name,description")
+            .eq("surface_code", surface)
+            .eq("is_active", true)
+            .eq("code", "default")
+            .maybeSingle();
 
     if (presetResult.error) {
         return { ok: false, error: fromSupabaseError(presetResult.error) };
@@ -165,7 +225,7 @@ async function getBuyerHomePresetSummary(profileId: string): Promise<
     const fallbackResult = await supabase
         .from("home_group_preset")
         .select("id,code,name,description")
-        .eq("surface_code", "buyer_home")
+        .eq("surface_code", surface)
         .eq("is_active", true)
         .eq("code", "default")
         .maybeSingle();
@@ -187,8 +247,10 @@ async function getBuyerHomePresetSummary(profileId: string): Promise<
     };
 }
 
-export async function getCurrentBuyerHomePresetOptions(): Promise<
-    { ok: true; data: BuyerHomePresetOption[] } | { ok: false; error: AppError }
+async function getCurrentProfileHomePresetOptions(
+    surface: HomePresetSurface
+): Promise<
+    { ok: true; data: HomePresetOption[] } | { ok: false; error: AppError }
 > {
     const profileResult = await getCurrentAuthenticatedProfile();
     if (!profileResult.ok) return profileResult;
@@ -196,7 +258,7 @@ export async function getCurrentBuyerHomePresetOptions(): Promise<
     const presetResult = await supabase
         .from("home_group_preset")
         .select("id,code,name,description")
-        .eq("surface_code", "buyer_home")
+        .eq("surface_code", surface)
         .eq("is_active", true)
         .order("created_at", { ascending: true });
 
@@ -219,8 +281,9 @@ export async function getCurrentBuyerHomePresetOptions(): Promise<
 
     const assignedPresetId = assignmentResult.data?.preset_id ?? null;
     const fallbackPreset = presets.find((preset) => preset.code === "default") ?? presets[0] ?? null;
+    const hasAssignedPreset = presets.some((preset) => preset.id === assignedPresetId);
     const currentPresetId =
-        presets.some((preset) => preset.id === assignedPresetId)
+        hasAssignedPreset
             ? assignedPresetId
             : fallbackPreset?.id ?? null;
 
@@ -247,7 +310,7 @@ export async function getCurrentBuyerHomePresetOptions(): Promise<
             .from("home_group")
             .select("*")
             .in("id", groupIds)
-            .eq("surface_code", "buyer_home")
+            .eq("surface_code", surface)
             .eq("is_active", true);
 
         if (groupResult.error) {
@@ -259,7 +322,7 @@ export async function getCurrentBuyerHomePresetOptions(): Promise<
         }
     }
 
-    const groupsByPresetId = new Map<string, BuyerHomePresetPreviewGroup[]>();
+    const groupsByPresetId = new Map<string, HomePresetPreviewGroup[]>();
     for (const item of presetItems) {
         const group = groupById.get(item.group_id);
         if (!group) continue;
@@ -287,6 +350,76 @@ export async function getCurrentBuyerHomePresetOptions(): Promise<
                 (a, b) => a.sortOrder - b.sortOrder
             ),
         })),
+    };
+}
+
+export async function getCurrentBuyerHomePresetOptions(): Promise<
+    { ok: true; data: BuyerHomePresetOption[] } | { ok: false; error: AppError }
+> {
+    return await getCurrentProfileHomePresetOptions("buyer_home");
+}
+
+export async function getCurrentSellerHomePresetOptions(): Promise<
+    { ok: true; data: HomePresetOption[] } | { ok: false; error: AppError }
+> {
+    return await getCurrentProfileHomePresetOptions("seller_home");
+}
+
+export async function getCurrentBusinessCategoryOptions(): Promise<
+    { ok: true; data: BusinessCategoryOption[] } | { ok: false; error: AppError }
+> {
+    const categoryResult = await supabase
+        .from("category")
+        .select("id,name,path")
+        .order("name", { ascending: true });
+
+    if (categoryResult.error) {
+        return { ok: false, error: fromSupabaseError(categoryResult.error) };
+    }
+
+    return {
+        ok: true,
+        data: (categoryResult.data ?? []).map((category) => ({
+            id: category.id,
+            name: category.name,
+            path: formatCategoryPath(category.path),
+        })),
+    };
+}
+
+export async function updateCurrentBusinessCategoryPreferences(
+    categoryIds: string[]
+): Promise<{ ok: true; data: { categoryIds: string[] } } | { ok: false; error: AppError }> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const uniqueCategoryIds = Array.from(
+        new Set(categoryIds.map((categoryId) => categoryId.trim()).filter(Boolean))
+    );
+
+    const rpcResult: any = await (supabase as any).rpc(
+        "set_current_business_category_preferences",
+        {
+            p_profile_id: profileResult.data.id,
+            p_category_ids: uniqueCategoryIds,
+        }
+    );
+
+    if (rpcResult?.error) {
+        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    }
+
+    const returnedCategoryIds = Array.isArray(rpcResult?.data?.category_ids)
+        ? rpcResult.data.category_ids.filter(
+            (categoryId: unknown): categoryId is string => typeof categoryId === "string"
+        )
+        : uniqueCategoryIds;
+
+    return {
+        ok: true,
+        data: {
+            categoryIds: returnedCategoryIds,
+        },
     };
 }
 
@@ -356,7 +489,7 @@ export async function getCurrentBuyerProfileOverview(): Promise<
     const statsResult = await getBuyerProfileStats(profileResult.data.id);
     if (!statsResult.ok) return statsResult;
 
-    const presetResult = await getBuyerHomePresetSummary(profileResult.data.id);
+    const presetResult = await getProfileHomePresetSummary(profileResult.data.id, "buyer_home");
     if (!presetResult.ok) return presetResult;
 
     return {
@@ -365,6 +498,154 @@ export async function getCurrentBuyerProfileOverview(): Promise<
             profile: profileResult.data,
             stats: statsResult.data,
             buyerHomePreset: presetResult.data,
+        },
+    };
+}
+
+async function getSellerBusinessOverview(profileId: string): Promise<
+    { ok: true; data: SellerBusinessOverview | null } | { ok: false; error: AppError }
+> {
+    const profileBusinessResult = await supabase
+        .from("profile_business")
+        .select("business_id")
+        .eq("profile_id", profileId)
+        .maybeSingle();
+
+    if (profileBusinessResult.error) {
+        return { ok: false, error: fromSupabaseError(profileBusinessResult.error) };
+    }
+
+    const businessId = profileBusinessResult.data?.business_id;
+    if (!businessId) {
+        return { ok: true, data: null };
+    }
+
+    const businessResult = await supabase
+        .from("business")
+        .select("*")
+        .eq("id", businessId)
+        .maybeSingle();
+
+    if (businessResult.error) {
+        return { ok: false, error: fromSupabaseError(businessResult.error) };
+    }
+
+    if (!businessResult.data) {
+        return { ok: true, data: null };
+    }
+
+    const ratingResult = await supabase
+        .from("business_rating_summary")
+        .select("rating,num_ratings")
+        .eq("business_id", businessId)
+        .maybeSingle();
+
+    if (ratingResult.error) {
+        return { ok: false, error: fromSupabaseError(ratingResult.error) };
+    }
+
+    let location: SellerBusinessLocation | null = null;
+    if (businessResult.data.location_id) {
+        const locationResult = await supabase
+            .from("location")
+            .select("province,canton,district")
+            .eq("id", businessResult.data.location_id)
+            .maybeSingle();
+
+        if (locationResult.error) {
+            return { ok: false, error: fromSupabaseError(locationResult.error) };
+        }
+
+        location = locationResult.data
+            ? {
+                province: locationResult.data.province,
+                canton: locationResult.data.canton,
+                district: locationResult.data.district,
+            }
+            : null;
+    }
+
+    const preferenceResult = await supabase
+        .from("business_category_preference")
+        .select("id,category_id")
+        .eq("business_id", businessId);
+
+    if (preferenceResult.error) {
+        return { ok: false, error: fromSupabaseError(preferenceResult.error) };
+    }
+
+    const preferences = preferenceResult.data ?? [];
+    const categoryIds = Array.from(new Set(preferences.map((preference) => preference.category_id)));
+    const categoriesById = new Map<string, { name: string; path: unknown }>();
+
+    if (categoryIds.length > 0) {
+        const categoryResult = await supabase
+            .from("category")
+            .select("id,name,path")
+            .in("id", categoryIds);
+
+        if (categoryResult.error) {
+            return { ok: false, error: fromSupabaseError(categoryResult.error) };
+        }
+
+        for (const category of categoryResult.data ?? []) {
+            categoriesById.set(category.id, {
+                name: category.name,
+                path: category.path,
+            });
+        }
+    }
+
+    return {
+        ok: true,
+        data: {
+            id: businessResult.data.id,
+            name: businessResult.data.name,
+            idDocument: businessResult.data.id_document,
+            createdAt: businessResult.data.created_at,
+            rating:
+                typeof ratingResult.data?.rating === "number"
+                    ? ratingResult.data.rating
+                    : null,
+            numRatings:
+                typeof ratingResult.data?.num_ratings === "number"
+                    ? ratingResult.data.num_ratings
+                    : 0,
+            location,
+            categoryPreferences: preferences.map((preference) => {
+                const category = categoriesById.get(preference.category_id);
+                return {
+                    id: preference.id,
+                    categoryId: preference.category_id,
+                    categoryName: category?.name ?? "Categoría sin nombre",
+                    categoryPath: formatCategoryPath(category?.path),
+                };
+            }),
+        },
+    };
+}
+
+export async function getCurrentSellerProfileOverview(): Promise<
+    { ok: true; data: SellerProfileOverview } | { ok: false; error: AppError }
+> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const businessResult = await getSellerBusinessOverview(profileResult.data.id);
+    if (!businessResult.ok) return businessResult;
+
+    const presetResult = await getProfileHomePresetSummary(
+        profileResult.data.id,
+        "seller_home"
+    );
+    if (!presetResult.ok) return presetResult;
+
+    return {
+        ok: true,
+        data: {
+            profile: profileResult.data,
+            business: businessResult.data,
+            sellerHomePreset: presetResult.data,
         },
     };
 }
@@ -395,6 +676,19 @@ export async function updateCurrentProfileField(
 export async function updateCurrentBuyerHomePreset(
     presetId: string
 ): Promise<{ ok: true; data: BuyerHomePresetSummary } | { ok: false; error: AppError }> {
+    return await updateCurrentProfileHomePreset("buyer_home", presetId);
+}
+
+export async function updateCurrentSellerHomePreset(
+    presetId: string
+): Promise<{ ok: true; data: HomePresetSummary } | { ok: false; error: AppError }> {
+    return await updateCurrentProfileHomePreset("seller_home", presetId);
+}
+
+async function updateCurrentProfileHomePreset(
+    surface: HomePresetSurface,
+    presetId: string
+): Promise<{ ok: true; data: HomePresetSummary } | { ok: false; error: AppError }> {
     const profileResult = await getCurrentAuthenticatedProfile();
     if (!profileResult.ok) return profileResult;
 
@@ -402,7 +696,7 @@ export async function updateCurrentBuyerHomePreset(
         .from("home_group_preset")
         .select("id,code,name,description")
         .eq("id", presetId)
-        .eq("surface_code", "buyer_home")
+        .eq("surface_code", surface)
         .eq("is_active", true)
         .maybeSingle();
 

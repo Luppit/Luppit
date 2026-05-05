@@ -8,7 +8,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Buyer home request discovery must come from `public.get_buyer_home_purchase_requests(p_profile_id uuid)`.
 - UI must render section groups from RPC `groups[]` payload (`code`, `name`, `total`, `items[]`) in DB-provided order.
 - Group visibility/order/limits are DB configuration (`home_group`, `home_group_preset`, `home_group_preset_item`), not client logic.
-- Seller preset assignment is DB-driven via `business_home_group_preset`; buyer preset assignment is DB-driven via `profile_home_group_preset`.
+- Buyer and seller preset assignment is profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
 - Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
 - Seller home filters (request-name text, date range, category selection, seller interaction state) must drive the same seller RPC, not a separate local grouping source.
 - Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set, which currently includes `active` and `offer_accepted`.
@@ -39,6 +39,10 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Seller request card press (home + group listing) must not navigate to purchase-request detail for seller role.
 - Seller request card press must open `/(conversation)/offer` and resolve conversation via DB RPC `public.get_or_create_seller_purchase_request_conversation(...)`.
 - Seller request-card open side effects, including one-row-per-profile visualization tracking, belong in `public.get_or_create_seller_purchase_request_conversation(...)`; do not rely on a separate client insert as the source of truth.
+- Buyer and seller home request cards may expose long-press menus, but favorite state must be preloaded from the role-specific favorite RPCs and mutations must use add/remove favorite RPC wrappers.
+- Buyer home card long-press menu should mirror purchase-request detail options, including favorite toggle copy/icon (`star` vs `star-off`), category info, share, and cancel placeholders unless product requirements change.
+- Seller home card long-press menu is intentionally minimal: only add/remove favorite for that seller/request, with `star` when adding and `star-off` when removing.
+- Long-press card animations should be subtle press-in lift/scale feedback and must not change card layout, carousel geometry, or normal tap navigation.
 - Buyer grouped home/group screens may enrich RPC items with offer counts client-side for `ProductCard` footer text, but must not replace RPC-driven grouping/order/visibility logic.
 - Buyer home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
 - Seller home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
@@ -52,8 +56,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - the CTA should open the dedicated email setup modal (`/(modal)/email-setup`)
   - do not duplicate email form state inside the home screen itself.
 
-## Buyer Profile & Account Settings
-- Buyer profile is a focused account surface; hide the shared top navbar on `/profile` and keep the bottom navbar.
+## Buyer/Seller Profile & Account Settings
+- Profile is a focused account surface; hide the shared top navbar on `/profile` and keep the bottom navbar.
 - Phone number is the read-only login identity. Show it as account information only; do not add phone edit flows unless auth/login requirements change.
 - Buyer profile stats must use real DB-backed data:
   - created requests from buyer-owned `purchase_request` rows
@@ -63,9 +67,9 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - `name` and `id_document` may update through `profile.service.ts`
   - email must update through the existing OTP verification modal (`/(modal)/email-setup`), not through a plain profile update
 - Account settings should keep rows simple and actionable; rows that change data should show a navigation arrow and route to the dedicated edit/verification flow.
-- Buyer home preset settings:
-  - `Vista de inicio` reads active `buyer_home` presets from `home_group_preset`
-  - current assignment comes from `profile_home_group_preset`, falling back to active `default`
+- Buyer/seller home preset settings:
+  - `Vista de inicio` reads active presets from `home_group_preset` for the current surface (`buyer_home` or `seller_home`)
+  - current assignment comes from `profile_home_group_preset`, falling back to active `default` for that surface
   - preview cards must render DB group names/order and `home_group_preset_item.max_items`
   - previewing a preset must not mutate DB; only `Guardar cambios` updates `profile_home_group_preset`
   - do not hardcode preset names, descriptions, group names, order, or limits in the UI.
@@ -90,3 +94,18 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - `price_col_high_to_low`
   - `price_usd_low_to_high`
   - `price_usd_high_to_low`
+
+## Favorites Tab
+- The `Favoritas` tab is a standalone list surface like seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
+- Favorites listing data must come from role-specific RPC wrappers:
+  - buyer: `public.get_buyer_purchase_request_favorites(...)`
+  - seller: `public.get_seller_purchase_request_favorites(...)`
+- Favorites search/filter/sort should map to RPC parameters rather than remaining client-side:
+  - text search -> `p_search_text`
+  - favorited date range -> `p_start_date` / `p_end_date`
+  - category chips -> `p_category_ids`
+  - status chips -> `p_status_codes`
+  - sort radio -> `p_sort_code`
+- Expected favorite item payload includes request card fields plus `favorite_id`, `favorited_at`, and `offers_count`.
+- Buyer favorite rows open `/(detail)/purchase-request`; seller favorite rows open `/(conversation)/offer` through `get_or_create_seller_purchase_request_conversation(...)`.
+- Favorites popup controls must reuse `GlobalPopupHost` visual behavior and applied chips, matching seller offers.

@@ -124,7 +124,8 @@ export default function ProfileFieldEditScreen() {
           />
 
           <Button
-            title={isSaving ? "Guardando..." : "Guardar cambios"}
+            title="Guardar cambios"
+            loading={isSaving}
             disabled={!canSave}
             onPress={() => void save()}
           />

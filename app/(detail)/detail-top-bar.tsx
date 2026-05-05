@@ -1,18 +1,99 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 import { openPopup } from "@/src/services/popup.service";
+import {
+  addCurrentBuyerPurchaseRequestFavorite,
+  getCurrentBuyerPurchaseRequestFavoriteStatus,
+  removeCurrentBuyerPurchaseRequestFavorite,
+} from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { router } from "expo-router";
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 
 type DetailTopBarProps = {
   title?: string;
   hideMenu?: boolean;
+  purchaseRequestId?: string | null;
 };
 
-export default function DetailTopBar({ title, hideMenu = false }: DetailTopBarProps) {
+export default function DetailTopBar({
+  title,
+  hideMenu = false,
+  purchaseRequestId,
+}: DetailTopBarProps) {
   const t = useTheme();
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isSavingFavorite, setIsSavingFavorite] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadFavoriteStatus = async () => {
+      if (!purchaseRequestId) {
+        setIsFavorite(false);
+        return;
+      }
+
+      const result = await getCurrentBuyerPurchaseRequestFavoriteStatus(purchaseRequestId);
+      if (!active || !result.ok) return;
+      setIsFavorite(result.data);
+    };
+
+    void loadFavoriteStatus();
+
+    return () => {
+      active = false;
+    };
+  }, [purchaseRequestId]);
+
+  const handleFavoritePress = useCallback(async () => {
+    if (isSavingFavorite) return;
+
+    if (!purchaseRequestId) {
+      showError("No se pudo actualizar", "No encontramos esta solicitud.");
+      return;
+    }
+
+    setIsSavingFavorite(true);
+    try {
+      if (isFavorite) {
+        const result = await removeCurrentBuyerPurchaseRequestFavorite(purchaseRequestId);
+
+        if (!result.ok) {
+          showError("No se pudo quitar de favoritos", result.error.message);
+          return;
+        }
+
+        if (!result.data.removed) {
+          showInfo("Ya no estaba en favoritos");
+          setIsFavorite(false);
+          return;
+        }
+
+        setIsFavorite(false);
+        showSuccess("Favorito eliminado");
+        return;
+      }
+
+      const result = await addCurrentBuyerPurchaseRequestFavorite(purchaseRequestId);
+
+      if (!result.ok) {
+        showError("No se pudo agregar a favoritos", result.error.message);
+        return;
+      }
+
+      setIsFavorite(true);
+      if (result.data.alreadyExists) {
+        showInfo("Ya estaba en favoritos");
+        return;
+      }
+      showSuccess("Favorito agregado");
+    } finally {
+      setIsSavingFavorite(false);
+    }
+  }, [isFavorite, isSavingFavorite, purchaseRequestId]);
 
   return (
     <View
@@ -45,11 +126,11 @@ export default function DetailTopBar({ title, hideMenu = false }: DetailTopBarPr
               options: [
                 {
                   id: "favorite",
-                  label: "Añadir como favorito",
-                  icon: "star",
+                  label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
+                  icon: isFavorite ? "star-off" : "star",
                   textColorKey: "textDark",
                   iconColorKey: "textDark",
-                  onPress: () => console.log("detail popup: favorite"),
+                  onPress: () => void handleFavoritePress(),
                 },
                 {
                   id: "category-info",

@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import LoadingState from "@/src/components/loading/LoadingState";
 import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
@@ -21,22 +22,29 @@ import {
 } from "@/src/services/seller.home.filters.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
+import { openPopup } from "@/src/services/popup.service";
 import {
+  addCurrentBuyerPurchaseRequestFavorite,
+  addCurrentSellerPurchaseRequestFavorite,
   BuyerHomePurchaseRequestGroup,
   BuyerHomePurchaseRequestItem,
   getCurrentBuyerHomePurchaseRequestGroups,
+  getCurrentBuyerPurchaseRequestFavorites,
   getCurrentSellerHomePurchaseRequestGroups,
+  getCurrentSellerPurchaseRequestFavorites,
+  removeCurrentBuyerPurchaseRequestFavorite,
+  removeCurrentSellerPurchaseRequestFavorite,
   SellerHomePurchaseRequestGroup,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
 import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
-import { showError, showInfo } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Image, Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 export default function HomeScreen() {
@@ -44,7 +52,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1, padding: t.spacing.xs }}>
       <RoleGate
-        loading={<Text>Cargando contenido...</Text>}
+        loading={<LoadingState label="Cargando contenido..." />}
         buyer={<BuyerHomeContent />}
         seller={<SellerHomeContent />}
       />
@@ -59,6 +67,7 @@ function BuyerHomeContent() {
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
   const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
+  const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
@@ -69,6 +78,7 @@ function BuyerHomeContent() {
       setEmailSetupStatus(null);
       setGroups([]);
       setOfferCountsByRequestId({});
+      setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
     }
@@ -77,6 +87,7 @@ function BuyerHomeContent() {
     if (!emailSetupResult.data.isComplete) {
       setGroups([]);
       setOfferCountsByRequestId({});
+      setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
     }
@@ -88,6 +99,13 @@ function BuyerHomeContent() {
     const requestIds = nextGroups.flatMap((group) => group.items.map((item) => item.id));
     const countsResult = await getPurchaseOffersCountByPurchaseRequestIds(requestIds);
     setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
+
+    const favoritesResult = await getCurrentBuyerPurchaseRequestFavorites();
+    if (favoritesResult.ok) {
+      setFavoriteRequestIds(new Set(favoritesResult.data.map((item) => item.id)));
+    } else {
+      setFavoriteRequestIds(new Set());
+    }
     setIsLoading(false);
   }, [filters]);
 
@@ -107,9 +125,17 @@ function BuyerHomeContent() {
     [groups]
   );
   const hasActiveFilters = useMemo(() => hasBuyerHomeFilters(filters), [filters]);
+  const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
+    setFavoriteRequestIds((current) => {
+      const next = new Set(current);
+      if (nextIsFavorite) next.add(purchaseRequestId);
+      else next.delete(purchaseRequestId);
+      return next;
+    });
+  }, []);
 
   if (isLoading) {
-    return <Text>Cargando solicitudes...</Text>;
+    return <LoadingState label="Cargando solicitudes..." />;
   }
 
   if (emailSetupStatus && !emailSetupStatus.isComplete) {
@@ -184,6 +210,8 @@ function BuyerHomeContent() {
               key={item.id}
               item={item}
               offersCount={offerCountsByRequestId[item.id] ?? 0}
+              isFavorite={favoriteRequestIds.has(item.id)}
+              onFavoriteChange={handleFavoriteChange}
             />
           )}
         />
@@ -198,6 +226,7 @@ function SellerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<SellerHomePurchaseRequestGroup[]>([]);
+  const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
@@ -207,6 +236,7 @@ function SellerHomeContent() {
     if (!emailSetupResult.ok) {
       setEmailSetupStatus(null);
       setGroups([]);
+      setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
     }
@@ -214,12 +244,20 @@ function SellerHomeContent() {
     setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
       setGroups([]);
+      setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
     }
 
     const result = await getCurrentSellerHomePurchaseRequestGroups(filters);
     setGroups(result.ok ? result.data : []);
+
+    const favoritesResult = await getCurrentSellerPurchaseRequestFavorites();
+    if (favoritesResult.ok) {
+      setFavoriteRequestIds(new Set(favoritesResult.data.map((item) => item.id)));
+    } else {
+      setFavoriteRequestIds(new Set());
+    }
     setIsLoading(false);
   }, [filters]);
 
@@ -239,9 +277,17 @@ function SellerHomeContent() {
     [groups]
   );
   const hasActiveFilters = useMemo(() => hasSellerHomeFilters(filters), [filters]);
+  const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
+    setFavoriteRequestIds((current) => {
+      const next = new Set(current);
+      if (nextIsFavorite) next.add(purchaseRequestId);
+      else next.delete(purchaseRequestId);
+      return next;
+    });
+  }, []);
 
   if (isLoading) {
-    return <Text>Cargando solicitudes...</Text>;
+    return <LoadingState label="Cargando solicitudes..." />;
   }
 
   if (emailSetupStatus && !emailSetupStatus.isComplete) {
@@ -301,7 +347,14 @@ function SellerHomeContent() {
               },
             })
           }
-          renderItem={(item) => <SellerHomeRequestCard key={item.id} item={item} />}
+          renderItem={(item) => (
+            <SellerHomeRequestCard
+              key={item.id}
+              item={item}
+              isFavorite={favoriteRequestIds.has(item.id)}
+              onFavoriteChange={handleFavoriteChange}
+            />
+          )}
         />
       ))}
     </ScrollView>
@@ -407,10 +460,88 @@ function HomeGroupSection({
 function BuyerHomeRequestCard({
   item,
   offersCount,
+  isFavorite,
+  onFavoriteChange,
 }: {
   item: BuyerHomePurchaseRequestItem;
   offersCount: number;
+  isFavorite: boolean;
+  onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
 }) {
+  const openRequestDetail = useCallback(() => {
+    router.push({
+      pathname: "/(detail)/purchase-request",
+      params: {
+        title: item.title ?? "Detalle de solicitud",
+        purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
+      },
+    });
+  }, [item]);
+
+  const toggleFavorite = useCallback(async () => {
+    if (isFavorite) {
+      const result = await removeCurrentBuyerPurchaseRequestFavorite(item.id);
+
+      if (!result.ok) {
+        showError("No se pudo quitar de favoritos", result.error.message);
+        return;
+      }
+
+      onFavoriteChange(item.id, false);
+      showSuccess(result.data.removed ? "Favorito eliminado" : "Ya no estaba en favoritos");
+      return;
+    }
+
+    const result = await addCurrentBuyerPurchaseRequestFavorite(item.id);
+
+    if (!result.ok) {
+      showError("No se pudo agregar a favoritos", result.error.message);
+      return;
+    }
+
+    onFavoriteChange(item.id, true);
+    showSuccess(result.data.alreadyExists ? "Ya estaba en favoritos" : "Favorito agregado");
+  }, [isFavorite, item.id, onFavoriteChange]);
+
+  const openCardOptions = useCallback(() => {
+    openPopup({
+      options: [
+        {
+          id: "favorite",
+          label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
+          icon: isFavorite ? "star-off" : "star",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+          onPress: () => void toggleFavorite(),
+        },
+        {
+          id: "category-info",
+          label: "Información sobre categorías",
+          icon: "circle-help",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+          onPress: () => showInfo("Categoría", item.category_path ?? "-"),
+        },
+        {
+          id: "share",
+          label: "Compartir",
+          icon: "share-2",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+          onPress: () => console.log("buyer home card popup: share"),
+        },
+        {
+          id: "cancel-request",
+          label: "Cancelar solicitud",
+          icon: "trash-2",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: () => console.log("buyer home card popup: cancel request"),
+        },
+      ],
+    });
+  }, [isFavorite, item.category_path, toggleFavorite]);
+
   return (
     <View style={{ width: 270 }}>
       <ProductCard
@@ -419,23 +550,70 @@ function BuyerHomeRequestCard({
         views={item.views_count}
         statusLabel={item.status_label ?? item.status}
         offersLabel={`${offersCount} ofertas`}
-        onPress={() =>
-          router.push({
-            pathname: "/(detail)/purchase-request",
-            params: {
-              title: item.title ?? "Detalle de solicitud",
-              purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
-            },
-          })
-        }
+        onPress={openRequestDetail}
+        onLongPress={openCardOptions}
       />
     </View>
   );
 }
 
-function SellerHomeRequestCard({ item }: { item: SellerHomePurchaseRequestItem }) {
+function SellerHomeRequestCard({
+  item,
+  isFavorite,
+  onFavoriteChange,
+}: {
+  item: SellerHomePurchaseRequestItem;
+  isFavorite: boolean;
+  onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
+}) {
   const t = useTheme();
   const publishedLabel = formatPublishedLabel(item.published_at ?? item.created_at);
+  const liftScale = useRef(new Animated.Value(1)).current;
+  const liftTranslateY = useRef(new Animated.Value(0)).current;
+  const didLongPressRef = useRef(false);
+
+  const settleCard = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(liftScale, {
+        toValue: 1,
+        damping: 16,
+        stiffness: 220,
+        mass: 0.7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(liftTranslateY, {
+        toValue: 0,
+        damping: 16,
+        stiffness: 220,
+        mass: 0.7,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [liftScale, liftTranslateY]);
+
+  const liftCard = useCallback(() => {
+    didLongPressRef.current = false;
+    liftScale.stopAnimation();
+    liftTranslateY.stopAnimation();
+    Animated.parallel([
+      Animated.timing(liftScale, {
+        toValue: 1.025,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+      Animated.timing(liftTranslateY, {
+        toValue: -3,
+        duration: 110,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [liftScale, liftTranslateY]);
+
+  const handlePressOut = useCallback(() => {
+    if (didLongPressRef.current) return;
+    settleCard();
+  }, [settleCard]);
+
   const openRequestConversation = useCallback(async () => {
     await registerPurchaseRequestVisualization(item.id);
     const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
@@ -459,69 +637,120 @@ function SellerHomeRequestCard({ item }: { item: SellerHomePurchaseRequestItem }
     });
   }, [item.id, item.title]);
 
+  const toggleFavorite = useCallback(async () => {
+    if (isFavorite) {
+      const result = await removeCurrentSellerPurchaseRequestFavorite(item.id);
+
+      if (!result.ok) {
+        showError("No se pudo quitar de favoritos", result.error.message);
+        return;
+      }
+
+      onFavoriteChange(item.id, false);
+      showSuccess(result.data.removed ? "Favorito eliminado" : "Ya no estaba en favoritos");
+      return;
+    }
+
+    const result = await addCurrentSellerPurchaseRequestFavorite(item.id);
+
+    if (!result.ok) {
+      showError("No se pudo agregar a favoritos", result.error.message);
+      return;
+    }
+
+    onFavoriteChange(item.id, true);
+    showSuccess(result.data.alreadyExists ? "Ya estaba en favoritos" : "Favorito agregado");
+  }, [isFavorite, item.id, onFavoriteChange]);
+
+  const openCardOptions = useCallback(() => {
+    didLongPressRef.current = true;
+    openPopup({
+      options: [
+        {
+          id: "favorite",
+          label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
+          icon: isFavorite ? "star-off" : "star",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+          onPress: () => void toggleFavorite(),
+        },
+      ],
+    });
+    settleCard();
+  }, [isFavorite, settleCard, toggleFavorite]);
+
   return (
-    <Pressable
-      onPress={() => void openRequestConversation()}
-      accessibilityRole="button"
+    <Animated.View
       style={{
-        width: 270,
-        borderRadius: 22,
-        backgroundColor: t.colors.primaryLight,
-        padding: 8,
-        gap: t.spacing.xs,
+        transform: [{ translateY: liftTranslateY }, { scale: liftScale }],
       }}
     >
-      <View
+      <Pressable
+        onPress={() => void openRequestConversation()}
+        onPressIn={liftCard}
+        onPressOut={handlePressOut}
+        onLongPress={openCardOptions}
+        accessibilityRole="button"
         style={{
-          backgroundColor: t.colors.backgroudWhite,
-          borderRadius: 18,
-          paddingHorizontal: t.spacing.md,
-          paddingTop: t.spacing.sm + t.spacing.xs,
-          paddingBottom: t.spacing.xs + t.spacing.xs,
-          gap: t.spacing.md,
-          shadowColor: t.colors.shadow,
-          shadowOpacity: 0.08,
-          shadowOffset: { width: 0, height: 4 },
-          shadowRadius: 10,
-          elevation: 4,
+          width: 270,
+          borderRadius: 22,
+          backgroundColor: t.colors.primaryLight,
+          padding: 8,
+          gap: t.spacing.xs,
         }}
       >
-        <View>
-          <Text variant="subtitle" maxLines={1}>
-            {item.title ?? "Solicitud"}
-          </Text>
-          <Text variant="body" maxLines={1} color="stateAnulated">
-            {item.category_name ?? "-"}
-          </Text>
-        </View>
-
         <View
           style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
+            backgroundColor: t.colors.backgroudWhite,
+            borderRadius: 18,
+            paddingHorizontal: t.spacing.md,
+            paddingTop: t.spacing.sm + t.spacing.xs,
+            paddingBottom: t.spacing.xs + t.spacing.xs,
+            gap: t.spacing.md,
+            shadowColor: t.colors.shadow,
+            shadowOpacity: 0.08,
+            shadowOffset: { width: 0, height: 4 },
+            shadowRadius: 10,
+            elevation: 4,
           }}
         >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
-            <Icon name="eye" size={18} color={t.colors.stateAnulated} />
-            <Text variant="body" color="stateAnulated">
-              {item.views_count}
+          <View>
+            <Text variant="subtitle" maxLines={1}>
+              {item.title ?? "Solicitud"}
+            </Text>
+            <Text variant="body" maxLines={1} color="stateAnulated">
+              {item.category_name ?? "-"}
             </Text>
           </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
-            <Icon name="star" size={18} color={t.colors.accentYellow} />
-            <Text variant="body" color="stateAnulated">
-              {item.views_count}
-            </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+              <Icon name="eye" size={18} color={t.colors.stateAnulated} />
+              <Text variant="body" color="stateAnulated">
+                {item.views_count}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+              <Icon name="star" size={18} color={t.colors.accentYellow} />
+              <Text variant="body" color="stateAnulated">
+                {item.views_count}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <Text variant="body" align="center">
-        {publishedLabel}
-      </Text>
-    </Pressable>
+        <Text variant="body" align="center">
+          {publishedLabel}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 

@@ -13,6 +13,11 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 - Accepted offer resolution must come from DB-backed conversation data (acceptance transition), not local heuristics.
 - Offer timeline must come from `public.get_conversation_timeline(...)`.
 - Seller reputation shown on offer cards must come from the DB-backed rating view/summary relation (`business_with_rating` or equivalent), not from removed `business.rating` / `business.num_ratings` columns.
+- Buyer purchase-request detail ellipsis favorite state must come from buyer favorite RPC state, not from route params or local-only assumptions.
+- The detail ellipsis favorite option must toggle copy/icon by current state:
+  - not favorited: `Añadir como favorito` with `star`
+  - favorited: `Quitar de favoritos` with `star-off`
+- Detail favorite actions must call the buyer add/remove favorite RPC wrappers and update local presentation only after the RPC result.
 - UI must consume timeline row metadata directly:
   - `label`
   - `icon`
@@ -30,8 +35,8 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 ## Account Settings Detail Screens
 - Account settings detail routes are not purchase-request detail routes; hide the purchase-request ellipsis/menu on these routes.
 - `/(detail)/account-settings` should display profile/account fields from `profile.service.ts` and route edits to dedicated flows.
-- `/(detail)/home-preset` is the buyer home preset chooser:
-  - load options from active `buyer_home` preset metadata
+- `/(detail)/home-preset` is the buyer/seller home preset chooser:
+  - load options from active preset metadata for the current surface (`buyer_home` or `seller_home`)
   - render a visual blueprint from DB group names/order/max-items
   - keep selection local until the user taps `Guardar cambios`
   - save through the profile service upsert into `profile_home_group_preset`.

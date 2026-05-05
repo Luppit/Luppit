@@ -14,6 +14,28 @@ export type PurchaseRequestStatusUiOption = {
   statusCode: string;
   label: string;
 };
+export type AddPurchaseRequestFavoriteResult = {
+  favoriteId: string | null;
+  alreadyExists: boolean;
+  roleName: string | null;
+};
+export type RemovePurchaseRequestFavoriteResult = {
+  favoriteId: string | null;
+  removed: boolean;
+  roleName: string | null;
+};
+export type PurchaseRequestFavoriteFilters = {
+  searchValue: string;
+  startDate: string;
+  endDate: string;
+  selectedCategoryIds: string[];
+  selectedStatusCodes: string[];
+};
+export type PurchaseRequestFavoriteItem = SellerHomePurchaseRequestItem & {
+  favorite_id: string;
+  favorited_at: string;
+  offers_count: number;
+};
 export type SellerHomePurchaseRequestItem = {
   id: string;
   title: string | null;
@@ -170,6 +192,33 @@ function parseSellerHomePurchaseRequestGroup(
     total: typeof value.total === "number" ? value.total : items.length,
     items,
   };
+}
+
+function parsePurchaseRequestFavoriteItem(raw: unknown): PurchaseRequestFavoriteItem | null {
+  const item = parseSellerHomePurchaseRequestItem(raw);
+  if (!item || !raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const favoriteId = typeof value.favorite_id === "string" ? value.favorite_id : "";
+  const favoritedAt = typeof value.favorited_at === "string" ? value.favorited_at : "";
+  if (!favoriteId || !favoritedAt) return null;
+
+  return {
+    ...item,
+    favorite_id: favoriteId,
+    favorited_at: favoritedAt,
+    offers_count: typeof value.offers_count === "number" ? value.offers_count : 0,
+  };
+}
+
+function extractPurchaseRequestFavoriteItems(payload: unknown): PurchaseRequestFavoriteItem[] {
+  const itemsRaw: unknown[] =
+    payload && typeof payload === "object" && Array.isArray((payload as any).items)
+      ? (payload as any).items
+      : [];
+
+  return itemsRaw
+    .map(parsePurchaseRequestFavoriteItem)
+    .filter((item): item is PurchaseRequestFavoriteItem => item !== null);
 }
 
 function extractBuyerHomePurchaseRequestGroups(
@@ -345,6 +394,30 @@ function mapPurchaseRequestStatusUiOption(
   };
 }
 
+function mapAddPurchaseRequestFavoriteResult(
+  raw: unknown
+): AddPurchaseRequestFavoriteResult {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    favoriteId: typeof value.favorite_id === "string" ? value.favorite_id : null,
+    alreadyExists: value.already_exists === true,
+    roleName: typeof value.role_name === "string" ? value.role_name : null,
+  };
+}
+
+function mapRemovePurchaseRequestFavoriteResult(
+  raw: unknown
+): RemovePurchaseRequestFavoriteResult {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    favoriteId: typeof value.favorite_id === "string" ? value.favorite_id : null,
+    removed: value.removed === true,
+    roleName: typeof value.role_name === "string" ? value.role_name : null,
+  };
+}
+
 function buildFallbackSellerCategoryOptions(
   groups: SellerHomePurchaseRequestGroup[]
 ): SellerHomeFilterCategoryOption[] {
@@ -467,6 +540,210 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
   }
 
   return { ok: true, data: extractBuyerHomePurchaseRequestGroups(rpcResult?.data) };
+}
+
+export async function addCurrentBuyerPurchaseRequestFavorite(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: AddPurchaseRequestFavoriteResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "add_buyer_purchase_request_favorite",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: mapAddPurchaseRequestFavoriteResult(rpcResult?.data) };
+}
+
+export async function removeCurrentBuyerPurchaseRequestFavorite(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: RemovePurchaseRequestFavoriteResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "remove_buyer_purchase_request_favorite",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: mapRemovePurchaseRequestFavoriteResult(rpcResult?.data) };
+}
+
+export async function addCurrentSellerPurchaseRequestFavorite(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: AddPurchaseRequestFavoriteResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "add_seller_purchase_request_favorite",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: mapAddPurchaseRequestFavoriteResult(rpcResult?.data) };
+}
+
+export async function removeCurrentSellerPurchaseRequestFavorite(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: RemovePurchaseRequestFavoriteResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "remove_seller_purchase_request_favorite",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: mapRemovePurchaseRequestFavoriteResult(rpcResult?.data) };
+}
+
+function buildPurchaseRequestFavoriteRpcArgs(
+  profileId: string,
+  filters?: PurchaseRequestFavoriteFilters,
+  sortCode?: string
+) {
+  return {
+    p_profile_id: profileId,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_category_ids:
+      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+        ? filters.selectedCategoryIds
+        : null,
+    p_status_codes:
+      filters?.selectedStatusCodes && filters.selectedStatusCodes.length > 0
+        ? filters.selectedStatusCodes
+        : null,
+    p_sort_code: sortCode || "favorited_newest",
+  };
+}
+
+async function getCurrentPurchaseRequestFavorites(
+  rpcName: "get_buyer_purchase_request_favorites" | "get_seller_purchase_request_favorites",
+  filters?: PurchaseRequestFavoriteFilters,
+  sortCode?: string
+): Promise<
+  { ok: true; data: PurchaseRequestFavoriteItem[] } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    rpcName,
+    buildPurchaseRequestFavoriteRpcArgs(profile.data.id, filters, sortCode)
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: extractPurchaseRequestFavoriteItems(rpcResult?.data) };
+}
+
+export async function getCurrentBuyerPurchaseRequestFavorites(
+  filters?: PurchaseRequestFavoriteFilters,
+  sortCode?: string
+): Promise<
+  { ok: true; data: PurchaseRequestFavoriteItem[] } | { ok: false; error: AppError }
+> {
+  return getCurrentPurchaseRequestFavorites(
+    "get_buyer_purchase_request_favorites",
+    filters,
+    sortCode
+  );
+}
+
+export async function getCurrentBuyerPurchaseRequestFavoriteStatus(
+  purchaseRequestId: string
+): Promise<{ ok: true; data: boolean } | { ok: false; error: AppError }> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const favorites = await getCurrentBuyerPurchaseRequestFavorites();
+  if (!favorites.ok) return favorites;
+
+  return {
+    ok: true,
+    data: favorites.data.some((item) => item.id === purchaseRequestId),
+  };
+}
+
+export async function getCurrentSellerPurchaseRequestFavorites(
+  filters?: PurchaseRequestFavoriteFilters,
+  sortCode?: string
+): Promise<
+  { ok: true; data: PurchaseRequestFavoriteItem[] } | { ok: false; error: AppError }
+> {
+  return getCurrentPurchaseRequestFavorites(
+    "get_seller_purchase_request_favorites",
+    filters,
+    sortCode
+  );
 }
 
 export async function getCurrentSellerHomeFilterCategoryOptions(): Promise<

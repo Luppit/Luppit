@@ -1,11 +1,13 @@
 import { Icon } from "@/src/components/Icon";
-import Button from "@/src/components/button/Button";
+import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { signOut } from "@/src/lib/supabase";
 import {
   BuyerProfileOverview,
+  SellerProfileOverview,
   getCurrentBuyerProfileOverview,
+  getCurrentSellerProfileOverview,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo } from "@/src/utils/useToast";
@@ -13,7 +15,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -24,9 +25,9 @@ import {
 export default function ProfileScreen() {
   return (
     <RoleGate
-      loading={<Text>Cargando contenido...</Text>}
+      loading={<LoadingState label="Cargando contenido..." />}
       buyer={<BuyerProfileContent />}
-      seller={<SellerProfileFallback />}
+      seller={<SellerProfileContent />}
     />
   );
 }
@@ -91,10 +92,7 @@ function BuyerProfileContent() {
       </View>
 
       {isLoading ? (
-        <View style={s.loadingBox}>
-          <ActivityIndicator color={t.colors.primary} />
-          <Text color="stateAnulated">Cargando perfil...</Text>
-        </View>
+        <LoadingState label="Cargando perfil..." variant="inline" style={s.loadingBox} />
       ) : (
         <>
           <View style={s.phoneCard}>
@@ -163,14 +161,127 @@ function BuyerProfileContent() {
   );
 }
 
-function SellerProfileFallback() {
+function SellerProfileContent() {
   const t = useTheme();
+  const s = useMemo(() => createProfileStyles(t), [t]);
+  const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadOverview = useCallback(async () => {
+    setIsLoading(true);
+    const result = await getCurrentSellerProfileOverview();
+    if (!result.ok) {
+      setOverview(null);
+      setIsLoading(false);
+      showError("No se pudo cargar tu perfil", result.error.message);
+      return;
+    }
+
+    setOverview(result.data);
+    setIsLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadOverview();
+      return () => {};
+    }, [loadOverview])
+  );
+
+  const phone = overview?.profile.phone?.trim() || "";
+  const business = overview?.business ?? null;
+  const rating = business?.rating;
+  const ratingLabel =
+    typeof rating === "number" && business?.numRatings
+      ? rating.toFixed(1)
+      : "Sin rating";
+  const ratingDetail = business?.numRatings
+    ? `${business.numRatings} calificaciones`
+    : "Sin calificaciones";
 
   return (
-    <View style={{ flex: 1, padding: t.spacing.md, gap: t.spacing.md }}>
-      <Text variant="title">Profile Seller</Text>
-      <Button variant="dark" title="Sign Out" onPress={signOut} />
-    </View>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={s.content}
+    >
+      <View style={s.header}>
+        <Text variant="title">Mi cuenta</Text>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={() =>
+            router.push({
+              pathname: "/(detail)/account-settings",
+              params: { title: "Configuración", hideMenu: "true" },
+            })
+          }
+          style={s.iconButton}
+        >
+          <Icon name="settings" size={22} />
+        </Pressable>
+      </View>
+
+      {isLoading ? (
+        <LoadingState label="Cargando perfil..." variant="inline" style={s.loadingBox} />
+      ) : (
+        <>
+          <View style={s.phoneCard}>
+            <View style={[s.iconBadge, s.phoneIconBadge]}>
+              <Icon name="lock" size={20} color={t.colors.primary} />
+            </View>
+            <View style={s.phoneText}>
+              <Text color="stateAnulated">Número telefónico</Text>
+              <Text variant="subtitle" maxLines={1} style={s.flexText}>
+                {phone || "Sin número registrado"}
+              </Text>
+            </View>
+          </View>
+
+          <View style={s.statsGrid}>
+            <StatCard
+              label="Negocio"
+              value={business?.name || "Sin negocio"}
+              detail={business ? "asignado" : "pendiente"}
+              icon="house"
+              tone="primary"
+            />
+            <StatCard
+              label="Rating promedio"
+              value={ratingLabel}
+              detail={ratingDetail}
+              icon="star"
+              tone="warning"
+            />
+          </View>
+
+          <BusinessSummaryCard business={business} />
+
+          <View style={s.actionList}>
+            <ActionRow
+              icon="bell"
+              label="Notificaciones"
+              onPress={() => showInfo("Notificaciones", "Esta opción estará disponible pronto.")}
+            />
+            <ActionRow
+              icon="life-buoy"
+              label="Contactar soporte"
+              onPress={() => showInfo("Soporte", "Estamos preparando este canal de ayuda.")}
+            />
+            <ActionRow
+              icon="help-circle"
+              label="Ayuda"
+              onPress={() => showInfo("Ayuda", "Pronto tendrás más información aquí.")}
+            />
+            <ActionRow
+              icon="log-out"
+              label="Cerrar sesión"
+              destructive
+              onPress={signOut}
+            />
+          </View>
+        </>
+      )}
+    </ScrollView>
   );
 }
 
@@ -185,7 +296,7 @@ function StatCard({
   label: string;
   value: string;
   detail: string;
-  icon: "file-text" | "star" | "tag";
+  icon: "file-text" | "star" | "tag" | "house";
   tone: "primary" | "secondary" | "warning";
   wide?: boolean;
 }) {
@@ -212,6 +323,57 @@ function StatCard({
         </View>
       </View>
     </View>
+  );
+}
+
+function BusinessSummaryCard({
+  business,
+}: {
+  business: SellerProfileOverview["business"];
+}) {
+  const t = useTheme();
+  const s = useMemo(() => createProfileStyles(t), [t]);
+
+  if (!business) {
+    return (
+      <View style={s.businessCard}>
+        <View style={[s.iconBadge, s.phoneIconBadge]}>
+          <Icon name="house" size={20} color={t.colors.primary} />
+        </View>
+        <View style={s.businessText}>
+          <Text variant="subtitle">Información del negocio</Text>
+          <Text color="stateAnulated">
+            No encontramos un negocio asociado a este perfil.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() =>
+        router.push({
+          pathname: "/(detail)/business-profile",
+          params: { title: "Negocio", hideMenu: "true" },
+        })
+      }
+      style={s.businessCard}
+    >
+      <View style={[s.iconBadge, s.phoneIconBadge]}>
+        <Icon name="house" size={20} color={t.colors.primary} />
+      </View>
+      <View style={s.businessText}>
+        <Text variant="subtitle" maxLines={1} style={s.flexText}>
+          Información del negocio
+        </Text>
+        <Text color="stateAnulated" maxLines={2}>
+          {business.name || "Negocio sin nombre"} · Ver información del negocio
+        </Text>
+      </View>
+      <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} />
+    </Pressable>
   );
 }
 
@@ -323,6 +485,20 @@ function createProfileStyles(t: Theme) {
     phoneText: {
       flex: 1,
       gap: 2,
+    },
+    businessCard: {
+      minHeight: 84,
+      borderRadius: t.borders.md,
+      ...cardSurface,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm + t.spacing.xs,
+    },
+    businessText: {
+      flex: 1,
+      gap: t.spacing.xs,
     },
     flexText: {
       flexShrink: 1,
