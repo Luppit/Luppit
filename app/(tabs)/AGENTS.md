@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Scope
-Applies to tab screens, with special focus on home behavior for buyer/seller and the buyer profile tab.
+Applies to tab screens, with special focus on home behavior for buyer/seller and the buyer/seller profile tab.
 
 ## Buyer/Seller Home: DB-Driven Contract (Mandatory)
 - Seller home request discovery must come from `public.get_seller_home_purchase_requests(...)`.
@@ -63,10 +63,18 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - created requests from buyer-owned `purchase_request` rows
   - offers received from offers attached to those requests
   - buyer rating from `profile_rating_summary`, not recalculated in client code
-- Editable buyer profile fields:
+- Seller profile data must use real DB-backed data:
+  - seller profile identity from the current authenticated `profile`
+  - business membership from `profile_business`
+  - business display data from `business`
+  - business rating from `business_rating_summary`, not recalculated in client code
+- Seller main profile should show business summary/actions, but must not show a standalone category metric card. Business categories are managed on `/(detail)/business-profile`.
+- Seller business information entry points should route to `/(detail)/business-profile`, where category preferences can be viewed and edited.
+- Editable buyer/seller profile fields:
   - `name` and `id_document` may update through `profile.service.ts`
   - email must update through the existing OTP verification modal (`/(modal)/email-setup`), not through a plain profile update
 - Account settings should keep rows simple and actionable; rows that change data should show a navigation arrow and route to the dedicated edit/verification flow.
+- The seller settings cog must route to the same role-aware account settings detail flow as the buyer; detail routes must not depend on tab-only role context being mounted.
 - Buyer/seller home preset settings:
   - `Vista de inicio` reads active presets from `home_group_preset` for the current surface (`buyer_home` or `seller_home`)
   - current assignment comes from `profile_home_group_preset`, falling back to active `default` for that surface

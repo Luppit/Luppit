@@ -35,9 +35,18 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 ## Account Settings Detail Screens
 - Account settings detail routes are not purchase-request detail routes; hide the purchase-request ellipsis/menu on these routes.
 - `/(detail)/account-settings` should display profile/account fields from `profile.service.ts` and route edits to dedicated flows.
+- `/(detail)/account-settings` must resolve the current role itself because detail routes can render outside the tab `RoleProvider`; do not leave buyer/seller rows blocked behind tab-only context.
 - `/(detail)/home-preset` is the buyer/seller home preset chooser:
   - load options from active preset metadata for the current surface (`buyer_home` or `seller_home`)
   - render a visual blueprint from DB group names/order/max-items
   - keep selection local until the user taps `Guardar cambios`
   - save through the profile service upsert into `profile_home_group_preset`.
 - Do not make preset preview destructive by temporarily changing the user's actual assignment.
+- `/(detail)/business-profile` is the seller business information surface:
+  - show general business data resolved from the seller's `profile_business` membership
+  - show business rating from `business_rating_summary`
+  - load editable category options from `category`
+  - show current preferences from `business_category_preference`
+  - keep category add/remove changes local until `Guardar cambios`
+  - save category changes through `profile.service.ts` using `set_current_business_category_preferences`.
+- Business categories belong on `/(detail)/business-profile`; do not duplicate them as a seller main-profile metric card.

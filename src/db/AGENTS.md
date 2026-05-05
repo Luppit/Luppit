@@ -18,7 +18,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - email setup is considered complete only when all three resolve to a non-empty email + `true` opt-in + non-null opt-in timestamp.
   - email updates should be verified through email OTP flow and update all three email fields atomically.
 - `profile_business`: profile-business mapping.
-- `business_category_preference`: business-to-category preference mapping used for seller request discovery.
+- `business_category_preference`: business-to-category preference mapping used for seller request discovery and edited from the seller business information page.
 - `location`: geographic data.
 - `role`: role catalog (e.g. buyer/seller).
 - `profile_role`: profile-role mapping.
@@ -54,6 +54,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Buyer/seller profile preset chooser uses `home_group_preset` + `home_group_preset_item` + `home_group` metadata for non-destructive previews. It must not temporarily update `profile_home_group_preset` just to preview a preset.
 - Buyer/seller preset assignment writes only `profile_home_group_preset`.
 - Legacy seller-only home-group tables should not be reintroduced as the runtime source of truth once shared home-group config exists.
+- `business_home_group_preset` is not a runtime source of truth for seller home selection. If it is dropped from the database, regenerate `database.types.ts` before relying on generated types.
 
 ### Requests & Offers
 - `purchase_request`: buyer request.
@@ -138,6 +139,18 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Unknown group codes should return empty `items[]` unless explicitly implemented with DB-backed rules.
 - Seller-home normal groups should exclude requests whose latest seller conversation is `REQUEST_DISCARDED` or `OFFER_REJECTED`.
 - Seller-home `discarded` group should include only requests whose latest seller conversation is `REQUEST_DISCARDED`.
+
+## Business Category Preference RPC (DB-Driven)
+- Runtime source of truth for seller business category editing is `public.set_current_business_category_preferences(p_profile_id uuid, p_category_ids uuid[] default '{}'::uuid[])`.
+- Resolution flow:
+  - resolve the seller business through `profile_business` using `p_profile_id`
+  - validate every requested category id exists in `category`
+  - remove category preferences for the business that are no longer selected
+  - insert selected category preferences into `business_category_preference`
+  - return JSON containing the resolved `business_id` and resulting `category_ids`
+- `business_category_preference` must preserve uniqueness on (`business_id`, `category_id`).
+- Do not update business categories directly from UI code. Use the RPC through `profile.service.ts` so validation and replacement semantics stay centralized.
+- Business category preferences are also the seller-home discovery scope; changing them affects which active purchase requests the seller can see.
 
 ## Buyer Home Discovery RPC (DB-Driven)
 - Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null)`.
