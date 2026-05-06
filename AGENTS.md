@@ -27,6 +27,8 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Conversation action placement is DB-driven via `conversation_action.ui_slot` / `ui_slot_catalog`; supported action slots now include `TOP`, `AUX`, and `MENU`.
 - Conversation header ellipsis options must be sourced from DB `MENU` actions returned by `get_conversation_view`; do not hardcode menu items in client code.
 - Never hardcode double-rating prevention in client code when DB conversation-action resolution already knows whether the participant has rated.
+- Keep buyer/seller chat-list discovery DB-driven via `public.get_current_profile_conversations(...)`; do not rebuild chat listing/search/unread ordering from direct client table reads.
+- Keep conversation message open/unopened state DB-driven via `conversation_message` buyer/seller open-state columns; only `public.get_conversation_messages(...)` marks visible non-system messages opened for the current viewer side.
 - Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.
 - Passive conversation status cards are DB-driven via `get_conversation_view(...).slots[]`; current informational slot `STATUS` is used for active deadline cards resolved from deadline metadata, not from `conversation_action`.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.

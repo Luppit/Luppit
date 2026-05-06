@@ -36,6 +36,7 @@ Applies to conversation screens and conversation UI behavior.
 - Respect `requires_refresh` to decide whether to reload conversation view/messages.
 - Do not locally suppress or persist rating-action visibility; after execution, refresh and trust the DB-returned `actions[]`.
 - Do not hardcode buyer/seller system-message visibility in client logic; rely on `get_conversation_messages` DB filtering.
+- Do not mark messages opened in client code. Loading a conversation must rely on `public.get_conversation_messages(...)` to mark visible non-system messages opened for the current viewer side.
 - Keyboard behavior in popup confirmations must keep inputs visible (avoid keyboard overlap) while preserving sheet visibility.
 - Chat screen should open anchored at the newest message (bottom) on initial load/refresh.
 - `STATUS` slots belong inside the scrollable message thread and should render after the existing messages, like the latest passive system item.

@@ -258,6 +258,12 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `conversation_status`: conversation state machine states, includes UI timeline icon key (`icon`).
 - `conversation_message`: conversation messages (text/image/system), includes `image_path`.
   - System message visibility can be role-targeted via `visible_to_role_id` (FK to `role.id`).
+- `conversation_message_open_state`: open-state catalog for participant-side message visibility (`unopened`, `opened`).
+- `conversation_message` tracks participant-side message state with `buyer_open_state`, `seller_open_state`, `buyer_opened_at`, and `seller_opened_at`.
+  - Non-system messages are created as `opened` for the sender side and `unopened` for the recipient side.
+  - System messages are excluded from open-state tracking and should keep all buyer/seller open-state fields null.
+  - `public.get_conversation_messages(...)` is the only procedure that marks visible non-system messages opened for the current viewer side.
+  - Chat-list unread counts and ordering should read these fields; do not recalculate unread state in client code.
 - `conversation_message_kind`: message kind catalog.
 
 ### Conversation Actions & Rules
@@ -486,6 +492,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - create `purchase_offer_delivery`, `purchase_offer`, `purchase_offer_image`
   - apply conversation transition/history for seller first offer
   - create chat messages in order: one `TEXT` summary first, then `IMAGE` messages.
+  - initialize those seller-authored summary/image messages as seller `opened`, buyer `unopened`.
 - For offer-publish chat images, `conversation_message.image_path` must reference files uploaded to the `conversations` storage bucket (same contract as chat image upload), not offer-only storage paths.
 - `public.get_seller_offer_edit_payload_v2(...)` should be the preferred DB-backed preload source for seller offer edit mode when available because it returns exact timing fields; `public.get_seller_offer_edit_payload(...)` remains the legacy fallback and may return `files[]` directly when the deployment supports it.
 - `public.update_seller_offer_from_conversation(...)` must atomically:
@@ -495,6 +502,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - append one system message announcing the update
   - append a refreshed `TEXT` offer summary message
   - append `IMAGE` chat messages in the final order provided by `p_conversation_image_paths`
+  - keep the system message out of open-state tracking and initialize refreshed seller summary/image messages as seller `opened`, buyer `unopened`.
   - keep the conversation in `OFFER_MADE`
 
 ## Role-Specific System Messages
