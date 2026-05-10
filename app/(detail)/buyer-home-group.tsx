@@ -39,11 +39,16 @@ export default function BuyerHomeGroupScreen() {
   const t = useTheme();
   const params = useGlobalSearchParams<{
     groupCode?: string | string[];
+    segmentSvgName?: string | string[];
   }>();
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<BuyerHomePurchaseRequestItem[]>([]);
   const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
   const groupCode = useMemo(() => parseStringParam(params.groupCode), [params.groupCode]);
+  const segmentSvgName = useMemo(
+    () => parseStringParam(params.segmentSvgName),
+    [params.segmentSvgName]
+  );
 
   const loadGroup = useCallback(async () => {
     if (!groupCode) {
@@ -53,7 +58,7 @@ export default function BuyerHomeGroupScreen() {
     }
 
     setIsLoading(true);
-    const result = await getCurrentBuyerHomePurchaseRequestGroups();
+    const result = await getCurrentBuyerHomePurchaseRequestGroups(undefined, segmentSvgName);
     if (!result.ok) {
       setItems([]);
       setIsLoading(false);
@@ -69,7 +74,7 @@ export default function BuyerHomeGroupScreen() {
     );
     setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
     setIsLoading(false);
-  }, [groupCode]);
+  }, [groupCode, segmentSvgName]);
 
   useFocusEffect(
     useCallback(() => {

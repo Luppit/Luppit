@@ -8,6 +8,7 @@ import { getSession } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
 import { getProfileByUserId } from "./profile.service";
+import { ALL_SEGMENTS_SVG_NAME } from "./segment.service";
 
 export type PurchaseRequest = Row<"purchase_request">;
 export type PurchaseRequestStatusUiOption = {
@@ -435,8 +436,15 @@ function buildFallbackSellerCategoryOptions(
   return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es"));
 }
 
+function getHomeSegmentRpcValue(segmentSvgName?: string) {
+  const normalized = segmentSvgName?.trim();
+  if (!normalized || normalized === ALL_SEGMENTS_SVG_NAME) return null;
+  return normalized;
+}
+
 export async function getCurrentSellerHomePurchaseRequestGroups(
-  filters?: SellerHomeFilters
+  filters?: SellerHomeFilters,
+  segmentSvgName?: string
 ): Promise<
   { ok: true; data: SellerHomePurchaseRequestGroup[] } | { ok: false; error: AppError }
 > {
@@ -447,6 +455,7 @@ export async function getCurrentSellerHomePurchaseRequestGroups(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
   const rpcArgs = {
     p_profile_id: profile.data.id,
     p_search_text: filters?.searchValue?.trim() || null,
@@ -460,6 +469,7 @@ export async function getCurrentSellerHomePurchaseRequestGroups(
       filters?.selectedInteractionStates && filters.selectedInteractionStates.length > 0
         ? filters.selectedInteractionStates
         : null,
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
   const rpcResult: any = await (supabase as any).rpc(
@@ -493,7 +503,8 @@ export async function getCurrentSellerHomePurchaseRequestGroups(
 }
 
 export async function getCurrentBuyerHomePurchaseRequestGroups(
-  filters?: BuyerHomeFilters
+  filters?: BuyerHomeFilters,
+  segmentSvgName?: string
 ): Promise<
   { ok: true; data: BuyerHomePurchaseRequestGroup[] } | { ok: false; error: AppError }
 > {
@@ -504,6 +515,7 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
   const rpcArgs = {
     p_profile_id: profile.data.id,
     p_search_text: filters?.searchValue?.trim() || null,
@@ -513,6 +525,7 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
       filters?.selectedChipIds && filters.selectedChipIds.length > 0
         ? filters.selectedChipIds
         : null,
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
   const rpcResult: any = await (supabase as any).rpc("get_buyer_home_purchase_requests", rpcArgs);
@@ -746,10 +759,12 @@ export async function getCurrentSellerPurchaseRequestFavorites(
   );
 }
 
-export async function getCurrentSellerHomeFilterCategoryOptions(): Promise<
+export async function getCurrentSellerHomeFilterCategoryOptions(
+  segmentSvgName?: string
+): Promise<
   { ok: true; data: SellerHomeFilterCategoryOption[] } | { ok: false; error: AppError }
 > {
-  const groupsResult = await getCurrentSellerHomePurchaseRequestGroups();
+  const groupsResult = await getCurrentSellerHomePurchaseRequestGroups(undefined, segmentSvgName);
   if (!groupsResult.ok) return groupsResult;
 
   return {

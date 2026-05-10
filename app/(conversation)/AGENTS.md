@@ -47,6 +47,16 @@ Applies to conversation screens and conversation UI behavior.
 - Menu-option styling is still DB-driven by `style_code`; `primary` should render with the usual primary color and `error` with the error color.
 - Deadline-card copy, labels, and due date should prefer DB-provided slot values; client may apply only safe presentational fallback formatting when a preformatted date is absent.
 
+## Realtime Refresh Behavior
+- Conversation realtime uses private Supabase Broadcast topics named `conversation:<conversation_id>`.
+- Broadcast payloads are invalidation hints only, currently shaped like `{ conversation_id, reason, refresh }`; they must not carry raw message text, action metadata, confirmation payloads, or role-specific system-message content.
+- The conversation layout subscribes with `{ private: true }`, listens for `conversation_changed`, and reloads existing DB-owned RPC data:
+  - `refresh` containing `messages` bumps the message refresh tick so chat reloads through `public.get_conversation_messages(...)`.
+  - `refresh` containing `view` reloads `public.get_conversation_view(...)` so `TOP`, `AUX`, `MENU`, permissions, and `STATUS` slots update.
+- When multiple broadcasts arrive close together, merge refresh targets across the debounce window. Do not let a later message-only event cancel a required view refresh; otherwise header `TOP` actions can remain stale while messages/AUX appear fresh.
+- Header `TOP` actions are derived from the current `get_conversation_view(...).actions[]` payload. If the top action set changes, the top action button cluster should remount/update from the new action signature rather than preserving stale overlay state.
+- Realtime must never replace the local action execution path. `MENU`, `TOP`, and `AUX` presses still execute through DB-provided executor/confirmation metadata, then refresh according to `requires_refresh`.
+
 ## Live Configuration Reference
 - Buyer accept offer action is currently configured as:
   - `conversation_action.code = 'BUYER_ACCEPT_OFFER'`

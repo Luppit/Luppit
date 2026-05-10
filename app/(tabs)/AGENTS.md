@@ -5,14 +5,16 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 
 ## Buyer/Seller Home: DB-Driven Contract (Mandatory)
 - Seller home request discovery must come from `public.get_seller_home_purchase_requests(...)`.
-- Buyer home request discovery must come from `public.get_buyer_home_purchase_requests(p_profile_id uuid)`.
+- Buyer home request discovery must come from `public.get_buyer_home_purchase_requests(...)`.
 - UI must render section groups from RPC `groups[]` payload (`code`, `name`, `total`, `items[]`) in DB-provided order.
 - Group visibility/order/limits are DB configuration (`home_group`, `home_group_preset`, `home_group_preset_item`), not client logic.
 - Buyer and seller preset assignment is profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
 - Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
 - Seller home filters (request-name text, date range, category selection, seller interaction state) must drive the same seller RPC, not a separate local grouping source.
+- Seller home segment selection must drive the same seller RPC via `p_segment_svg_name`; `todas` means no segment filter.
 - Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set, which currently includes `active` and `offer_accepted`.
 - Buyer home filters (request-name text, date range, status selection) must drive the same buyer RPC, not a separate local grouping source.
+- Buyer home segment selection must drive the same buyer RPC via `p_segment_svg_name`; `todas` means no segment filter.
 - Home-card status chip text is DB-driven by RPC item field `status_label`; `status` remains the raw lifecycle code and must not be shown directly in the card UI.
 - Home-card eye count is DB-driven by RPC item field `views_count`; do not recompute visualization totals in home/group screens when the RPC already provides them.
 - Empty home state must render when all returned groups have `items.length = 0`.
@@ -46,7 +48,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Buyer grouped home/group screens may enrich RPC items with offer counts client-side for `ProductCard` footer text, but must not replace RPC-driven grouping/order/visibility logic.
 - Buyer home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
 - Seller home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
-- Seller home group listing screens intentionally reload unfiltered group contents by `groupCode`; do not inherit active top-navbar seller filters there unless product requirements explicitly change.
+- Buyer and seller home must react to shared top-navbar segment state so tapping a segment reloads grouped cards in place through the RPC, not through client-side filtering.
+- Buyer/seller home group listing screens carry the active `segmentSvgName` route param and reload that segment's group contents by `groupCode`; they intentionally do not inherit the rest of the active top-navbar filters unless product requirements explicitly change.
 - Carousel geometry convention for seller home:
   - carousels can be full-bleed within seller-home screen context
   - first card must align with the group header text at initial position

@@ -8,7 +8,9 @@ import { StyleSheet, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 export default function auth() {
-  const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
+  const logoAsset = Asset.fromModule(
+    require("../../assets/images/logo-icon.svg"),
+  );
 
   return (
     <View
@@ -18,7 +20,12 @@ export default function auth() {
       }}
     >
       {logoAsset.uri ? (
-        <SvgUri uri={logoAsset.uri} width={120} height={120} />
+        <SvgUri
+          uri={logoAsset.uri}
+          width={80}
+          height={80}
+          style={{ marginBottom: spacing.lg }}
+        />
       ) : null}
       <Text variant="title" style={{ marginBottom: spacing.xs }}>
         ¡Luppit te da la bienvenida!

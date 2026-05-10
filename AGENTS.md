@@ -14,6 +14,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep buyer/seller ratings DB-driven via normalized rating tables/views; do not reintroduce rating-as-source-of-truth columns on `business`.
 - Keep buyer/seller home discovery and grouping DB-driven via shared home-group preset metadata.
 - Seller home discovery remains category-driven via `business_category_preference`; buyer home discovery remains profile-owned via `purchase_request.profile_id`.
+- Top-navbar segments are the parent scope for categories: `purchase_request.category_id -> category.segment_id -> segment.id`; buyer/seller home RPCs must apply the selected segment via `p_segment_svg_name`, with `todas` meaning all segments.
 - Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
 - Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
 - Keep seller-home filtering DB-driven via `public.get_seller_home_purchase_requests(...)`; do not rebuild seller-home search/date/category/interaction filtering as a separate source of truth in screen components once the RPC supports it.
@@ -29,6 +30,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Never hardcode double-rating prevention in client code when DB conversation-action resolution already knows whether the participant has rated.
 - Keep buyer/seller chat-list discovery DB-driven via `public.get_current_profile_conversations(...)`; do not rebuild chat listing/search/unread ordering from direct client table reads.
 - Keep conversation message open/unopened state DB-driven via `conversation_message` buyer/seller open-state columns; only `public.get_conversation_messages(...)` marks visible non-system messages opened for the current viewer side.
+- Keep conversation realtime as a private Broadcast invalidation layer only; do not stream raw conversation rows to clients. Realtime should wake screens so they reload DB-owned RPCs (`get_conversation_messages`, `get_conversation_view`) rather than becoming a source of truth.
 - Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.
 - Passive conversation status cards are DB-driven via `get_conversation_view(...).slots[]`; current informational slot `STATUS` is used for active deadline cards resolved from deadline metadata, not from `conversation_action`.
 - Never hardcode navbar items/routes/labels/icons when DB metadata exists.

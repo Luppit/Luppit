@@ -8,6 +8,8 @@ import InputChat from "@/src/components/inputChat/inputChat";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
+import { getSession } from "@/src/lib/supabase";
+import { supabase } from "@/src/lib/supabase/client";
 import { openPopup, PopupOption } from "@/src/services/popup.service";
 import {
   ConversationMessage,
@@ -29,6 +31,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -167,6 +170,16 @@ type RatingPayload = {
   comment: string;
 };
 
+type ConversationRealtimeRefreshTarget = "view" | "messages";
+
+type ConversationRealtimePayload = {
+  conversation_id?: string;
+  reason?: string;
+  refresh?: unknown;
+};
+
+const realtimeRefreshDelayMs = 200;
+
 function isRatingPayload(value: unknown): value is RatingPayload {
   if (!value || typeof value !== "object") return false;
   const parsed = value as Record<string, unknown>;
@@ -175,6 +188,19 @@ function isRatingPayload(value: unknown): value is RatingPayload {
     Array.isArray(parsed.tags) &&
     typeof parsed.comment === "string"
   );
+}
+
+function getRealtimeRefreshTargets(
+  payload: ConversationRealtimePayload
+): ConversationRealtimeRefreshTarget[] {
+  if (!Array.isArray(payload.refresh)) return ["view", "messages"];
+
+  const targets = payload.refresh.filter(
+    (target): target is ConversationRealtimeRefreshTarget =>
+      target === "view" || target === "messages"
+  );
+
+  return targets.length > 0 ? targets : ["view", "messages"];
 }
 
 export default function ConversationLayout() {
@@ -193,6 +219,12 @@ export default function ConversationLayout() {
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
+  );
+  const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const realtimeRefreshTargetsRef = useRef<Set<ConversationRealtimeRefreshTarget>>(
+    new Set()
   );
 
   const conversationId = useMemo(
@@ -278,6 +310,82 @@ export default function ConversationLayout() {
       void refreshConversation();
     }, [refreshConversation])
   );
+
+  useEffect(() => {
+    if (!conversationId) return;
+
+    let isActive = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const clearPendingRefresh = () => {
+      if (!realtimeRefreshTimeoutRef.current) return;
+      clearTimeout(realtimeRefreshTimeoutRef.current);
+      realtimeRefreshTimeoutRef.current = null;
+      realtimeRefreshTargetsRef.current.clear();
+    };
+
+    const scheduleRefresh = (payload: ConversationRealtimePayload) => {
+      if (payload.conversation_id && payload.conversation_id !== conversationId) {
+        return;
+      }
+
+      const targets = getRealtimeRefreshTargets(payload);
+      targets.forEach((target) => realtimeRefreshTargetsRef.current.add(target));
+
+      if (realtimeRefreshTimeoutRef.current) {
+        clearTimeout(realtimeRefreshTimeoutRef.current);
+      }
+
+      realtimeRefreshTimeoutRef.current = setTimeout(() => {
+        realtimeRefreshTimeoutRef.current = null;
+        if (!isActive) return;
+
+        const pendingTargets = Array.from(realtimeRefreshTargetsRef.current);
+        realtimeRefreshTargetsRef.current.clear();
+
+        if (pendingTargets.includes("view")) {
+          void refreshConversation();
+        }
+
+        if (pendingTargets.includes("messages")) {
+          setMessageRefreshTick((prev) => prev + 1);
+        }
+      }, realtimeRefreshDelayMs);
+    };
+
+    const subscribe = async () => {
+      const session = await getSession();
+      if (!isActive) return;
+
+      await supabase.realtime.setAuth(session?.access_token ?? null);
+      if (!isActive) return;
+
+      const nextChannel = supabase.channel(`conversation:${conversationId}`, {
+        config: { private: true },
+      });
+
+      channel = nextChannel;
+      nextChannel
+        .on(
+          "broadcast",
+          { event: "conversation_changed" },
+          ({ payload }: { payload: ConversationRealtimePayload }) => {
+            scheduleRefresh(payload ?? {});
+          }
+        )
+        .subscribe();
+    };
+
+    void subscribe();
+
+    return () => {
+      isActive = false;
+      clearPendingRefresh();
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [conversationId, refreshConversation]);
 
   const runAction = useCallback(
     async (
@@ -531,6 +639,12 @@ export default function ConversationLayout() {
   const topActions = conversationView.actions
     .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
     .map(toTopButtonConfig);
+  const topActionsSignature = topActions
+    .map(
+      (action) =>
+        `${action.id}:${action.label}:${action.icon}:${action.backgroundColorKey}:${action.textColorKey}:${action.iconColorKey}`
+    )
+    .join("|");
   const topActionsById = new Map(
     conversationView.actions
       .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
@@ -631,6 +745,7 @@ export default function ConversationLayout() {
               pointerEvents="box-none"
             >
               <ConversationActionButtons
+                key={topActionsSignature}
                 buttons={topActions}
                 onPress={(id) => {
                   const action = topActionsById.get(id);

@@ -51,6 +51,18 @@ Agents must parse and use this payload directly for rendering and execution deci
 - For rating input entries, submit structured payload under `payload_key` (e.g. stars/tags/comment) and use `component_config` to drive UI.
 - Client-side validation is presentational only (required/length checks); source of truth is DB executor validation.
 
+## Conversation Realtime Contract
+- Realtime is an invalidation mechanism, not a data service. Services and screens must continue loading canonical conversation data through RPC wrappers.
+- The active conversation surface subscribes to private Broadcast topic `conversation:<conversation_id>` and event `conversation_changed`.
+- Expected payload fields:
+  - `conversation_id`: the affected conversation id.
+  - `reason`: diagnostic reason such as `message_inserted`, `conversation_view_changed`, `rating_changed`, or `deadline_changed`.
+  - `refresh`: array containing `messages`, `view`, or both.
+- `messages` means reload messages through `getConversationMessagesByConversationId(...)`, which calls `public.get_conversation_messages(...)` and preserves DB-owned open-state side effects.
+- `view` means reload the current user conversation view through `getCurrentUserConversationView(...)`, which calls `public.get_conversation_view(...)` and refreshes permissions, `TOP`/`AUX`/`MENU` actions, confirmations, and passive slots.
+- Debounced realtime handlers must accumulate refresh targets from all broadcasts received in the debounce window. A later `messages` event must not erase an earlier `view` event from the same DB-side action.
+- Do not subscribe directly to raw `conversation_message` or `conversation` Postgres Changes for the chat UI unless the DB/security contract is intentionally redesigned.
+
 ## RPC Contract: `get_conversation_messages`
 Current function contract:
 - `public.get_conversation_messages(p_conversation_id uuid)`
@@ -238,10 +250,12 @@ Service behavior:
 - Top-navbar segment chips for buyer/seller home must come from this table (no hardcoded list).
 - `is_disabled=true` must be propagated to UI so chips render disabled (greyed out + non-pressable).
 - `svg_name` maps to bundled app asset `assets/segments/{svg_name}.svg`.
+- Selected segment state lives in `segment.service.ts` and is shared by the top navbar, buyer/seller home screens, and home group drilldowns.
+- `svg_name = 'todas'` is the all-segments value. Service RPC wrappers should omit `p_segment_svg_name` for `todas`, empty, or missing selected segment.
 
 ## RPC Contract: `get_seller_home_purchase_requests`
 Current function contract:
-- `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`
+- `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null, p_segment_svg_name text default null)`
 - Returns JSON object with `groups[]`.
 
 Expected payload for each group entry:
@@ -271,7 +285,8 @@ Service behavior:
   - date range -> `p_start_date` / `p_end_date`
   - selected category chips -> `p_category_ids`
   - selected interaction-state chips -> `p_seller_interaction_states`
-- Seller filter category options currently come from the unfiltered seller-home RPC response by deduplicating item `category_id` / `category_name`; do not call or invent a separate category-options RPC unless product/DB contract changes.
+  - selected top-navbar segment -> `p_segment_svg_name` unless selected segment is `todas`
+- Seller filter category options currently come from the seller-home RPC response for the active segment by deduplicating item `category_id` / `category_name`; do not call or invent a separate category-options RPC unless product/DB contract changes.
 - Seller interaction states are seller-specific conversation states:
   - `new`: no seller conversation exists for this seller/request
   - `opened`: a seller conversation exists and is not discarded
@@ -285,7 +300,7 @@ Service behavior:
 
 ## RPC Contract: `get_buyer_home_purchase_requests`
 Current function contract:
-- `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null)`
+- `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null, p_segment_svg_name text default null)`
 - Returns JSON object with `groups[]`.
 
 Expected payload for each group entry:
@@ -315,6 +330,7 @@ Service behavior:
   - request-name text -> `p_search_text`
   - date range -> `p_start_date` / `p_end_date`
   - selected status chips -> `p_status_codes`
+  - selected top-navbar segment -> `p_segment_svg_name` unless selected segment is `todas`
 - Buyer home cards must render `status_label` when present and treat `status` as the raw lifecycle code for downstream logic.
 - Buyer home cards and buyer group listings must render the RPC-provided `views_count` directly; a missing/zero eye count should be investigated in the RPC payload before changing UI code.
 - Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.

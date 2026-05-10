@@ -25,12 +25,15 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `menu_item`: navbar menu catalog (`code`, `label`, `route`, `icon`, `is_active`).
 - `role_menu`: role-to-menu mapping with ordering (`sort_order`, `is_active`).
 - `segment`: top-navbar segment catalog (`name`, `svg_name`, `is_disabled`, `created_at`).
+- `category.segment_id`: segment parent for each category; purchase requests inherit segment scope through `purchase_request.category_id -> category.segment_id`.
 
 ### Top Navbar Segment Configuration
 - Buyer/seller top horizontal chips must be sourced from `segment`, not hardcoded UI arrays.
 - `segment.is_disabled = true` means segment is visible but non-interactive (greyed out + not clickable).
 - Segment icon identity is DB-driven via `segment.svg_name`.
 - Icon file location is a fixed app asset convention: `assets/segments/{svg_name}.svg` (bundled app asset path).
+- `segment.svg_name = 'todas'` is the all-segments option and must not filter requests.
+- Segment filtering for buyer/seller home is DB-backed through home RPC parameter `p_segment_svg_name`; do not filter home request arrays by segment in screen components.
 
 ### Shared Home Group Configuration
 - `home_group`: shared group catalog for home sections, keyed by `surface_code` (currently `seller_home`, `buyer_home`).
@@ -99,7 +102,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - If a normalized email is already used by another profile, the unique email index/constraint should reject it; DB functions may raise a clearer `email_already_in_use` error before profile update.
 
 ## Seller Home Discovery RPC (DB-Driven)
-- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null)`.
+- Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null, p_segment_svg_name text default null)`.
 - Resolution flow:
   - resolve business by `profile_business` using `p_profile_id`
   - resolve category scope by `business_category_preference`
@@ -111,6 +114,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
     - `p_category_ids`: narrow the existing `business_category_preference` category scope
     - `p_seller_interaction_states`: match seller-specific request state (`new`, `opened`, `discarded`)
+    - `p_segment_svg_name`: narrow the existing category scope through `category.segment_id -> segment.id`; null/empty/`todas` means no segment filter
   - resolve `seller_interaction_state` from the latest conversation for that seller/request:
     - `new`: no conversation row exists for the seller/request
     - `opened`: a conversation exists and is not `REQUEST_DISCARDED`
@@ -153,7 +157,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Business category preferences are also the seller-home discovery scope; changing them affects which active purchase requests the seller can see.
 
 ## Buyer Home Discovery RPC (DB-Driven)
-- Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null)`.
+- Runtime source of truth is `public.get_buyer_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_status_codes text[] default null, p_segment_svg_name text default null)`.
 - Resolution flow:
   - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'buyer_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'buyer_home'`
@@ -162,6 +166,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - `p_search_text`: case-insensitive match against request title
     - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
     - `p_status_codes`: match against `purchase_request.status`
+    - `p_segment_svg_name`: match requests whose category belongs to the selected segment; null/empty/`todas` means no segment filter
   - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
   - resolve `views_count` from `purchase_request_visualization` aggregated by `purchase_request_id`.
 - Do not rebuild request-card status text from lifecycle codes in client code.
@@ -265,6 +270,24 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `public.get_conversation_messages(...)` is the only procedure that marks visible non-system messages opened for the current viewer side.
   - Chat-list unread counts and ordering should read these fields; do not recalculate unread state in client code.
 - `conversation_message_kind`: message kind catalog.
+
+### Conversation Realtime Broadcast
+- Conversation realtime is implemented with private Supabase Broadcast, not raw Postgres Changes on operational tables.
+- Do not add `conversation`, `conversation_message`, `conversation_deadline`, `conversation_rating`, or offer tables to the `supabase_realtime` publication for chat UI unless the security model is explicitly redesigned.
+- Internal realtime helpers belong in an unexposed schema such as `private`; revoke direct schema access from `anon` and `authenticated`.
+- Private channel authorization lives on `realtime.messages` and must allow selecting Broadcast messages only when the authenticated profile is one of the conversation participants for topic `conversation:<conversation_id>`.
+- Broadcast topics use `conversation:<conversation_id>` and event name `conversation_changed`.
+- Broadcast payloads must be lightweight invalidation hints only:
+  - `conversation_id`
+  - `reason` (for diagnostics)
+  - `refresh` array containing `messages`, `view`, or both
+- Never broadcast raw message text, system-message content, action/confirmation metadata, OTP/rating payloads, or other role-specific data. Clients must call `get_conversation_messages(...)` and `get_conversation_view(...)` after receiving the hint.
+- Current DB trigger convention:
+  - `after insert on conversation_message` broadcasts `reason='message_inserted'`, `refresh=['messages']`.
+  - `after update of status_code, purchase_offer_id on conversation` broadcasts `reason='conversation_view_changed'`, `refresh=['view','messages']` when either field changes.
+  - `after insert/update on conversation_rating` broadcasts `reason='rating_changed'`, `refresh=['view']`.
+  - `after insert/update of due_at, resolved_at, deadline_type, trigger_transition_to on conversation_deadline` may broadcast `reason='deadline_changed'`, `refresh=['view']`; current deadline rows are treated as keyed by `conversation.id` unless a real `conversation_id` column is added.
+- Do not broadcast on `conversation_message` updates for current chat behavior. `public.get_conversation_messages(...)` updates open-state fields, and broadcasting those updates can create noisy refresh loops.
 
 ### Conversation Actions & Rules
 - `conversation_action`: UI actions (`code`, `label`, `icon`, `ui_slot`, `style_code`) plus:

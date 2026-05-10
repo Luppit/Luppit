@@ -20,6 +20,11 @@ import {
   SellerHomeFilters,
   subscribeSellerHomeFilters,
 } from "@/src/services/seller.home.filters.service";
+import {
+  ALL_SEGMENTS_SVG_NAME,
+  getSelectedSegmentSvgName,
+  subscribeSelectedSegment,
+} from "@/src/services/segment.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import { openPopup } from "@/src/services/popup.service";
@@ -69,6 +74,9 @@ function BuyerHomeContent() {
   const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
   const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
+  const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
+    getSelectedSegmentSvgName()
+  );
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
   const loadGroups = useCallback(async () => {
@@ -92,7 +100,10 @@ function BuyerHomeContent() {
       return;
     }
 
-    const result = await getCurrentBuyerHomePurchaseRequestGroups(filters);
+    const result = await getCurrentBuyerHomePurchaseRequestGroups(
+      filters,
+      selectedSegmentSvgName
+    );
     const nextGroups = result.ok ? result.data : [];
     setGroups(nextGroups);
 
@@ -107,10 +118,14 @@ function BuyerHomeContent() {
       setFavoriteRequestIds(new Set());
     }
     setIsLoading(false);
-  }, [filters]);
+  }, [filters, selectedSegmentSvgName]);
 
   useEffect(() => {
     return subscribeBuyerHomeFilters(setFilters);
+  }, []);
+
+  useEffect(() => {
+    return subscribeSelectedSegment(setSelectedSegmentSvgName);
   }, []);
 
   useFocusEffect(
@@ -124,7 +139,11 @@ function BuyerHomeContent() {
     () => groups.some((group) => group.items.length > 0),
     [groups]
   );
-  const hasActiveFilters = useMemo(() => hasBuyerHomeFilters(filters), [filters]);
+  const hasActiveFilters = useMemo(
+    () =>
+      hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
+    [filters, selectedSegmentSvgName]
+  );
   const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
     setFavoriteRequestIds((current) => {
       const next = new Set(current);
@@ -202,6 +221,7 @@ function BuyerHomeContent() {
               params: {
                 title: group.name,
                 groupCode: group.code,
+                segmentSvgName: selectedSegmentSvgName,
               },
             })
           }
@@ -228,6 +248,9 @@ function SellerHomeContent() {
   const [groups, setGroups] = useState<SellerHomePurchaseRequestGroup[]>([]);
   const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
+  const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
+    getSelectedSegmentSvgName()
+  );
   const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
   const loadGroups = useCallback(async () => {
@@ -249,7 +272,10 @@ function SellerHomeContent() {
       return;
     }
 
-    const result = await getCurrentSellerHomePurchaseRequestGroups(filters);
+    const result = await getCurrentSellerHomePurchaseRequestGroups(
+      filters,
+      selectedSegmentSvgName
+    );
     setGroups(result.ok ? result.data : []);
 
     const favoritesResult = await getCurrentSellerPurchaseRequestFavorites();
@@ -259,10 +285,14 @@ function SellerHomeContent() {
       setFavoriteRequestIds(new Set());
     }
     setIsLoading(false);
-  }, [filters]);
+  }, [filters, selectedSegmentSvgName]);
 
   useEffect(() => {
     return subscribeSellerHomeFilters(setFilters);
+  }, []);
+
+  useEffect(() => {
+    return subscribeSelectedSegment(setSelectedSegmentSvgName);
   }, []);
 
   useFocusEffect(
@@ -276,7 +306,11 @@ function SellerHomeContent() {
     () => groups.some((group) => group.items.length > 0),
     [groups]
   );
-  const hasActiveFilters = useMemo(() => hasSellerHomeFilters(filters), [filters]);
+  const hasActiveFilters = useMemo(
+    () =>
+      hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
+    [filters, selectedSegmentSvgName]
+  );
   const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
     setFavoriteRequestIds((current) => {
       const next = new Set(current);
@@ -344,6 +378,7 @@ function SellerHomeContent() {
               params: {
                 title: group.name,
                 groupCode: group.code,
+                segmentSvgName: selectedSegmentSvgName,
               },
             })
           }

@@ -18,7 +18,9 @@ Applies to navbar UI components and rendering behavior.
 - Segment icon identity must render from `segment.svg_name`, resolved against bundled assets at `assets/segments/{svg_name}.svg`.
 - `segment.is_disabled=true` must render segment as disabled (greyed out) and non-clickable.
 - No hardcoded segment list fallback is allowed.
-- Segment chips are separate DB configuration from home-group presets; do not infer seller/buyer home grouping or request filtering from segment values unless a DB-backed contract explicitly adds that behavior.
+- Segment chips are separate DB configuration from home-group presets. They now drive DB-backed buyer/seller home filtering through shared selected-segment state and home RPC `p_segment_svg_name`.
+- `segment.svg_name = 'todas'` means all segments and must clear segment narrowing in the RPC wrapper.
+- Segment selection state must be shared through `segment.service.ts`; do not keep segment selection as navbar-only local state.
 - Home request-card status labels are also DB-driven, but they come from the home RPC item payload (`status_label`), not from `segment` data.
 - The large home search control is a visual trigger, not a free-typing search field, on buyer/seller home routes.
 - Current home trigger behavior:
@@ -34,7 +36,7 @@ Applies to navbar UI components and rendering behavior.
   - seller category chips
   - seller interaction-state chips
 - Buyer status filter options should prefer `purchase_request_status_ui` and may fall back safely to buyer-home RPC `status/status_label` values when needed for resilience.
-- Seller category filter chips are currently derived from the unfiltered seller-home RPC item payload (`category_id` / `category_name`) and deduplicated client-side; this means only categories represented in visible returned home items are shown.
+- Seller category filter chips are currently derived from the seller-home RPC item payload for the active segment (`category_id` / `category_name`) and deduplicated client-side; this means only categories represented in visible returned home items are shown.
 - Seller interaction-state chips use stable client labels (`Sin abrir`, `En gestión`, `Descartadas`) mapped to DB-filter values (`new`, `opened`, `discarded`); do not use raw purchase-request lifecycle status for this seller filter.
 - When buyer-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
 - When seller-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
