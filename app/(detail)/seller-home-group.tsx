@@ -40,10 +40,15 @@ export default function SellerHomeGroupScreen() {
   const t = useTheme();
   const params = useGlobalSearchParams<{
     groupCode?: string | string[];
+    segmentSvgName?: string | string[];
   }>();
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<SellerHomePurchaseRequestItem[]>([]);
   const groupCode = useMemo(() => parseStringParam(params.groupCode), [params.groupCode]);
+  const segmentSvgName = useMemo(
+    () => parseStringParam(params.segmentSvgName),
+    [params.segmentSvgName]
+  );
   const openRequestConversation = useCallback(async (item: SellerHomePurchaseRequestItem) => {
     await registerPurchaseRequestVisualization(item.id);
     const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
@@ -71,7 +76,7 @@ export default function SellerHomeGroupScreen() {
     }
 
     setIsLoading(true);
-    const result = await getCurrentSellerHomePurchaseRequestGroups();
+    const result = await getCurrentSellerHomePurchaseRequestGroups(undefined, segmentSvgName);
     if (!result.ok) {
       setItems([]);
       setIsLoading(false);
@@ -81,7 +86,7 @@ export default function SellerHomeGroupScreen() {
     const group = result.data.find((value) => value.code === groupCode);
     setItems(group?.items ?? []);
     setIsLoading(false);
-  }, [groupCode]);
+  }, [groupCode, segmentSvgName]);
 
   useFocusEffect(
     useCallback(() => {

@@ -27,7 +27,13 @@ import {
   PurchaseRequestStatusUiOption,
   SellerHomeFilterCategoryOption,
 } from "@/src/services/purchase.request.service";
-import { getSegments, Segment } from "@/src/services/segment.service";
+import {
+  getSelectedSegmentSvgName,
+  getSegments,
+  Segment,
+  setSelectedSegmentSvgName,
+  subscribeSelectedSegment,
+} from "@/src/services/segment.service";
 import { usePathname } from "expo-router";
 import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
@@ -108,7 +114,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     return uris;
   }, []);
   const [segments, setSegments] = useState<Segment[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSegmentSvgName, setSelectedSegmentSvgNameState] = useState("");
   const [searchValue, setSearchValue] = useState("");
   const [homeFilters, setHomeFilters] = useState(getBuyerHomeFilters());
   const [sellerHomeFilters, setSellerHomeFiltersState] = useState(getSellerHomeFilters());
@@ -126,6 +132,10 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
 
   useEffect(() => {
     return subscribeSellerHomeFilters(setSellerHomeFiltersState);
+  }, []);
+
+  useEffect(() => {
+    return subscribeSelectedSegment(setSelectedSegmentSvgNameState);
   }, []);
 
   useEffect(() => {
@@ -159,15 +169,17 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       if (!active || segmentResult.ok === false) return;
 
       setSegments(segmentResult.data);
-      setSelectedCategory((current) => {
-        const hasCurrentEnabled = segmentResult.data.some(
-          (segment) => segment.svgName === current && !segment.isDisabled
-        );
-        if (hasCurrentEnabled) return current;
+      const currentSegmentSvgName = getSelectedSegmentSvgName();
+      const hasCurrentEnabled = segmentResult.data.some(
+        (segment) => segment.svgName === currentSegmentSvgName && !segment.isDisabled
+      );
+      if (hasCurrentEnabled) return;
 
-        const firstEnabled = segmentResult.data.find((segment) => !segment.isDisabled)?.svgName;
-        return firstEnabled ?? segmentResult.data[0]?.svgName ?? "";
-      });
+      const firstEnabled = segmentResult.data.find((segment) => !segment.isDisabled)?.svgName;
+      const nextSegmentSvgName = firstEnabled ?? segmentResult.data[0]?.svgName ?? "";
+      if (nextSegmentSvgName) {
+        setSelectedSegmentSvgName(nextSegmentSvgName);
+      }
     };
 
     void loadSegments();
@@ -186,7 +198,10 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       const statusResult = await getPurchaseRequestStatusUiOptions();
       if (!active) return;
 
-      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups();
+      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups(
+        undefined,
+        selectedSegmentSvgName
+      );
       if (!active) return;
 
       const groupedOptions = groupsResult.ok
@@ -203,7 +218,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     return () => {
       active = false;
     };
-  }, [role]);
+  }, [role, selectedSegmentSvgName]);
 
   useEffect(() => {
     if (role !== "seller") return;
@@ -211,7 +226,9 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     let active = true;
 
     const loadSellerCategories = async () => {
-      const categoryResult = await getCurrentSellerHomeFilterCategoryOptions();
+      const categoryResult = await getCurrentSellerHomeFilterCategoryOptions(
+        selectedSegmentSvgName
+      );
       if (!active || !categoryResult.ok) return;
 
       setSellerCategoryOptions(categoryResult.data);
@@ -222,14 +239,17 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     return () => {
       active = false;
     };
-  }, [role]);
+  }, [role, selectedSegmentSvgName]);
 
   const openFiltersPopup = useCallback(async () => {
     if (role === "buyer") {
       let statusOptions = buyerStatusOptions;
 
       const statusResult = await getPurchaseRequestStatusUiOptions();
-      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups();
+      const groupsResult = await getCurrentBuyerHomePurchaseRequestGroups(
+        undefined,
+        selectedSegmentSvgName
+      );
       const groupedOptions = groupsResult.ok
         ? buildFallbackBuyerStatusOptions(groupsResult.data)
         : [];
@@ -272,7 +292,9 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       return;
     }
 
-    const categoryResult = await getCurrentSellerHomeFilterCategoryOptions();
+    const categoryResult = await getCurrentSellerHomeFilterCategoryOptions(
+      selectedSegmentSvgName
+    );
     const nextCategoryOptions = categoryResult.ok ? categoryResult.data : sellerCategoryOptions;
     setSellerCategoryOptions(nextCategoryOptions);
 
@@ -323,7 +345,14 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
         });
       },
     });
-  }, [buyerStatusOptions, homeFilters, role, sellerCategoryOptions, sellerHomeFilters]);
+  }, [
+    buyerStatusOptions,
+    homeFilters,
+    role,
+    selectedSegmentSvgName,
+    sellerCategoryOptions,
+    sellerHomeFilters,
+  ]);
 
   return (
     <View style={s.container}>
@@ -393,12 +422,11 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
               disabled={segment.isDisabled}
               onPress={() => {
                 if (segment.isDisabled) return;
-                setSelectedCategory(segment.svgName);
-                console.log("open category", segment.svgName);
+                setSelectedSegmentSvgName(segment.svgName);
               }}
               style={[
                 s.categoryButton,
-                selectedCategory === segment.svgName &&
+                selectedSegmentSvgName === segment.svgName &&
                   !segment.isDisabled &&
                   s.categoryButtonActive,
                 segment.isDisabled && s.categoryButtonDisabled,

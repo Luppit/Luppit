@@ -37,28 +37,37 @@ export const OtpVerifier = ({
   const [isActive, setIsActive] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
   const [isValid, setIsValid] = useState<boolean>(false);
+  const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
   const INTERLVAL_TIME = 30;
   const [remainingTime, setRemainingTime] = useState<number>(INTERLVAL_TIME);
 
-  const inputsRef = useRef<Array<TextInput | null>>([]);
+  const inputsRef = useRef<(TextInput | null)[]>([]);
+  const isVerifyingRef = useRef(false);
 
   const focus = (i: number) => inputsRef.current[i]?.focus();
   const blur = (i: number) => inputsRef.current[i]?.blur();
 
   const maybeComplete = async (nextValues: string[]) => {
-    if (nextValues.every((c) => c !== "")) {
-      const otp = nextValues.join("");
-      const success = await onVerify(otp);
+    if (isVerifyingRef.current || !nextValues.every((c) => c !== "")) return;
+
+    isVerifyingRef.current = true;
+    setIsVerifying(true);
+
+    try {
+      const success = await onVerify(nextValues.join(""));
       setIsValid(success);
       if (!success) {
         setHasError(true);
       }
+    } finally {
+      isVerifyingRef.current = false;
+      setIsVerifying(false);
     }
   };
 
   const handleChange = (text: string, i: number) => {
-    if (isValid) return;
+    if (isValid || isVerifying) return;
     setHasError(false);
     const cleaned = text.replace(/\D/g, "");
     if (cleaned.length === 0) {
@@ -84,7 +93,7 @@ export const OtpVerifier = ({
   };
 
   const handleKeyPress = (e: any, i: number) => {
-    if (isValid) return;
+    if (isValid || isVerifying) return;
     if (e.nativeEvent.key !== "Backspace") return;
     if (values[i] === "" && i > 0) {
       const next = [...values];
@@ -95,7 +104,7 @@ export const OtpVerifier = ({
   };
 
   const handleFocus = (i: number) => {
-    if (isValid) return;
+    if (isValid || isVerifying) return;
     if (!values[i]) return;
     const next = [...values];
     next[i] = "";
@@ -106,6 +115,9 @@ export const OtpVerifier = ({
     if (!isActive) return;
     setIsActive(false);
     await onResendCode();
+    setValues(Array(otpLength).fill(""));
+    setHasError(false);
+    setIsValid(false);
     startCountdown();
   };
 
@@ -150,7 +162,7 @@ export const OtpVerifier = ({
               onFocus={() => handleFocus(index)}
               keyboardType="number-pad"
               maxLength={1}
-              editable={!isValid}
+              editable={!isValid && !isVerifying}
               textContentType="oneTimeCode"
               autoComplete="one-time-code"
             />

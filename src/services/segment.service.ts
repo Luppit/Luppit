@@ -7,6 +7,13 @@ export type Segment = {
   isDisabled: boolean;
 };
 
+type SelectedSegmentListener = (segmentSvgName: string) => void;
+
+export const ALL_SEGMENTS_SVG_NAME = "todas";
+
+const selectedSegmentListeners = new Set<SelectedSegmentListener>();
+let currentSelectedSegmentSvgName = ALL_SEGMENTS_SVG_NAME;
+
 function mapSegment(value: any): Segment | null {
   if (!value || typeof value !== "object") return null;
 
@@ -37,4 +44,32 @@ export async function getSegments(): Promise<
   const mapped = rows.map(mapSegment).filter((segment): segment is Segment => segment !== null);
 
   return { ok: true, data: mapped };
+}
+
+function normalizeSegmentSvgName(segmentSvgName: string) {
+  return segmentSvgName.trim() || ALL_SEGMENTS_SVG_NAME;
+}
+
+function emitSelectedSegment() {
+  selectedSegmentListeners.forEach((listener) => listener(currentSelectedSegmentSvgName));
+}
+
+export function getSelectedSegmentSvgName() {
+  return currentSelectedSegmentSvgName;
+}
+
+export function setSelectedSegmentSvgName(segmentSvgName: string) {
+  const nextSegmentSvgName = normalizeSegmentSvgName(segmentSvgName);
+  if (nextSegmentSvgName === currentSelectedSegmentSvgName) return;
+
+  currentSelectedSegmentSvgName = nextSegmentSvgName;
+  emitSelectedSegment();
+}
+
+export function subscribeSelectedSegment(listener: SelectedSegmentListener) {
+  selectedSegmentListeners.add(listener);
+  listener(currentSelectedSegmentSvgName);
+  return () => {
+    selectedSegmentListeners.delete(listener);
+  };
 }

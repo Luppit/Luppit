@@ -66,7 +66,7 @@ export function Step1({ next, values, setValues }: any) {
 
 export function Step2({ next, back, values }: any) {
   const onVerify = async (code: string) => {
-    await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
+    return await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
       .then(() => {
         next();
         return true;
@@ -75,7 +75,6 @@ export function Step2({ next, back, values }: any) {
         showError(err.message);
         return false;
       });
-    return false;
   };
 
   const onResend = async () => {
@@ -95,7 +94,7 @@ export function Step2({ next, back, values }: any) {
   );
 }
 
-export default function login() {
+export default function Login() {
   const stepperRef = useRef<StepperRef>(null);
 
   const [values, setValues] = useState({

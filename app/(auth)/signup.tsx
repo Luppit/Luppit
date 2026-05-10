@@ -156,11 +156,14 @@ function VerifyStep({
       name: fullName,
       id_document: idDocument,
       created_at: new Date().toISOString(),
+      email: null,
+      email_opt_in: false,
+      email_opt_in_at: null,
       user_id: "",
       phone: defaultCountryCode + phoneNumber,
     };
 
-    await verifyPhoneOtp(
+    return await verifyPhoneOtp(
       defaultCountryCode + phoneNumber,
       code,
       userProfile,
@@ -197,8 +200,6 @@ function VerifyStep({
         showError(err.message);
         return false;
       });
-
-    return false;
   };
 
   const onResend = async () => {
@@ -214,7 +215,7 @@ function VerifyStep({
   );
 }
 
-export default function signup() {
+export default function Signup() {
   const stepperRef = useRef<StepperRef>(null);
 
   const [userType, setUserType] = useState<UserType>("buyer");
