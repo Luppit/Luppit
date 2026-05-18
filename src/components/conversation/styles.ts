@@ -22,7 +22,7 @@ export function createConversationActionButtonsStyles(
       shadowOffset: { width: 0, height: 6 },
       shadowRadius: 10,
       elevation: 10,
-      backgroundColor: t.colors.backgroudWhite,
+      backgroundColor: "transparent",
     },
     container: {
       flexDirection: "row",

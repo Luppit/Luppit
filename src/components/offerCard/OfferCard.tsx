@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { LucideIconName } from "@/src/icons/lucide";
 import { openPopup } from "@/src/services/popup.service";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
@@ -42,46 +43,57 @@ export default function OfferCard({
 }: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
-  const businessName = offer.business_name ?? "-";
-  const province = offer.business_province ?? "-";
+  const businessName = offer.business_name?.trim() || "Negocio";
+  const province = offer.business_province?.trim();
   const rating = offer.business_rating ?? 0;
   const numRatings = offer.business_num_ratings ?? 0;
   const currencyCode = offer.offer_currency_code ?? "CRC";
   const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
   const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("en-US")}`;
   const badgeText = rating >= 4.7 ? "Mejor reputación" : "Mejor oferta";
-  const badgeColor = rating >= 4.7 ? t.colors.info : t.colors.primaryLight;
 
   return (
-    <View style={s.container}>
+    <GlassSurface
+      variant="surface"
+      highlight
+      style={s.surface}
+      contentStyle={s.container}
+    >
       <View style={s.topRow}>
-        <View style={{ flex: 1 }}>
-          <Text variant="titleRegular" maxLines={1} style={s.businessName}>
+        <View style={s.businessBlock}>
+          <Text variant="subtitleRegular" maxLines={1} style={s.businessName}>
             {businessName}
           </Text>
-          <Text variant="body" style={s.province}>
-            {province}
-          </Text>
-          <View style={s.ratingRow}>
-            <Icon name="star" size={18} color={t.colors.accentYellow} />
-            <Text variant="body" style={s.ratingText}>
-              {rating.toFixed(1)}
+          {province ? (
+            <Text variant="body" maxLines={1} style={s.province}>
+              {province}
             </Text>
-            <Text variant="body" color="stateAnulated">
-              ({numRatings})
-            </Text>
-          </View>
+          ) : null}
         </View>
 
-        <View style={{ alignItems: "flex-end", gap: t.spacing.sm }}>
-          <Text variant="price" style={s.priceText}>
+        <View style={s.priceBlock}>
+          <Text variant="subtitle" maxLines={1} style={s.priceText}>
             {formattedPrice}
           </Text>
-          <View style={[s.badge, { backgroundColor: badgeColor }]}>
-            <Text variant="body" style={s.badgeText}>
-              {badgeText}
-            </Text>
-          </View>
+        </View>
+      </View>
+
+      <View style={s.metaRow}>
+        <View style={s.ratingRow}>
+          <Icon name="star" size={16} color={t.colors.accentYellow} />
+          <Text variant="body" maxLines={1} style={s.ratingText}>
+            {rating.toFixed(1)}
+          </Text>
+          <Text variant="body" maxLines={1} color="stateAnulated">
+            ({numRatings})
+          </Text>
+        </View>
+
+        <View style={s.badge}>
+          <View style={s.badgeDot} />
+          <Text variant="body" maxLines={1} style={s.badgeText}>
+            {badgeText}
+          </Text>
         </View>
       </View>
 
@@ -169,6 +181,6 @@ export default function OfferCard({
           </Text>
         </Pressable>
       </View>
-    </View>
+    </GlassSurface>
   );
 }

@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { openPopup } from "@/src/services/popup.service";
 import {
   addCurrentBuyerPurchaseRequestFavorite,
@@ -16,12 +17,14 @@ type DetailTopBarProps = {
   title?: string;
   hideMenu?: boolean;
   purchaseRequestId?: string | null;
+  topInset: number;
 };
 
 export default function DetailTopBar({
   title,
   hideMenu = false,
   purchaseRequestId,
+  topInset,
 }: DetailTopBarProps) {
   const t = useTheme();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -96,75 +99,99 @@ export default function DetailTopBar({
   }, [isFavorite, isSavingFavorite, purchaseRequestId]);
 
   return (
-    <View
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
       style={{
-        height: 56,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        backgroundColor: t.colors.background,
+        height: topInset + 72,
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: t.glass.radius.chrome,
+        borderBottomRightRadius: t.glass.radius.chrome,
+      }}
+      clipStyle={{
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: t.glass.radius.chrome,
+        borderBottomRightRadius: t.glass.radius.chrome,
+        overflow: "hidden",
+      }}
+      contentStyle={{
+        flex: 1,
+        paddingTop: topInset + t.spacing.xs,
+        paddingHorizontal: t.spacing.xl,
+        paddingBottom: t.spacing.xs,
       }}
     >
-      <Pressable
-        onPress={() => router.back()}
-        hitSlop={12}
-        style={{ width: 40, alignItems: "flex-start" }}
+      <View
+        style={{
+          height: 56,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
       >
-        <Icon name="arrow-left" size={28} />
-      </Pressable>
-
-      <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
-        {title ?? ""}
-      </Text>
-
-      {hideMenu ? (
-        <View style={{ width: 40 }} />
-      ) : (
         <Pressable
-          onPress={() =>
-            openPopup({
-              options: [
-                {
-                  id: "favorite",
-                  label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
-                  icon: isFavorite ? "star-off" : "star",
-                  textColorKey: "textDark",
-                  iconColorKey: "textDark",
-                  onPress: () => void handleFavoritePress(),
-                },
-                {
-                  id: "category-info",
-                  label: "Información sobre categorías",
-                  icon: "circle-help",
-                  textColorKey: "textDark",
-                  iconColorKey: "textDark",
-                  onPress: () => console.log("detail popup: category info"),
-                },
-                {
-                  id: "share",
-                  label: "Compartir",
-                  icon: "share-2",
-                  textColorKey: "textDark",
-                  iconColorKey: "textDark",
-                  onPress: () => console.log("detail popup: share"),
-                },
-                {
-                  id: "cancel-request",
-                  label: "Cancelar solicitud",
-                  icon: "trash-2",
-                  textColorKey: "error",
-                  iconColorKey: "error",
-                  onPress: () => console.log("detail popup: cancel request"),
-                },
-              ],
-            })
-          }
+          onPress={() => router.back()}
           hitSlop={12}
-          style={{ width: 40, alignItems: "flex-end" }}
+          style={{ width: 40, alignItems: "flex-start", justifyContent: "center" }}
         >
-          <Icon name="ellipsis" size={28} />
+          <Icon name="arrow-left" size={28} />
         </Pressable>
-      )}
-    </View>
+
+        <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
+          {title ?? ""}
+        </Text>
+
+        {hideMenu ? (
+          <View style={{ width: 40 }} />
+        ) : (
+          <Pressable
+            onPress={() =>
+              openPopup({
+                options: [
+                  {
+                    id: "favorite",
+                    label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
+                    icon: isFavorite ? "star-off" : "star",
+                    textColorKey: "textDark",
+                    iconColorKey: "textDark",
+                    onPress: () => void handleFavoritePress(),
+                  },
+                  {
+                    id: "category-info",
+                    label: "Información sobre categorías",
+                    icon: "circle-help",
+                    textColorKey: "textDark",
+                    iconColorKey: "textDark",
+                    onPress: () => console.log("detail popup: category info"),
+                  },
+                  {
+                    id: "share",
+                    label: "Compartir",
+                    icon: "share-2",
+                    textColorKey: "textDark",
+                    iconColorKey: "textDark",
+                    onPress: () => console.log("detail popup: share"),
+                  },
+                  {
+                    id: "cancel-request",
+                    label: "Cancelar solicitud",
+                    icon: "trash-2",
+                    textColorKey: "error",
+                    iconColorKey: "error",
+                    onPress: () => console.log("detail popup: cancel request"),
+                  },
+                ],
+              })
+            }
+            hitSlop={12}
+            style={{ width: 40, alignItems: "flex-end", justifyContent: "center" }}
+          >
+            <Icon name="ellipsis" size={28} />
+          </Pressable>
+        )}
+      </View>
+    </GlassSurface>
   );
 }

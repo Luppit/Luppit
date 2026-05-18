@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
@@ -14,6 +15,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMPTY_CHAT_FILTERS: ConversationListFilters = {
   searchValue: "",
@@ -103,9 +105,13 @@ export default function ChatsScreen() {
 
   return (
     <View style={s.screen}>
-      <ChatsTopBar title="Chats" />
       <RoleGate
-        loading={<LoadingState label="Cargando contenido..." />}
+        loading={
+          <>
+            <ChatsTopBar title="Chats" />
+            <LoadingState label="Cargando contenido..." />
+          </>
+        }
         buyer={<ChatsContent />}
         seller={<ChatsContent />}
       />
@@ -115,7 +121,7 @@ export default function ChatsScreen() {
 
 function ChatsContent() {
   const t = useTheme();
-  const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
+  const s = React.useMemo(() => createChatsScreenStyles(t, 0, true), [t]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [conversations, setConversations] = React.useState<ConversationListItem[]>([]);
@@ -248,18 +254,24 @@ function ChatsContent() {
 
   const content = (() => {
     if (isLoading) {
-      return <LoadingState label="Cargando chats..." />;
+      return (
+        <View style={s.stateContent}>
+          <LoadingState label="Cargando chats..." />
+        </View>
+      );
     }
 
     if (visibleConversations.length === 0) {
       return (
-        <Text color="stateAnulated">
-          {loadError
-            ? "No se pudieron cargar tus chats."
-            : hasActiveFilters
-              ? "No encontramos chats con los filtros aplicados."
-              : "Cuando tengas conversaciones, aparecerán aquí."}
-        </Text>
+        <View style={s.stateContent}>
+          <Text color="stateAnulated">
+            {loadError
+              ? "No se pudieron cargar tus chats."
+              : hasActiveFilters
+                ? "No encontramos chats con los filtros aplicados."
+                : "Cuando tengas conversaciones, aparecerán aquí."}
+          </Text>
+        </View>
       );
     }
 
@@ -268,6 +280,25 @@ function ChatsContent() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.chatList}
       >
+        {hasActiveFilters ? (
+          <View style={s.activeChipsRow}>
+            <View style={s.activeChip}>
+              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
+              <Text variant="body" style={s.activeChipLabel}>
+                Filtros ({activeFilterCount})
+              </Text>
+              <Pressable
+                style={s.activeChipClose}
+                onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
+                accessibilityRole="button"
+                accessibilityLabel="Limpiar filtros"
+              >
+                <Icon name="x" size={16} color={t.colors.textDark} />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         {visibleConversations.map((item) => (
           <ChatListRow
             key={item.conversation_id}
@@ -279,8 +310,7 @@ function ChatsContent() {
     );
   })();
 
-  return (
-    <View style={s.content}>
+  const toolbar = (
       <View style={s.toolbar}>
         <Pressable
           style={s.searchTrigger}
@@ -293,28 +323,15 @@ function ChatsContent() {
           </Text>
         </Pressable>
       </View>
+  );
 
-      {hasActiveFilters ? (
-        <View style={s.activeChipsRow}>
-          <View style={s.activeChip}>
-            <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-            <Text variant="body" style={s.activeChipLabel}>
-              Filtros ({activeFilterCount})
-            </Text>
-            <Pressable
-              style={s.activeChipClose}
-              onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
-              accessibilityRole="button"
-              accessibilityLabel="Limpiar filtros"
-            >
-              <Icon name="x" size={16} color={t.colors.textDark} />
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
-      {content}
-    </View>
+  return (
+    <>
+      <View style={s.content}>
+        {content}
+      </View>
+      <ChatsTopBar title="Chats" accessory={toolbar} />
+    </>
   );
 }
 
@@ -373,9 +390,19 @@ function ChatListRow({
   );
 }
 
-function ChatsTopBar({ title }: { title: string }) {
+function ChatsTopBar({
+  title,
+  accessory,
+}: {
+  title: string;
+  accessory?: React.ReactNode;
+}) {
   const t = useTheme();
-  const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const s = React.useMemo(
+    () => createChatsScreenStyles(t, insets.top, Boolean(accessory)),
+    [accessory, insets.top, t]
+  );
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) {
@@ -387,32 +414,73 @@ function ChatsTopBar({ title }: { title: string }) {
   }, []);
 
   return (
-    <View style={s.topBar}>
-      <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
-        <Icon name="arrow-left" size={28} color={t.colors.textDark} />
-      </Pressable>
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.topBar}
+      clipStyle={s.topBarClip}
+      contentStyle={s.topBarContent}
+    >
+      <View style={s.topBarTitleRow}>
+        <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
+          <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+        </Pressable>
 
-      <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
-        {title}
-      </Text>
+        <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
+          {title}
+        </Text>
 
-      <View style={s.topBarSide} />
-    </View>
+        <View style={s.topBarSide} />
+      </View>
+
+      {accessory ? <View style={s.topBarAccessory}>{accessory}</View> : null}
+    </GlassSurface>
   );
 }
 
-function createChatsScreenStyles(t: Theme) {
+function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = false) {
+  const topOffset = topInset + t.spacing.md;
+  const topBarVisibleHeight = hasTopBarAccessory ? 128 : 72;
+  const topBarHeight = topOffset + (hasTopBarAccessory ? 128 : 72);
+
   return StyleSheet.create({
     screen: {
       flex: 1,
       backgroundColor: t.colors.background,
     },
     topBar: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      elevation: 10,
+      height: topBarHeight,
+      marginHorizontal: -t.spacing.md,
+      marginTop: -topOffset,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+    },
+    topBarClip: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+      overflow: "hidden",
+    },
+    topBarContent: {
+      flex: 1,
+      paddingTop: topOffset,
+      paddingHorizontal: t.spacing.xl,
+      paddingBottom: t.spacing.md,
+    },
+    topBarTitleRow: {
       height: 56,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: t.colors.background,
     },
     topBarSide: {
       width: 40,
@@ -422,9 +490,17 @@ function createChatsScreenStyles(t: Theme) {
     topBarTitle: {
       flex: 1,
     },
+    topBarAccessory: {
+      height: 48,
+      marginTop: t.spacing.sm,
+    },
     content: {
       flex: 1,
       gap: t.spacing.md,
+    },
+    stateContent: {
+      flex: 1,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
     },
     toolbar: {
       flexDirection: "row",
@@ -435,14 +511,7 @@ function createChatsScreenStyles(t: Theme) {
       flex: 1,
       minHeight: 48,
       borderRadius: 999,
-      backgroundColor: t.colors.backgroudWhite,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
+      ...t.glass.headerControl,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
@@ -460,9 +529,7 @@ function createChatsScreenStyles(t: Theme) {
       maxWidth: "100%",
       minHeight: 36,
       borderRadius: 999,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.backgroudWhite,
+      ...t.glass.chip,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
@@ -482,6 +549,7 @@ function createChatsScreenStyles(t: Theme) {
     },
     chatList: {
       gap: t.spacing.md,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
       paddingBottom: 112,
     },
     chatRow: {

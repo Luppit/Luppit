@@ -49,6 +49,7 @@ export type SellerHomePurchaseRequestItem = {
   published_at: string | null;
   created_at: string;
   views_count: number;
+  offers_count?: number | null;
   seller_interaction_state?: SellerHomeInteractionState | null;
 };
 
@@ -169,6 +170,7 @@ function parseSellerHomePurchaseRequestItem(
     published_at: typeof value.published_at === "string" ? value.published_at : null,
     created_at: createdAt,
     views_count: typeof value.views_count === "number" ? value.views_count : 0,
+    offers_count: typeof value.offers_count === "number" ? value.offers_count : null,
     seller_interaction_state: parseSellerHomeInteractionState(value.seller_interaction_state),
   };
 }

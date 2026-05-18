@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
@@ -43,7 +44,7 @@ import {
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
 import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
-import { useTheme } from "@/src/themes";
+import { type Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
@@ -63,6 +64,23 @@ export default function HomeScreen() {
       />
     </View>
   );
+}
+
+function getHomeTopContentInset(t: Theme, hasFilterChip: boolean) {
+  const profileHeight = t.typography.subtitle.lineHeight;
+  const searchHeight = 48;
+  const segmentHeight = 58;
+  const headerHeight =
+    t.spacing.lg +
+    profileHeight +
+    t.spacing.md +
+    searchHeight +
+    t.spacing.md +
+    segmentHeight +
+    t.spacing.md;
+  const filterChipHeight = hasFilterChip ? 36 + t.spacing.md : 0;
+
+  return headerHeight + filterChipHeight + t.spacing.md;
 }
 
 function BuyerHomeContent() {
@@ -144,6 +162,10 @@ function BuyerHomeContent() {
       hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
     [filters, selectedSegmentSvgName]
   );
+  const topContentInset = useMemo(
+    () => getHomeTopContentInset(t, hasBuyerHomeFilters(filters)),
+    [filters, t]
+  );
   const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
     setFavoriteRequestIds((current) => {
       const next = new Set(current);
@@ -158,7 +180,7 @@ function BuyerHomeContent() {
   }
 
   if (emailSetupStatus && !emailSetupStatus.isComplete) {
-    return <AccountSetupRequiredState />;
+    return <AccountSetupRequiredState topContentInset={topContentInset} />;
   }
 
   if (!hasAnyItems) {
@@ -169,6 +191,7 @@ function BuyerHomeContent() {
           justifyContent: "center",
           alignItems: "center",
           gap: t.spacing.md,
+          paddingTop: topContentInset,
           paddingHorizontal: t.spacing.lg,
           paddingBottom: 96,
         }}
@@ -207,6 +230,7 @@ function BuyerHomeContent() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         gap: t.spacing.md,
+        paddingTop: topContentInset,
         paddingBottom: t.spacing.xl,
       }}
     >
@@ -311,6 +335,10 @@ function SellerHomeContent() {
       hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
     [filters, selectedSegmentSvgName]
   );
+  const topContentInset = useMemo(
+    () => getHomeTopContentInset(t, hasSellerHomeFilters(filters)),
+    [filters, t]
+  );
   const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
     setFavoriteRequestIds((current) => {
       const next = new Set(current);
@@ -325,7 +353,7 @@ function SellerHomeContent() {
   }
 
   if (emailSetupStatus && !emailSetupStatus.isComplete) {
-    return <AccountSetupRequiredState />;
+    return <AccountSetupRequiredState topContentInset={topContentInset} />;
   }
 
   if (!hasAnyItems) {
@@ -336,6 +364,7 @@ function SellerHomeContent() {
           alignItems: "center",
           justifyContent: "center",
           gap: t.spacing.md,
+          paddingTop: topContentInset,
           paddingHorizontal: t.spacing.lg,
           paddingBottom: 96,
         }}
@@ -364,6 +393,7 @@ function SellerHomeContent() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         gap: t.spacing.md,
+        paddingTop: topContentInset,
         paddingBottom: t.spacing.xl,
       }}
     >
@@ -396,7 +426,7 @@ function SellerHomeContent() {
   );
 }
 
-function AccountSetupRequiredState() {
+function AccountSetupRequiredState({ topContentInset }: { topContentInset: number }) {
   const t = useTheme();
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
@@ -407,6 +437,7 @@ function AccountSetupRequiredState() {
         justifyContent: "center",
         alignItems: "center",
         gap: t.spacing.md,
+        paddingTop: topContentInset,
         paddingHorizontal: t.spacing.lg,
         paddingBottom: 96,
       }}
@@ -482,7 +513,7 @@ function HomeGroupSection({
           contentContainerStyle={{
             gap: t.spacing.md,
             paddingHorizontal: headerInset,
-            paddingVertical: t.spacing.xs,
+            paddingVertical: t.spacing.sm,
           }}
         >
           {group.items.map((item) => renderItem(item))}
@@ -578,13 +609,18 @@ function BuyerHomeRequestCard({
   }, [isFavorite, item.category_path, toggleFavorite]);
 
   return (
-    <View style={{ width: 270 }}>
+    <View style={{ width: 286 }}>
       <ProductCard
         title={item.title ?? "Solicitud"}
         subtitle={item.category_name ?? "-"}
         views={item.views_count}
         statusLabel={item.status_label ?? item.status}
-        offersLabel={`${offersCount} ofertas`}
+        offersLabel={
+          offersCount <= 0
+            ? "Sin ofertas"
+            : `${offersCount} ${offersCount === 1 ? "oferta" : "ofertas"}`
+        }
+        offersCount={offersCount}
         onPress={openRequestDetail}
         onLongPress={openCardOptions}
       />
@@ -602,7 +638,12 @@ function SellerHomeRequestCard({
   onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
 }) {
   const t = useTheme();
+  const s = useMemo(() => createSellerHomeRequestCardStyles(t), [t]);
   const publishedLabel = formatPublishedLabel(item.published_at ?? item.created_at);
+  const statusLabel = item.status_label?.trim();
+  const summaryText = item.summary_text?.trim();
+  const categoryName = item.category_name?.trim();
+  const offersCount = typeof item.offers_count === "number" ? item.offers_count : null;
   const liftScale = useRef(new Animated.Value(1)).current;
   const liftTranslateY = useRef(new Animated.Value(0)).current;
   const didLongPressRef = useRef(false);
@@ -726,64 +767,75 @@ function SellerHomeRequestCard({
         onPressOut={handlePressOut}
         onLongPress={openCardOptions}
         accessibilityRole="button"
-        style={{
-          width: 270,
-          borderRadius: 22,
-          backgroundColor: t.colors.primaryLight,
-          padding: 8,
-          gap: t.spacing.xs,
-        }}
+        style={s.pressable}
       >
-        <View
-          style={{
-            backgroundColor: t.colors.backgroudWhite,
-            borderRadius: 18,
-            paddingHorizontal: t.spacing.md,
-            paddingTop: t.spacing.sm + t.spacing.xs,
-            paddingBottom: t.spacing.xs + t.spacing.xs,
-            gap: t.spacing.md,
-            shadowColor: t.colors.shadow,
-            shadowOpacity: 0.08,
-            shadowOffset: { width: 0, height: 4 },
-            shadowRadius: 10,
-            elevation: 4,
-          }}
+        <GlassSurface
+          variant="surface"
+          highlight
+          style={s.surface}
+          contentStyle={s.card}
         >
           <View>
-            <Text variant="subtitle" maxLines={1}>
+            <Text variant="subtitle" maxLines={1} style={s.title}>
               {item.title ?? "Solicitud"}
             </Text>
-            <Text variant="body" maxLines={1} color="stateAnulated">
-              {item.category_name ?? "-"}
+            {categoryName ? (
+              <Text variant="body" maxLines={1} style={s.category}>
+                {categoryName}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={s.summarySlot}>
+            {summaryText ? (
+              <Text variant="body" maxLines={1} style={s.summary}>
+                {summaryText}
+              </Text>
+            ) : null}
+          </View>
+
+          {statusLabel ? (
+            <View style={s.statusPill}>
+              <View style={s.statusDot} />
+              <Text variant="body" maxLines={1} style={s.statusText}>
+                {statusLabel}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={s.metaRow}>
+            <View style={s.metaLeftRow}>
+              <View style={s.metaItemRow}>
+                <Icon name="eye" size={18} color={t.colors.stateAnulated} />
+                <Text variant="body" color="stateAnulated" maxLines={1}>
+                  {item.views_count}
+                </Text>
+              </View>
+
+              {isFavorite ? (
+                <View style={s.metaItemRow}>
+                  <Icon name="star" size={16} color={t.colors.accentYellow} />
+                  <Text variant="body" color="stateAnulated" maxLines={1}>
+                    Favorita
+                  </Text>
+                </View>
+              ) : null}
+
+              {offersCount != null ? (
+                <View style={s.metaItemRow}>
+                  <Icon name="message-circle" size={16} color={t.colors.stateAnulated} />
+                  <Text variant="body" color="stateAnulated" maxLines={1}>
+                    {offersCount}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text variant="body" color="stateAnulated" maxLines={1}>
+              {publishedLabel}
             </Text>
           </View>
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
-              <Icon name="eye" size={18} color={t.colors.stateAnulated} />
-              <Text variant="body" color="stateAnulated">
-                {item.views_count}
-              </Text>
-            </View>
-
-            <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
-              <Icon name="star" size={18} color={t.colors.accentYellow} />
-              <Text variant="body" color="stateAnulated">
-                {item.views_count}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <Text variant="body" align="center">
-          {publishedLabel}
-        </Text>
+        </GlassSurface>
       </Pressable>
     </Animated.View>
   );
@@ -804,6 +856,83 @@ function formatPublishedLabel(rawDate: string | null): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `Hace ${diffDays} d`;
   return date.toLocaleDateString("es-CR");
+}
+
+function createSellerHomeRequestCardStyles(t: Theme) {
+  return {
+    pressable: {
+      width: 270,
+      height: 176,
+      borderRadius: 24,
+    },
+    surface: {
+      height: 176,
+      borderRadius: 24,
+    },
+    card: {
+      height: 176,
+      borderRadius: 24,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 8,
+      overflow: "hidden",
+    },
+    title: {
+      color: t.colors.textDark,
+    },
+    category: {
+      color: t.colors.textMedium,
+    },
+    summarySlot: {
+      minHeight: t.typography.body.lineHeight,
+    },
+    summary: {
+      color: t.colors.stateAnulated,
+    },
+    statusPill: {
+      ...t.glass.chip,
+      alignSelf: "flex-start",
+      maxWidth: "100%",
+      minHeight: 30,
+      backgroundColor: t.colors.primaryLight,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      flexDirection: "row",
+      gap: 6,
+      alignItems: "center",
+    },
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: t.colors.primary,
+      flexShrink: 0,
+    },
+    statusText: {
+      color: t.colors.textDark,
+      flexShrink: 1,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 24,
+      gap: t.spacing.sm,
+    },
+    metaLeftRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      flexShrink: 1,
+    },
+    metaItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+      flexShrink: 1,
+    },
+  } as const;
 }
 
 function toPurchaseRequestParam(item: BuyerHomePurchaseRequestItem) {

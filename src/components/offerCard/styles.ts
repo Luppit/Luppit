@@ -2,14 +2,19 @@ import { Theme } from "@/src/themes";
 import { TextStyle, ViewStyle } from "react-native";
 
 export type OfferCardStyles = {
+  surface: ViewStyle;
   container: ViewStyle;
   topRow: ViewStyle;
+  businessBlock: ViewStyle;
+  priceBlock: ViewStyle;
   businessName: TextStyle;
   province: TextStyle;
+  metaRow: ViewStyle;
   ratingRow: ViewStyle;
   ratingText: TextStyle;
   priceText: TextStyle;
   badge: ViewStyle;
+  badgeDot: ViewStyle;
   badgeText: TextStyle;
   separator: ViewStyle;
   timelineContainer: ViewStyle;
@@ -29,30 +34,48 @@ export type OfferCardStyles = {
 
 export function createOfferCardStyles(t: Theme): OfferCardStyles {
   return {
+    surface: {
+      borderRadius: 24,
+    },
     container: {
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      borderRadius: t.borders.md,
-      padding: t.spacing.md,
-      backgroundColor: t.colors.backgroudWhite,
-      gap: t.spacing.sm,
+      borderRadius: 24,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 10,
+      overflow: "hidden",
     },
     topRow: {
       flexDirection: "row",
+      alignItems: "flex-start",
       justifyContent: "space-between",
-      gap: t.spacing.md,
-      marginBottom: t.spacing.md
+      gap: t.spacing.sm,
+    },
+    businessBlock: {
+      flex: 1,
+      minWidth: 0,
+    },
+    priceBlock: {
+      alignItems: "flex-end",
+      flexShrink: 0,
     },
     businessName: {
       color: t.colors.textDark,
     },
     province: {
-      color: t.colors.textDark,
+      color: t.colors.textMedium,
+    },
+    metaRow: {
+      minHeight: 30,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: t.spacing.sm,
     },
     ratingRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
+      flexShrink: 1,
     },
     ratingText: {
       color: t.colors.textDark,
@@ -62,24 +85,36 @@ export function createOfferCardStyles(t: Theme): OfferCardStyles {
       textAlign: "right",
     },
     badge: {
+      ...t.glass.chip,
       alignSelf: "flex-end",
+      maxWidth: "58%",
       borderRadius: 999,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.xs,
       backgroundColor: t.colors.primaryLight,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    badgeDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: t.colors.primary,
+      flexShrink: 0,
     },
     badgeText: {
       color: t.colors.textDark,
+      flexShrink: 1,
     },
     separator: {
       height: 1,
       backgroundColor: t.colors.border,
-      marginTop: 0,
-      marginBottom: t.spacing.md,
+      opacity: 0.75,
     },
     timelineContainer: {
       gap: t.spacing.md,
-      marginBottom: t.spacing.md,
     },
     timelineRow: {
       flexDirection: "row",
@@ -121,24 +156,20 @@ export function createOfferCardStyles(t: Theme): OfferCardStyles {
     actionsRow: {
       flexDirection: "row",
       gap: t.spacing.sm,
+      alignItems: "center",
     },
     menuButton: {
-      width: 64,
-      height: 64,
-      borderRadius: t.borders.md,
+      width: 52,
+      height: 48,
+      borderRadius: 16,
       backgroundColor: t.colors.textDark,
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.16,
-      shadowOffset: { width: 0, height: 4 },
-      shadowRadius: 8,
-      elevation: 4,
     },
     connectButton: {
       flex: 1,
-      height: 64,
-      borderRadius: t.borders.md,
+      height: 48,
+      borderRadius: 16,
       backgroundColor: t.colors.primary,
       alignItems: "center",
       justifyContent: "center",

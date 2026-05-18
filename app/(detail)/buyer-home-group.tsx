@@ -107,7 +107,14 @@ export default function BuyerHomeGroupScreen() {
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
             statusLabel={item.status_label ?? item.status}
-            offersLabel={`${offerCountsByRequestId[item.id] ?? 0} ofertas`}
+            offersLabel={
+              (offerCountsByRequestId[item.id] ?? 0) <= 0
+                ? "Sin ofertas"
+                : `${offerCountsByRequestId[item.id] ?? 0} ${
+                    (offerCountsByRequestId[item.id] ?? 0) === 1 ? "oferta" : "ofertas"
+                  }`
+            }
+            offersCount={offerCountsByRequestId[item.id] ?? 0}
             onPress={() =>
               router.push({
                 pathname: "/(detail)/purchase-request",

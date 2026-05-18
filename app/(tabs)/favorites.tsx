@@ -1,4 +1,5 @@
 import LoadingState from "@/src/components/loading/LoadingState";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import ProductCard from "@/src/components/productCard/ProductCard";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Icon } from "@/src/components/Icon";
@@ -17,6 +18,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FAVORITE_SORT_OPTIONS = [
   { id: "favorited_newest", label: "Guardadas recientemente" },
@@ -103,9 +105,13 @@ export default function FavoritesScreen() {
 
   return (
     <View style={s.screen}>
-      <FavoritesTopBar title="Favoritas" />
       <RoleGate
-        loading={<LoadingState label="Cargando contenido..." />}
+        loading={
+          <>
+            <FavoritesTopBar title="Favoritas" />
+            <LoadingState label="Cargando contenido..." />
+          </>
+        }
         buyer={<FavoriteRequestsContent role="buyer" />}
         seller={<FavoriteRequestsContent role="seller" />}
       />
@@ -115,7 +121,7 @@ export default function FavoritesScreen() {
 
 function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
   const t = useTheme();
-  const s = React.useMemo(() => createFavoritesScreenStyles(t), [t]);
+  const s = React.useMemo(() => createFavoritesScreenStyles(t, 0, true), [t]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [favorites, setFavorites] = React.useState<PurchaseRequestFavoriteItem[]>([]);
@@ -305,16 +311,22 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
 
   const content = (() => {
     if (isLoading) {
-      return <LoadingState label="Cargando favoritas..." />;
+      return (
+        <View style={s.stateContent}>
+          <LoadingState label="Cargando favoritas..." />
+        </View>
+      );
     }
 
     if (favorites.length === 0) {
       return (
-        <Text color="stateAnulated">
-          {loadError
-            ? "No se pudieron cargar tus favoritas."
-            : "Cuando guardes solicitudes, aparecerán aquí."}
-        </Text>
+        <View style={s.stateContent}>
+          <Text color="stateAnulated">
+            {loadError
+              ? "No se pudieron cargar tus favoritas."
+              : "Cuando guardes solicitudes, aparecerán aquí."}
+          </Text>
+        </View>
       );
     }
 
@@ -323,6 +335,44 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.favoritesList}
       >
+        {hasActiveFilters || hasCustomSort ? (
+          <View style={s.activeChipsRow}>
+            {hasActiveFilters ? (
+              <View style={s.activeChip}>
+                <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
+                <Text variant="body" style={s.activeChipLabel}>
+                  Filtros ({activeFilterCount})
+                </Text>
+                <Pressable
+                  style={s.activeChipClose}
+                  onPress={() => setFilters(EMPTY_FAVORITE_FILTERS)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpiar filtros"
+                >
+                  <Icon name="x" size={16} color={t.colors.textDark} />
+                </Pressable>
+              </View>
+            ) : null}
+
+            {hasCustomSort ? (
+              <View style={s.activeChip}>
+                <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
+                <Text variant="body" style={s.activeChipLabel} maxLines={1}>
+                  {getSortLabel(selectedSortId)}
+                </Text>
+                <Pressable
+                  style={s.activeChipClose}
+                  onPress={() => setSelectedSortId(DEFAULT_FAVORITE_SORT_ID)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restablecer orden"
+                >
+                  <Icon name="x" size={16} color={t.colors.textDark} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {favorites.map((item) => (
           <ProductCard
             key={item.favorite_id}
@@ -330,7 +380,14 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
             statusLabel={item.status_label ?? item.status}
-            offersLabel={`${item.offers_count} ofertas`}
+            offersLabel={
+              item.offers_count <= 0
+                ? "Sin ofertas"
+                : `${item.offers_count} ${
+                    item.offers_count === 1 ? "oferta" : "ofertas"
+                  }`
+            }
+            offersCount={item.offers_count}
             onPress={() => void openFavorite(item)}
           />
         ))}
@@ -338,8 +395,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
     );
   })();
 
-  return (
-    <View style={s.content}>
+  const toolbar = (
       <View style={s.toolbar}>
         <Pressable
           style={s.searchTrigger}
@@ -361,53 +417,31 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
           <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
         </Pressable>
       </View>
+  );
 
-      {hasActiveFilters || hasCustomSort ? (
-        <View style={s.activeChipsRow}>
-          {hasActiveFilters ? (
-            <View style={s.activeChip}>
-              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeChipLabel}>
-                Filtros ({activeFilterCount})
-              </Text>
-              <Pressable
-                style={s.activeChipClose}
-                onPress={() => setFilters(EMPTY_FAVORITE_FILTERS)}
-                accessibilityRole="button"
-                accessibilityLabel="Limpiar filtros"
-              >
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
-          ) : null}
-
-          {hasCustomSort ? (
-            <View style={s.activeChip}>
-              <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeChipLabel} maxLines={1}>
-                {getSortLabel(selectedSortId)}
-              </Text>
-              <Pressable
-                style={s.activeChipClose}
-                onPress={() => setSelectedSortId(DEFAULT_FAVORITE_SORT_ID)}
-                accessibilityRole="button"
-                accessibilityLabel="Restablecer orden"
-              >
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-
-      {content}
-    </View>
+  return (
+    <>
+      <View style={s.content}>
+        {content}
+      </View>
+      <FavoritesTopBar title="Favoritas" accessory={toolbar} />
+    </>
   );
 }
 
-function FavoritesTopBar({ title }: { title: string }) {
+function FavoritesTopBar({
+  title,
+  accessory,
+}: {
+  title: string;
+  accessory?: React.ReactNode;
+}) {
   const t = useTheme();
-  const s = React.useMemo(() => createFavoritesScreenStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const s = React.useMemo(
+    () => createFavoritesScreenStyles(t, insets.top, Boolean(accessory)),
+    [accessory, insets.top, t]
+  );
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) {
@@ -419,32 +453,73 @@ function FavoritesTopBar({ title }: { title: string }) {
   }, []);
 
   return (
-    <View style={s.topBar}>
-      <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
-        <Icon name="arrow-left" size={28} color={t.colors.textDark} />
-      </Pressable>
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.topBar}
+      clipStyle={s.topBarClip}
+      contentStyle={s.topBarContent}
+    >
+      <View style={s.topBarTitleRow}>
+        <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
+          <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+        </Pressable>
 
-      <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
-        {title}
-      </Text>
+        <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
+          {title}
+        </Text>
 
-      <View style={s.topBarSide} />
-    </View>
+        <View style={s.topBarSide} />
+      </View>
+
+      {accessory ? <View style={s.topBarAccessory}>{accessory}</View> : null}
+    </GlassSurface>
   );
 }
 
-function createFavoritesScreenStyles(t: Theme) {
+function createFavoritesScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = false) {
+  const topOffset = topInset + t.spacing.md;
+  const topBarVisibleHeight = hasTopBarAccessory ? 128 : 72;
+  const topBarHeight = topOffset + (hasTopBarAccessory ? 128 : 72);
+
   return StyleSheet.create({
     screen: {
       flex: 1,
       backgroundColor: t.colors.background,
     },
     topBar: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      elevation: 10,
+      height: topBarHeight,
+      marginHorizontal: -t.spacing.md,
+      marginTop: -topOffset,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+    },
+    topBarClip: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+      overflow: "hidden",
+    },
+    topBarContent: {
+      flex: 1,
+      paddingTop: topOffset,
+      paddingHorizontal: t.spacing.xl,
+      paddingBottom: t.spacing.md,
+    },
+    topBarTitleRow: {
       height: 56,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: t.colors.background,
     },
     topBarSide: {
       width: 40,
@@ -454,9 +529,17 @@ function createFavoritesScreenStyles(t: Theme) {
     topBarTitle: {
       flex: 1,
     },
+    topBarAccessory: {
+      height: 48,
+      marginTop: t.spacing.sm,
+    },
     content: {
       flex: 1,
       gap: t.spacing.md,
+    },
+    stateContent: {
+      flex: 1,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
     },
     toolbar: {
       flexDirection: "row",
@@ -467,14 +550,7 @@ function createFavoritesScreenStyles(t: Theme) {
       flex: 1,
       minHeight: 48,
       borderRadius: 999,
-      backgroundColor: t.colors.backgroudWhite,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
+      ...t.glass.headerControl,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
@@ -492,9 +568,7 @@ function createFavoritesScreenStyles(t: Theme) {
       maxWidth: "100%",
       minHeight: 36,
       borderRadius: 999,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.backgroudWhite,
+      ...t.glass.chip,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
@@ -520,6 +594,8 @@ function createFavoritesScreenStyles(t: Theme) {
     },
     favoritesList: {
       gap: t.spacing.md,
+      paddingHorizontal: t.spacing.sm,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
       paddingBottom: 112,
     },
   });

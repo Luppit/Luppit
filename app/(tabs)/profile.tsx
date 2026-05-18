@@ -15,7 +15,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -426,23 +425,7 @@ function ActionRow({
 
 function createProfileStyles(t: Theme) {
   const cardSurface = {
-    backgroundColor: t.colors.backgroudWhite,
-    shadowColor: t.colors.shadow,
-    ...Platform.select({
-      ios: {
-        shadowOpacity: 0.06,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 5,
-      },
-      android: {
-        elevation: 2,
-      },
-      default: {
-        shadowOpacity: 0.06,
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 5,
-      },
-    }),
+    ...t.glass.surface,
   };
 
   return StyleSheet.create({

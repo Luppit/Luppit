@@ -1,7 +1,7 @@
 export * from './borders';
 export * from './colors';
 export * from './fontScale';
+export * from './glass';
 export * from './spacing';
 export * from './ThemeProvider';
 export * from './typography';
-

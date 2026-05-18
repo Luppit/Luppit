@@ -14,6 +14,7 @@ export type PurchaseOfferCardData = PurchaseOffer & {
   offer_currency_code: string | null;
 };
 export type SellerPurchaseOfferCardData = PurchaseOffer & {
+  request_category_id: string | null;
   request_title: string | null;
   request_category_name: string | null;
   request_profile_name: string | null;
@@ -47,6 +48,14 @@ export type CreatePurchaseOfferInput = {
   shippingCost?: number | null;
   shippingMaxTime?: number | null;
   shippingMaxTimeUnit?: DeliveryUnit;
+};
+
+export type SellerPurchaseOfferFilters = {
+  searchValue?: string;
+  startDate?: string;
+  endDate?: string;
+  selectedCategoryIds?: string[];
+  selectedCurrencyIds?: string[];
 };
 
 export type CreatePurchaseOfferResult = {
@@ -198,7 +207,10 @@ export async function getPurchaseOffersCountByPurchaseRequestIds(
   return { ok: true, data: counts };
 }
 
-export async function getCurrentSellerPurchaseOffers(): Promise<
+export async function getCurrentSellerPurchaseOffers(
+  filters?: SellerPurchaseOfferFilters,
+  sortCode = "newly_listed"
+): Promise<
   { ok: true; data: SellerPurchaseOfferCardData[] } | { ok: false; error: AppError }
 > {
   const session = await getSession();
@@ -207,6 +219,45 @@ export async function getCurrentSellerPurchaseOffers(): Promise<
   const profile = await getProfileByUserId(session.user.id);
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc("get_current_seller_purchase_offers", {
+    p_profile_id: profile.data.id,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_category_ids:
+      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+        ? filters.selectedCategoryIds
+        : null,
+    p_currency_ids:
+      filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
+        ? filters.selectedCurrencyIds
+        : null,
+    p_sort_code: sortCode || "newly_listed",
+  });
+
+  if (!rpcResult?.error) {
+    const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+    return {
+      ok: true,
+      data: rows.map((row: any) => ({
+        ...row,
+        request_category_id:
+          typeof row.request_category_id === "string" ? row.request_category_id : null,
+        request_title: typeof row.request_title === "string" ? row.request_title : null,
+        request_category_name:
+          typeof row.request_category_name === "string" ? row.request_category_name : null,
+        request_profile_name:
+          typeof row.request_profile_name === "string" ? row.request_profile_name : null,
+        offer_currency_code:
+          typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+      })) as SellerPurchaseOfferCardData[],
+    };
+  }
+
+  if (!isMissingRpcError(rpcResult.error, "get_current_seller_purchase_offers")) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
 
   const businessRef = await getBusinessIdByProfileId(profile.data.id);
   if (businessRef?.ok === false) return { ok: false, error: businessRef.error };
@@ -244,13 +295,18 @@ export async function getCurrentSellerPurchaseOffers(): Promise<
 
   const requestInfoById = new Map<
     string,
-    { requestTitle: string | null; categoryName: string | null; profileId: string | null }
+    {
+      requestTitle: string | null;
+      categoryId: string | null;
+      categoryName: string | null;
+      profileId: string | null;
+    }
   >();
 
   if (purchaseRequestIds.length > 0) {
     const requestResult = await supabase
       .from("purchase_request")
-      .select("id, title, category_name, profile_id")
+      .select("id, title, category_id, category_name, profile_id")
       .in("id", purchaseRequestIds);
 
     if (!requestResult.error) {
@@ -258,6 +314,8 @@ export async function getCurrentSellerPurchaseOffers(): Promise<
         if (!row?.id) continue;
         requestInfoById.set(row.id, {
           requestTitle: typeof row.title === "string" ? row.title : null,
+          categoryId:
+            typeof row.category_id === "string" ? row.category_id : null,
           categoryName:
             typeof row.category_name === "string" ? row.category_name : null,
           profileId: typeof row.profile_id === "string" ? row.profile_id : null,
@@ -266,37 +324,11 @@ export async function getCurrentSellerPurchaseOffers(): Promise<
     }
   }
 
-  const visualizationProfileIdByRequestId = new Map<string, string>();
-
-  if (purchaseRequestIds.length > 0) {
-    const visualizationResult = await supabase
-      .from("purchase_request_visualization")
-      .select("purchase_request_id, profile_id, created_at")
-      .in("purchase_request_id", purchaseRequestIds)
-      .order("created_at", { ascending: false });
-
-    if (!visualizationResult.error) {
-      for (const row of visualizationResult.data ?? []) {
-        const requestId =
-          typeof row.purchase_request_id === "string" ? row.purchase_request_id : null;
-        const profileId =
-          typeof row.profile_id === "string" ? row.profile_id : null;
-        if (!requestId || !profileId) continue;
-        if (!visualizationProfileIdByRequestId.has(requestId)) {
-          visualizationProfileIdByRequestId.set(requestId, profileId);
-        }
-      }
-    }
-  }
-
   const profileIds = Array.from(
     new Set(
-      [
-        ...Array.from(visualizationProfileIdByRequestId.values()),
-        ...Array.from(requestInfoById.values())
-          .map((item) => item.profileId)
-          .filter((id): id is string => typeof id === "string" && id.length > 0),
-      ].filter((id): id is string => id.length > 0)
+      Array.from(requestInfoById.values())
+        .map((item) => item.profileId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
     )
   );
 
@@ -322,18 +354,14 @@ export async function getCurrentSellerPurchaseOffers(): Promise<
     const requestId = offer.purchase_request_id;
     const requestInfo =
       typeof requestId === "string" ? requestInfoById.get(requestId) : undefined;
-    const profileIdFromVisualization =
-      typeof requestId === "string"
-        ? visualizationProfileIdByRequestId.get(requestId)
-        : undefined;
-    const resolvedProfileId = profileIdFromVisualization ?? requestInfo?.profileId ?? null;
-    const requestProfileName = resolvedProfileId
-      ? profileNameById.get(resolvedProfileId) ?? null
+    const requestProfileName = requestInfo?.profileId
+      ? profileNameById.get(requestInfo.profileId) ?? null
       : null;
 
     return {
       ...offer,
       request_title: requestInfo?.requestTitle ?? null,
+      request_category_id: requestInfo?.categoryId ?? null,
       request_category_name: requestInfo?.categoryName ?? null,
       request_profile_name: requestProfileName,
       offer_currency_code: currency?.currency_code ?? null,

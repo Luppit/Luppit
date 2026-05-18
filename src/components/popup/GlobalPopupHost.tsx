@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
@@ -335,7 +336,12 @@ export default function GlobalPopupHost() {
                 transform: [{ translateY }],
               }}
             >
-              <View
+              <GlassSurface
+                variant="sheet"
+                blur="sheet"
+                highlight
+                highlightStyle={s.bottomSheetHighlight}
+                clipStyle={s.bottomSheetClip}
                 style={[
                   s.bottomSheet,
                   {
@@ -716,17 +722,18 @@ export default function GlobalPopupHost() {
                     option.iconColorKey != null
                       ? t.colors[option.iconColorKey]
                       : textColor;
-                  const optionBackground =
-                    option.backgroundColorKey != null
-                      ? t.colors[option.backgroundColorKey]
-                      : t.colors.backgroudWhite;
 
                   return (
                     <React.Fragment key={option.id}>
                       {index > 0 ? <View style={s.separator} /> : null}
                       <Pressable
                         onPress={() => handleOptionPress(option)}
-                        style={[s.optionButton, { backgroundColor: optionBackground }]}
+                        style={[
+                          s.optionButton,
+                          option.backgroundColorKey != null
+                            ? { backgroundColor: t.colors[option.backgroundColorKey] }
+                            : null,
+                        ]}
                       >
                         {option.icon ? (
                           <Icon name={option.icon} size={22} color={iconColor} />
@@ -739,7 +746,7 @@ export default function GlobalPopupHost() {
                   );
                 })
                 )}
-              </View>
+              </GlassSurface>
             </Animated.View>
           </View>
         </KeyboardAvoidingView>
@@ -752,55 +759,62 @@ export default function GlobalPopupHost() {
         onRequestClose={() => setActiveDateField(null)}
       >
         <Pressable style={s.datePickerBackdrop} onPress={() => setActiveDateField(null)}>
-          <Pressable style={s.datePickerCard} onPress={(event) => event.stopPropagation()}>
-            <View style={s.datePickerHeader}>
-              <Text variant="subtitle">
-                {activeDateField === "start" ? "Selecciona la fecha inicial" : "Selecciona la fecha final"}
-              </Text>
-              <Text variant="body" color="stateAnulated">
-                {formatDateValue(pickerValue)}
-              </Text>
-            </View>
-
-            <DateTimePicker
-              value={pickerValue}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "calendar"}
-              style={s.datePicker}
-              themeVariant="light"
-              textColor={t.colors.textDark}
-              onChange={(_event, selectedDate) => {
-                if (selectedDate) {
-                  setPickerValue(selectedDate);
-                }
-              }}
-            />
-
-            <View style={s.datePickerActionsRow}>
-              <Pressable
-                style={[s.filterActionButton, s.filterActionButtonSecondary]}
-                onPress={() => setActiveDateField(null)}
-              >
-                <Text
-                  variant="body"
-                  style={[s.filterActionLabel, s.filterActionLabelSecondary]}
-                >
-                  Cancelar
+          <Pressable onPress={(event) => event.stopPropagation()}>
+            <GlassSurface
+              variant="sheet"
+              blur="sheet"
+              highlight
+              contentStyle={s.datePickerCard}
+            >
+              <View style={s.datePickerHeader}>
+                <Text variant="subtitle">
+                  {activeDateField === "start" ? "Selecciona la fecha inicial" : "Selecciona la fecha final"}
                 </Text>
-              </Pressable>
-
-              <Pressable
-                style={[s.filterActionButton, s.filterActionButtonPrimary]}
-                onPress={applyDatePickerValue}
-              >
-                <Text
-                  variant="body"
-                  style={[s.filterActionLabel, s.filterActionLabelPrimary]}
-                >
-                  Confirmar
+                <Text variant="body" color="stateAnulated">
+                  {formatDateValue(pickerValue)}
                 </Text>
-              </Pressable>
-            </View>
+              </View>
+
+              <DateTimePicker
+                value={pickerValue}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "calendar"}
+                style={s.datePicker}
+                themeVariant="light"
+                textColor={t.colors.textDark}
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    setPickerValue(selectedDate);
+                  }
+                }}
+              />
+
+              <View style={s.datePickerActionsRow}>
+                <Pressable
+                  style={[s.filterActionButton, s.filterActionButtonSecondary]}
+                  onPress={() => setActiveDateField(null)}
+                >
+                  <Text
+                    variant="body"
+                    style={[s.filterActionLabel, s.filterActionLabelSecondary]}
+                  >
+                    Cancelar
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  style={[s.filterActionButton, s.filterActionButtonPrimary]}
+                  onPress={applyDatePickerValue}
+                >
+                  <Text
+                    variant="body"
+                    style={[s.filterActionLabel, s.filterActionLabelPrimary]}
+                  >
+                    Confirmar
+                  </Text>
+                </Pressable>
+              </View>
+            </GlassSurface>
           </Pressable>
         </Pressable>
       </Modal>

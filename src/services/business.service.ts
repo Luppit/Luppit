@@ -8,9 +8,14 @@ export type BusinessInsert = InsertRow<"business">;
 export async function createBusiness(
   business: BusinessInsert
 ): Promise<{ ok: true; data: Business } | { ok: false; error: AppError }> {
+  const insertData: BusinessInsert = {
+    ...business,
+    location_id: business.location_id || null,
+  };
+
   const { data, error } = await supabase
     .from("business")
-    .insert(business)
+    .insert(insertData)
     .select()
     .single();
   if (error) return { ok: false, error: fromSupabaseError(error) };

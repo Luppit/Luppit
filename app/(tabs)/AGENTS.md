@@ -33,6 +33,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Do not hardcode buyer/seller home groups such as `Ver todas`, `Populares`, or `Nuevas` in product logic.
 - Do not pass custom limits from client; `max_items` per group is defined in DB.
 - Do not use local purchase-request mocks for buyer/seller home flows when RPC data exists.
+- Buyer request cards use shared glass card styling from `ProductCard`; keep card material changes in `ProductCard`/theme glass tokens rather than per-screen overrides.
+- Horizontal buyer card lists need enough padding for the shared glass shadow so card shadows are not clipped at list edges.
 - Keep client behavior presentation-only (horizontal carousels, navigation, loading/empty states).
 - Group header action should navigate to a dedicated group listing screen (for example with `groupCode` param) for both buyer and seller.
 - Buyer home and seller home may share the same grouped section layout, but buyer request cards must keep the buyer visual contract (`ProductCard` with status chip + footer offers label) instead of reusing the seller compact card.
@@ -90,6 +92,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - hide the home top navbar and bottom navbar on this route
   - render the existing back-button + centered-title layout pattern
   - keep title copy as `Todas mis ofertas` unless product copy changes.
+- The standalone listing header must use the shared top-attached glass header pattern, not a floating card: full width/top coverage, safe-area compensation, and bottom-only rounded corners.
 - Seller offers data should come from `public.get_current_seller_purchase_offers(...)` once that RPC is available.
 - Seller offers search/filter/sort must map to the offers RPC parameters instead of remaining a separate client-only filtering source:
   - text search -> `p_search_text`
@@ -108,6 +111,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 
 ## Favorites Tab
 - The `Favoritas` tab is a standalone list surface like seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
+- The Favorites top bar must follow the shared top-attached glass header pattern used by standalone list screens, not a floating pill/card.
 - Favorites listing data must come from role-specific RPC wrappers:
   - buyer: `public.get_buyer_purchase_request_favorites(...)`
   - seller: `public.get_seller_purchase_request_favorites(...)`
@@ -123,6 +127,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 
 ## Chats Tab
 - The `Chats` tab is a standalone list surface like `Favoritas` and seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
+- The Chats top bar must follow the shared top-attached glass header pattern used by standalone list screens, not a floating pill/card.
 - Buyer and seller chat-list data must come from `public.get_current_profile_conversations(...)` through `conversation.service.ts`; do not direct-query `conversation` / `conversation_message` from the screen.
 - Chat-list search/filter inputs map to RPC params:
   - text search -> `p_search_text`

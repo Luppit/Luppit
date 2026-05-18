@@ -37,14 +37,14 @@ export function createTextFieldWithToggleStyles(t: Theme): TextFieldWithToggleSt
       flex: 1,
       borderWidth: 1,
       borderColor: t.colors.border,
-      borderRadius: t.borders.sm,
-      height: 44,
-      paddingHorizontal: t.spacing.sm,
+      borderRadius: t.borders.md,
+      height: 48,
+      paddingHorizontal: t.spacing.md,
       justifyContent: "center",
       backgroundColor: t.colors.backgroudWhite,
     },
     inputContainerFocused: {
-      borderWidth: 2,
+      borderColor: t.colors.primary,
     },
     inputContainerError: {
       borderColor: t.colors.error,
@@ -66,7 +66,7 @@ export function createTextFieldWithToggleStyles(t: Theme): TextFieldWithToggleSt
     },
     toggleContainer: {
       width: 86,
-      borderRadius: t.borders.sm,
+      borderRadius: t.borders.md,
       borderWidth: 1,
       borderColor: t.colors.border,
       overflow: "hidden",

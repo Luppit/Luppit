@@ -172,8 +172,6 @@ function VerifyStep({
         if (!isSeller) return;
 
         const businessResult = await createBusiness({
-          id: "",
-          created_at: new Date().toISOString(),
           name: sellerBusinessValues.businessName,
           id_document: sellerBusinessValues.businessIdDocument,
         });

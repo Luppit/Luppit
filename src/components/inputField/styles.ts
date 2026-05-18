@@ -22,10 +22,11 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
     },
     inputContainer: {
       borderWidth: 1,
-      borderRadius: t.borders.sm,
+      borderRadius: t.borders.md,
       borderColor: t.colors.border,
-      height: 44,
-      paddingHorizontal: t.spacing.sm
+      height: 48,
+      paddingHorizontal: t.spacing.md,
+      backgroundColor: t.colors.backgroudWhite,
     },
     input: {
       flex: 1,
@@ -50,7 +51,7 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
       borderColor: t.colors.error
     },
     inputFocused: {
-      borderWidth: 2
+      borderColor: t.colors.primary,
     },
     errorLabel: {
       color: t.colors.error,

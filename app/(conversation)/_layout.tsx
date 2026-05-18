@@ -3,6 +3,7 @@ import ConversationActionButtons, {
   ConversationActionButtonConfig,
 } from "@/src/components/conversation/ConversationActionButtons";
 import Button from "@/src/components/button/Button";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -659,6 +660,7 @@ export default function ConversationLayout() {
   const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
   const headerBarHeight = 56;
+  const headerChromeHeight = insets.top + 72;
   const actionButtonsOverlaySpace = showActionButtons ? 64 + t.spacing.md : 0;
   const title = routeTitle ?? "Conversación";
 
@@ -684,11 +686,34 @@ export default function ConversationLayout() {
         keyboardVerticalOffset={0}
       >
         <View style={{ flex: 1 }}>
-          <View
+          <GlassSurface
+            variant="chrome"
+            blur="chrome"
             style={{
-              paddingTop: insets.top,
-              paddingHorizontal: t.spacing.md,
-              backgroundColor: t.colors.background,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              elevation: 10,
+              height: headerChromeHeight,
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+            }}
+            clipStyle={{
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+              overflow: "hidden",
+            }}
+            contentStyle={{
+              flex: 1,
+              paddingTop: insets.top + t.spacing.xs,
+              paddingHorizontal: t.spacing.xl,
+              paddingBottom: t.spacing.xs,
             }}
           >
             <View
@@ -702,7 +727,7 @@ export default function ConversationLayout() {
               <Pressable
                 onPress={() => router.back()}
                 hitSlop={12}
-                style={{ width: 40, alignItems: "flex-start" }}
+                style={{ width: 40, alignItems: "flex-start", justifyContent: "center" }}
               >
                 <Icon name="arrow-left" size={28} />
               </Pressable>
@@ -719,6 +744,7 @@ export default function ConversationLayout() {
                   style={{
                     width: 40,
                     alignItems: "flex-end",
+                    justifyContent: "center",
                     opacity: isExecutingAction ? 0.6 : 1,
                   }}
                 >
@@ -728,13 +754,13 @@ export default function ConversationLayout() {
                 <View style={{ width: 40 }} />
               )}
             </View>
-          </View>
+          </GlassSurface>
 
           {showActionButtons ? (
             <View
               style={{
                 position: "absolute",
-                top: insets.top + headerBarHeight - t.spacing.xs,
+                top: headerChromeHeight - t.spacing.xs,
                 left: 0,
                 right: 0,
                 zIndex: 10,
@@ -760,7 +786,7 @@ export default function ConversationLayout() {
             style={{
               flex: 1,
               paddingHorizontal: t.spacing.md,
-              paddingTop: actionButtonsOverlaySpace,
+              paddingTop: headerChromeHeight + actionButtonsOverlaySpace,
             }}
             onTouchStart={() => Keyboard.dismiss()}
           >

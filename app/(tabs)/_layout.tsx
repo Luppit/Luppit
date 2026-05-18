@@ -40,23 +40,30 @@ export default function TabsLayout() {
   if (!isAuth) return <Redirect href="/(auth)/auth" />;
 
   return (
-    <SafeAreaView style={{ ...layoutStyles.container, ...layoutStyles.view }}>
+    <View style={layoutStyles.root}>
       <RoleProvider>
+        <SafeAreaView style={layoutStyles.view}>
+          <View style={layoutStyles.container}>
+            <Slot />
+          </View>
+        </SafeAreaView>
         {hidesTopNavbar ? null : <TopNavbar />}
-        <View style={layoutStyles.container}>
-          <Slot />
-        </View>
       </RoleProvider>
       <Navbar />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const layoutStyles = {
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
   },
   view: {
+    flex: 1,
     padding: spacing.md,
     backgroundColor: colors.background,
   },
