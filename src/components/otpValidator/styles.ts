@@ -1,5 +1,5 @@
 import { Theme } from "@/src/themes";
-import { TextStyle, ViewStyle } from "react-native";
+import { Platform, TextStyle, ViewStyle } from "react-native";
 
 export type OtpValidatorStyles = {
   container: ViewStyle;
@@ -11,6 +11,7 @@ export type OtpValidatorStyles = {
   inputBoxStretch: ViewStyle;
   inputBoxFocused: ViewStyle;
   inputText: TextStyle;
+  hiddenInput: TextStyle;
 };
 
 export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
@@ -60,8 +61,25 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       textAlign: "center",
       color: t.colors.textDark,
       fontSize: 22,
+      lineHeight: 32,
       fontWeight: "600",
       paddingVertical: 0,
+      includeFontPadding: false,
+    },
+    hiddenInput: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      opacity: 0,
+      ...Platform.select({
+        web: {
+          outlineWidth: 0,
+          outlineColor: "transparent",
+          borderWidth: 0,
+          backgroundColor: "transparent",
+        } as TextStyle,
+        default: {},
+      }),
     },
   };
 }

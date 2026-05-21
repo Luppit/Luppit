@@ -42,6 +42,7 @@ Applies to conversation screens and conversation UI behavior.
 - `STATUS` slots belong inside the scrollable message thread and should render after the existing messages, like the latest passive system item.
 - `permissions.can_send_messages=true` must show the composer even when AUX actions exist.
 - AUX actions and the composer are not mutually exclusive; when both are present, render AUX actions in a fixed bottom area above the composer, not inside the scrollable message history.
+- Shared composer internals, including multiline autosize, live in `src/components/inputChat/AGENTS.md`; do not rebuild composer sizing logic in the conversation layout.
 - When `permissions.can_send_messages=false`, AUX actions may continue using the in-thread placement behavior.
 - `MENU` actions belong to the header ellipsis popup, not the in-thread action bar or composer area.
 - Menu-option styling is still DB-driven by `style_code`; `primary` should render with the usual primary color and `error` with the error color.

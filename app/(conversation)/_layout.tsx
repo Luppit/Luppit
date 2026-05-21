@@ -38,6 +38,7 @@ import React, {
 import {
   Keyboard,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   View,
@@ -56,6 +57,8 @@ type ConversationLayoutContextValue = {
   messageRefreshTick: number;
   optimisticMessages: ConversationMessage[];
   clearOptimisticMessages: (messageIds: string[]) => void;
+  contentTopInset: number;
+  contentBottomInset: number;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -218,6 +221,7 @@ export default function ConversationLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
   );
@@ -631,6 +635,13 @@ export default function ConversationLayout() {
     [handleActionPress]
   );
 
+  const handleComposerOverlayLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setComposerOverlayHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
@@ -662,6 +673,12 @@ export default function ConversationLayout() {
   const headerBarHeight = 56;
   const headerChromeHeight = insets.top + 72;
   const actionButtonsOverlaySpace = showActionButtons ? 64 + t.spacing.md : 0;
+  const composerOverlayFallbackHeight =
+    showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
+  const contentTopInset = headerChromeHeight + actionButtonsOverlaySpace;
+  const contentBottomInset = showComposer
+    ? composerOverlayHeight || composerOverlayFallbackHeight
+    : 0;
   const title = routeTitle ?? "Conversación";
 
   const providerValue: ConversationLayoutContextValue = {
@@ -676,6 +693,8 @@ export default function ConversationLayout() {
     messageRefreshTick,
     optimisticMessages,
     clearOptimisticMessages,
+    contentTopInset,
+    contentBottomInset,
   };
 
   return (
@@ -786,7 +805,6 @@ export default function ConversationLayout() {
             style={{
               flex: 1,
               paddingHorizontal: t.spacing.md,
-              paddingTop: headerChromeHeight + actionButtonsOverlaySpace,
             }}
             onTouchStart={() => Keyboard.dismiss()}
           >
@@ -794,7 +812,19 @@ export default function ConversationLayout() {
           </View>
 
           {showComposer ? (
-            <>
+            <View
+              pointerEvents="box-none"
+              onLayout={handleComposerOverlayLayout}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 9,
+                elevation: 9,
+                backgroundColor: t.colors.background,
+              }}
+            >
               {auxActions.length > 0 ? (
                 <View
                   style={{
@@ -843,10 +873,12 @@ export default function ConversationLayout() {
                   paddingHorizontal: t.spacing.md,
                   paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
                   paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+                  backgroundColor: t.colors.background,
                 }}
               >
                 <InputChat
                   clearOnSendStart
+                  placeholder="Escribe un mensaje"
                   onSend={({ text, images }) => {
                     const outgoingMessages = buildOptimisticMessages(text, images);
                     if (outgoingMessages.length === 0) return;
@@ -894,7 +926,7 @@ export default function ConversationLayout() {
                   }}
                 />
               </View>
-            </>
+            </View>
           ) : null}
         </View>
       </KeyboardAvoidingView>

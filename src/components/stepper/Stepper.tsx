@@ -1,14 +1,27 @@
 import { colors, useTheme } from "@/src/themes";
 import React, {
+  useCallback,
   forwardRef,
   useImperativeHandle,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { Pressable, StyleProp, View, ViewStyle } from "react-native";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  TouchableWithoutFeedback,
+  View,
+  ViewStyle,
+} from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { Icon } from "../Icon";
 import { Text } from "../Text";
+import { StepperKeyboardContext } from "./StepperKeyboardContext";
 import { createStepperStyles } from "./styles";
 
 export type StepApi = {
@@ -44,18 +57,19 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
   ({ steps, initialStep = 0, onFinish, onBackAtFirstStep, style }, ref) => {
     const t = useTheme();
     const s = useMemo(() => createStepperStyles(t), [t]);
+    const scrollViewRef = useRef<ScrollView | null>(null);
     const [currentStep, setCurrentStep] = useState<number>(initialStep);
     const totalSteps = steps.length;
 
-    const goNext = () => {
+    const goNext = useCallback(() => {
       if (currentStep < totalSteps - 1) setCurrentStep((i) => i + 1);
       else onFinish?.();
-    };
+    }, [currentStep, onFinish, totalSteps]);
 
-    const goBack = () => {
+    const goBack = useCallback(() => {
       if (currentStep === 0) onBackAtFirstStep?.();
       else setCurrentStep((i) => i - 1);
-    };
+    }, [currentStep, onBackAtFirstStep]);
 
     useImperativeHandle(
       ref,
@@ -69,7 +83,7 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
           return currentStep;
         },
       }),
-      [currentStep, totalSteps]
+      [currentStep, goBack, goNext, totalSteps]
     );
 
     const progress = useMemo(
@@ -77,47 +91,83 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
       [currentStep, totalSteps]
     );
     const current = steps[currentStep];
+    const scrollToFocusedInput = useCallback(
+      (target?: unknown | null) => {
+        if (target == null) return;
+
+        const scrollToTarget = () => {
+          scrollViewRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+            target,
+            t.spacing.lg,
+            true,
+          );
+        };
+
+        requestAnimationFrame(scrollToTarget);
+        setTimeout(scrollToTarget, 150);
+      },
+      [t.spacing.lg],
+    );
 
     return (
-      <View style={s.base.parent}>
-        <View style={s.header.container}>
-          {/* Header */}
-          <View style={s.header.icon}>
-            <Pressable onPress={goBack}>
-              <Icon name="arrow-left" size={20}></Icon>
-            </Pressable>
-          </View>
-          <View style={s.header.content}>
-            <ProgressCircle
-              progress={progress}
-              currentStep={currentStep + 1}
-              totalSteps={totalSteps}
-            ></ProgressCircle>
-            <View style={s.header.contentInfo}>
-              <Text variant="subtitle">{current.title}</Text>
-              <Text variant="caption" color="stateAnulated">
-                <Text
-                  variant="caption"
-                  color="stateAnulated"
-                  style={{ fontWeight: "bold" }}
-                >
-                  Siguiente paso:{" "}
-                </Text>
-                {current.isNextStepShown
-                  ? steps[currentStep + 1]?.title || current.description
-                  : current.description}
-              </Text>
-            </View>
-          </View>
-          {/* Content */}
-          <View style={s.base.contentContainer}>
-            {current.render({ next: goNext, back: goBack, index: currentStep })}
-          </View>
-        </View>
-      </View>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={[s.base.parent, style]}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            automaticallyAdjustKeyboardInsets
+            contentContainerStyle={s.base.scrollContent}
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardShouldPersistTaps="handled"
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            style={s.base.scroll}
+          >
+            <StepperKeyboardContext.Provider value={{ scrollToFocusedInput }}>
+              <View style={s.header.container}>
+                {/* Header */}
+                <View style={s.header.icon}>
+                  <Pressable onPress={goBack}>
+                    <Icon name="arrow-left" size={20}></Icon>
+                  </Pressable>
+                </View>
+                <View style={s.header.content}>
+                  <ProgressCircle
+                    progress={progress}
+                    currentStep={currentStep + 1}
+                    totalSteps={totalSteps}
+                  ></ProgressCircle>
+                  <View style={s.header.contentInfo}>
+                    <Text variant="subtitle">{current.title}</Text>
+                    <Text variant="caption" color="stateAnulated">
+                      <Text
+                        variant="caption"
+                        color="stateAnulated"
+                        style={{ fontWeight: "bold" }}
+                      >
+                        Siguiente paso:{" "}
+                      </Text>
+                      {current.isNextStepShown
+                        ? steps[currentStep + 1]?.title || current.description
+                        : current.description}
+                    </Text>
+                  </View>
+                </View>
+                {/* Content */}
+                <View style={s.base.contentContainer}>
+                  {current.render({ next: goNext, back: goBack, index: currentStep })}
+                </View>
+              </View>
+            </StepperKeyboardContext.Provider>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     );
   }
 );
+
+Stepper.displayName = "Stepper";
 
 export default Stepper;
 

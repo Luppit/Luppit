@@ -13,6 +13,7 @@ import { Icon } from "../Icon";
 import { Text } from "../Text";
 import { createInputFieldStyles } from "./styles";
 import { LucideIconName } from "@/src/icons/lucide";
+import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 
 type TextFieldProps = TextInputProps & {
   label?: string;
@@ -42,6 +43,7 @@ export const TextField: React.FC<TextFieldProps> = ({
 }) => {
   const t = useTheme();
   const s = useMemo(() => createInputFieldStyles(t), [t]);
+  const stepperKeyboard = useStepperKeyboard();
   const [focused, setFocused] = useState(false);
 
   const { children, ...textInputProps } = props as TextInputProps & {
@@ -91,6 +93,7 @@ export const TextField: React.FC<TextFieldProps> = ({
               style={[s.input, inputStyle]}
               onFocus={(event) => {
                 setFocused(true);
+                stepperKeyboard?.scrollToFocusedInput(event.target);
                 textInputProps.onFocus?.(event);
               }}
               onBlur={(event) => {

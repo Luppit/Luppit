@@ -58,6 +58,7 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
 - Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
 - Home tabs, buyer/seller home behavior, and profile tab behavior: `app/(tabs)/AGENTS.md`
+- Shared chat composer behavior: `src/components/inputChat/AGENTS.md`
 - Navbar UI behavior: `src/components/navbar/AGENTS.md`
 - RPC/runtime contracts and execution behavior: `src/services/AGENTS.md`
 - Data model and SQL transition/procedure constraints: `src/db/AGENTS.md`

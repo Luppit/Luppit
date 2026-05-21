@@ -70,6 +70,8 @@ export default function ConversationChatScreen() {
     isExecutingAction,
     optimisticMessages,
     clearOptimisticMessages,
+    contentTopInset,
+    contentBottomInset,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -587,9 +589,9 @@ export default function ConversationChatScreen() {
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingTop: t.spacing.sm,
+          paddingTop: contentTopInset + t.spacing.sm,
           gap: t.spacing.md,
-          paddingBottom: t.spacing.xl,
+          paddingBottom: contentBottomInset + t.spacing.xl,
         }}
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {

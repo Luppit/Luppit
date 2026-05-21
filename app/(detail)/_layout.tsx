@@ -34,15 +34,15 @@ export default function DetailLayout() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+      <View style={{ flex: 1, paddingHorizontal: t.spacing.md }}>
+        <Slot />
+      </View>
       <DetailTopBar
         title={title}
         hideMenu={hideMenu}
         purchaseRequestId={purchaseRequestId}
         topInset={insets.top}
       />
-      <View style={{ flex: 1, paddingHorizontal: t.spacing.md }}>
-        <Slot />
-      </View>
     </View>
   );
 }

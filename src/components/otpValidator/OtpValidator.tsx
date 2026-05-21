@@ -1,7 +1,8 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React, { useMemo, useRef, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, TextInput, View } from "react-native";
+import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createOtpValidatorStyles } from "./styles";
 
 type OtpValidatorProps = {
@@ -21,87 +22,68 @@ export default function OtpValidator({
 }: OtpValidatorProps) {
   const t = useTheme();
   const s = useMemo(() => createOtpValidatorStyles(t), [t]);
-  const inputsRef = useRef<(TextInput | null)[]>([]);
+  const stepperKeyboard = useStepperKeyboard();
+  const inputRef = useRef<TextInput | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
-  const [values, setValues] = useState<string[]>(Array(otpLength).fill(""));
+  const [value, setValue] = useState("");
 
-  const focus = (index: number) => inputsRef.current[index]?.focus();
+  const values = Array.from(
+    { length: otpLength },
+    (_, index) => value[index] ?? ""
+  );
 
-  const emit = (nextValues: string[]) => {
-    onChange?.(nextValues.join(""));
+  const focus = () => inputRef.current?.focus();
+
+  const emit = (nextValue: string) => {
+    onChange?.(nextValue);
   };
 
-  const handleChange = (text: string, index: number) => {
-    const cleaned = text.replace(/\D/g, "");
-    const next = [...values];
+  const handleChange = (text: string) => {
+    const cleaned = text.replace(/\D/g, "").slice(0, otpLength);
+    setValue(cleaned);
+    emit(cleaned);
+    setFocusedIndex(Math.min(cleaned.length, otpLength - 1));
 
-    if (cleaned.length === 0) {
-      next[index] = "";
-      setValues(next);
-      emit(next);
-      return;
-    }
-
-    let cursor = index;
-    for (const char of cleaned) {
-      if (cursor >= otpLength) break;
-      next[cursor] = char;
-      cursor += 1;
-    }
-
-    setValues(next);
-    emit(next);
-    if (cursor < otpLength) focus(cursor);
-    else inputsRef.current[otpLength - 1]?.blur();
-  };
-
-  const handleKeyPress = (key: string, index: number) => {
-    if (key !== "Backspace") return;
-    if (values[index] !== "") return;
-    if (index <= 0) return;
-
-    const next = [...values];
-    next[index - 1] = "";
-    setValues(next);
-    emit(next);
-    focus(index - 1);
+    if (cleaned.length === otpLength) inputRef.current?.blur();
   };
 
   return (
     <View style={s.container}>
-      <View style={[s.inputRow, stretch ? s.inputRowStretch : null]}>
+      <Pressable
+        style={[s.inputRow, stretch ? s.inputRowStretch : null]}
+        onPress={focus}
+      >
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={handleChange}
+          onFocus={(event) => {
+            stepperKeyboard?.scrollToFocusedInput(event.target);
+            setFocusedIndex(Math.min(value.length, otpLength - 1));
+          }}
+          onBlur={() => setFocusedIndex(null)}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={otpLength}
+          textContentType="oneTimeCode"
+          autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
+          importantForAutofill="yes"
+          caretHidden
+          style={s.hiddenInput}
+        />
         {Array.from({ length: otpLength }).map((_, index) => (
-          <Pressable
+          <View
             key={index}
             style={[
               s.inputBox,
               stretch ? s.inputBoxStretch : null,
               focusedIndex === index ? s.inputBoxFocused : null,
             ]}
-            onPress={() => focus(index)}
           >
-            <TextInput
-              ref={(el) => {
-                inputsRef.current[index] = el;
-              }}
-              value={values[index]}
-              onChangeText={(text) => handleChange(text, index)}
-              onKeyPress={(event) =>
-                handleKeyPress(event.nativeEvent.key, index)
-              }
-              onFocus={() => setFocusedIndex(index)}
-              onBlur={() =>
-                setFocusedIndex((prev) => (prev === index ? null : prev))
-              }
-              keyboardType="number-pad"
-              maxLength={1}
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-              style={s.inputText}
-            />
-          </Pressable>
+            <Text style={s.inputText}>{values[index]}</Text>
+          </View>
         ))}
-      </View>
+      </Pressable>
       {helperText ? (
         <Text variant="body" style={s.helperText}>
           {helperText}

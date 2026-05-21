@@ -6,6 +6,11 @@ import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import NavbarItem from "./NavbarItem";
 import { createNavbarStyles } from "./styles";
+import {
+  isEmailSetupAllowedTabPath,
+  normalizeTabPath,
+  useEmailSetupGate,
+} from "./useEmailSetupGate";
 import { useNavItems } from "./useNavItems";
 
 export default function Navbar() {
@@ -14,11 +19,13 @@ export default function Navbar() {
   const t = useTheme();
   const s = React.useMemo(() => createNavbarStyles(t), [t]);
   const items = useNavItems();
+  const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
+  const shouldRestrictTabs = isLoadingEmailSetupStatus || isAccountSetupBlocked;
 
   const isActive = (href: string, path: string) => {
-    const stripGroups = (p: string) => p.replace(/\([^/]+\)\//g, "");
-    const h = stripGroups(href);
-    return h === "/" ? path === "/" : path.startsWith(h);
+    const h = normalizeTabPath(href);
+    const p = normalizeTabPath(path);
+    return h === "/" ? p === "/" : p.startsWith(h);
   };
 
   return (
@@ -31,7 +38,12 @@ export default function Navbar() {
         contentStyle={s.pill}
       >
         {items.map((it) => (
-          <NavbarItem key={it.name} item={it} active={isActive(String(it.href), pathname)} />
+          <NavbarItem
+            key={it.name}
+            item={it}
+            active={isActive(String(it.href), pathname)}
+            disabled={shouldRestrictTabs && !isEmailSetupAllowedTabPath(String(it.href))}
+          />
         ))}
       </GlassSurface>
     </View>

@@ -58,6 +58,9 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       flex: 1,
       color: t.colors.stateAnulated,
     },
+    searchTriggerDisabled: {
+      opacity: 0.45,
+    },
     activeFilterChip: {
       alignSelf: "flex-start",
       minHeight: 36,

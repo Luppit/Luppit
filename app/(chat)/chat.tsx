@@ -5,14 +5,91 @@ import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
-import React from "react";
-import { Image, ScrollView, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Image, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 function AssistantTextBlock({ text }: { text: string }) {
   return (
     <View style={{ maxWidth: "96%", alignSelf: "flex-start" }}>
       <Text variant="body">{text}</Text>
+    </View>
+  );
+}
+
+function AssistantThinkingBlock() {
+  const t = useTheme();
+  const dotOpacities = useRef([
+    new Animated.Value(0.35),
+    new Animated.Value(0.35),
+    new Animated.Value(0.35),
+  ]).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.stagger(
+        140,
+        dotOpacities.map((opacity) =>
+          Animated.sequence([
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 360,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+              toValue: 0.35,
+              duration: 360,
+              useNativeDriver: true,
+            }),
+          ])
+        )
+      )
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [dotOpacities]);
+
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLiveRegion="polite"
+      accessibilityLabel="Pensando"
+      style={{
+        maxWidth: "96%",
+        alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: t.spacing.xs,
+        paddingVertical: t.spacing.xs,
+      }}
+    >
+      <Text variant="body" color="stateAnulated">
+        Pensando
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+        {dotOpacities.map((opacity, index) => (
+          <Animated.View
+            key={index}
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: t.colors.stateAnulated,
+              opacity,
+              transform: [
+                {
+                  translateY: opacity.interpolate({
+                    inputRange: [0.35, 1],
+                    outputRange: [1, -2],
+                  }),
+                },
+              ],
+            }}
+          />
+        ))}
+      </View>
     </View>
   );
 }
@@ -72,19 +149,22 @@ function PublishRequestCard({
 
 export default function ChatScreen() {
   const t = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
   const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
   const {
     messages,
     uiState,
     canPublish,
+    isSendingMessage,
     isExecutingControl,
     summary,
     summaryText,
     publishDraft,
     status,
   } = useChatSession();
+  const isAssistantBusy = isSendingMessage || isExecutingControl;
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !isAssistantBusy) {
     return (
       <View
         style={{
@@ -112,8 +192,12 @@ export default function ChatScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
+      onContentSizeChange={() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }}
       contentContainerStyle={{
         paddingTop: t.spacing.sm,
         gap: t.spacing.sm,
@@ -141,13 +225,15 @@ export default function ChatScreen() {
         )
       ))}
 
+      {isAssistantBusy ? <AssistantThinkingBlock /> : null}
+
       {uiState === "review" ? (
         <>
           <AssistantTextBlock text="Aquí tienes el resumen de tu solicitud. Revisa que toda la información sea correcta antes de continuar." />
           <PublishRequestCard
             title={summary?.titulo ?? "Solicitud"}
             description={summaryText ?? "Sin descripción"}
-            disabled={!canPublish || isExecutingControl}
+            disabled={!canPublish || isAssistantBusy}
             loading={isExecutingControl}
             onPublish={() => void publishDraft()}
           />

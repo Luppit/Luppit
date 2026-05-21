@@ -33,6 +33,7 @@ type ChatSessionContextValue = {
   isSendingMessage: boolean;
   isExecutingControl: boolean;
   canPublish: boolean;
+  showComposer: boolean;
   canCompose: boolean;
   sendMessage: (text: string) => Promise<void>;
   continueClarifying: () => Promise<void>;
@@ -56,6 +57,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   isSendingMessage: false,
   isExecutingControl: false,
   canPublish: false,
+  showComposer: true,
   canCompose: true,
   sendMessage: async () => {},
   continueClarifying: async () => {},
@@ -166,13 +168,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       setSummaryText(next.summaryText);
       setPurchaseRequestId(next.purchaseRequestId);
 
-      if (appendAssistantMessage && next.assistantMessage) {
+      const assistantMessage = next.assistantMessage;
+      if (appendAssistantMessage && assistantMessage) {
         setMessages((prev) => [
           ...prev,
           {
             id: createMessageId("assistant"),
             sender: "assistant",
-            text: next.assistantMessage,
+            text: assistantMessage,
           },
         ]);
       }
@@ -323,7 +326,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         Boolean(draftId) &&
         status === "ready" &&
         uiState === "review" &&
-        status !== "published",
+        !isSendingMessage &&
+        !isExecutingControl,
+      showComposer: status !== "published",
       canCompose:
         !isSendingMessage &&
         !isExecutingControl &&

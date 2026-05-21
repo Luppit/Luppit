@@ -20,6 +20,8 @@ type DetailTopBarProps = {
   topInset: number;
 };
 
+export const DETAIL_TOP_BAR_VISIBLE_HEIGHT = 72;
+
 export default function DetailTopBar({
   title,
   hideMenu = false,
@@ -103,7 +105,13 @@ export default function DetailTopBar({
       variant="chrome"
       blur="chrome"
       style={{
-        height: topInset + 72,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        elevation: 10,
+        height: topInset + DETAIL_TOP_BAR_VISIBLE_HEIGHT,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,
         borderBottomLeftRadius: t.glass.radius.chrome,

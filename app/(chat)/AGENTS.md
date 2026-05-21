@@ -14,6 +14,7 @@ Applies to the buyer request-assistant chat flow under `app/(chat)`.
 - The chat currently runs in text-only mode:
   - do not send images from `/(chat)` unless product explicitly re-enables that flow
   - the composer should hide attachment affordances for this surface
+- Shared composer internals, including multiline autosize, live in `src/components/inputChat/AGENTS.md`; this surface should configure the shared component rather than forking composer behavior.
 
 ## Chat UI Behavior
 - Buyer request-assistant messages should render as plain assistant text, not assistant chat bubbles.

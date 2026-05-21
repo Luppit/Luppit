@@ -15,9 +15,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 function ChatLayoutContent() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { title, sendMessage, messages, canCompose, isSendingMessage, isExecutingControl } =
-    useChatSession();
+  const {
+    title,
+    sendMessage,
+    messages,
+    showComposer,
+    canCompose,
+    isSendingMessage,
+    isExecutingControl,
+  } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const isAssistantBusy = isSendingMessage || isExecutingControl;
 
   useEffect(() => {
     const showEvent =
@@ -67,7 +75,7 @@ function ChatLayoutContent() {
           <Slot />
         </View>
 
-        {canCompose ? (
+        {showComposer ? (
           <View
             style={{
               paddingHorizontal: t.spacing.md,
@@ -78,12 +86,14 @@ function ChatLayoutContent() {
             }}
           >
             <InputChat
+              clearOnSendStart
               autoFocus={messages.length === 0}
-              disabled={isSendingMessage || isExecutingControl}
+              disabled={!canCompose}
+              busy={isAssistantBusy}
               showAttachmentButton={false}
               maxImages={0}
               onSend={({ text }) => {
-                void sendMessage(text);
+                return sendMessage(text);
               }}
             />
           </View>
