@@ -3,6 +3,7 @@ import ConversationActionButtons, {
   ConversationActionButtonConfig,
 } from "@/src/components/conversation/ConversationActionButtons";
 import Button from "@/src/components/button/Button";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -37,6 +38,7 @@ import React, {
 import {
   Keyboard,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Platform,
   Pressable,
   View,
@@ -55,6 +57,8 @@ type ConversationLayoutContextValue = {
   messageRefreshTick: number;
   optimisticMessages: ConversationMessage[];
   clearOptimisticMessages: (messageIds: string[]) => void;
+  contentTopInset: number;
+  contentBottomInset: number;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -217,6 +221,7 @@ export default function ConversationLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
   );
@@ -630,6 +635,13 @@ export default function ConversationLayout() {
     [handleActionPress]
   );
 
+  const handleComposerOverlayLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setComposerOverlayHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading || !conversationView || !profileId) {
@@ -659,7 +671,14 @@ export default function ConversationLayout() {
   const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
   const headerBarHeight = 56;
+  const headerChromeHeight = insets.top + 72;
   const actionButtonsOverlaySpace = showActionButtons ? 64 + t.spacing.md : 0;
+  const composerOverlayFallbackHeight =
+    showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
+  const contentTopInset = headerChromeHeight + actionButtonsOverlaySpace;
+  const contentBottomInset = showComposer
+    ? composerOverlayHeight || composerOverlayFallbackHeight
+    : 0;
   const title = routeTitle ?? "Conversación";
 
   const providerValue: ConversationLayoutContextValue = {
@@ -674,6 +693,8 @@ export default function ConversationLayout() {
     messageRefreshTick,
     optimisticMessages,
     clearOptimisticMessages,
+    contentTopInset,
+    contentBottomInset,
   };
 
   return (
@@ -684,11 +705,34 @@ export default function ConversationLayout() {
         keyboardVerticalOffset={0}
       >
         <View style={{ flex: 1 }}>
-          <View
+          <GlassSurface
+            variant="chrome"
+            blur="chrome"
             style={{
-              paddingTop: insets.top,
-              paddingHorizontal: t.spacing.md,
-              backgroundColor: t.colors.background,
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              elevation: 10,
+              height: headerChromeHeight,
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+            }}
+            clipStyle={{
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+              overflow: "hidden",
+            }}
+            contentStyle={{
+              flex: 1,
+              paddingTop: insets.top + t.spacing.xs,
+              paddingHorizontal: t.spacing.xl,
+              paddingBottom: t.spacing.xs,
             }}
           >
             <View
@@ -702,7 +746,7 @@ export default function ConversationLayout() {
               <Pressable
                 onPress={() => router.back()}
                 hitSlop={12}
-                style={{ width: 40, alignItems: "flex-start" }}
+                style={{ width: 40, alignItems: "flex-start", justifyContent: "center" }}
               >
                 <Icon name="arrow-left" size={28} />
               </Pressable>
@@ -719,6 +763,7 @@ export default function ConversationLayout() {
                   style={{
                     width: 40,
                     alignItems: "flex-end",
+                    justifyContent: "center",
                     opacity: isExecutingAction ? 0.6 : 1,
                   }}
                 >
@@ -728,13 +773,13 @@ export default function ConversationLayout() {
                 <View style={{ width: 40 }} />
               )}
             </View>
-          </View>
+          </GlassSurface>
 
           {showActionButtons ? (
             <View
               style={{
                 position: "absolute",
-                top: insets.top + headerBarHeight - t.spacing.xs,
+                top: headerChromeHeight - t.spacing.xs,
                 left: 0,
                 right: 0,
                 zIndex: 10,
@@ -760,7 +805,6 @@ export default function ConversationLayout() {
             style={{
               flex: 1,
               paddingHorizontal: t.spacing.md,
-              paddingTop: actionButtonsOverlaySpace,
             }}
             onTouchStart={() => Keyboard.dismiss()}
           >
@@ -768,7 +812,19 @@ export default function ConversationLayout() {
           </View>
 
           {showComposer ? (
-            <>
+            <View
+              pointerEvents="box-none"
+              onLayout={handleComposerOverlayLayout}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 9,
+                elevation: 9,
+                backgroundColor: t.colors.background,
+              }}
+            >
               {auxActions.length > 0 ? (
                 <View
                   style={{
@@ -817,10 +873,12 @@ export default function ConversationLayout() {
                   paddingHorizontal: t.spacing.md,
                   paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
                   paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+                  backgroundColor: t.colors.background,
                 }}
               >
                 <InputChat
                   clearOnSendStart
+                  placeholder="Escribe un mensaje"
                   onSend={({ text, images }) => {
                     const outgoingMessages = buildOptimisticMessages(text, images);
                     if (outgoingMessages.length === 0) return;
@@ -868,7 +926,7 @@ export default function ConversationLayout() {
                   }}
                 />
               </View>
-            </>
+            </View>
           ) : null}
         </View>
       </KeyboardAvoidingView>

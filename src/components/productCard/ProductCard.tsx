@@ -11,6 +11,7 @@ type ProductCardProps = {
   views: number;
   statusLabel?: string;
   offersLabel?: string;
+  offersCount?: number;
   onPress?: () => void;
   onLongPress?: () => void;
 };
@@ -21,11 +22,14 @@ export default function ProductCard({
   views,
   statusLabel = "Activa",
   offersLabel = "# ofertas",
+  offersCount,
   onPress,
   onLongPress,
 }: ProductCardProps) {
   const t = useTheme();
   const s = useMemo(() => createProductCardStyles(t), [t]);
+  const hasOfferCount = typeof offersCount === "number";
+  const hasOffers = hasOfferCount && offersCount > 0;
   const liftScale = useRef(new Animated.Value(1)).current;
   const liftTranslateY = useRef(new Animated.Value(0)).current;
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,6 +110,8 @@ export default function ProductCard({
         accessibilityRole="button"
       >
         <View style={s.card}>
+          <View pointerEvents="none" style={s.topSheen} />
+
           <View>
             <Text variant="subtitle" maxLines={1} style={s.title}>
               {title}
@@ -115,25 +121,43 @@ export default function ProductCard({
             </Text>
           </View>
 
+          <View style={s.statusPill}>
+            <View style={s.statusDot} />
+            <Text variant="body" maxLines={1} style={s.statusText}>
+              {statusLabel}
+            </Text>
+          </View>
+
           <View style={s.bottomRow}>
             <View style={s.viewsRow}>
-              <Icon name="eye" size={26} color={t.colors.stateAnulated} />
-              <Text variant="body" style={s.viewsText}>
+              <Icon name="eye" size={20} color={t.colors.stateAnulated} />
+              <Text variant="body" maxLines={1} style={s.viewsText}>
                 {views}
               </Text>
             </View>
 
-            <View style={s.statusPill}>
-              <Text variant="body" style={s.statusText}>
-                {statusLabel}
+            {hasOfferCount ? (
+              <View style={s.offersMetric}>
+                <Icon
+                  name="tag"
+                  size={14}
+                  color={t.colors.textDark}
+                />
+                <Text
+                  variant="body"
+                  maxLines={1}
+                  style={[s.offersText, hasOffers ? s.offersTextActive : s.offersTextInactive]}
+                >
+                  {offersLabel}
+                </Text>
+              </View>
+            ) : (
+              <Text variant="body" maxLines={1} style={s.offersPlainText}>
+                {offersLabel}
               </Text>
-            </View>
+            )}
           </View>
         </View>
-
-        <Text variant="body" style={s.offersText}>
-          {offersLabel}
-        </Text>
       </Pressable>
     </Animated.View>
   );

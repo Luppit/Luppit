@@ -24,8 +24,10 @@ import { Image } from "expo-image";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgUri } from "react-native-svg";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 function parsePurchaseRequestParam(
   raw: string | string[] | undefined,
@@ -41,6 +43,7 @@ function parsePurchaseRequestParam(
 
 export default function PurchaseRequestDetailScreen() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const [showCategoryHint, setShowCategoryHint] = useState(false);
   const [offers, setOffers] = useState<PurchaseOfferCardData[]>([]);
   const [offersLoading, setOffersLoading] = useState(true);
@@ -193,8 +196,14 @@ export default function PurchaseRequestDetailScreen() {
   }, [purchaseRequest.id]);
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={{ flex: 1, paddingTop: t.spacing.md }}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingTop: insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT + t.spacing.md,
+        paddingBottom: t.spacing.xl,
+      }}
+    >
+      <View style={{ flex: 1 }}>
         <View>
           <Text variant="body">{purchaseRequest.summary_text ?? ""}</Text>
         </View>

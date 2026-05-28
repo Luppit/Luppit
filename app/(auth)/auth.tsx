@@ -13,62 +13,61 @@ export default function auth() {
   );
 
   return (
-    <View
-      style={{
-        alignItems: "center",
-        ...styles.container,
-      }}
-    >
-      {logoAsset.uri ? (
-        <SvgUri
-          uri={logoAsset.uri}
-          width={80}
-          height={80}
-          style={{ marginBottom: spacing.lg }}
-        />
-      ) : null}
-      <Text variant="title" style={{ marginBottom: spacing.xs }}>
-        ¡Luppit te da la bienvenida!
-      </Text>
-      <Text variant="body" color="stateAnulated" align="center">
-        Empieza a comprar y vender en nuetra comunidad.
-      </Text>
-
-      <View style={{ width: "100%", paddingTop: spacing.lg }}>
-        <Button
-          onPress={() => router.push("/(auth)/signup")}
-          variant="white"
-          title="Crear cuenta con teléfono"
-          icon="smartphone"
-        ></Button>
-      </View>
-
-      <View style={styles.parentContainer}>
-        <View style={styles.childrenLine}></View>
-        <View style={styles.separatorCircle}></View>
-        <View style={styles.childrenLine}></View>
-      </View>
-
-      <View style={{ width: "100%" }}>
-        <Button
-          onPress={() => router.push("/(auth)/login")}
-          variant="dark"
-          title="Iniciar sesión con mi cuenta"
-        ></Button>
-      </View>
-
-      <View style={styles.footer}>
-        <Text variant="caption" align="center">
-          Al continuar, aceptas automáticamente los
+    <View style={styles.container}>
+      <View style={styles.brand}>
+        {logoAsset.uri ? (
+          <SvgUri
+            uri={logoAsset.uri}
+            width={80}
+            height={80}
+            style={{ marginBottom: spacing.lg }}
+          />
+        ) : null}
+        <Text variant="title" align="center" style={{ marginBottom: spacing.xs }}>
+          ¡Luppit te da la bienvenida!
         </Text>
-        <Link href="https://google.com">
-          <Text
-            variant="caption"
-            style={{ textDecorationLine: "underline", fontWeight: "bold" }}
-          >
-            Términos y condiciones
+        <Text variant="body" color="stateAnulated" align="center">
+          Empieza a comprar y vender en nuestra comunidad.
+        </Text>
+      </View>
+
+      <View style={styles.actions}>
+        <View style={styles.actionButton}>
+          <Button
+            onPress={() => router.push("/(auth)/signup")}
+            variant="white"
+            title="Crear cuenta con teléfono"
+            icon="smartphone"
+          ></Button>
+        </View>
+
+        <View style={styles.parentContainer}>
+          <View style={styles.childrenLine}></View>
+          <View style={styles.separatorCircle}></View>
+          <View style={styles.childrenLine}></View>
+        </View>
+
+        <View style={styles.actionButton}>
+          <Button
+            onPress={() => router.push("/(auth)/login")}
+            variant="dark"
+            title="Iniciar sesión con mi cuenta"
+          ></Button>
+        </View>
+
+        <View style={styles.footer}>
+          <Text variant="caption" align="center">
+            Al continuar, aceptas automáticamente los
           </Text>
-        </Link>
+          <Link href="https://google.com">
+            <Text
+              variant="caption"
+              style={{ textDecorationLine: "underline", fontWeight: "bold" }}
+            >
+              Términos y condiciones
+            </Text>
+          </Link>
+        </View>
       </View>
     </View>
   );
@@ -79,12 +78,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     flex: 1,
   },
+  brand: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingBottom: spacing.xl,
+  },
+  actions: {
+    width: "100%",
+    paddingBottom: spacing.lg,
+  },
+  actionButton: {
+    width: "100%",
+  },
   footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.md,
+    paddingTop: spacing.xl,
     alignItems: "center",
   },
   parentContainer: {

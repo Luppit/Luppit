@@ -3,13 +3,16 @@ import { TextStyle, ViewStyle } from "react-native";
 
 export type SellerOfferCardStyles = {
   wrapper: ViewStyle;
+  surface: ViewStyle;
   card: ViewStyle;
-  topSection: ViewStyle;
+  titleRow: ViewStyle;
+  title: TextStyle;
   description: TextStyle;
-  category: TextStyle;
-  bottomRow: ViewStyle;
-  profileName: TextStyle;
+  descriptionSpacer: ViewStyle;
+  detailRow: ViewStyle;
+  metaText: TextStyle;
   statusPill: ViewStyle;
+  statusDot: ViewStyle;
   statusText: TextStyle;
   priceText: TextStyle;
 };
@@ -19,54 +22,71 @@ export function createSellerOfferCardStyles(t: Theme): SellerOfferCardStyles {
     wrapper: {
       width: "100%",
       alignSelf: "stretch",
-      borderRadius: 22,
-      backgroundColor: t.colors.primaryLight,
-      padding: t.spacing.sm,
-      gap: t.spacing.xs,
+      borderRadius: 24,
+    },
+    surface: {
+      borderRadius: 24,
     },
     card: {
-      backgroundColor: t.colors.backgroudWhite,
-      borderRadius: 18,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
-      gap: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.08,
-      shadowOffset: { width: 0, height: 4 },
-      shadowRadius: 10,
-      elevation: 4,
+      minHeight: 116,
+      borderRadius: 24,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 8,
+      overflow: "hidden",
     },
-    topSection: {
+    titleRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
       gap: 2,
     },
-    description: {
+    title: {
       color: t.colors.textDark,
+      flex: 1,
+      paddingRight: t.spacing.sm,
     },
-    category: {
-      color: t.colors.stateAnulated,
+    metaText: {
+      color: t.colors.textMedium,
     },
-    bottomRow: {
+    detailRow: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-end",
       justifyContent: "space-between",
       gap: t.spacing.sm,
     },
-    profileName: {
-      color: t.colors.textDark,
+    description: {
+      color: t.colors.stateAnulated,
+      flex: 1,
+    },
+    descriptionSpacer: {
       flex: 1,
     },
     statusPill: {
-      backgroundColor: t.colors.primary,
+      ...t.glass.chip,
+      backgroundColor: t.colors.primaryLight,
       borderRadius: 999,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: 6,
+      maxWidth: "55%",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: t.colors.primary,
     },
     statusText: {
-      color: t.colors.backgroudWhite,
+      color: t.colors.textDark,
+      flexShrink: 1,
     },
     priceText: {
       color: t.colors.textDark,
-      textAlign: "center",
+      flexShrink: 0,
     },
   };
 }

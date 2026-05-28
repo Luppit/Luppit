@@ -20,10 +20,17 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 export default function BusinessProfileScreen() {
   const t = useTheme();
-  const s = useMemo(() => createBusinessProfileStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createBusinessProfileStyles(t, topContentInset),
+    [t, topContentInset]
+  );
   const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<BusinessCategoryOption[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<SellerBusinessCategoryPreference[]>([]);
@@ -366,11 +373,11 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-function createBusinessProfileStyles(t: Theme) {
+function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
   return StyleSheet.create({
     content: {
       gap: t.spacing.lg,
-      paddingTop: t.spacing.sm,
+      paddingTop: topContentInset + t.spacing.sm,
       paddingBottom: t.spacing.xl,
     },
     loadingBox: {
@@ -378,6 +385,7 @@ function createBusinessProfileStyles(t: Theme) {
       alignItems: "center",
       justifyContent: "center",
       gap: t.spacing.sm,
+      paddingTop: topContentInset,
     },
     emptyState: {
       flex: 1,
@@ -385,6 +393,7 @@ function createBusinessProfileStyles(t: Theme) {
       justifyContent: "center",
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.lg,
+      paddingTop: topContentInset,
     },
     emptyIcon: {
       width: 48,

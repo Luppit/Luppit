@@ -1,5 +1,9 @@
 import Navbar from "@/src/components/navbar/Navbar";
 import TopNavbar from "@/src/components/navbar/TopNavbar";
+import {
+  isEmailSetupAllowedTabPath,
+  useEmailSetupGate,
+} from "@/src/components/navbar/useEmailSetupGate";
 import { RoleProvider } from "@/src/components/role/RoleContext";
 import { colors, spacing } from "@/src/themes";
 import { Redirect, Slot, usePathname } from "expo-router";
@@ -13,6 +17,7 @@ export default function TabsLayout() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);
+  const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
   const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
   const isFavoritesTabScreen = pathname === "/favorites";
   const isChatsTabScreen = pathname === "/chats";
@@ -39,24 +44,39 @@ export default function TabsLayout() {
 
   if (!isAuth) return <Redirect href="/(auth)/auth" />;
 
+  if (
+    !isLoadingEmailSetupStatus &&
+    isAccountSetupBlocked &&
+    !isEmailSetupAllowedTabPath(pathname)
+  ) {
+    return <Redirect href="/" />;
+  }
+
   return (
-    <SafeAreaView style={{ ...layoutStyles.container, ...layoutStyles.view }}>
+    <View style={layoutStyles.root}>
       <RoleProvider>
+        <SafeAreaView style={layoutStyles.view}>
+          <View style={layoutStyles.container}>
+            <Slot />
+          </View>
+        </SafeAreaView>
         {hidesTopNavbar ? null : <TopNavbar />}
-        <View style={layoutStyles.container}>
-          <Slot />
-        </View>
       </RoleProvider>
       <Navbar />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const layoutStyles = {
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
   },
   view: {
+    flex: 1,
     padding: spacing.md,
     backgroundColor: colors.background,
   },

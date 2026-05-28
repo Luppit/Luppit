@@ -5,7 +5,9 @@ export type OtpVerifierStyles = {
   label: ViewStyle;
   otpCodeContainer: ViewStyle;
   otpCodeInputContainer: ViewStyle;
+  otpCodeInputContainerFocused: ViewStyle;
   otpCodeInput: TextStyle;
+  otpHiddenInput: TextStyle;
   resendCodeView: ViewStyle;
   errorView: ViewStyle;
   inputState: {
@@ -41,12 +43,25 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       borderWidth: 1,
       borderColor: t.colors.border,
       borderRadius: t.borders.sm,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    otpCodeInputContainerFocused: {
+      borderColor: t.colors.primary,
     },
     otpCodeInput: {
-      flex: 1,
       textAlign: "center",
       fontSize: t.fontSizes.lg,
+      lineHeight: t.fontSizes.lg + 10,
       fontFamily: t.typography.body.fontFamily,
+      color: t.colors.textDark,
+      includeFontPadding: false,
+    },
+    otpHiddenInput: {
+      position: "absolute",
+      width: 1,
+      height: 1,
+      opacity: 0,
       ...Platform.select({
         web: {
           outlineWidth: 0,

@@ -1,7 +1,8 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, TextInput, View } from "react-native";
+import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createOtpVerifierStyles } from "./styles";
 
 type OtpVerifierProps = {
@@ -21,6 +22,7 @@ export const OtpVerifier = ({
 }: OtpVerifierProps) => {
   const t = useTheme();
   const s = useMemo(() => createOtpVerifierStyles(t), [t]);
+  const stepperKeyboard = useStepperKeyboard();
 
   useEffect(() => {
     startCountdown();
@@ -33,6 +35,7 @@ export const OtpVerifier = ({
   const [values, setValues] = useState<string[]>(() =>
     Array(otpLength).fill("")
   );
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
   const [isActive, setIsActive] = useState<boolean>(true);
   const [hasError, setHasError] = useState<boolean>(false);
@@ -42,11 +45,11 @@ export const OtpVerifier = ({
   const INTERLVAL_TIME = 30;
   const [remainingTime, setRemainingTime] = useState<number>(INTERLVAL_TIME);
 
-  const inputsRef = useRef<(TextInput | null)[]>([]);
+  const inputRef = useRef<TextInput | null>(null);
   const isVerifyingRef = useRef(false);
 
-  const focus = (i: number) => inputsRef.current[i]?.focus();
-  const blur = (i: number) => inputsRef.current[i]?.blur();
+  const focus = () => inputRef.current?.focus();
+  const blur = () => inputRef.current?.blur();
 
   const maybeComplete = async (nextValues: string[]) => {
     if (isVerifyingRef.current || !nextValues.every((c) => c !== "")) return;
@@ -66,49 +69,20 @@ export const OtpVerifier = ({
     }
   };
 
-  const handleChange = (text: string, i: number) => {
+  const handleChange = (text: string) => {
     if (isValid || isVerifying) return;
     setHasError(false);
-    const cleaned = text.replace(/\D/g, "");
-    if (cleaned.length === 0) {
-      const next = [...values];
-      next[i] = "";
-      setValues(next);
-      return;
-    }
-
-    const next = [...values];
-    let idx = i;
-    for (const ch of cleaned) {
-      if (idx >= otpLength) break;
-      next[idx] = ch;
-      idx++;
-    }
+    const cleaned = text.replace(/\D/g, "").slice(0, otpLength);
+    const next = Array.from(
+      { length: otpLength },
+      (_, index) => cleaned[index] ?? ""
+    );
     setValues(next);
+    setFocusedIndex(Math.min(cleaned.length, otpLength - 1));
 
-    if (idx < otpLength) focus(idx);
-    else blur(otpLength - 1);
+    if (cleaned.length === otpLength) blur();
 
     void maybeComplete(next);
-  };
-
-  const handleKeyPress = (e: any, i: number) => {
-    if (isValid || isVerifying) return;
-    if (e.nativeEvent.key !== "Backspace") return;
-    if (values[i] === "" && i > 0) {
-      const next = [...values];
-      next[i - 1] = "";
-      setValues(next);
-      focus(i - 1);
-    }
-  };
-
-  const handleFocus = (i: number) => {
-    if (isValid || isVerifying) return;
-    if (!values[i]) return;
-    const next = [...values];
-    next[i] = "";
-    setValues(next);
   };
 
   const resendCode = async () => {
@@ -116,9 +90,11 @@ export const OtpVerifier = ({
     setIsActive(false);
     await onResendCode();
     setValues(Array(otpLength).fill(""));
+    setFocusedIndex(0);
     setHasError(false);
     setIsValid(false);
     startCountdown();
+    focus();
   };
 
   const startCountdown = () => {
@@ -143,32 +119,46 @@ export const OtpVerifier = ({
           Se ha enviado un código a {maskPhone(phoneNumber)}
         </Text>
       </View>
-      <View style={s.otpCodeContainer}>
+      <Pressable
+        style={s.otpCodeContainer}
+        onPress={focus}
+        disabled={isValid || isVerifying}
+      >
+        <TextInput
+          ref={inputRef}
+          value={values.join("")}
+          onChangeText={handleChange}
+          onFocus={(event) => {
+            stepperKeyboard?.scrollToFocusedInput(event.target);
+            setFocusedIndex(Math.min(values.join("").length, otpLength - 1));
+          }}
+          onBlur={() => setFocusedIndex(null)}
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={otpLength}
+          editable={!isValid && !isVerifying}
+          textContentType="oneTimeCode"
+          autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
+          importantForAutofill="yes"
+          caretHidden
+          style={s.otpHiddenInput}
+        />
         {Array.from({ length: otpLength }).map((_, index) => (
-          <View key={index} style={[s.otpCodeInputContainer, 
-            hasError ? s.inputState.error : undefined,
-            isValid ? s.inputState.success : undefined
-          ]}>
-            <TextInput
-              ref={(el) => {
-                inputsRef.current[index] = el;
-              }}
-              style={
-                s.otpCodeInput
-              }
-              value={values[index]}
-              onChangeText={(txt) => handleChange(txt, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
-              onFocus={() => handleFocus(index)}
-              keyboardType="number-pad"
-              maxLength={1}
-              editable={!isValid && !isVerifying}
-              textContentType="oneTimeCode"
-              autoComplete="one-time-code"
-            />
+          <View
+            key={index}
+            style={[
+              s.otpCodeInputContainer,
+              focusedIndex === index
+                ? s.otpCodeInputContainerFocused
+                : undefined,
+              hasError ? s.inputState.error : undefined,
+              isValid ? s.inputState.success : undefined,
+            ]}
+          >
+            <Text style={s.otpCodeInput}>{values[index]}</Text>
           </View>
         ))}
-      </View>
+      </Pressable>
       {Boolean(hasError) && (
         <View style={s.errorView}>
           <Text color="error">

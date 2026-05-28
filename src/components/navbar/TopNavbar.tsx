@@ -1,4 +1,5 @@
 import { TextField } from "@/src/components/inputField/InputField";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { getSession } from "@/src/lib/supabase";
@@ -39,9 +40,11 @@ import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { createTopNavbarStyles } from "./topNavbarStyles";
+import { useEmailSetupGate } from "./useEmailSetupGate";
 
 const segmentSvgModules: Record<string, number> = {
   todas: require("../../../assets/segments/todas.svg"),
@@ -104,7 +107,8 @@ function buildFallbackBuyerStatusOptions(
 
 function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const t = useTheme();
-  const s = useMemo(() => createTopNavbarStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const s = useMemo(() => createTopNavbarStyles(t, insets.top), [insets.top, t]);
   const pathname = usePathname();
   const segmentIconUris = useMemo(() => {
     const uris: Record<string, string> = {};
@@ -125,6 +129,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   >([]);
   const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
   const isHomeRoute = pathname === "/" || pathname === "/index";
+  const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
+  const shouldBlockHomeControls = isLoadingEmailSetupStatus || isAccountSetupBlocked;
 
   useEffect(() => {
     return subscribeBuyerHomeFilters(setHomeFilters);
@@ -190,7 +196,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   }, []);
 
   useEffect(() => {
-    if (role !== "buyer") return;
+    if (role !== "buyer" || shouldBlockHomeControls) return;
 
     let active = true;
 
@@ -218,10 +224,10 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     return () => {
       active = false;
     };
-  }, [role, selectedSegmentSvgName]);
+  }, [role, selectedSegmentSvgName, shouldBlockHomeControls]);
 
   useEffect(() => {
-    if (role !== "seller") return;
+    if (role !== "seller" || shouldBlockHomeControls) return;
 
     let active = true;
 
@@ -239,9 +245,11 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     return () => {
       active = false;
     };
-  }, [role, selectedSegmentSvgName]);
+  }, [role, selectedSegmentSvgName, shouldBlockHomeControls]);
 
   const openFiltersPopup = useCallback(async () => {
+    if (shouldBlockHomeControls) return;
+
     if (role === "buyer") {
       let statusOptions = buyerStatusOptions;
 
@@ -352,10 +360,23 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     selectedSegmentSvgName,
     sellerCategoryOptions,
     sellerHomeFilters,
+    shouldBlockHomeControls,
   ]);
+  const showBuyerFilterChip =
+    !shouldBlockHomeControls && role === "buyer" && hasBuyerHomeFilters(homeFilters);
+  const showSellerFilterChip =
+    !shouldBlockHomeControls &&
+    role === "seller" &&
+    hasSellerHomeFilters(sellerHomeFilters);
 
   return (
-    <View style={s.container}>
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.container}
+      clipStyle={s.containerClip}
+      contentStyle={s.containerContent}
+    >
       <Pressable onPress={() => console.log("open profile switcher")}>
         <View style={s.profileRow}>
           <Text variant="subtitle">{profileName}</Text>
@@ -366,14 +387,18 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
 
       {isHomeRoute ? (
         <>
-          <Pressable style={s.searchTrigger} onPress={() => void openFiltersPopup()}>
+          <Pressable
+            disabled={shouldBlockHomeControls}
+            style={[s.searchTrigger, shouldBlockHomeControls && s.searchTriggerDisabled]}
+            onPress={() => void openFiltersPopup()}
+          >
             <Icon name="search" size={20} color={t.colors.stateAnulated} />
             <Text variant="body" style={s.searchTriggerText}>
               Buscar en Luppit
             </Text>
           </Pressable>
 
-          {role === "buyer" && hasBuyerHomeFilters(homeFilters) ? (
+          {showBuyerFilterChip ? (
             <View style={s.activeFilterChip}>
               <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
               <Text variant="body" style={s.activeFilterChipLabel}>
@@ -385,7 +410,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
             </View>
           ) : null}
 
-          {role === "seller" && hasSellerHomeFilters(sellerHomeFilters) ? (
+          {showSellerFilterChip ? (
             <View style={s.activeFilterChip}>
               <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
               <Text variant="body" style={s.activeFilterChipLabel}>
@@ -415,34 +440,34 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       >
         {segments.map((segment) => {
           const segmentIconUri = segmentIconUris[segment.svgName];
+          const isSelected =
+            selectedSegmentSvgName === segment.svgName && !segment.isDisabled;
 
           return (
             <Pressable
               key={segment.svgName}
-              disabled={segment.isDisabled}
+              disabled={shouldBlockHomeControls || segment.isDisabled}
               onPress={() => {
-                if (segment.isDisabled) return;
+                if (shouldBlockHomeControls || segment.isDisabled) return;
                 setSelectedSegmentSvgName(segment.svgName);
               }}
               style={[
                 s.categoryButton,
-                selectedSegmentSvgName === segment.svgName &&
-                  !segment.isDisabled &&
-                  s.categoryButtonActive,
-                segment.isDisabled && s.categoryButtonDisabled,
+                isSelected && s.categoryButtonActive,
+                (shouldBlockHomeControls || segment.isDisabled) && s.categoryButtonDisabled,
               ]}
             >
               <View style={s.categoryImageContainer}>
                 {!segmentIconUri || failedSegmentIcons[segment.svgName] ? (
                   <Image
                     source={require("../../../assets/images/icon.png")}
-                    style={s.categoryImage}
+                    style={[s.categoryImage, isSelected && s.categoryImageActive]}
                   />
                 ) : (
                   <SvgUri
                     uri={segmentIconUri}
-                    width={34}
-                    height={34}
+                    width={isSelected ? 38 : 34}
+                    height={isSelected ? 38 : 34}
                     onError={() =>
                       setFailedSegmentIcons((current) =>
                         current[segment.svgName]
@@ -453,14 +478,19 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
                   />
                 )}
               </View>
-              <Text color={segment.isDisabled ? "IconColorGray" : "textDark"}>
+              <Text
+                color={
+                  shouldBlockHomeControls || segment.isDisabled ? "IconColorGray" : "textDark"
+                }
+                style={[isSelected && s.categoryLabelActive]}
+              >
                 {segment.name}
               </Text>
             </Pressable>
           );
         })}
       </ScrollView>
-    </View>
+    </GlassSurface>
   );
 }
 

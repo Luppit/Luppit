@@ -42,11 +42,23 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep buyer/seller home preset assignment profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
 - Keep seller business category preferences DB-driven via `business_category_preference` and `set_current_business_category_preferences`; category editing belongs on the business information detail page, not as a seller main-profile metric card.
 
+## Shared Glass UI
+- Keep iOS-style glass materials centralized in `src/themes/glass.ts` and render blurred glass surfaces through `src/components/glass/GlassSurface.tsx`; do not create one-off rgba/shadow/blur recipes in individual screens.
+- Use the existing glass roles intentionally: `surface` for content cards, `chrome` for top navigation/header chrome, `nav` for the bottom tab navbar, `sheet` for popup sheets, `control` for search/date/input controls, `headerControl` for controls that live inside top chrome, and `chip` for applied filters/status-like pills.
+- `GlassSurface` owns the material: it composes `BlurView`, the translucent tint, radius, border, and shadow from the theme. Use `variant`, `blur`, `style`, `clipStyle`, and `contentStyle` instead of nesting ad hoc `BlurView`/rgba/shadow layers.
+- Header chrome should attach to the top and side edges of the screen, including the safe-area/status region, with only bottom corners rounded. Do not make top headers float as detached cards unless product explicitly asks for that.
+- Bottom nav chrome should use `GlassSurface` with the `nav` role, not a raw `BlurView`. Keep it visually separate from the content passing behind it with the shared `nav` tint/border/shadow; do not reintroduce a horizontal highlight streak inside the pill.
+- For glass to read correctly, keep blur under a translucent tint and place real content behind/under it when possible; avoid opaque white fills that flatten the material. Content should be able to scroll under chrome, but the foreground text/icons must remain readable.
+- Tune glass from `src/themes/glass.ts`: increase role `backgroundColor` alpha when the material is too transparent or busy, decrease `blurIntensity` when content underneath becomes too distorted/smeared, and strengthen `borderColor`/`borderBottomColor` for edge definition. Do this per role (`chrome`, `nav`, `headerControl`) rather than by adding one-off screen styles.
+- Controls inside glass should be plainer and more defined than their parent material. For example, search inputs in headers should use `headerControl` so they read as tappable controls instead of becoming "glass inside glass."
+- Preserve shared shadows and clipping behavior from `GlassSurface`; do not put `overflow: hidden` on the same view that owns the shadow unless using the component's `clipStyle` for the inner blur layer.
+
 ## Scoped Guidance Map
 - Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
 - Conversation UI behavior: `app/(conversation)/AGENTS.md`
 - Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
 - Home tabs, buyer/seller home behavior, and profile tab behavior: `app/(tabs)/AGENTS.md`
+- Shared chat composer behavior: `src/components/inputChat/AGENTS.md`
 - Navbar UI behavior: `src/components/navbar/AGENTS.md`
 - RPC/runtime contracts and execution behavior: `src/services/AGENTS.md`
 - Data model and SQL transition/procedure constraints: `src/db/AGENTS.md`

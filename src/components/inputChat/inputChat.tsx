@@ -4,11 +4,13 @@ import { ArrowUp, Paperclip, X } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import type { TextInputKeyPressEvent } from "react-native";
 import {
-    Image,
-    Pressable,
-    ScrollView,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { createInputChatStyles } from "./styles";
 
@@ -27,6 +29,7 @@ export type InputChatProps = {
   maxImages?: number;
   showAttachmentButton?: boolean;
   disabled?: boolean;
+  busy?: boolean;
   autoFocus?: boolean;
   clearOnSend?: boolean;
   clearOnSendStart?: boolean;
@@ -45,6 +48,7 @@ export default function InputChat({
   maxImages = 10,
   showAttachmentButton = true,
   disabled = false,
+  busy = false,
   autoFocus = false,
   clearOnSend = true,
   clearOnSendStart = false,
@@ -60,10 +64,8 @@ export default function InputChat({
   const [images, setImages] = useState<ChatImage[]>([]);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<TextInput>(null);
-
-  const MIN_INPUT_HEIGHT = 45;
-  const MAX_INPUT_HEIGHT = 200;
-  const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+  const isBusy = busy || sending;
+  const isBlocked = disabled || isBusy;
 
   const updateImages = useCallback(
     (updater: (prev: ChatImage[]) => ChatImage[]) => {
@@ -80,7 +82,6 @@ export default function InputChat({
     setText("");
     updateImages(() => []);
     inputRef.current?.clear();
-    setInputHeight(MIN_INPUT_HEIGHT);
   }, [updateImages]);
 
   const removeImageAt = useCallback(
@@ -120,7 +121,7 @@ export default function InputChat({
   }, [images.length, maxImages, updateImages]);
 
   const handlePickImages = useCallback(async () => {
-    if (disabled || sending) return;
+    if (isBlocked) return;
 
     if (onPickImages) {
       const result = await Promise.resolve(onPickImages());
@@ -132,8 +133,7 @@ export default function InputChat({
 
     await handleDefaultPickImages();
   }, [
-    disabled,
-    sending,
+    isBlocked,
     onPickImages,
     handleDefaultPickImages,
     maxImages,
@@ -142,7 +142,7 @@ export default function InputChat({
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
-    if (disabled || sending) return;
+    if (isBlocked) return;
     if (!trimmed && images.length === 0) return;
 
     try {
@@ -162,8 +162,7 @@ export default function InputChat({
   }, [
     text,
     images,
-    disabled,
-    sending,
+    isBlocked,
     clearOnSend,
     clearOnSendStart,
     clearInput,
@@ -180,8 +179,17 @@ export default function InputChat({
     [handleSend],
   );
 
+  const handleTextChange = useCallback(
+    (value: string) => {
+      setText(value.slice(0, maxChars));
+    },
+    [maxChars],
+  );
+
   const canSend =
-    !disabled && !sending && (text.trim().length > 0 || images.length > 0);
+    !isBlocked && (text.trim().length > 0 || images.length > 0);
+  const measureText =
+    text.length === 0 ? " " : text.endsWith("\n") ? `${text} ` : text;
 
   return (
     <View style={styles.wrapper}>
@@ -195,64 +203,94 @@ export default function InputChat({
             {images.map((img, idx) => (
               <View key={idx} style={styles.previewItem}>
                 <Image source={{ uri: img.uri }} style={styles.previewImage} />
-                <View style={styles.previewCloseButton}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Quitar imagen"
+                  hitSlop={8}
+                  onPress={() => removeImageAt(idx)}
+                  style={styles.previewCloseButton}
+                >
                   <X
                     size={14}
                     color={t.colors.textDark}
-                    onPress={() => removeImageAt(idx)}
                   />
-                </View>
+                </Pressable>
               </View>
             ))}
           </ScrollView>
         )}
 
         <View style={styles.innerRow}>
-          <TextInput
-            ref={inputRef}
-            style={[styles.textInput, { height: inputHeight }]}
-            placeholder={placeholder}
-            placeholderTextColor={t.colors.IconColorGray}
-            value={text}
-            onChangeText={(v) => setText(v.slice(0, maxChars))}
-            editable={!disabled && !sending}
-            autoFocus={autoFocus}
-            multiline={true}
-            returnKeyType="send"
-            onKeyPress={handleKeyPress}
-            onContentSizeChange={(e) => {
-              const newHeight = e.nativeEvent.contentSize.height;
-              if (!text.trim()) {
-                setInputHeight(MIN_INPUT_HEIGHT);
-                return;
-              }
-              const clamped = Math.min(
-                MAX_INPUT_HEIGHT,
-                Math.max(MIN_INPUT_HEIGHT, newHeight),
-              );
-              setInputHeight(clamped);
-            }}
-          />
+          <View style={styles.inputArea}>
+            <Text
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[styles.textInput, styles.textMeasure]}
+            >
+              {measureText}
+            </Text>
+            <TextInput
+              ref={inputRef}
+              style={[styles.textInput, styles.textInputOverlay]}
+              placeholder={placeholder}
+              placeholderTextColor={t.colors.stateAnulated}
+              value={text}
+              onChangeText={handleTextChange}
+              editable={!isBlocked}
+              accessibilityLabel="Mensaje"
+              autoFocus={autoFocus}
+              multiline={true}
+              returnKeyType="send"
+              scrollEnabled
+              textAlignVertical="top"
+              onKeyPress={handleKeyPress}
+            />
+          </View>
 
           <View style={styles.buttonsContainer}>
             {showAttachmentButton ? (
-              <Pressable style={styles.iconButton}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Adjuntar imágenes"
+                accessibilityState={{ disabled: isBlocked }}
+                disabled={isBlocked}
+                onPress={handlePickImages}
+                style={({ pressed }) => [
+                  styles.iconButton,
+                  pressed && !isBlocked ? styles.iconButtonPressed : null,
+                  isBlocked ? styles.iconButtonDisabled : null,
+                ]}
+              >
                 <Paperclip
-                  size={18}
-                  color={t.colors.IconColorGray}
-                  onPress={handlePickImages}
-                  hitSlop={8}
+                  size={20}
+                  color={isBlocked ? t.colors.border : t.colors.IconColorGray}
                 />
               </Pressable>
             ) : null}
 
-            <Pressable style={styles.sendButton}>
-              <ArrowUp
-                size={18}
-                color={t.colors.textDark}
-                onPress={canSend ? handleSend : undefined}
-                hitSlop={8}
-              />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={isBusy ? "Pensando" : "Enviar mensaje"}
+              accessibilityState={{ disabled: !canSend, busy: isBusy }}
+              disabled={!canSend}
+              onPress={handleSend}
+              style={({ pressed }) => [
+                styles.sendButton,
+                !canSend ? styles.sendButtonDisabled : null,
+                isBusy ? styles.sendButtonBusy : null,
+                pressed && canSend ? styles.sendButtonPressed : null,
+              ]}
+              hitSlop={8}
+            >
+              {isBusy ? (
+                <ActivityIndicator size="small" color={t.colors.backgroudWhite} />
+              ) : (
+                <ArrowUp
+                  size={20}
+                  color={canSend ? t.colors.backgroudWhite : t.colors.IconColorGray}
+                />
+              )}
             </Pressable>
           </View>
         </View>

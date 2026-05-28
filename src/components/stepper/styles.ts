@@ -13,6 +13,8 @@ export type StepperStyles = {
     parent: ViewStyle;
     container: ViewStyle;
     contentContainer: ViewStyle;
+    scroll: ViewStyle;
+    scrollContent: ViewStyle;
   };
   circle: {
     counterCenter: ViewStyle;
@@ -52,7 +54,14 @@ export function createStepperStyles(t: Theme): StepperStyles {
         marginTop: spacing.xl,
         flex: 1,
         flexDirection: "column",
-      }
+      },
+      scroll: {
+        flex: 1,
+      },
+      scrollContent: {
+        flexGrow: 1,
+        paddingBottom: spacing.xl * 3,
+      },
     },
     circle: {
       counterCenter: {

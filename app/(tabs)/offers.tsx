@@ -1,3 +1,4 @@
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import RoleGate from "@/src/components/role/RoleGate";
 import LoadingState from "@/src/components/loading/LoadingState";
 import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
@@ -14,6 +15,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showError, showInfo } from "@/src/utils/useToast";
 
 const SELLER_OFFER_SORT_OPTIONS = [
@@ -71,10 +73,14 @@ function normalizeFilterList(values: string[]) {
 }
 
 function getOfferCategoryFilterId(offer: SellerPurchaseOfferCardData) {
-  return normalizeSearchValue(offer.request_category_name);
+  return offer.request_category_id?.trim() || normalizeSearchValue(offer.request_category_name);
 }
 
 function getOfferCurrencyFilterId(offer: SellerPurchaseOfferCardData) {
+  return offer.currency_id?.trim() || normalizeSearchValue(offer.offer_currency_code);
+}
+
+function getOfferCurrencyCode(offer: SellerPurchaseOfferCardData) {
   return normalizeSearchValue(offer.offer_currency_code);
 }
 
@@ -107,8 +113,8 @@ function compareOfferPriceByCurrency(
   currencyCode: "col" | "usd",
   direction: "asc" | "desc"
 ) {
-  const aMatchesCurrency = getOfferCurrencyFilterId(a) === currencyCode;
-  const bMatchesCurrency = getOfferCurrencyFilterId(b) === currencyCode;
+  const aMatchesCurrency = getOfferCurrencyCode(a) === currencyCode;
+  const bMatchesCurrency = getOfferCurrencyCode(b) === currencyCode;
 
   if (aMatchesCurrency !== bMatchesCurrency) {
     return aMatchesCurrency ? -1 : 1;
@@ -128,10 +134,19 @@ export default function OffersScreen() {
 
   return (
     <View style={s.screen}>
-      <OffersTopBar title="Todas mis ofertas" />
       <RoleGate
-        loading={<LoadingState label="Cargando contenido..." />}
-        buyer={<Text variant="title">Offers Buyer</Text>}
+        loading={
+          <>
+            <OffersTopBar title="Todas mis ofertas" />
+            <LoadingState label="Cargando contenido..." />
+          </>
+        }
+        buyer={
+          <>
+            <OffersTopBar title="Todas mis ofertas" />
+            <Text variant="title">Offers Buyer</Text>
+          </>
+        }
         seller={<SellerOffersContent />}
       />
     </View>
@@ -140,7 +155,7 @@ export default function OffersScreen() {
 
 function SellerOffersContent() {
   const t = useTheme();
-  const s = React.useMemo(() => createOffersScreenStyles(t), [t]);
+  const s = React.useMemo(() => createOffersScreenStyles(t, 0, true), [t]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [offers, setOffers] = React.useState<SellerPurchaseOfferCardData[]>([]);
@@ -181,7 +196,7 @@ function SellerOffersContent() {
   const loadOffers = React.useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    const result = await getCurrentSellerPurchaseOffers();
+    const result = await getCurrentSellerPurchaseOffers(filters, selectedSortId);
     if (!isMountedRef.current) return;
 
     if (result.ok) {
@@ -193,7 +208,7 @@ function SellerOffersContent() {
     }
 
     setIsLoading(false);
-  }, []);
+  }, [filters, selectedSortId]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -364,24 +379,32 @@ function SellerOffersContent() {
 
   const content = (() => {
     if (isLoading) {
-      return <LoadingState label="Cargando ofertas..." />;
+      return (
+        <View style={s.stateContent}>
+          <LoadingState label="Cargando ofertas..." />
+        </View>
+      );
     }
 
     if (offers.length === 0) {
       return (
-        <Text color="stateAnulated">
-          {loadError
-            ? "No se pudieron cargar tus ofertas."
-            : "Cuando envíes ofertas, aparecerán aquí."}
-        </Text>
+        <View style={s.stateContent}>
+          <Text color="stateAnulated">
+            {loadError
+              ? "No se pudieron cargar tus ofertas."
+              : "Cuando envíes ofertas, aparecerán aquí."}
+          </Text>
+        </View>
       );
     }
 
     if (visibleOffers.length === 0) {
       return (
-        <Text color="stateAnulated">
-          No encontramos ofertas con los filtros aplicados.
-        </Text>
+        <View style={s.stateContent}>
+          <Text color="stateAnulated">
+            No encontramos ofertas con los filtros aplicados.
+          </Text>
+        </View>
       );
     }
 
@@ -390,6 +413,44 @@ function SellerOffersContent() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.offersList}
       >
+        {hasActiveFilters || hasCustomSort ? (
+          <View style={s.activeChipsRow}>
+            {hasActiveFilters ? (
+              <View style={s.activeChip}>
+                <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
+                <Text variant="body" style={s.activeChipLabel}>
+                  Filtros ({activeFilterCount})
+                </Text>
+                <Pressable
+                  style={s.activeChipClose}
+                  onPress={() => setFilters(EMPTY_SELLER_OFFER_FILTERS)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Limpiar filtros"
+                >
+                  <Icon name="x" size={16} color={t.colors.textDark} />
+                </Pressable>
+              </View>
+            ) : null}
+
+            {hasCustomSort ? (
+              <View style={s.activeChip}>
+                <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
+                <Text variant="body" style={s.activeChipLabel} maxLines={1}>
+                  {getSortLabel(selectedSortId)}
+                </Text>
+                <Pressable
+                  style={s.activeChipClose}
+                  onPress={() => setSelectedSortId(DEFAULT_SELLER_OFFER_SORT_ID)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restablecer orden"
+                >
+                  <Icon name="x" size={16} color={t.colors.textDark} />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {visibleOffers.map((offer) => (
           <SellerOfferCard
             key={offer.id}
@@ -401,76 +462,53 @@ function SellerOffersContent() {
     );
   })();
 
-  return (
-    <View style={s.content}>
-      <View style={s.toolbar}>
-        <Pressable
-          style={s.searchTrigger}
-          onPress={openSearchPopup}
-          accessibilityRole="button"
-        >
-          <Icon name="search" size={20} color={t.colors.textDark} />
-          <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
-            {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
-          </Text>
-        </Pressable>
+  const toolbar = (
+    <View style={s.toolbar}>
+      <Pressable
+        style={s.searchTrigger}
+        onPress={openSearchPopup}
+        accessibilityRole="button"
+      >
+        <Icon name="search" size={20} color={t.colors.textDark} />
+        <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+          {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
+        </Text>
+      </Pressable>
 
-        <Pressable
-          style={s.sortButton}
-          onPress={openSortPopup}
-          accessibilityRole="button"
-          accessibilityLabel="Ordenar ofertas"
-        >
-          <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
-        </Pressable>
-      </View>
-
-      {hasActiveFilters || hasCustomSort ? (
-        <View style={s.activeChipsRow}>
-          {hasActiveFilters ? (
-            <View style={s.activeChip}>
-              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeChipLabel}>
-                Filtros ({activeFilterCount})
-              </Text>
-              <Pressable
-                style={s.activeChipClose}
-                onPress={() => setFilters(EMPTY_SELLER_OFFER_FILTERS)}
-                accessibilityRole="button"
-                accessibilityLabel="Limpiar filtros"
-              >
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
-          ) : null}
-
-          {hasCustomSort ? (
-            <View style={s.activeChip}>
-              <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeChipLabel} maxLines={1}>
-                {getSortLabel(selectedSortId)}
-              </Text>
-              <Pressable
-                style={s.activeChipClose}
-                onPress={() => setSelectedSortId(DEFAULT_SELLER_OFFER_SORT_ID)}
-                accessibilityRole="button"
-                accessibilityLabel="Restablecer orden"
-              >
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      ) : null}
-
-      {content}
+      <Pressable
+        style={s.sortButton}
+        onPress={openSortPopup}
+        accessibilityRole="button"
+        accessibilityLabel="Ordenar ofertas"
+      >
+        <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+      </Pressable>
     </View>
+  );
+
+  return (
+    <>
+      <View style={s.content}>
+        {content}
+      </View>
+      <OffersTopBar title="Todas mis ofertas" accessory={toolbar} />
+    </>
   );
 }
 
-function OffersTopBar({ title }: { title: string }) {
+function OffersTopBar({
+  title,
+  accessory,
+}: {
+  title: string;
+  accessory?: React.ReactNode;
+}) {
   const t = useTheme();
-  const s = React.useMemo(() => createOffersScreenStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const s = React.useMemo(
+    () => createOffersScreenStyles(t, insets.top, Boolean(accessory)),
+    [accessory, insets.top, t]
+  );
 
   const goBack = React.useCallback(() => {
     if (router.canGoBack()) {
@@ -482,32 +520,73 @@ function OffersTopBar({ title }: { title: string }) {
   }, []);
 
   return (
-    <View style={s.topBar}>
-      <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
-        <Icon name="arrow-left" size={28} color={t.colors.textDark} />
-      </Pressable>
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.topBar}
+      clipStyle={s.topBarClip}
+      contentStyle={s.topBarContent}
+    >
+      <View style={s.topBarTitleRow}>
+        <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
+          <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+        </Pressable>
 
-      <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
-        {title}
-      </Text>
+        <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
+          {title}
+        </Text>
 
-      <View style={s.topBarSide} />
-    </View>
+        <View style={s.topBarSide} />
+      </View>
+
+      {accessory ? <View style={s.topBarAccessory}>{accessory}</View> : null}
+    </GlassSurface>
   );
 }
 
-function createOffersScreenStyles(t: Theme) {
+function createOffersScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = false) {
+  const topOffset = topInset + t.spacing.md;
+  const topBarVisibleHeight = hasTopBarAccessory ? 128 : 72;
+  const topBarHeight = topOffset + (hasTopBarAccessory ? 128 : 72);
+
   return StyleSheet.create({
     screen: {
       flex: 1,
       backgroundColor: t.colors.background,
     },
     topBar: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      elevation: 10,
+      height: topBarHeight,
+      marginHorizontal: -t.spacing.md,
+      marginTop: -topOffset,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+    },
+    topBarClip: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+      overflow: "hidden",
+    },
+    topBarContent: {
+      flex: 1,
+      paddingTop: topOffset,
+      paddingHorizontal: t.spacing.xl,
+      paddingBottom: t.spacing.md,
+    },
+    topBarTitleRow: {
       height: 56,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: t.colors.background,
     },
     topBarSide: {
       width: 40,
@@ -517,9 +596,17 @@ function createOffersScreenStyles(t: Theme) {
     topBarTitle: {
       flex: 1,
     },
+    topBarAccessory: {
+      height: 48,
+      marginTop: t.spacing.sm,
+    },
     content: {
       flex: 1,
       gap: t.spacing.md,
+    },
+    stateContent: {
+      flex: 1,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
     },
     toolbar: {
       flexDirection: "row",
@@ -530,14 +617,7 @@ function createOffersScreenStyles(t: Theme) {
       flex: 1,
       minHeight: 48,
       borderRadius: 999,
-      backgroundColor: t.colors.backgroudWhite,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
+      ...t.glass.headerControl,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
@@ -555,9 +635,7 @@ function createOffersScreenStyles(t: Theme) {
       maxWidth: "100%",
       minHeight: 36,
       borderRadius: 999,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.backgroudWhite,
+      ...t.glass.chip,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
@@ -583,6 +661,7 @@ function createOffersScreenStyles(t: Theme) {
     },
     offersList: {
       gap: t.spacing.md,
+      paddingTop: topBarVisibleHeight + t.spacing.md,
       paddingBottom: 112,
     },
   });

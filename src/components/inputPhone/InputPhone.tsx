@@ -2,6 +2,7 @@ import { useTheme } from "@/src/themes";
 import { useMemo, useState } from "react";
 import { TextInput, TextInputProps, View } from "react-native";
 import { Text } from "../Text";
+import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createInputPhoneStyles } from "./styles";
 
 type InputPhoneProps = TextInputProps & {
@@ -22,6 +23,7 @@ export const InputPhone = ({
 }: InputPhoneProps) => {
   const t = useTheme();
   const s = useMemo(() => createInputPhoneStyles(t), [t]);
+  const stepperKeyboard = useStepperKeyboard();
   const [focused, setFocused] = useState(false);
 
   const { children, ...textInputProps } = props as TextInputProps & {
@@ -50,8 +52,15 @@ export const InputPhone = ({
             {...textInputProps}
             style={s.input}
             keyboardType="phone-pad"
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
+            onFocus={(event) => {
+              setFocused(true);
+              stepperKeyboard?.scrollToFocusedInput(event.target);
+              textInputProps.onFocus?.(event);
+            }}
+            onBlur={(event) => {
+              setFocused(false);
+              textInputProps.onBlur?.(event);
+            }}
             placeholderTextColor={t.colors.stateAnulated}
           />
         </View>

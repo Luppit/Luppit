@@ -11,6 +11,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 function parseStringParam(raw: string | string[] | undefined): string {
   if (!raw) return "";
@@ -37,6 +39,8 @@ function toPurchaseRequestParam(item: BuyerHomePurchaseRequestItem) {
 
 export default function BuyerHomeGroupScreen() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const params = useGlobalSearchParams<{
     groupCode?: string | string[];
     segmentSvgName?: string | string[];
@@ -84,11 +88,19 @@ export default function BuyerHomeGroupScreen() {
   );
 
   if (isLoading) {
-    return <LoadingState label="Cargando solicitudes..." />;
+    return (
+      <View style={{ flex: 1, paddingTop: topContentInset }}>
+        <LoadingState label="Cargando solicitudes..." />
+      </View>
+    );
   }
 
   if (items.length === 0) {
-    return <Text color="stateAnulated">No hay solicitudes para mostrar.</Text>;
+    return (
+      <View style={{ paddingTop: topContentInset + t.spacing.md }}>
+        <Text color="stateAnulated">No hay solicitudes para mostrar.</Text>
+      </View>
+    );
   }
 
   return (
@@ -96,7 +108,7 @@ export default function BuyerHomeGroupScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         gap: t.spacing.md,
-        paddingVertical: t.spacing.md,
+        paddingTop: topContentInset + t.spacing.md,
         paddingBottom: t.spacing.xl,
       }}
     >
@@ -107,7 +119,14 @@ export default function BuyerHomeGroupScreen() {
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
             statusLabel={item.status_label ?? item.status}
-            offersLabel={`${offerCountsByRequestId[item.id] ?? 0} ofertas`}
+            offersLabel={
+              (offerCountsByRequestId[item.id] ?? 0) <= 0
+                ? "Sin ofertas"
+                : `${offerCountsByRequestId[item.id] ?? 0} ${
+                    (offerCountsByRequestId[item.id] ?? 0) === 1 ? "oferta" : "ofertas"
+                  }`
+            }
+            offersCount={offerCountsByRequestId[item.id] ?? 0}
             onPress={() =>
               router.push({
                 pathname: "/(detail)/purchase-request",

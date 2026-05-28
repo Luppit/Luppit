@@ -4,6 +4,8 @@ import { ImageStyle, TextStyle, ViewStyle } from "react-native";
 export type GlobalPopupStyles = {
   backdrop: ViewStyle;
   bottomSheet: ViewStyle;
+  bottomSheetClip: ViewStyle;
+  bottomSheetHighlight: ViewStyle;
   indicatorTouchArea: ViewStyle;
   indicator: ViewStyle;
   optionButton: ViewStyle;
@@ -72,15 +74,23 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       backgroundColor: t.colors.shadow,
     },
     bottomSheet: {
-      backgroundColor: t.colors.backgroudWhite,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    },
+    bottomSheetClip: {
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
       overflow: "hidden",
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.16,
-      shadowOffset: { width: 0, height: -2 },
-      shadowRadius: 10,
-      elevation: 8,
+    },
+    bottomSheetHighlight: {
+      ...t.glass.topHighlight,
+      left: 16,
+      top: 8,
+      width: "72%",
     },
     indicatorTouchArea: {
       alignItems: "center",
@@ -121,10 +131,10 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     filterInputContainer: {
-      height: 56,
+      height: 48,
+      borderRadius: 999,
       borderWidth: 1,
       borderColor: t.colors.border,
-      borderRadius: t.borders.md,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       justifyContent: "center",
@@ -139,10 +149,10 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     filterDateField: {
       flex: 1,
-      height: 56,
+      height: 48,
+      borderRadius: 999,
       borderWidth: 1,
       borderColor: t.colors.border,
-      borderRadius: t.borders.md,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
@@ -204,8 +214,8 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderColor: t.colors.primary,
     },
     filterActionButtonSecondary: {
-      backgroundColor: t.colors.backgroudWhite,
       borderColor: t.colors.border,
+      backgroundColor: t.colors.backgroudWhite,
     },
     filterActionLabel: {
       textAlign: "center",
@@ -217,7 +227,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     sortOptionsList: {
-      backgroundColor: t.colors.backgroudWhite,
+      backgroundColor: "transparent",
     },
     sortOptionButton: {
       minHeight: 56,
@@ -344,8 +354,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       paddingHorizontal: t.spacing.md,
     },
     datePickerCard: {
-      backgroundColor: t.colors.backgroudWhite,
-      borderRadius: t.borders.md,
       padding: t.spacing.md,
       gap: t.spacing.md,
     },

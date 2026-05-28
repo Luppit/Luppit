@@ -82,7 +82,7 @@ export default function TextFieldWithToggle<T extends string = string>({
               setFocused(false);
               onBlur?.(event);
             }}
-            placeholderTextColor={colors.border}
+            placeholderTextColor={colors.stateAnulated}
           />
         </View>
 

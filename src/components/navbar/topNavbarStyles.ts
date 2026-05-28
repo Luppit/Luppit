@@ -1,11 +1,31 @@
 import { Theme } from "@/src/themes";
 import { StyleSheet } from "react-native";
 
-export const createTopNavbarStyles = (t: Theme) =>
-  StyleSheet.create({
+export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
+  return StyleSheet.create({
     container: {
-      backgroundColor: t.colors.background,
-      paddingBottom: t.spacing.sm,
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      zIndex: 10,
+      elevation: 10,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+    },
+    containerClip: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+      overflow: "hidden",
+    },
+    containerContent: {
+      paddingTop: topInset + t.spacing.lg,
+      paddingHorizontal: t.spacing.xl,
+      paddingBottom: t.spacing.md,
       gap: t.spacing.md,
     },
     profileRow: {
@@ -23,25 +43,12 @@ export const createTopNavbarStyles = (t: Theme) =>
     searchInputContainer: {
       borderRadius: 999,
       height: 48,
-      backgroundColor: t.colors.backgroudWhite,
-      borderColor: t.colors.border,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
+      ...t.glass.headerControl,
     },
     searchTrigger: {
       borderRadius: 999,
       minHeight: 48,
-      backgroundColor: t.colors.backgroudWhite,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.12,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
+      ...t.glass.headerControl,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
@@ -51,13 +58,14 @@ export const createTopNavbarStyles = (t: Theme) =>
       flex: 1,
       color: t.colors.stateAnulated,
     },
+    searchTriggerDisabled: {
+      opacity: 0.45,
+    },
     activeFilterChip: {
       alignSelf: "flex-start",
       minHeight: 36,
       borderRadius: 999,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.backgroudWhite,
+      ...t.glass.chip,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
@@ -76,20 +84,27 @@ export const createTopNavbarStyles = (t: Theme) =>
     },
     categoryListContainer: {
       paddingRight: t.spacing.sm,
-      gap: t.spacing.lg,
+      gap: t.spacing.md,
     },
     categoryButton: {
       alignItems: "center",
-      paddingBottom: t.spacing.xs,
-      borderBottomWidth: 2,
-      borderBottomColor: "transparent",
-      minWidth: 54,
+      justifyContent: "center",
+      minWidth: 60,
+      minHeight: 58,
+      paddingHorizontal: t.spacing.sm,
+      paddingVertical: 2,
+      borderRadius: 999,
     },
     categoryButtonDisabled: {
       opacity: 0.45,
     },
     categoryButtonActive: {
-      borderBottomColor: t.colors.textDark,
+      transform: [{ translateY: -1 }],
+    },
+    categoryLabelActive: {
+      fontFamily: t.typography.label.fontFamily,
+      fontSize: t.typography.body.fontSize + 1,
+      lineHeight: t.typography.body.lineHeight + 1,
     },
     categoryImageContainer: {
       width: 34,
@@ -103,4 +118,8 @@ export const createTopNavbarStyles = (t: Theme) =>
       height: 34,
       borderRadius: 8,
     },
+    categoryImageActive: {
+      transform: [{ scale: 1.12 }],
+    },
   });
+};

@@ -45,6 +45,9 @@ Applies to navbar UI components and rendering behavior.
 - Do not define static buyer/seller navbar lists in app code.
 - Do not hardcode role-to-menu mapping in client logic when `role_menu` exists.
 - Do not define static top-navbar segment arrays in app code when `segment` exists.
+- Top-navbar chrome must use the shared glass system (`GlassSurface` + `t.glass.chrome/control/chip`) instead of local shadows, borders, or translucent colors.
+- The home top navbar is a top-attached glass header: it should extend through the safe-area/status region and full screen sides, with only bottom corners rounded.
+- Keep the top-navbar search trigger as the lighter `control` material inside the `chrome` header; avoid stacking full `chrome` surfaces inside other `chrome` surfaces.
 - Load navbar config after session/profile resolution and render DB order (`sort_order`).
 - Keep client behavior presentation-only (active state, press handling, accessibility).
 - Do not convert the home search trigger back into a standalone local text input on home routes unless product requirements change.

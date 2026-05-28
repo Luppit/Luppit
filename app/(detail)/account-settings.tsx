@@ -21,6 +21,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 export default function AccountSettingsScreen() {
   const [role, setRole] = useState<Roles | null>(null);
@@ -64,7 +66,12 @@ export default function AccountSettingsScreen() {
 
 function BuyerAccountSettingsContent() {
   const t = useTheme();
-  const s = useMemo(() => createAccountSettingsStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createAccountSettingsStyles(t, topContentInset),
+    [t, topContentInset]
+  );
   const [overview, setOverview] = useState<BuyerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -126,7 +133,12 @@ function BuyerAccountSettingsContent() {
 
 function SellerAccountSettingsContent() {
   const t = useTheme();
-  const s = useMemo(() => createAccountSettingsStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createAccountSettingsStyles(t, topContentInset),
+    [t, topContentInset]
+  );
   const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -289,11 +301,11 @@ function SettingsRow({
   return <View style={s.row}>{content}</View>;
 }
 
-function createAccountSettingsStyles(t: Theme) {
+function createAccountSettingsStyles(t: Theme, topContentInset = 0) {
   return StyleSheet.create({
     content: {
       gap: t.spacing.lg,
-      paddingTop: t.spacing.sm,
+      paddingTop: topContentInset + t.spacing.sm,
       paddingBottom: t.spacing.xl,
     },
     loadingBox: {
@@ -301,6 +313,7 @@ function createAccountSettingsStyles(t: Theme) {
       alignItems: "center",
       justifyContent: "center",
       gap: t.spacing.sm,
+      paddingTop: topContentInset,
     },
     section: {
       gap: t.spacing.sm,

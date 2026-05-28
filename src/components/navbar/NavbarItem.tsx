@@ -6,39 +6,49 @@ import { Icon } from "../Icon";
 import { createNavbarStyles } from "./styles";
 import type { NavItem } from "./useNavItems";
 
-type Props = { item: NavItem; active: boolean };
+type Props = { item: NavItem; active: boolean; disabled?: boolean };
 
-export default function NavbarItem({ item, active }: Props) {
+export default function NavbarItem({ item, active, disabled = false }: Props) {
   const t = useTheme();
   const s = React.useMemo(() => createNavbarStyles(t), [t]);
 
   const flat = StyleSheet.flatten([s.label, active && s.labelActive]) as TextStyle;
   const labelColor = (flat.color ?? s._colors.text) as string;
 
+  const content = (
+    <Pressable
+      style={s.item}
+      android_ripple={
+        Platform.OS === "android"
+          ? { color: s._colors.ripple, borderless: true }
+          : undefined
+      }
+      hitSlop={12}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={item.label}
+      disabled={active}
+      testID={`tab-${item.name}`}
+    >
+      <View style={s.itemInner}>
+        {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+          style={[s.label, active && s.labelActive]}
+        >
+          {item.label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+
+  if (disabled) return content;
+
   return (
     <Link href={item.href} asChild prefetch>
-      <Pressable
-        style={s.item}
-        android_ripple={Platform.OS === "android" ? { color: s._colors.ripple, borderless: true } : undefined}
-        hitSlop={12}
-        accessibilityRole="tab"
-        accessibilityState={{ selected: active }}
-        accessibilityLabel={item.label}
-        disabled={active}
-        testID={`tab-${item.name}`}
-      >
-        <View style={s.itemInner}>
-          {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
-          <Text
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.85}
-            style={[s.label, active && s.labelActive]}
-          >
-            {item.label}
-          </Text>
-        </View>
-      </Pressable>
+      {content}
     </Link>
   );
 }

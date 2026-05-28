@@ -24,11 +24,16 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 export default function HomePresetScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const s = useMemo(() => createHomePresetStyles(t, insets.bottom), [t, insets.bottom]);
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createHomePresetStyles(t, insets.bottom, topContentInset),
+    [insets.bottom, t, topContentInset]
+  );
   const params = useLocalSearchParams<{ surface?: string | string[] }>();
   const surfaceParam = Array.isArray(params.surface) ? params.surface[0] : params.surface;
   const surface: HomePresetSurface = isHomePresetSurface(surfaceParam)
@@ -230,7 +235,7 @@ function PresetBlueprintGroup({ group }: { group: HomePresetPreviewGroup }) {
   );
 }
 
-function createHomePresetStyles(t: Theme, bottomInset = 0) {
+function createHomePresetStyles(t: Theme, bottomInset = 0, topContentInset = 0) {
   const cardSurface = {
     backgroundColor: t.colors.backgroudWhite,
     shadowColor: t.colors.shadow,
@@ -257,7 +262,7 @@ function createHomePresetStyles(t: Theme, bottomInset = 0) {
     },
     content: {
       gap: t.spacing.md,
-      paddingTop: t.spacing.sm,
+      paddingTop: topContentInset + t.spacing.sm,
       paddingBottom: 120 + bottomInset,
     },
     loadingBox: {
@@ -265,6 +270,7 @@ function createHomePresetStyles(t: Theme, bottomInset = 0) {
       alignItems: "center",
       justifyContent: "center",
       gap: t.spacing.sm,
+      paddingTop: topContentInset,
     },
     emptyState: {
       minHeight: 220,
