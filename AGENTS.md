@@ -41,6 +41,8 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep buyer/seller profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, seller business rating comes from `business_rating_summary`, and buyer/seller home preset assignment comes from `profile_home_group_preset`.
 - Keep buyer/seller home preset assignment profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
 - Keep seller business category preferences DB-driven via `business_category_preference` and `set_current_business_category_preferences`; category editing belongs on the business information detail page, not as a seller main-profile metric card.
+- Keep seller business location DB-driven via `business.location_id -> location.id` and `set_current_business_location`; location editing belongs on the seller business information detail page, not account settings or seller main-profile cards.
+- Keep profile notifications DB-driven via `notification`, `notification_type_catalog`, and `profile_notification`; unread state is `profile_notification.read_at`, and opening the notifications screen marks the current profile's notifications read through the DB RPC.
 
 ## Shared Glass UI
 - Keep iOS-style glass materials centralized in `src/themes/glass.ts` and render blurred glass surfaces through `src/components/glass/GlassSurface.tsx`; do not create one-off rgba/shadow/blur recipes in individual screens.

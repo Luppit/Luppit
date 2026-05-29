@@ -64,6 +64,9 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 ## Buyer/Seller Profile & Account Settings
 - Profile is a focused account surface; hide the shared top navbar on `/profile` and keep the bottom navbar.
 - Phone number is the read-only login identity. Show it as account information only; do not add phone edit flows unless auth/login requirements change.
+- The `Notificaciones` profile action must route to `/(detail)/notifications` with title `Notificaciones` and `hideMenu: "true"`; do not show a placeholder toast for this option.
+- The `Notificaciones` profile action unread badge is profile-owned and sourced from `notification.service.ts`; show a compact primary pill between the label and chevron only when unread count is greater than zero, cap display at `99+`, and keep the row accessibility label in Spanish (for example `Notificaciones, 3 sin leer`).
+- Notification unread-count loading must not block the profile screen. Refresh it on profile focus so the badge clears after the notifications detail screen marks rows read.
 - Buyer profile stats must use real DB-backed data:
   - created requests from buyer-owned `purchase_request` rows
   - offers received from offers attached to those requests
@@ -74,7 +77,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - business display data from `business`
   - business rating from `business_rating_summary`, not recalculated in client code
 - Seller main profile should show business summary/actions, but must not show a standalone category metric card. Business categories are managed on `/(detail)/business-profile`.
-- Seller business information entry points should route to `/(detail)/business-profile`, where category preferences can be viewed and edited.
+- Seller business information entry points should route to `/(detail)/business-profile`, where category preferences and business location can be viewed and edited.
 - Editable buyer/seller profile fields:
   - `name` and `id_document` may update through `profile.service.ts`
   - email must update through the existing OTP verification modal (`/(modal)/email-setup`), not through a plain profile update

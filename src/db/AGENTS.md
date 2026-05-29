@@ -19,9 +19,12 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - email updates should be verified through email OTP flow and update all three email fields atomically.
 - `profile_business`: profile-business mapping.
 - `business_category_preference`: business-to-category preference mapping used for seller request discovery and edited from the seller business information page.
-- `location`: geographic data.
+- `location`: Costa Rica geographic lookup data, seeded as one row per selectable district.
 - `role`: role catalog (e.g. buyer/seller).
 - `profile_role`: profile-role mapping.
+- `notification_type_catalog`: notification type catalog. Current core codes are `urgent`, `action_needed`, and `information`.
+- `notification`: system notification payload (`message`, `type_code`, `created_at`), intentionally text-only for now.
+- `profile_notification`: profile-specific notification delivery/read state; `read_at is null` means unread.
 - `menu_item`: navbar menu catalog (`code`, `label`, `route`, `icon`, `is_active`).
 - `role_menu`: role-to-menu mapping with ordering (`sort_order`, `is_active`).
 - `segment`: top-navbar segment catalog (`name`, `svg_name`, `is_disabled`, `created_at`).
@@ -100,6 +103,30 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `profile_email_opt_in_requires_email_check` requires `email_opt_in = true` to have both a non-empty `email` and non-null `email_opt_in_at`.
 - Because these checks are immediate, email verification procedures must update `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at` in the same profile update statement.
 - If a normalized email is already used by another profile, the unique email index/constraint should reject it; DB functions may raise a clearer `email_already_in_use` error before profile update.
+
+### Business Location
+- Business location source of truth is `business.location_id -> location.id`; do not store province/canton/district text directly on `business`.
+- `location` is a stable Costa Rica district lookup seeded from official DTA data. Runtime app flows must not depend on public location APIs.
+- Active selectable business locations are `location` rows with:
+  - `country_code = 'CR'`
+  - `is_active = true`
+  - stable code fields such as `province_code`, `canton_code`, `district_code`, and `territorial_code`
+- Future DTA changes should insert new district rows and mark unavailable rows `is_active = false`; do not delete locations that may still be referenced by existing businesses.
+- Seller business location updates are DB-owned through `public.set_current_business_location(p_profile_id uuid, p_location_id uuid)`.
+- `set_current_business_location` must validate that `p_profile_id` belongs to `auth.uid()`, resolve the seller business through `profile_business`, validate the target active CR location, update only that resolved `business.location_id`, and return the resolved business/location metadata.
+- Do not update `business.location_id` directly from client code.
+
+### Profile Notifications
+- Notification delivery is profile-owned, not buyer/seller-role-owned:
+  - `notification` stores shared notification content and `type_code`.
+  - `notification_type_catalog` stores presentation/category metadata for types such as `urgent`, `action_needed`, and `information`.
+  - `profile_notification` links a notification to a `profile_id` and owns user-specific read state through `read_at`.
+- Unread counts must be derived from `profile_notification.read_at is null`; do not create client-only unread counters.
+- Creating notifications from DB procedures should use the shared notification insert procedure/helper when available (for example `private.create_profile_notification(...)`) instead of directly scattering notification inserts through transition procedures.
+- Marking notifications read is DB-owned:
+  - `public.mark_all_profile_notifications_read(p_profile_id uuid)` marks all current-profile notifications read.
+  - If a single-read RPC is available, it should validate the authenticated profile owns the target notification before updating `profile_notification.read_at`.
+- Notification rows are text-only for now. Do not add client assumptions for routes, images, actions, or rich payloads unless the DB schema/RPC contract explicitly adds them.
 
 ## Seller Home Discovery RPC (DB-Driven)
 - Runtime source of truth is `public.get_seller_home_purchase_requests(p_profile_id uuid, p_search_text text default null, p_start_date date default null, p_end_date date default null, p_category_ids uuid[] default null, p_seller_interaction_states text[] default null, p_segment_svg_name text default null)`.

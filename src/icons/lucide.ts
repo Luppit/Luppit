@@ -27,6 +27,7 @@ import {
   Lock,
   LogOut,
   MailWarning,
+  MapPin,
   MessageCircle,
   MessageSquare,
   Pencil,
@@ -97,6 +98,7 @@ export const lucideIcons = {
   "file-pen-line": FilePenLine,
   "plane": Plane,
   "mail-warning": MailWarning,
+  "map-pin": MapPin,
   "send": Send,
 } as const;
 

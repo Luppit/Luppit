@@ -106,6 +106,14 @@ Service behavior:
 - Returned rows should be ordered by `has_unopened desc`, then `last_message_at desc`.
 - `get_current_profile_conversations(...)` must not mark messages opened; only `get_conversation_messages(...)` has that side effect.
 
+## Profile Notification Service Contract
+- Notification client access belongs in `notification.service.ts`.
+- Services must resolve the current authenticated profile internally before reading notifications, counting unread rows, or calling notification read RPCs; screens must not pass arbitrary profile ids.
+- The notifications list should load from `profile_notification` joined to `notification`, and type labels/descriptions should come from `notification_type_catalog`.
+- Unread count should use a lightweight exact-count query on `profile_notification` with `read_at is null`; do not load full notification messages just to render the profile badge.
+- `markAllCurrentProfileNotificationsRead()` should call `public.mark_all_profile_notifications_read` and should not emulate read-state updates with direct client table writes.
+- Notification service helpers should return normalized UI-safe fields such as notification id, message, type code/label, created date, profile id, and `readAt`; do not invent route/action metadata until the DB contract provides it.
+
 ## RPC Contract: `get_conversation_timeline`
 Current function contract:
 - `public.get_conversation_timeline(p_conversation_id uuid)`
@@ -197,12 +205,22 @@ Current buyer request-assistant chat contract:
   - current authenticated `profile`
   - seller business membership from `profile_business`
   - business display fields from `business`
+  - business location from `business.location_id -> location`, including `location.id` for edit flows
   - business rating from `business_rating_summary`
   - business category preferences from `business_category_preference` joined to `category`
   - current seller home preset from `profile_home_group_preset`, falling back to active `home_group_preset.code = 'default'` under `surface_code = 'seller_home'`
 - Editable profile fields currently supported by direct profile update are only `name` and `id_document`.
 - Do not expose phone editing through profile services; phone is the login identity.
 - Do not expose plain email editing through profile services; verified email changes must go through the email OTP RPC flow.
+- `updateCurrentBusinessLocation(locationId)` should resolve the current authenticated profile and call `public.set_current_business_location(...)`; UI code should not pass arbitrary profile ids or update `business.location_id` directly.
+
+## Business Location Service Contract
+- `location.service.ts` owns read helpers for business location selectors and labels.
+- `getActiveBusinessLocations()` should load active Costa Rica district rows from `location` using `country_code = 'CR'` and `is_active = true`.
+- Location selector rows should include `id`, province/canton/district names, province/canton/district codes, and `territorial_code`.
+- Location ordering should use the stable code hierarchy (`province_code`, `canton_code`, `district_code`) rather than localized display names.
+- `formatLocationLabel(...)` should render `district, canton, province` and fall back to `Sin ubicación`.
+- Keep province/canton/district selection derived from the flat `location` table; save only the selected district row `id`.
 
 ## Buyer/Seller Home Preset Settings Service Contract
 - `getCurrentBuyerHomePresetOptions()` should read active `home_group_preset` rows for `surface_code = 'buyer_home'`.
