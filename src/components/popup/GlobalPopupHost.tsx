@@ -29,6 +29,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createGlobalPopupStyles } from "./styles";
@@ -52,6 +53,7 @@ function formatDateValue(date: Date): string {
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
@@ -78,6 +80,7 @@ export default function GlobalPopupHost() {
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
+  const summaryDescriptionMaxHeight = Math.round(windowHeight * 0.45);
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -241,6 +244,28 @@ export default function GlobalPopupHost() {
     } finally {
       setPendingSummaryActionId(null);
     }
+  };
+
+  const renderSummaryDescription = () => {
+    if (!summaryConfig?.description) return null;
+
+    const description = (
+      <Text variant="body" style={s.summaryDescription}>
+        {summaryConfig.description}
+      </Text>
+    );
+
+    if (!summaryConfig.descriptionScroll) return description;
+
+    return (
+      <ScrollView
+        style={[s.summaryDescriptionScroll, { maxHeight: summaryDescriptionMaxHeight }]}
+        contentContainerStyle={s.summaryDescriptionScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {description}
+      </ScrollView>
+    );
   };
 
   const handleFilterChipPress = (chipId: string) => {
@@ -588,11 +613,9 @@ export default function GlobalPopupHost() {
                       <View style={s.summaryHeaderSeparator} />
                     </View>
 
-                    {summaryConfig.description ? (
-                      <Text variant="body" style={s.summaryDescription}>
-                        {summaryConfig.description}
-                      </Text>
-                    ) : null}
+                    {summaryConfig.descriptionPlacement === "afterRows"
+                      ? null
+                      : renderSummaryDescription()}
 
                     {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
                       <View style={s.summaryRowsList}>
@@ -608,6 +631,10 @@ export default function GlobalPopupHost() {
                         ))}
                       </View>
                     ) : null}
+
+                    {summaryConfig.descriptionPlacement === "afterRows"
+                      ? renderSummaryDescription()
+                      : null}
 
                     {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
                       <View style={s.summaryInputsList}>

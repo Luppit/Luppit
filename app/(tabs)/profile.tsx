@@ -3,6 +3,7 @@ import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import { signOut } from "@/src/lib/supabase";
+import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
 import {
   BuyerProfileOverview,
   SellerProfileOverview,
@@ -36,9 +37,11 @@ function BuyerProfileContent() {
   const s = useMemo(() => createProfileStyles(t), [t]);
   const [overview, setOverview] = useState<BuyerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
+    void refreshUnreadNotificationsCount(setUnreadNotificationsCount);
     const result = await getCurrentBuyerProfileOverview();
     if (!result.ok) {
       setOverview(null);
@@ -135,7 +138,14 @@ function BuyerProfileContent() {
             <ActionRow
               icon="bell"
               label="Notificaciones"
-              onPress={() => showInfo("Notificaciones", "Esta opción estará disponible pronto.")}
+              unreadCount={unreadNotificationsCount}
+              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/notifications",
+                  params: { title: "Notificaciones", hideMenu: "true" },
+                })
+              }
             />
             <ActionRow
               icon="life-buoy"
@@ -165,9 +175,11 @@ function SellerProfileContent() {
   const s = useMemo(() => createProfileStyles(t), [t]);
   const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
+    void refreshUnreadNotificationsCount(setUnreadNotificationsCount);
     const result = await getCurrentSellerProfileOverview();
     if (!result.ok) {
       setOverview(null);
@@ -259,7 +271,14 @@ function SellerProfileContent() {
             <ActionRow
               icon="bell"
               label="Notificaciones"
-              onPress={() => showInfo("Notificaciones", "Esta opción estará disponible pronto.")}
+              unreadCount={unreadNotificationsCount}
+              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/notifications",
+                  params: { title: "Notificaciones", hideMenu: "true" },
+                })
+              }
             />
             <ActionRow
               icon="life-buoy"
@@ -397,25 +416,65 @@ function getMetricTone(t: Theme, tone: "primary" | "secondary" | "warning") {
   };
 }
 
+function getNotificationRowAccessibilityLabel(unreadCount: number) {
+  if (unreadCount <= 0) return "Notificaciones";
+  return `Notificaciones, ${unreadCount > 99 ? "99 o más" : unreadCount} sin leer`;
+}
+
+async function refreshUnreadNotificationsCount(
+  setUnreadNotificationsCount: (count: number) => void
+) {
+  try {
+    const result = await getCurrentProfileUnreadNotificationCount();
+    if (result.ok) {
+      setUnreadNotificationsCount(result.data);
+    }
+  } catch {
+    return;
+  }
+}
+
 function ActionRow({
   icon,
   label,
+  unreadCount,
+  accessibilityLabel,
   destructive = false,
   onPress,
 }: {
   icon: "bell" | "life-buoy" | "help-circle" | "log-out";
   label: string;
+  unreadCount?: number;
+  accessibilityLabel?: string;
   destructive?: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createProfileStyles(t), [t]);
   const color = destructive ? t.colors.error : t.colors.textDark;
+  const displayCount = Math.max(0, unreadCount ?? 0);
+  const displayCountLabel = displayCount > 99 ? "99+" : String(displayCount);
 
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={s.actionRow}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      onPress={onPress}
+      style={s.actionRow}
+    >
       <Icon name={icon} size={22} color={color} />
       <Text style={[s.actionLabel, { color }]}>{label}</Text>
+      {displayCount > 0 ? (
+        <View
+          style={s.actionCountPill}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <Text variant="label" color="backgroudWhite" style={s.actionCountText}>
+            {displayCountLabel}
+          </Text>
+        </View>
+      ) : null}
       {!destructive ? (
         <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} />
       ) : null}
@@ -548,6 +607,18 @@ function createProfileStyles(t: Theme) {
     },
     actionLabel: {
       flex: 1,
+    },
+    actionCountPill: {
+      minWidth: 28,
+      height: 22,
+      borderRadius: 11,
+      paddingHorizontal: t.spacing.sm,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.primary,
+    },
+    actionCountText: {
+      textAlign: "center",
     },
   });
 }
