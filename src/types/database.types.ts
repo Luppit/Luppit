@@ -1387,24 +1387,48 @@ export type Database = {
       location: {
         Row: {
           canton: string | null
+          canton_code: string | null
+          country_code: string
           created_at: string
           district: string | null
+          district_code: string | null
           id: string
+          is_active: boolean
           province: string | null
+          province_code: string | null
+          source: string
+          source_version: string
+          territorial_code: string | null
         }
         Insert: {
           canton?: string | null
+          canton_code?: string | null
+          country_code?: string
           created_at?: string
           district?: string | null
+          district_code?: string | null
           id?: string
+          is_active?: boolean
           province?: string | null
+          province_code?: string | null
+          source?: string
+          source_version?: string
+          territorial_code?: string | null
         }
         Update: {
           canton?: string | null
+          canton_code?: string | null
+          country_code?: string
           created_at?: string
           district?: string | null
+          district_code?: string | null
           id?: string
+          is_active?: boolean
           province?: string | null
+          province_code?: string | null
+          source?: string
+          source_version?: string
+          territorial_code?: string | null
         }
         Relationships: []
       }
@@ -3116,6 +3140,10 @@ export type Database = {
       }
       set_current_business_category_preferences: {
         Args: { p_category_ids?: string[]; p_profile_id: string }
+        Returns: Json
+      }
+      set_current_business_location: {
+        Args: { p_location_id: string; p_profile_id: string }
         Returns: Json
       }
       set_purchase_offer_delivery_timing: {

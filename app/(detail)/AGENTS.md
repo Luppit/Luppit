@@ -36,6 +36,13 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 - Account settings detail routes are not purchase-request detail routes; hide the purchase-request ellipsis/menu on these routes.
 - `/(detail)/account-settings` should display profile/account fields from `profile.service.ts` and route edits to dedicated flows.
 - `/(detail)/account-settings` must resolve the current role itself because detail routes can render outside the tab `RoleProvider`; do not leave buyer/seller rows blocked behind tab-only context.
+- `/(detail)/notifications` is the profile notification inbox:
+  - use the shared detail top bar with `hideMenu=true`; do not create a custom notification header.
+  - load notifications through `notification.service.ts`, ordered newest first.
+  - on successful screen open/load, call the mark-all-read RPC through the service when any loaded item is unread; do not mark notifications read from row press alone.
+  - keep notification rows compact with only a bottom separator, a leading unread dot when `readAt` is null, a type icon/tone, catalog label title, two-line message preview, timestamp, and a muted chevron.
+  - tapping a row opens the existing shared `GlobalPopupHost` summary sheet with the full message as plain description text, `Recibida` metadata, and `Listo` action; do not wrap the message in an input/control-like box.
+  - empty state should stay quiet and centered (`Sin notificaciones` plus explanatory copy), with no CTA unless product adds a real notification-management flow.
 - `/(detail)/home-preset` is the buyer/seller home preset chooser:
   - load options from active preset metadata for the current surface (`buyer_home` or `seller_home`)
   - render a visual blueprint from DB group names/order/max-items
@@ -44,9 +51,13 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 - Do not make preset preview destructive by temporarily changing the user's actual assignment.
 - `/(detail)/business-profile` is the seller business information surface:
   - show general business data resolved from the seller's `profile_business` membership
+  - show current business location from `business.location_id -> location`
+  - make the `Ubicación` row actionable and route edits to `/(modal)/business-location-edit`; do not edit business location inline in this screen.
   - show business rating from `business_rating_summary`
   - load editable category options from `category`
   - show current preferences from `business_category_preference`
   - keep category add/remove changes local until `Guardar cambios`
   - save category changes through `profile.service.ts` using `set_current_business_category_preferences`.
+- Business location editing uses a dedicated modal with dependent province -> canton -> district selection from active `location` rows; save only a district-level `location.id` through `profile.service.ts` using `set_current_business_location`.
+- If the current business location is missing from active selectable locations, the modal must show that the saved location is no longer available and require selecting a valid district before saving.
 - Business categories belong on `/(detail)/business-profile`; do not duplicate them as a seller main-profile metric card.

@@ -53,6 +53,7 @@ export type BusinessCategoryOption = {
     path: string | null;
 };
 export type SellerBusinessLocation = {
+    id: string;
     province: string | null;
     canton: string | null;
     district: string | null;
@@ -423,6 +424,42 @@ export async function updateCurrentBusinessCategoryPreferences(
     };
 }
 
+export async function updateCurrentBusinessLocation(
+    locationId: string
+): Promise<{ ok: true; data: { locationId: string } } | { ok: false; error: AppError }> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const normalizedLocationId = locationId.trim();
+    if (!normalizedLocationId) {
+        return { ok: false, error: fromAppError("validation") };
+    }
+
+    const rpcResult: any = await (supabase as any).rpc(
+        "set_current_business_location",
+        {
+            p_profile_id: profileResult.data.id,
+            p_location_id: normalizedLocationId,
+        }
+    );
+
+    if (rpcResult?.error) {
+        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    }
+
+    const returnedLocationId =
+        typeof rpcResult?.data?.location_id === "string"
+            ? rpcResult.data.location_id
+            : normalizedLocationId;
+
+    return {
+        ok: true,
+        data: {
+            locationId: returnedLocationId,
+        },
+    };
+}
+
 async function getBuyerProfileStats(profileId: string): Promise<
     { ok: true; data: BuyerProfileStats } | { ok: false; error: AppError }
 > {
@@ -548,7 +585,7 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     if (businessResult.data.location_id) {
         const locationResult = await supabase
             .from("location")
-            .select("province,canton,district")
+            .select("id,province,canton,district")
             .eq("id", businessResult.data.location_id)
             .maybeSingle();
 
@@ -558,6 +595,7 @@ async function getSellerBusinessOverview(profileId: string): Promise<
 
         location = locationResult.data
             ? {
+                id: locationResult.data.id,
                 province: locationResult.data.province,
                 canton: locationResult.data.canton,
                 district: locationResult.data.district,

@@ -2,6 +2,7 @@ import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
+import { formatLocationLabel } from "@/src/services/location.service";
 import {
   BusinessCategoryOption,
   SellerBusinessCategoryPreference,
@@ -13,6 +14,7 @@ import {
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
+import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   Pressable,
@@ -83,7 +85,7 @@ export default function BusinessProfileScreen() {
     [categoryOptions, selectedCategoryIds]
   );
   const categoryLabel = getCategoryLabel(selectedCategories);
-  const locationLabel = getLocationLabel(business);
+  const locationLabel = formatLocationLabel(business?.location);
   const ratingLabel =
     typeof business?.rating === "number" && business.numRatings > 0
       ? `${business.rating.toFixed(1)} (${business.numRatings} calificaciones)`
@@ -179,7 +181,20 @@ export default function BusinessProfileScreen() {
           label="Documento de identificación"
           value={business.idDocument || "Sin documento"}
         />
-        <InfoRow label="Ubicación" value={locationLabel} />
+        <InfoRow
+          label="Ubicación"
+          value={locationLabel}
+          onPress={() =>
+            router.push({
+              pathname: "/(modal)/business-location-edit",
+              params: {
+                title: "Editar ubicación",
+                locationId: business.location?.id ?? "",
+                locationLabel,
+              },
+            })
+          }
+        />
         <InfoRow label="Fecha de creación" value={formatDate(business.createdAt)} />
       </BusinessSection>
 
@@ -255,21 +270,37 @@ function BusinessSection({
 function InfoRow({
   label,
   value,
+  onPress,
 }: {
   label: string;
   value: string;
+  onPress?: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createBusinessProfileStyles(t), [t]);
-
-  return (
-    <View style={s.row}>
+  const content = (
+    <>
       <View style={s.rowText}>
         <Text>{label}</Text>
         <Text color="stateAnulated" maxLines={2}>
           {value}
         </Text>
       </View>
+      {onPress ? <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} /> : null}
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable accessibilityRole="button" onPress={onPress} style={s.row}>
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View style={s.row}>
+      {content}
     </View>
   );
 }
@@ -348,18 +379,6 @@ function haveCategoryIdsChanged(initialIds: string[], currentIds: string[]) {
 
   const currentSet = new Set(currentIds);
   return initialIds.some((id) => !currentSet.has(id));
-}
-
-function getLocationLabel(business: SellerProfileOverview["business"]) {
-  const locationParts = [
-    business?.location?.district,
-    business?.location?.canton,
-    business?.location?.province,
-  ]
-    .map((part) => part?.trim())
-    .filter(Boolean);
-
-  return locationParts.length > 0 ? locationParts.join(", ") : "Sin ubicación";
 }
 
 function formatDate(value: string) {
