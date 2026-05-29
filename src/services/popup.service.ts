@@ -55,6 +55,8 @@ export type PopupSummaryConfig = {
   title: string;
   icon?: LucideIconName;
   description?: string;
+  descriptionPlacement?: "beforeRows" | "afterRows";
+  descriptionScroll?: boolean;
   rows?: PopupSummaryRow[];
   inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];

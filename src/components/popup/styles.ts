@@ -43,6 +43,8 @@ export type GlobalPopupStyles = {
   summaryHeaderSeparator: ViewStyle;
   summaryTitle: TextStyle;
   summaryDescription: TextStyle;
+  summaryDescriptionScroll: ViewStyle;
+  summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
   summaryInputsList: ViewStyle;
   summaryRowBlock: ViewStyle;
@@ -281,6 +283,15 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryDescription: {
       color: t.colors.textDark,
+    },
+    summaryDescriptionScroll: {
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: t.borders.sm,
+      backgroundColor: t.colors.backgroudWhite,
+    },
+    summaryDescriptionScrollContent: {
+      padding: t.spacing.md,
     },
     summaryRowsList: {
       gap: t.spacing.md,

@@ -148,18 +148,29 @@ export type Database = {
           id: string
           name: string
           path: unknown
+          segment_id: string | null
         }
         Insert: {
           id?: string
           name: string
           path: unknown
+          segment_id?: string | null
         }
         Update: {
           id?: string
           name?: string
           path?: unknown
+          segment_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "category_segment_id_fkey"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "segment"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       category_requirement: {
         Row: {
@@ -622,36 +633,55 @@ export type Database = {
       }
       conversation_message: {
         Row: {
+          buyer_open_state: string | null
+          buyer_opened_at: string | null
           conversation_id: string | null
           created_at: string
           id: string
           image_path: string | null
           message_kind: string | null
+          seller_open_state: string | null
+          seller_opened_at: string | null
           sender_profile_id: string | null
           text: string | null
           visible_to_role_id: string | null
         }
         Insert: {
+          buyer_open_state?: string | null
+          buyer_opened_at?: string | null
           conversation_id?: string | null
           created_at?: string
           id?: string
           image_path?: string | null
           message_kind?: string | null
+          seller_open_state?: string | null
+          seller_opened_at?: string | null
           sender_profile_id?: string | null
           text?: string | null
           visible_to_role_id?: string | null
         }
         Update: {
+          buyer_open_state?: string | null
+          buyer_opened_at?: string | null
           conversation_id?: string | null
           created_at?: string
           id?: string
           image_path?: string | null
           message_kind?: string | null
+          seller_open_state?: string | null
+          seller_opened_at?: string | null
           sender_profile_id?: string | null
           text?: string | null
           visible_to_role_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_message_buyer_open_state_fkey"
+            columns: ["buyer_open_state"]
+            isOneToOne: false
+            referencedRelation: "conversation_message_open_state"
+            referencedColumns: ["code"]
+          },
           {
             foreignKeyName: "conversation_message_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -664,6 +694,13 @@ export type Database = {
             columns: ["message_kind"]
             isOneToOne: false
             referencedRelation: "conversation_message_kind"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_message_seller_open_state_fkey"
+            columns: ["seller_open_state"]
+            isOneToOne: false
+            referencedRelation: "conversation_message_open_state"
             referencedColumns: ["code"]
           },
           {
@@ -701,6 +738,24 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+        }
+        Relationships: []
+      }
+      conversation_message_open_state: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
         }
         Relationships: []
       }
@@ -1387,16 +1442,196 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          message: string
+          type_code: string
         }
         Insert: {
           created_at?: string
           id?: string
+          message: string
+          type_code: string
         }
         Update: {
           created_at?: string
           id?: string
+          message?: string
+          type_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_type_code_fkey"
+            columns: ["type_code"]
+            isOneToOne: false
+            referencedRelation: "notification_type_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      notification_type_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
         }
         Relationships: []
+      }
+      offer_draft: {
+        Row: {
+          client_request_hash: string | null
+          client_request_id: string | null
+          conversation_id: string
+          created_at: string
+          data: Json
+          id: string
+          pending_action: string | null
+          profile_id: string
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          status: string
+          ui_state: string
+          updated_at: string
+        }
+        Insert: {
+          client_request_hash?: string | null
+          client_request_id?: string | null
+          conversation_id: string
+          created_at?: string
+          data: Json
+          id?: string
+          pending_action?: string | null
+          profile_id: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          status?: string
+          ui_state?: string
+          updated_at?: string
+        }
+        Update: {
+          client_request_hash?: string | null
+          client_request_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          pending_action?: string | null
+          profile_id?: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          status?: string
+          ui_state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_draft_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_draft_message: {
+        Row: {
+          content: string
+          created_at: string
+          draft_id: string
+          id: string
+          metadata: Json | null
+          profile_id: string
+          role: string
+          sequence_id: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          draft_id: string
+          id?: string
+          metadata?: Json | null
+          profile_id: string
+          role: string
+          sequence_id?: never
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          draft_id?: string
+          id?: string
+          metadata?: Json | null
+          profile_id?: string
+          role?: string
+          sequence_id?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_draft_message_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "offer_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_message_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_message_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       otp_code: {
         Row: {
@@ -1652,16 +1887,19 @@ export type Database = {
           created_at: string
           notification_id: string
           profile_id: string
+          read_at: string | null
         }
         Insert: {
           created_at?: string
-          notification_id?: string
-          profile_id?: string
+          notification_id: string
+          profile_id: string
+          read_at?: string | null
         }
         Update: {
           created_at?: string
           notification_id?: string
           profile_id?: string
+          read_at?: string | null
         }
         Relationships: [
           {
@@ -2523,6 +2761,7 @@ export type Database = {
           p_end_date?: string
           p_profile_id: string
           p_search_text?: string
+          p_segment_svg_name?: string
           p_start_date?: string
           p_status_codes?: string[]
         }
@@ -2568,11 +2807,15 @@ export type Database = {
       get_conversation_messages: {
         Args: { p_conversation_id: string }
         Returns: {
+          buyer_open_state: string | null
+          buyer_opened_at: string | null
           conversation_id: string | null
           created_at: string
           id: string
           image_path: string | null
           message_kind: string | null
+          seller_open_state: string | null
+          seller_opened_at: string | null
           sender_profile_id: string | null
           text: string | null
           visible_to_role_id: string | null
@@ -2604,6 +2847,16 @@ export type Database = {
       }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_current_profile_conversations: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_start_date?: string
+        }
         Returns: Json
       }
       get_current_seller_purchase_offers: {
@@ -2684,6 +2937,7 @@ export type Database = {
           p_end_date?: string
           p_profile_id: string
           p_search_text?: string
+          p_segment_svg_name?: string
           p_seller_interaction_states?: string[]
           p_start_date?: string
         }
@@ -2712,6 +2966,10 @@ export type Database = {
       is_category_leaf: {
         Args: { category_id_input: string }
         Returns: boolean
+      }
+      mark_all_profile_notifications_read: {
+        Args: { p_profile_id: string }
+        Returns: Json
       }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
       publish_purchase_request: {
@@ -2803,11 +3061,15 @@ export type Database = {
               p_text: string
             }
             Returns: {
+              buyer_open_state: string | null
+              buyer_opened_at: string | null
               conversation_id: string | null
               created_at: string
               id: string
               image_path: string | null
               message_kind: string | null
+              seller_open_state: string | null
+              seller_opened_at: string | null
               sender_profile_id: string | null
               text: string | null
               visible_to_role_id: string | null
@@ -2828,11 +3090,15 @@ export type Database = {
               p_text?: string
             }
             Returns: {
+              buyer_open_state: string | null
+              buyer_opened_at: string | null
               conversation_id: string | null
               created_at: string
               id: string
               image_path: string | null
               message_kind: string | null
+              seller_open_state: string | null
+              seller_opened_at: string | null
               sender_profile_id: string | null
               text: string | null
               visible_to_role_id: string | null
