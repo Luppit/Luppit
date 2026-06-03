@@ -10,9 +10,6 @@ export type ProductCardStyles = {
   bottomRow: ViewStyle;
   viewsRow: ViewStyle;
   viewsText: TextStyle;
-  statusPill: ViewStyle;
-  statusDot: ViewStyle;
-  statusText: TextStyle;
   offersMetric: ViewStyle;
   offersText: TextStyle;
   offersTextActive: TextStyle;
@@ -61,31 +58,6 @@ export function createProductCardStyles(t: Theme): ProductCardStyles {
     },
     viewsText: {
       color: t.colors.stateAnulated,
-    },
-    statusPill: {
-      alignSelf: "flex-start",
-      maxWidth: "100%",
-      minHeight: 32,
-      backgroundColor: t.colors.primaryLight,
-      borderWidth: 1,
-      borderColor: "rgba(131,163,30,0.18)",
-      borderRadius: 999,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-      flexDirection: "row",
-      gap: 6,
-      alignItems: "center",
-    },
-    statusDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 999,
-      backgroundColor: t.colors.primary,
-      flexShrink: 0,
-    },
-    statusText: {
-      color: t.colors.textDark,
-      flexShrink: 1,
     },
     offersMetric: {
       maxWidth: "72%",

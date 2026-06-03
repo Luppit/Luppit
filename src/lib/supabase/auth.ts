@@ -100,9 +100,8 @@ export function signOut() {
 }
 
 export function onAuthChange(cb: (event: string, hasSession: boolean) => void) {
-  const { data: sub } = supabase.auth.onAuthStateChange(async (evt) => {
-    const s = await getSession();
-    cb(evt, !!s);
+  const { data: sub } = supabase.auth.onAuthStateChange((evt, session) => {
+    cb(evt, !!session);
   });
   return () => sub.subscription.unsubscribe();
 }

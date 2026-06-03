@@ -8,6 +8,8 @@ import { Asset } from "expo-asset";
 import React, { useEffect, useRef } from "react";
 import { Animated, Image, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
 
 function AssistantTextBlock({ text }: { text: string }) {
   return (
@@ -149,6 +151,7 @@ function PublishRequestCard({
 
 export default function ChatScreen() {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
   const {
@@ -199,7 +202,7 @@ export default function ChatScreen() {
         scrollRef.current?.scrollToEnd({ animated: true });
       }}
       contentContainerStyle={{
-        paddingTop: t.spacing.sm,
+        paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT + t.spacing.sm,
         gap: t.spacing.sm,
         paddingBottom: t.spacing.lg,
       }}
@@ -229,7 +232,6 @@ export default function ChatScreen() {
 
       {uiState === "review" ? (
         <>
-          <AssistantTextBlock text="Aquí tienes el resumen de tu solicitud. Revisa que toda la información sea correcta antes de continuar." />
           <PublishRequestCard
             title={summary?.titulo ?? "Solicitud"}
             description={summaryText ?? "Sin descripción"}
@@ -239,9 +241,7 @@ export default function ChatScreen() {
           />
           {status === "published" ? (
             <AssistantTextBlock text="Esta solicitud ya fue publicada." />
-          ) : (
-            <AssistantTextBlock text="Si deseas ajustar algo, puedes decírmelo ahora. Cuando estés listo, pulsa Publicar solicitud para enviarla a los proveedores." />
-          )}
+          ) : null}
         </>
       ) : null}
     </ScrollView>

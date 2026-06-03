@@ -40,6 +40,9 @@ Applies to navbar UI components and rendering behavior.
 - Seller interaction-state chips use stable client labels (`Sin abrir`, `En gestión`, `Descartadas`) mapped to DB-filter values (`new`, `opened`, `discarded`); do not use raw purchase-request lifecycle status for this seller filter.
 - When buyer-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
 - When seller-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
+- The profile name row in the top navbar is a profile-switcher trigger, not a no-op. It should open the shared popup profile switcher using device-saved profile payloads.
+- Profile switcher presses should be ignored for the active profile. Pressing a non-active profile should set pending switch state, sign out, and route to `/(auth)/login` with that profile's phone and `autoSendOtp=true`.
+- Do not keep saved-profile switcher state as navbar-only local state. Persist saved profile payloads through `saved.profile.service.ts` and use `profile.switch.service.ts` only as the transient handoff during sign-out/login routing.
 
 ## Implementation Rules
 - Do not define static buyer/seller navbar lists in app code.
@@ -52,3 +55,4 @@ Applies to navbar UI components and rendering behavior.
 - Keep client behavior presentation-only (active state, press handling, accessibility).
 - Do not convert the home search trigger back into a standalone local text input on home routes unless product requirements change.
 - Do not change shared popup sheet layout/keyboard behavior just to add buyer/seller filter fields; pass filter config into `GlobalPopupHost` and keep popup visual behavior consistent unless the product explicitly asks for a popup redesign.
+- Do not implement a custom profile-switcher sheet in navbar components; pass a `profileSwitcher` popup config to `GlobalPopupHost` so it keeps the shared bottom-sheet behavior.

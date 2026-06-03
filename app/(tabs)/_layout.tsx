@@ -12,6 +12,7 @@ import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSession, onAuthChange } from "@/src/lib/supabase";
+import { getPendingProfileSwitch } from "@/src/services/profile.switch.service";
 
 export default function TabsLayout() {
   const pathname = usePathname();
@@ -42,7 +43,24 @@ export default function TabsLayout() {
 
   if (!ready) return null;
 
-  if (!isAuth) return <Redirect href="/(auth)/auth" />;
+  if (!isAuth) {
+    const pendingProfileSwitch = getPendingProfileSwitch();
+    if (pendingProfileSwitch) {
+      return (
+        <Redirect
+          href={{
+            pathname: "/(auth)/login",
+            params: {
+              phone: pendingProfileSwitch.phone,
+              autoSendOtp: "true",
+            },
+          }}
+        />
+      );
+    }
+
+    return <Redirect href="/(auth)/auth" />;
+  }
 
   if (
     !isLoadingEmailSetupStatus &&

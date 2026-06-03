@@ -126,11 +126,27 @@ export type PopupSortConfig = {
   onSelect?: (optionId: string) => void;
 };
 
+export type PopupProfileSwitcherItem = {
+  id: string;
+  title: string;
+  phone: string;
+  unreadNotificationCount?: number;
+  isActive?: boolean;
+  onPress?: () => void | Promise<void>;
+};
+
+export type PopupProfileSwitcherConfig = {
+  type: "profileSwitcher";
+  profiles: PopupProfileSwitcherItem[];
+  dismissOnBackdropPress?: boolean;
+};
+
 export type PopupConfig =
   | PopupMenuConfig
   | PopupSummaryConfig
   | PopupFilterConfig
-  | PopupSortConfig;
+  | PopupSortConfig
+  | PopupProfileSwitcherConfig;
 
 type PopupState = {
   config: PopupConfig | null;
