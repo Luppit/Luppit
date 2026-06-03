@@ -197,6 +197,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         router.push({
           pathname: "/(detail)/purchase-request",
           params: {
+            title: request.data.title ?? "Detalle de solicitud",
             purchaseRequest: JSON.stringify(
               toDetailRoutePurchaseRequest(request.data)
             ),

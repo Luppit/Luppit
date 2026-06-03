@@ -113,6 +113,17 @@ Service behavior:
 - Unread count should use a lightweight exact-count query on `profile_notification` with `read_at is null`; do not load full notification messages just to render the profile badge.
 - `markAllCurrentProfileNotificationsRead()` should call `public.mark_all_profile_notifications_read` and should not emulate read-state updates with direct client table writes.
 - Notification service helpers should return normalized UI-safe fields such as notification id, message, type code/label, created date, profile id, and `readAt`; do not invent route/action metadata until the DB contract provides it.
+- Saved-profile notification counts for non-active profiles are last-known device snapshots, not live cross-profile reads. The current authenticated profile may refresh its count through `notification.service.ts`; other saved profiles should not be queried under the current user's session unless the DB exposes an explicit safe RPC for that purpose.
+
+## Saved Profile Switcher Service Contract
+- Saved profile snapshots belong in `saved.profile.service.ts` and should use the app key-value storage abstraction. Store only non-sensitive display/login payload: `profileId`, `userId`, display `name`, `phone`, `savedAt`, and optional last-known `unreadNotificationCount`.
+- Never store Supabase session tokens, refresh tokens, OTP values, or other secrets in saved profile payloads.
+- Saving a profile payload should dedupe by profile id and phone. When a save does not include a fresh unread count, preserve the previous saved unread count instead of overwriting it with `undefined`.
+- After a successful OTP login, save/update the logged-in profile payload and its current unread notification count.
+- Opening the profile switcher should refresh and persist the active authenticated profile's unread notification count before rendering rows.
+- `profile.switch.service.ts` is only a transient in-memory handoff for selecting a saved account while signing out. Use it to carry the selected phone through the unauthenticated redirect; clear/consume it once login receives the phone params.
+- Selecting a saved non-active profile should reuse the existing phone OTP login flow (`/(auth)/login` with selected `phone` and `autoSendOtp=true`) rather than creating a parallel auth implementation.
+- Auth change listeners should use Supabase's `onAuthStateChange` event session argument to update mounted auth state; avoid calling `getSession()` inside the callback because sign-out can otherwise look stale until refresh.
 
 ## RPC Contract: `get_conversation_timeline`
 Current function contract:

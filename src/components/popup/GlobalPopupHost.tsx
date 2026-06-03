@@ -3,11 +3,13 @@ import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
+import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
 import {
   closePopup,
   PopupFilterConfig,
   PopupOption,
+  PopupProfileSwitcherConfig,
   PopupSortConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
@@ -50,6 +52,22 @@ function formatDateValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+  return initials || "?";
+}
+
+function formatUnreadNotificationCount(count?: number) {
+  const safeCount = typeof count === "number" && count > 0 ? count : 0;
+  if (safeCount === 0) return "Sin notificaciones pendientes";
+  if (safeCount === 1) return "Tienes 1 notificación";
+  return `Tienes ${safeCount} notificaciones`;
+}
+
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -59,6 +77,8 @@ export default function GlobalPopupHost() {
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
   const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
+  const [profileSwitcherConfig, setProfileSwitcherConfig] =
+    useState<PopupProfileSwitcherConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -148,6 +168,7 @@ export default function GlobalPopupHost() {
             setFilterConfig(null);
             setSortConfig(null);
             setSummaryConfig(null);
+            setProfileSwitcherConfig(null);
             setPendingSummaryActionId(null);
           }
         });
@@ -156,11 +177,13 @@ export default function GlobalPopupHost() {
 
       if (config.type === "summary") {
         setSummaryConfig(config);
+        setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions([]);
       } else if (config.type === "filters") {
         setSummaryConfig(null);
+        setProfileSwitcherConfig(null);
         setFilterConfig(config);
         setSortConfig(null);
         setOptions([]);
@@ -179,12 +202,20 @@ export default function GlobalPopupHost() {
         setActiveDateField(null);
       } else if (config.type === "sort") {
         setSummaryConfig(null);
+        setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(config);
         setOptions([]);
         setSelectedSortOptionId(config.initialSelectedId ?? config.options[0]?.id ?? "");
+      } else if (config.type === "profileSwitcher") {
+        setSummaryConfig(null);
+        setProfileSwitcherConfig(config);
+        setFilterConfig(null);
+        setSortConfig(null);
+        setOptions([]);
       } else {
         setSummaryConfig(null);
+        setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions(config.options);
@@ -229,6 +260,14 @@ export default function GlobalPopupHost() {
     setSelectedSortOptionId(optionId);
     sortConfig?.onSelect?.(optionId);
     closePopup();
+  };
+
+  const handleProfileSwitcherPress = (profileIndex: number) => {
+    const profile = profileSwitcherConfig?.profiles[profileIndex];
+    if (!profile || profile.isActive) return;
+
+    closePopup();
+    void profile.onPress?.();
   };
 
   const handleSummaryActionPress = async (action: PopupSummaryAction) => {
@@ -597,6 +636,56 @@ export default function GlobalPopupHost() {
                         );
                       })}
                     </View>
+                  </View>
+                ) : profileSwitcherConfig ? (
+                  <View style={s.profileSwitcherSection}>
+                    {profileSwitcherConfig.profiles.map((profile, index) => {
+                      const hasUnreadNotifications =
+                        typeof profile.unreadNotificationCount === "number" &&
+                        profile.unreadNotificationCount > 0;
+
+                      return (
+                        <React.Fragment key={profile.id}>
+                          {index > 0 ? <View style={s.profileSwitcherSeparator} /> : null}
+                          <Pressable
+                            disabled={profile.isActive}
+                            style={[
+                              s.profileSwitcherRow,
+                              profile.isActive ? s.profileSwitcherRowActive : null,
+                            ]}
+                            onPress={() => handleProfileSwitcherPress(index)}
+                            accessibilityRole="button"
+                          >
+                            <View style={s.profileSwitcherAvatar}>
+                              <Text variant="body" maxLines={1} style={s.profileSwitcherInitials}>
+                                {getInitials(profile.title)}
+                              </Text>
+                            </View>
+
+                            <View style={s.profileSwitcherContent}>
+                              <View style={s.profileSwitcherTitleRow}>
+                                <Text variant="subtitle" maxLines={1} style={s.profileSwitcherTitle}>
+                                  {profile.title}
+                                </Text>
+                                {profile.isActive ? <StatusChip label="Activo" /> : null}
+                              </View>
+                              <View style={s.profileSwitcherMetaRow}>
+                                {hasUnreadNotifications ? (
+                                  <View style={s.profileSwitcherMetaDot} />
+                                ) : null}
+                                <Text
+                                  variant="body"
+                                  maxLines={1}
+                                  style={s.profileSwitcherMetaText}
+                                >
+                                  {formatUnreadNotificationCount(profile.unreadNotificationCount)}
+                                </Text>
+                              </View>
+                            </View>
+                          </Pressable>
+                        </React.Fragment>
+                      );
+                    })}
                   </View>
                 ) : summaryConfig ? (
                 <>

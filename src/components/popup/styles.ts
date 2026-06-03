@@ -67,6 +67,18 @@ export type GlobalPopupStyles = {
   summaryActionButton: ViewStyle;
   summaryActionButtonSingle: ViewStyle;
   summaryActionLabel: TextStyle;
+  profileSwitcherSection: ViewStyle;
+  profileSwitcherRow: ViewStyle;
+  profileSwitcherRowActive: ViewStyle;
+  profileSwitcherAvatar: ViewStyle;
+  profileSwitcherInitials: TextStyle;
+  profileSwitcherContent: ViewStyle;
+  profileSwitcherTitleRow: ViewStyle;
+  profileSwitcherTitle: TextStyle;
+  profileSwitcherMetaRow: ViewStyle;
+  profileSwitcherMetaDot: ViewStyle;
+  profileSwitcherMetaText: TextStyle;
+  profileSwitcherSeparator: ViewStyle;
 };
 
 export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
@@ -403,5 +415,70 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       width: "100%",
     },
     summaryActionLabel: {},
+    profileSwitcherSection: {
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.lg,
+    },
+    profileSwitcherRow: {
+      minHeight: 92,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      paddingVertical: t.spacing.md,
+    },
+    profileSwitcherRowActive: {},
+    profileSwitcherAvatar: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.backgroudWhite,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    profileSwitcherInitials: {
+      color: t.colors.textDark,
+      fontFamily: t.typography.label.fontFamily,
+    },
+    profileSwitcherContent: {
+      flex: 1,
+      minWidth: 0,
+      gap: 4,
+    },
+    profileSwitcherTitleRow: {
+      minHeight: 32,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    profileSwitcherTitle: {
+      color: t.colors.textDark,
+      flex: 1,
+      minWidth: 0,
+    },
+    profileSwitcherMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    profileSwitcherMetaDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: t.colors.error,
+      flexShrink: 0,
+    },
+    profileSwitcherMetaText: {
+      color: t.colors.stateAnulated,
+      flex: 1,
+      minWidth: 0,
+    },
+    profileSwitcherSeparator: {
+      borderTopWidth: 1,
+      borderTopColor: t.colors.border,
+      marginLeft: 74,
+    },
   };
 }

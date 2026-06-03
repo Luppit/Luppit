@@ -1,4 +1,5 @@
 import { LucideIconName } from "@/src/icons/lucide";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { useTheme } from "@/src/themes";
 import React, { useMemo } from "react";
 import { Pressable, View } from "react-native";
@@ -14,6 +15,8 @@ type ChatTopBarProps = {
   isSurfaceVisible?: boolean;
 };
 
+export const CHAT_TOP_BAR_VISIBLE_HEIGHT = 56;
+
 export default function ChatTopBar({
   title,
   onClose,
@@ -23,51 +26,91 @@ export default function ChatTopBar({
   isSurfaceVisible = false,
 }: ChatTopBarProps) {
   const t = useTheme();
-  const barHeight = 56;
   const s = useMemo(
     () => ({
       container: {
-        height: barHeight + topInset,
+        position: "absolute" as const,
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+        elevation: 10,
+        height: CHAT_TOP_BAR_VISIBLE_HEIGHT + topInset,
         paddingTop: topInset,
-        backgroundColor: isSurfaceVisible ? t.colors.background : "transparent",
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: t.glass.radius.chrome,
+        borderBottomRightRadius: t.glass.radius.chrome,
+      },
+      clip: {
+        borderTopLeftRadius: 0,
+        borderTopRightRadius: 0,
+        borderBottomLeftRadius: t.glass.radius.chrome,
+        borderBottomRightRadius: t.glass.radius.chrome,
+        overflow: "hidden" as const,
       },
       bar: {
-        height: barHeight,
+        height: CHAT_TOP_BAR_VISIBLE_HEIGHT,
+        flexDirection: "row" as const,
+        alignItems: "center" as const,
         justifyContent: "center" as const,
+        paddingHorizontal: t.spacing.xl,
       },
       titleWrap: {
+        flex: 1,
         alignItems: "center" as const,
         justifyContent: "center" as const,
       },
-      leftIcon: {
-        position: "absolute" as const,
-        left: t.spacing.md,
-      },
-      closeIcon: {
-        position: "absolute" as const,
-        right: t.spacing.md,
+      iconSlot: {
+        width: 40,
+        justifyContent: "center" as const,
       },
     }),
-    [barHeight, isSurfaceVisible, t, topInset]
+    [t, topInset]
   );
 
-  return (
-    <View style={s.container}>
-      <View style={s.bar}>
-        {topIcon ? (
-          <Pressable onPress={onTopIconPress} style={s.leftIcon} hitSlop={12}>
-            <Icon name={topIcon} size={22} />
-          </Pressable>
-        ) : null}
-
-        <View style={s.titleWrap}>
-          <Text variant="subtitle">{title ?? ""}</Text>
-        </View>
-
-        <Pressable onPress={onClose} style={s.closeIcon} hitSlop={12}>
-          <Icon name="x" size={32} />
+  const content = (
+    <View style={s.bar}>
+      {topIcon ? (
+        <Pressable
+          onPress={onTopIconPress}
+          style={[s.iconSlot, { alignItems: "flex-start" }]}
+          hitSlop={12}
+        >
+          <Icon name={topIcon} size={22} />
         </Pressable>
+      ) : (
+        <View style={s.iconSlot} />
+      )}
+
+      <View style={s.titleWrap}>
+        <Text variant="subtitle" align="center" maxLines={1}>
+          {title ?? ""}
+        </Text>
       </View>
+
+      <Pressable
+        onPress={onClose}
+        style={[s.iconSlot, { alignItems: "flex-end" }]}
+        hitSlop={12}
+      >
+        <Icon name="x" size={32} />
+      </Pressable>
     </View>
+  );
+
+  if (!isSurfaceVisible) {
+    return <View style={s.container}>{content}</View>;
+  }
+
+  return (
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.container}
+      clipStyle={s.clip}
+    >
+      {content}
+    </GlassSurface>
   );
 }

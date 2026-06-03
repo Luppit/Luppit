@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
@@ -121,12 +122,7 @@ export default function ProductCard({
             </Text>
           </View>
 
-          <View style={s.statusPill}>
-            <View style={s.statusDot} />
-            <Text variant="body" maxLines={1} style={s.statusText}>
-              {statusLabel}
-            </Text>
-          </View>
+          <StatusChip label={statusLabel} />
 
           <View style={s.bottomRow}>
             <View style={s.viewsRow}>
