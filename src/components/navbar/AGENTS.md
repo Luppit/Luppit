@@ -36,6 +36,7 @@ Applies to navbar UI components and rendering behavior.
   - seller category chips
   - seller interaction-state chips
 - Buyer status filter options should prefer `purchase_request_status_ui` and may fall back safely to buyer-home RPC `status/status_label` values when needed for resilience.
+- Buyer status filter chips may carry `style_code` metadata for option identity, but the popup filter chips should stay plain text chips without status-color dots; colored status dots are reserved for request cards.
 - Seller category filter chips are currently derived from the seller-home RPC item payload for the active segment (`category_id` / `category_name`) and deduplicated client-side; this means only categories represented in visible returned home items are shown.
 - Seller interaction-state chips use stable client labels (`Sin abrir`, `En gestión`, `Descartadas`) mapped to DB-filter values (`new`, `opened`, `discarded`); do not use raw purchase-request lifecycle status for this seller filter.
 - When buyer-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.

@@ -64,8 +64,8 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 
 ### Requests & Offers
 - `purchase_request`: buyer request.
-- `purchase_request_status`: purchase request lifecycle catalog (`code`, `description`, `is_terminal`).
-- `purchase_request_status_ui`: one-row-per-status UI copy for request cards (`status_code`, `ui_text`).
+- `purchase_request_status`: purchase request lifecycle catalog (`code`, `description`, `is_terminal`) plus home-surface visibility flags such as `is_buyer_home_visible` and `is_seller_home_visible`.
+- `purchase_request_status_ui`: one-row-per-status UI presentation for request cards (`status_code`, `ui_text`, `style_code`).
 - `purchase_request_visualization`: one row per viewer profile and purchase request used for home/detail visualization counts.
 - `purchase_request_favorite`: role-specific saved purchase requests for buyer/seller favorite surfaces.
 - `purchase_offer`: seller offer for request.
@@ -75,7 +75,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `delivery_catalog`: delivery method catalog.
 - `purchase_request.status` is lifecycle state and must reference `purchase_request_status.code`.
 - UI-facing request-card status copy must come from `purchase_request_status_ui.ui_text`, not directly from `purchase_request.status`.
-- Current required lifecycle codes:
+- UI-facing request-card status style must come from `purchase_request_status_ui.style_code` referencing `action_style_catalog(code)` and be emitted by request-card RPC payloads as `status_style_code`; do not store raw hex colors or add a parallel status-title column.
+- Buyer/seller home lifecycle visibility must be DB-driven through `purchase_request_status` flags such as `is_buyer_home_visible` / `is_seller_home_visible`; do not hardcode lifecycle lists like `active`, `offer_accepted` inside home/favorite procedures.
+- Current seeded lifecycle codes:
   - `active`
   - `offer_accepted`
 - `purchase_request_visualization` uniqueness must stay one-row-per-profile-per-request:
@@ -84,6 +86,8 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - unique (`profile_id`, `purchase_request_id`, `role_id`)
 - Do not store favorite role as free-text when the normalized `role` table is available.
 - Buyer grouped home discovery must come from `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home groups from legacy single-request visualization lookup in client code.
+- Buyer home request-card `offers_count` must be computed in `public.get_buyer_home_purchase_requests(...)` from buyer-visible active offers only, matching `public.get_buyer_purchase_request_offers(...)`; do not count raw `purchase_offer` rows whose linked conversation is discarded, rejected, canceled, or otherwise inactive.
+- Buyer purchase-request detail offer rows must come from `public.get_buyer_purchase_request_offers(...)`, which should join the linked `conversation` and exclude discarded, rejected, canceled, or otherwise inactive conversation states.
 - Offer cards in purchase-request detail must include DB-backed business + location + currency metadata from `business_with_rating` (or equivalent DB-backed summary join), together with `purchase_offer.price`.
 - Seller offers listing/search/sort should be served by `public.get_current_seller_purchase_offers(...)` once deployed; do not make the app maintain long-term client-only filtering for seller-owned offers.
 - Seller offer price sorting must be currency-specific. Use separate COL and USD sort codes instead of mixing both currencies in one numeric order.
@@ -147,7 +151,10 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
     - `opened`: a conversation exists and is not `REQUEST_DISCARDED`
     - `discarded`: latest seller/request conversation is `REQUEST_DISCARDED`
   - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
+  - resolve request-card status style from `purchase_request_status_ui.style_code` and emit it as `status_style_code`.
+  - filter visible lifecycles through `purchase_request_status.is_seller_home_visible`, not hardcoded status codes.
   - resolve `views_count` from `purchase_request_visualization` aggregated by `purchase_request_id`.
+    - This was fixed in `public.get_seller_home_purchase_requests(...)` by replacing the old `0::int as views_count` placeholder with a `visualization_counts` CTE: `count(distinct profile_id)::int` grouped by `purchase_request_id`, left joined back to `purchase_request`, and emitted as `coalesce(vc.views_count, 0)::int`.
 - Do not rebuild request-card status text from lifecycle codes in client code.
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
 - Procedure output contract is JSON with `groups[]`; each group includes:
@@ -158,7 +165,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Item payload expected in `items[]`:
   - `id`, `title`, `summary_text`
   - `category_id`, `category_name`, `category_path`
-  - `status`, `status_label`, `published_at`, `created_at`
+  - `status`, `status_label`, `status_style_code`, `published_at`, `created_at`
   - `views_count`
   - `seller_interaction_state`
 - Sorting behavior by group code (current convention):
@@ -188,15 +195,19 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Resolution flow:
   - resolve active preset by `profile_home_group_preset` joined to `home_group_preset` for `surface_code = 'buyer_home'` (fallback to active preset code `default` when missing)
   - resolve visible groups/order/limits by `home_group_preset_item` + `home_group` for `surface_code = 'buyer_home'`
-  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and the buyer-home visible lifecycle set, currently `active` plus `offer_accepted`
+  - resolve request items from `purchase_request` filtered by the current buyer owner (`purchase_request.profile_id = p_profile_id`) and `purchase_request_status.is_buyer_home_visible`
   - when provided, apply buyer-home filters in DB:
     - `p_search_text`: case-insensitive match against request title
     - `p_start_date` / `p_end_date`: compare against request recency date (`published_at::date`, fallback `created_at::date`)
     - `p_status_codes`: match against `purchase_request.status`
     - `p_segment_svg_name`: match requests whose category belongs to the selected segment; null/empty/`todas` means no segment filter
   - resolve request-card status label from `purchase_request_status_ui` joined by `purchase_request.status`.
+  - resolve request-card status style from `purchase_request_status_ui.style_code` and emit it as `status_style_code`.
+  - filter visible lifecycles through `purchase_request_status.is_buyer_home_visible`, not hardcoded status codes.
   - resolve `views_count` from `purchase_request_visualization` aggregated by `purchase_request_id`.
+  - resolve `offers_count` from active buyer-visible `purchase_offer` rows joined through `conversation`, excluding discarded, rejected, canceled, or otherwise inactive conversation states.
 - Do not rebuild request-card status text from lifecycle codes in client code.
+- Do not rebuild buyer home request-card offer counts in client code once `offers_count` is present in the RPC payload.
 - The RPC must not require limit parameters; limits are fully DB-driven via preset items.
 - Procedure output contract is JSON with `groups[]`; each group includes:
   - `code`
@@ -206,8 +217,8 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - Item payload expected in `items[]`:
   - `id`, `title`, `summary_text`
   - `category_id`, `category_name`, `category_path`
-  - `status`, `status_label`, `published_at`, `created_at`
-  - `views_count`
+  - `status`, `status_label`, `status_style_code`, `published_at`, `created_at`
+  - `views_count`, `offers_count`
 - Sorting behavior by group code (current convention):
   - `all`: by `published_at desc nulls last`, then `created_at desc`
   - `popular`: by `views_count desc`, then recency
@@ -224,7 +235,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - unique (`profile_id`, `purchase_request_id`, `role_id`)
 - Buyer favorite visibility:
   - add/remove/query must validate the authenticated profile owns the buyer role.
-  - buyer favorites should only include buyer-owned requests (`purchase_request.profile_id = p_profile_id`) in buyer-visible lifecycle states (`active`, `offer_accepted`).
+  - buyer favorites should only include buyer-owned requests (`purchase_request.profile_id = p_profile_id`) in lifecycle states where `purchase_request_status.is_buyer_home_visible = true`.
 - Seller favorite visibility:
   - add/remove/query must validate the authenticated profile owns the seller role.
   - seller favorites should only include active requests visible through seller business category preferences (`profile_business` + `business_category_preference`).
@@ -248,7 +259,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `p_sort_code text default 'favorited_newest'`
 - Expected list payload is JSON `{ "items": [...] }`; each item should include:
   - `favorite_id`, `favorited_at`
-  - request card fields (`id`, `title`, `summary_text`, `category_id`, `category_name`, `category_path`, `status`, `status_label`, `published_at`, `created_at`, `views_count`)
+  - request card fields (`id`, `title`, `summary_text`, `category_id`, `category_name`, `category_path`, `status`, `status_label`, `status_style_code`, `published_at`, `created_at`, `views_count`)
   - `offers_count`
 - Supported favorite sort codes:
   - `favorited_newest`
@@ -353,6 +364,9 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `OFFER_REJECTED`: buyer rejected the seller's offer; request remains `active`.
   - `OFFER_MADE` may be reset back to `REQUEST_OPENED` when the seller cancels the current offer.
 - `public.get_or_create_seller_purchase_request_conversation(...)` is also the DB-owned side-effect point for seller request opens; it should insert into `purchase_request_visualization` with `on conflict (profile_id, purchase_request_id) do nothing` before returning/creating the conversation.
+- For brand-new seller/request conversations, `public.get_or_create_seller_purchase_request_conversation(...)` must also insert one buyer-authored `TEXT` first message so the seller sees the request context immediately. The message should be concise and built from `purchase_request.title`, `purchase_request.summary_text`, and the current null description placeholder; do not expose or pretty-print raw `purchase_request.contract` JSON in the chat.
+- Chat-list identity is resolved by `public.get_current_profile_conversations(...)`: seller viewers see the buyer profile name in `display_name`; buyer viewers see the seller business name in `display_name`. The purchase request title stays in `request_title` and is used for the conversation header.
+- Keep seller chat-list name resolution simple and explicit: seller path should read the buyer from `conversation.buyer_profile_id` (kept aligned with `purchase_request.profile_id` by conversation bootstrap/repair) and return `buyer_profile_name`/`request_profile_name` for UI fallback and search.
 - Seller first-offer action in current flow:
   - `conversation_action.code = 'SELLER_CREATE_OFFER'`
   - executor uses `execution_type='client_command'` with target `modal.offer`
@@ -526,7 +540,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
 - `public.buyer_accept_offer` must also update `purchase_request.status` from `active` to `offer_accepted` atomically with the conversation transition.
 - `public.seller_discard_request_conversation(...)` must transition `REQUEST_OPENED -> REQUEST_DISCARDED`, write history, and add the seller discard system message without changing `purchase_request.status`.
 - `public.buyer_reject_offer(...)` must transition `OFFER_MADE -> OFFER_REJECTED`, write history, and add the buyer reject system message without changing `purchase_request.status`.
-- `public.seller_cancel_offer(...)` must validate seller ownership in `OFFER_MADE`, delete the linked offer artifacts, reset the conversation to `REQUEST_OPENED`, and leave the thread reusable for a new offer.
+- `public.seller_cancel_offer(...)` must validate seller ownership in `OFFER_MADE`, delete/reset the linked offer state as needed, then call `public.cleanup_empty_request_opened_conversations(...)` so the emptied conversation and its artifacts are purged instead of leaving the thread reusable.
 - `public.submit_conversation_rating(...)` must validate actor membership, validate the structured `rating` payload, write/update `conversation_rating`, refresh rating summaries, and only apply a conversation transition when a matching DB transition exists.
 - `public.seller_concretar_request(...)` must transition `OFFER_ACCEPTED -> SELLER_ACCEPTED` and create/reset the active deadline from `deadline_type_catalog.code = 'SELLER_CONCRETAR_EXPIRATION'` for both delivery types.
 - `public.seller_concretar_request(...)` must generate+store a secure 4-digit transaction code hash in `otp_code` with `otp_type_code = 'conversation_transaction'` only for store pickup (`purchase_offer_delivery.after_value`/`after_unit`, fallback `after_days`), not for shipping (`purchase_offer_delivery.max_value`/`max_unit`, fallback `max_days`).
@@ -538,6 +552,7 @@ Applies to DB table usage, relationships, and SQL transition procedure behavior.
   - `public.create_seller_offer_from_conversation(...)`
 - `public.get_or_create_seller_purchase_request_conversation(...)` must resolve `buyer_profile_id` from `purchase_request.profile_id`, not from any legacy visualization table.
 - `public.get_or_create_seller_purchase_request_conversation(...)` should also repair stale existing conversations whose `buyer_profile_id` no longer matches the request owner before returning them.
+- `public.get_or_create_seller_purchase_request_conversation(...)` should only create the buyer-authored first request summary message when it creates a new conversation; reused conversations should not get duplicate first messages.
 - `public.create_seller_offer_from_conversation(...)` must atomically:
   - create `purchase_offer_delivery`, `purchase_offer`, `purchase_offer_image`
   - apply conversation transition/history for seller first offer

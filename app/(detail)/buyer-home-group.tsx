@@ -1,7 +1,6 @@
 import ProductCard from "@/src/components/productCard/ProductCard";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
-import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import {
   BuyerHomePurchaseRequestItem,
   getCurrentBuyerHomePurchaseRequestGroups,
@@ -47,7 +46,6 @@ export default function BuyerHomeGroupScreen() {
   }>();
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState<BuyerHomePurchaseRequestItem[]>([]);
-  const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
   const groupCode = useMemo(() => parseStringParam(params.groupCode), [params.groupCode]);
   const segmentSvgName = useMemo(
     () => parseStringParam(params.segmentSvgName),
@@ -72,11 +70,6 @@ export default function BuyerHomeGroupScreen() {
     const group = result.data.find((value) => value.code === groupCode);
     const nextItems = group?.items ?? [];
     setItems(nextItems);
-
-    const countsResult = await getPurchaseOffersCountByPurchaseRequestIds(
-      nextItems.map((item) => item.id)
-    );
-    setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
     setIsLoading(false);
   }, [groupCode, segmentSvgName]);
 
@@ -112,33 +105,36 @@ export default function BuyerHomeGroupScreen() {
         paddingBottom: t.spacing.xl,
       }}
     >
-      {items.map((item) => (
-        <View key={item.id}>
-          <ProductCard
-            title={item.title ?? "Solicitud"}
-            subtitle={item.category_name ?? "-"}
-            views={item.views_count}
-            statusLabel={item.status_label ?? item.status}
-            offersLabel={
-              (offerCountsByRequestId[item.id] ?? 0) <= 0
-                ? "Sin ofertas"
-                : `${offerCountsByRequestId[item.id] ?? 0} ${
-                    (offerCountsByRequestId[item.id] ?? 0) === 1 ? "oferta" : "ofertas"
-                  }`
-            }
-            offersCount={offerCountsByRequestId[item.id] ?? 0}
-            onPress={() =>
-              router.push({
-                pathname: "/(detail)/purchase-request",
-                params: {
-                  title: item.title ?? "Detalle de solicitud",
-                  purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
-                },
-              })
-            }
-          />
-        </View>
-      ))}
+      {items.map((item) => {
+        const offersCount = typeof item.offers_count === "number" ? item.offers_count : 0;
+
+        return (
+          <View key={item.id}>
+            <ProductCard
+              title={item.title ?? "Solicitud"}
+              subtitle={item.category_name ?? "-"}
+              views={item.views_count}
+              statusLabel={item.status_label ?? item.status}
+              statusStyleCode={item.status_style_code}
+              offersLabel={
+                offersCount <= 0
+                  ? "Sin ofertas"
+                  : `${offersCount} ${offersCount === 1 ? "oferta" : "ofertas"}`
+              }
+              offersCount={offersCount}
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/purchase-request",
+                  params: {
+                    title: item.title ?? "Detalle de solicitud",
+                    purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
+                  },
+                })
+              }
+            />
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }

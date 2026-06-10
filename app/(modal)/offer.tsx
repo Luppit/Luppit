@@ -4,7 +4,6 @@ import FilePicker, {
   SelectedFile,
 } from "@/src/components/filePicker/FilePicker";
 import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
-import { purchaseRequestExample } from "@/src/mocks/purchaseRequest.mock";
 import { Currency, getCurrencies } from "@/src/services/currency.service";
 import {
   DeliveryCatalog,
@@ -40,14 +39,21 @@ import {
 } from "react-native";
 
 type DeliveryTimeOption = "horas" | "dias";
+type OfferPurchaseRequest = Pick<PurchaseRequest, "id" | "title">;
 
 function parsePurchaseRequestParam(
   raw: string | string[] | undefined
-): PurchaseRequest | null {
+): OfferPurchaseRequest | null {
   if (!raw) return null;
   const value = Array.isArray(raw) ? raw[0] : raw;
   try {
-    return JSON.parse(value) as PurchaseRequest;
+    const parsed = JSON.parse(value) as Partial<PurchaseRequest>;
+    if (typeof parsed.id !== "string" || parsed.id.trim().length === 0) return null;
+
+    return {
+      id: parsed.id,
+      title: typeof parsed.title === "string" ? parsed.title : null,
+    };
   } catch {
     return null;
   }
@@ -63,13 +69,9 @@ function normalize(value: string | null | undefined) {
 
 function buildFallbackPurchaseRequest(
   purchaseRequestId: string | null | undefined
-): PurchaseRequest {
-  if (!purchaseRequestId) return purchaseRequestExample;
-
-  return {
-    ...purchaseRequestExample,
-    id: purchaseRequestId,
-  };
+): OfferPurchaseRequest | null {
+  if (!purchaseRequestId) return null;
+  return { id: purchaseRequestId, title: null };
 }
 
 export default function OfferScreen() {
@@ -89,7 +91,7 @@ export default function OfferScreen() {
     : params.conversationId;
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const isEditMode = mode === "edit";
-  const [purchaseRequest, setPurchaseRequest] = useState<PurchaseRequest>(
+  const [purchaseRequest, setPurchaseRequest] = useState<OfferPurchaseRequest | null>(
     initialPurchaseRequest ?? buildFallbackPurchaseRequest(purchaseRequestId)
   );
   const [requestLoading, setRequestLoading] = useState(
@@ -176,7 +178,7 @@ export default function OfferScreen() {
     }
 
     setPurchaseRequest((current) =>
-      current.id === resolvedPurchaseRequestId
+      current?.id === resolvedPurchaseRequestId
         ? current
         : buildFallbackPurchaseRequest(resolvedPurchaseRequestId)
     );
@@ -402,9 +404,14 @@ export default function OfferScreen() {
         pathname: "/(conversation)/offer",
         params: {
           conversationId,
-          title: purchaseRequest.title ?? "Conversación",
+          title: purchaseRequest?.title ?? "Conversación",
         },
       });
+      return;
+    }
+
+    if (!purchaseRequest) {
+      showError("No se pudo publicar la oferta", "No encontramos la solicitud asociada.");
       return;
     }
 
@@ -445,8 +452,7 @@ export default function OfferScreen() {
     pickupDelayUnit,
     pickupCatalog,
     price,
-    purchaseRequest.id,
-    purchaseRequest.title,
+    purchaseRequest,
     shippingCatalog,
     shippingCost,
     shippingMaxTime,
@@ -458,6 +464,25 @@ export default function OfferScreen() {
       <LoadingState
         label={isEditMode ? "Cargando oferta..." : "Cargando solicitud..."}
       />
+    );
+  }
+
+  if (!purchaseRequest) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: t.spacing.lg,
+          gap: t.spacing.md,
+        }}
+      >
+        <Text align="center" color="stateAnulated">
+          No encontramos la solicitud asociada.
+        </Text>
+        <Button title="Volver" onPress={() => router.back()} />
+      </View>
     );
   }
 

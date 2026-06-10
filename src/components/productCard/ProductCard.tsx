@@ -11,6 +11,7 @@ type ProductCardProps = {
   subtitle: string;
   views: number;
   statusLabel?: string;
+  statusStyleCode?: string | null;
   offersLabel?: string;
   offersCount?: number;
   onPress?: () => void;
@@ -21,7 +22,8 @@ export default function ProductCard({
   title,
   subtitle,
   views,
-  statusLabel = "Activa",
+  statusLabel,
+  statusStyleCode,
   offersLabel = "# ofertas",
   offersCount,
   onPress,
@@ -122,7 +124,7 @@ export default function ProductCard({
             </Text>
           </View>
 
-          <StatusChip label={statusLabel} />
+          {statusLabel ? <StatusChip label={statusLabel} styleCode={statusStyleCode} /> : null}
 
           <View style={s.bottomRow}>
             <View style={s.viewsRow}>

@@ -37,6 +37,9 @@ Applies to conversation screens and conversation UI behavior.
 - Do not locally suppress or persist rating-action visibility; after execution, refresh and trust the DB-returned `actions[]`.
 - Do not hardcode buyer/seller system-message visibility in client logic; rely on `get_conversation_messages` DB filtering.
 - Do not mark messages opened in client code. Loading a conversation must rely on `public.get_conversation_messages(...)` to mark visible non-system messages opened for the current viewer side.
+- Conversation header title should be the purchase request title when available, not the counterpart display name. If the conversation only has `purchase_offer_id`, resolve the request title through the offer's `purchase_request_id`.
+- Non-own message bubble labels should show the sender's real display identity: buyer-authored messages use the buyer profile name; seller-authored messages use the seller business name. Generic fallback labels such as `Comprador`/`Vendedor` are only last-resort resilience copy, not the normal product state.
+- When direct counterpart profile/business reads are unavailable, conversation bubbles may reuse the current-profile chat-list RPC item (`get_current_profile_conversations`) as the canonical counterpart display fallback.
 - Keyboard behavior in popup confirmations must keep inputs visible (avoid keyboard overlap) while preserving sheet visibility.
 - Chat screen should open anchored at the newest message (bottom) on initial load/refresh.
 - `STATUS` slots belong inside the scrollable message thread and should render after the existing messages, like the latest passive system item.
@@ -82,7 +85,7 @@ Applies to conversation screens and conversation UI behavior.
   - executor target: `public.seller_cancel_offer`
   - executor type: `server_rpc`
   - confirmation template: `SELLER_CANCEL_OFFER_CONFIRMATION`
-  - server-side effect: removes the current offer artifacts and resets the conversation to `REQUEST_OPENED`.
+  - server-side effect: removes the current offer artifacts, resets the conversation as needed for cleanup eligibility, and purges the emptied conversation through `public.cleanup_empty_request_opened_conversations(...)`.
 - Seller modify offer is currently configured as:
   - seller `Modificar` action in `OFFER_MADE`
   - executor target: `modal.offer.edit`

@@ -8,6 +8,7 @@ Applies to shared popup rendering in this folder.
 - Controls inside popup sheets must stay plain and readable: white background, grey border, no blur, no glass tint, and no one-off shadow.
 - Popup filter text fields and date selectors use the shared plain control shape: 48px height, pill radius, grey border, white background, dark text, and muted placeholder/icon color.
 - Popup filter chips are plain bordered chips by default; selected chips may use the app primary color.
+- Popup filter chips must not render status-color dots even when their options include style metadata; keep dots reserved for status chips on request cards/profile active chips.
 - Do not use `t.glass.control` or `t.glass.chip` for popup-internal inputs, date controls, or filter chips. Reserve glass roles for the popup shell and app chrome.
 - The profile switcher is a `GlobalPopupHost` variant, not a custom overlay. It must keep the shared bottom-sheet shell, drag indicator, backdrop, spacing, and separators.
 - Profile switcher active state must reuse the shared status-chip component used by buyer purchase request cards, with label `Activo`; do not duplicate the pill styling locally in the popup.

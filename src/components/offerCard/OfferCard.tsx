@@ -155,13 +155,6 @@ export default function OfferCard({
             openPopup({
               options: [
                 {
-                  id: "favorite",
-                  label: "Añadir como favorito",
-                  icon: "heart",
-                  textColorKey: "textDark",
-                  iconColorKey: "textDark",
-                },
-                {
                   id: "reject",
                   label: "Rechazar oferta",
                   icon: "trash-2",
