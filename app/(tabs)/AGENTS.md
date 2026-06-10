@@ -12,11 +12,15 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
 - Seller home filters (request-name text, date range, category selection, seller interaction state) must drive the same seller RPC, not a separate local grouping source.
 - Seller home segment selection must drive the same seller RPC via `p_segment_svg_name`; `todas` means no segment filter.
-- Buyer home request scope is DB-driven by the buyer RPC and currently resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set, which currently includes `active` and `offer_accepted`.
+- Buyer home request scope is DB-driven by the buyer RPC and resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set from `purchase_request_status.is_buyer_home_visible`.
 - Buyer home filters (request-name text, date range, status selection) must drive the same buyer RPC, not a separate local grouping source.
 - Buyer home segment selection must drive the same buyer RPC via `p_segment_svg_name`; `todas` means no segment filter.
 - Home-card status chip text is DB-driven by RPC item field `status_label`; `status` remains the raw lifecycle code and must not be shown directly in the card UI.
+- Home-card status chip style is DB-driven by RPC item field `status_style_code`, which must come from `purchase_request_status_ui.style_code`; do not make home screens query status UI metadata separately to paint cards.
+- Buyer/seller home visible lifecycle sets are DB-driven by `purchase_request_status` visibility flags; do not hardcode lifecycle status lists in app code or procedure logic.
 - Home-card eye count is DB-driven by RPC item field `views_count`; do not recompute visualization totals in home/group screens when the RPC already provides them.
+- Buyer home-card offer count is DB-driven by RPC item field `offers_count`; do not issue a separate client-side `purchase_offer` count for buyer home or buyer group listing cards.
+- Buyer home `offers_count` should represent only active buyer-visible offers, matching `public.get_buyer_purchase_request_offers(...)` by excluding offers whose linked conversation is discarded, rejected, canceled, or otherwise inactive.
 - Empty home state must render when all returned groups have `items.length = 0`.
 - Buyer empty-state behavior depends on filter state:
   - with no active filters, show the default creation CTA
@@ -39,6 +43,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Group header action should navigate to a dedicated group listing screen (for example with `groupCode` param) for both buyer and seller.
 - Buyer home and seller home may share the same grouped section layout, but buyer request cards must keep the buyer visual contract (`ProductCard` with status chip + footer offers label) instead of reusing the seller compact card.
 - Buyer and seller request cards must prefer `item.status_label` for the status pill and only fall back safely when the label is absent.
+- Request-card status pills must use `item.status_style_code` with shared `StatusChip`; the chip keeps dark text, uses the theme color for the dot, uses a light tint of the theme color for the background, and has no border.
 - Buyer grouped request cards and buyer group listing items must open `/(detail)/purchase-request`.
 - Seller request card press (home + group listing) must not navigate to purchase-request detail for seller role.
 - Seller request card press must open `/(conversation)/offer` and resolve conversation via DB RPC `public.get_or_create_seller_purchase_request_conversation(...)`.
@@ -47,7 +52,7 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
 - Buyer home card long-press menu should mirror purchase-request detail options, including favorite toggle copy/icon (`star` vs `star-off`), category info, share, and cancel placeholders unless product requirements change.
 - Seller home card long-press menu is intentionally minimal: only add/remove favorite for that seller/request, with `star` when adding and `star-off` when removing.
 - Long-press card animations should be subtle press-in lift/scale feedback and must not change card layout, carousel geometry, or normal tap navigation.
-- Buyer grouped home/group screens may enrich RPC items with offer counts client-side for `ProductCard` footer text, but must not replace RPC-driven grouping/order/visibility logic.
+- Buyer grouped home/group screens must render request-card offer counts from RPC item `offers_count`; do not enrich those counts client-side.
 - Buyer home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
 - Seller home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
 - Buyer and seller home must react to shared top-navbar segment state so tapping a segment reloads grouped cards in place through the RPC, not through client-side filtering.
@@ -142,7 +147,8 @@ Applies to tab screens, with special focus on home behavior for buyer/seller and
   - last-message date range -> `p_start_date` / `p_end_date`
   - category chips -> `p_category_ids`
 - Do not add status filtering to the chats popup unless the RPC contract changes.
-- Expected chat-list item payload includes `conversation_id`, `display_name`, request/category/status metadata, `last_message_text`, `last_message_kind`, `last_message_at`, `unopened_count`, and `has_unopened`.
-- Chat rows open `/(conversation)/offer` with `conversationId` and `display_name` as the title.
+- Expected chat-list item payload includes `conversation_id`, `display_name`, `business_name`, `buyer_profile_name`/`request_profile_name`, `request_title`, request/category/status metadata, `last_message_text`, `last_message_kind`, `last_message_at`, `unopened_count`, and `has_unopened`.
+- Chat row `display_name` is the counterpart identity: sellers see the buyer profile name; buyers see the seller business name. Do not show generic role labels such as `Comprador` or `Vendedor` when the profile/business name is available.
+- Chat rows open `/(conversation)/offer` with `conversationId` and the purchase request title (`request_title`) as the header title. Do not use `display_name` for the conversation header title.
 - Unopened chats must render before opened chats, then sort by `last_message_at desc`. The app may preserve this ordering client-side, but the RPC is also expected to return that order.
 - The unopened indicator must use the app theme primary color (`t.colors.primary`), not a hardcoded blue. Avatar, text, spacing, search trigger, popup, and applied-chip styling must reuse the existing theme and the `Favoritas`/`Ofertas` standalone-list pattern.

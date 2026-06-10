@@ -247,7 +247,7 @@ function ChatsContent() {
       pathname: "/(conversation)/offer",
       params: {
         conversationId: item.conversation_id,
-        title: item.display_name || "Conversación",
+        title: item.request_title || item.display_name || "Conversación",
       },
     });
   }, []);

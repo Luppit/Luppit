@@ -380,6 +380,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
             statusLabel={item.status_label ?? item.status}
+            statusStyleCode={item.status_style_code}
             offersLabel={
               item.offers_count <= 0
                 ? "Sin ofertas"

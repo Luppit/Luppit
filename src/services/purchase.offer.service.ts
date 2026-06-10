@@ -58,6 +58,13 @@ export type SellerPurchaseOfferFilters = {
   selectedCurrencyIds?: string[];
 };
 
+export type BuyerPurchaseOfferFilters = {
+  searchValue?: string;
+  startDate?: string;
+  endDate?: string;
+  selectedCurrencyIds?: string[];
+};
+
 export type CreatePurchaseOfferResult = {
   offer: PurchaseOffer;
   delivery: PurchaseOfferDelivery;
@@ -205,6 +212,53 @@ export async function getPurchaseOffersCountByPurchaseRequestIds(
   }
 
   return { ok: true, data: counts };
+}
+
+export async function getCurrentBuyerPurchaseRequestOffers(
+  purchaseRequestId: string,
+  filters?: BuyerPurchaseOfferFilters,
+  sortCode = "offer_created_newest"
+): Promise<{ ok: true; data: PurchaseOfferCardData[] } | { ok: false; error: AppError }> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc("get_buyer_purchase_request_offers", {
+    p_profile_id: profile.data.id,
+    p_purchase_request_id: purchaseRequestId,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_currency_ids:
+      filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
+        ? filters.selectedCurrencyIds
+        : null,
+    p_sort_code: sortCode || "offer_created_newest",
+  });
+
+  if (rpcResult?.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
+
+  const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+  return {
+    ok: true,
+    data: rows.map((row: any) => ({
+      ...row,
+      business_name: typeof row.business_name === "string" ? row.business_name : null,
+      business_province:
+        typeof row.business_province === "string" ? row.business_province : null,
+      business_rating:
+        typeof row.business_rating === "number" ? row.business_rating : null,
+      business_num_ratings:
+        typeof row.business_num_ratings === "number" ? row.business_num_ratings : null,
+      offer_currency_code:
+        typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+    })) as PurchaseOfferCardData[],
+  };
 }
 
 export async function getCurrentSellerPurchaseOffers(

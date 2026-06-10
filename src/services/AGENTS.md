@@ -89,6 +89,7 @@ Expected item fields:
 - `purchase_request_id`, `purchase_offer_id`
 - `display_name`
 - `business_name`
+- `buyer_profile_name` and/or `request_profile_name`
 - `request_title`
 - `request_category_id`, `request_category_name`
 - `status_code`, `status_label`
@@ -98,6 +99,9 @@ Expected item fields:
 
 Service behavior:
 - Resolve current authenticated profile in `conversation.service.ts` before calling the RPC; screens must not pass arbitrary profile ids.
+- `display_name` is counterpart-facing: for seller viewers it must resolve to the buyer profile name; for buyer viewers it must resolve to the seller business name.
+- `request_title` is the conversation header title source; do not substitute `display_name` for the header title.
+- `business_name`, `buyer_profile_name`, and `request_profile_name` are display-name support fields for search and UI fallback. Avoid returning generic role labels in these fields when real profile/business names exist.
 - Chat-list filters map to RPC params:
   - text search -> `p_search_text`
   - last-message date range -> `p_start_date` / `p_end_date`
@@ -302,6 +306,7 @@ Expected item fields in `items[]`:
 - `category_path`
 - `status`
 - `status_label`
+- `status_style_code`
 - `published_at`
 - `created_at`
 - `views_count`
@@ -321,7 +326,9 @@ Service behavior:
   - `opened`: a seller conversation exists and is not discarded
   - `discarded`: the seller conversation status is `REQUEST_DISCARDED`
 - Seller home cards must render `status_label` when present and treat `status` as the raw lifecycle code.
+- Seller home cards must render `status_style_code` from the RPC item payload for the status chip style; do not query `purchase_request_status_ui` separately in the client to paint cards.
 - Seller home cards must render the RPC-provided `views_count` directly; do not fetch or recalculate visualization totals separately in the screen layer.
+- `views_count` is expected to be emitted by `public.get_seller_home_purchase_requests(...)` from `purchase_request_visualization` via `count(distinct profile_id)` grouped by `purchase_request_id`. If seller cards show `0` incorrectly, inspect the RPC payload/SQL first; do not patch the screen to query visualization counts separately.
 - Do not send per-group limits from client; limits are DB configuration in `home_group_preset_item.max_items`.
 - Do not hardcode group visibility/order in services.
 - Do not build seller-home request groups from local mocks when this RPC is available.
@@ -347,6 +354,7 @@ Expected item fields in `items[]`:
 - `category_path`
 - `status`
 - `status_label`
+- `status_style_code`
 - `published_at`
 - `created_at`
 - `views_count`
@@ -354,15 +362,16 @@ Expected item fields in `items[]`:
 Service behavior:
 - Buyer home must call this RPC for request discovery/grouping.
 - Buyer preset resolution must read from shared home-group config for `surface_code = 'buyer_home'`, with assignment via `profile_home_group_preset`.
-- Buyer home currently includes the DB-visible lifecycle set for owned requests, which includes both `active` and `offer_accepted`.
+- Buyer home includes the DB-visible lifecycle set for owned requests as resolved by `purchase_request_status.is_buyer_home_visible`; do not hardcode lifecycle code lists in client wrappers or procedures.
 - Buyer-home filters map to RPC params:
   - request-name text -> `p_search_text`
   - date range -> `p_start_date` / `p_end_date`
   - selected status chips -> `p_status_codes`
   - selected top-navbar segment -> `p_segment_svg_name` unless selected segment is `todas`
 - Buyer home cards must render `status_label` when present and treat `status` as the raw lifecycle code for downstream logic.
+- Buyer home cards must render `status_style_code` from the RPC item payload for the status chip style; do not query `purchase_request_status_ui` separately in the client to paint cards.
 - Buyer home cards and buyer group listings must render the RPC-provided `views_count` directly; a missing/zero eye count should be investigated in the RPC payload before changing UI code.
-- Buyer grouped home/group screens may enrich items with purchase-offer counts client-side for `ProductCard` footer text, but grouping/order/visibility must still come from the RPC payload.
+- Buyer grouped home/group screens must render `offers_count` from the RPC item payload for `ProductCard` footer text; do not issue separate client-side offer-count queries.
 - Do not hardcode group visibility/order in services.
 - Do not build buyer-home request groups from local mocks when this RPC is available.
 - During rollout, client services may keep a compatibility fallback for older deployments that still expose the legacy single-argument buyer-home RPC signature, but that fallback must preserve the RPC payload shape and remain temporary.
@@ -397,7 +406,7 @@ Expected favorite item fields:
 - `favorite_id`, `favorited_at`
 - `id`, `title`, `summary_text`
 - `category_id`, `category_name`, `category_path`
-- `status`, `status_label`, `published_at`, `created_at`
+- `status`, `status_label`, `status_style_code`, `published_at`, `created_at`
 - `views_count`, `offers_count`
 
 Service behavior:
@@ -428,6 +437,7 @@ Service behavior:
 - RPC is source of truth to reuse existing seller/request conversation or bootstrap one when missing.
 - Buyer ownership for the bootstrapped conversation must come from `purchase_request.profile_id`.
 - Seller-open visualization tracking is also owned by this RPC: it should insert a `purchase_request_visualization` row for (`p_profile_id`, `p_purchase_request_id`) with conflict-safe idempotency (`do nothing` on the one-row-per-profile/request unique constraint).
+- When bootstrapping a new conversation, the RPC must insert the first chat message as buyer-authored `TEXT`: use the purchase request `title`, `summary_text`, and current null description placeholder only. Do not dump the full `purchase_request.contract` JSON into this first seller-visible message.
 - If an existing seller/request conversation is reused, the RPC should self-heal `conversation.buyer_profile_id` so it matches `purchase_request.profile_id` before returning it.
 
 ## RPC Contract: `create_seller_offer_from_conversation`

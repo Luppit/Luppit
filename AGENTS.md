@@ -23,12 +23,13 @@ Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
 - Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
 - Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
 - Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
+- Keep purchase-request status presentation DB-driven: request-card text comes from RPC `status_label`, style comes from RPC `status_style_code` sourced from `purchase_request_status_ui.style_code`, and lifecycle visibility comes from `purchase_request_status` flags rather than hardcoded status lists.
 - Keep seller discard / buyer reject / seller cancel-offer / seller edit-offer flows DB-driven through conversation state, action metadata, and RPCs; do not recreate those flows as client-only state.
 - Never hardcode conversation action behavior when DB metadata exists.
 - Conversation action placement is DB-driven via `conversation_action.ui_slot` / `ui_slot_catalog`; supported action slots now include `TOP`, `AUX`, and `MENU`.
 - Conversation header ellipsis options must be sourced from DB `MENU` actions returned by `get_conversation_view`; do not hardcode menu items in client code.
 - Never hardcode double-rating prevention in client code when DB conversation-action resolution already knows whether the participant has rated.
-- Keep buyer/seller chat-list discovery DB-driven via `public.get_current_profile_conversations(...)`; do not rebuild chat listing/search/unread ordering from direct client table reads.
+- Keep buyer/seller chat-list discovery DB-driven via `public.get_current_profile_conversations(...)`; do not rebuild chat listing/search/unread ordering from direct client table reads. Chat list `display_name` is the counterpart identity (seller sees buyer profile name, buyer sees seller business name), while conversation headers use the purchase request title.
 - Keep conversation message open/unopened state DB-driven via `conversation_message` buyer/seller open-state columns; only `public.get_conversation_messages(...)` marks visible non-system messages opened for the current viewer side.
 - Keep conversation realtime as a private Broadcast invalidation layer only; do not stream raw conversation rows to clients. Realtime should wake screens so they reload DB-owned RPCs (`get_conversation_messages`, `get_conversation_view`) rather than becoming a source of truth.
 - Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.

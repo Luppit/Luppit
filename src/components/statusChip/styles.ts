@@ -14,8 +14,6 @@ export function createStatusChipStyles(t: Theme): StatusChipStyles {
       maxWidth: "100%",
       minHeight: 32,
       backgroundColor: t.colors.primaryLight,
-      borderWidth: 1,
-      borderColor: "rgba(131,163,30,0.18)",
       borderRadius: 999,
       paddingHorizontal: 12,
       paddingVertical: 5,

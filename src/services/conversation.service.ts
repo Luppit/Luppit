@@ -401,12 +401,28 @@ function parseConversationListItem(raw: unknown): ConversationListItem | null {
       : typeof value.id === "string"
         ? value.id
         : "";
-  const displayName =
-    typeof value.display_name === "string"
-      ? value.display_name.trim()
-      : typeof value.business_name === "string"
-        ? value.business_name.trim()
+  const rawDisplayName =
+    typeof value.display_name === "string" ? value.display_name.trim() : "";
+  const buyerDisplayName =
+    typeof value.buyer_profile_name === "string" && value.buyer_profile_name.trim()
+      ? value.buyer_profile_name.trim()
+      : typeof value.request_profile_name === "string" && value.request_profile_name.trim()
+        ? value.request_profile_name.trim()
         : "";
+  const sellerDisplayName =
+    typeof value.business_name === "string" && value.business_name.trim()
+      ? value.business_name.trim()
+      : "";
+  const genericDisplayNames = new Set(["comprador", "vendedor", "contacto"]);
+  const normalizedDisplayName = rawDisplayName.toLowerCase();
+  const displayName =
+    rawDisplayName && !genericDisplayNames.has(normalizedDisplayName)
+      ? rawDisplayName
+      : normalizedDisplayName === "comprador"
+        ? buyerDisplayName || rawDisplayName
+        : normalizedDisplayName === "vendedor"
+          ? sellerDisplayName || rawDisplayName
+          : buyerDisplayName || sellerDisplayName || rawDisplayName;
   const lastMessageAt =
     typeof value.last_message_at === "string"
       ? value.last_message_at

@@ -23,6 +23,8 @@ import {
   executeConversationActionByExecutor,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
+import { getPurchaseOfferById } from "@/src/services/purchase.offer.service";
+import { getPurchaseRequestById } from "@/src/services/purchase.request.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
@@ -207,6 +209,19 @@ function getRealtimeRefreshTargets(
   return targets.length > 0 ? targets : ["view", "messages"];
 }
 
+function didPurgeConversationResult(value: unknown, conversationId: string) {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  const purgedConversationId =
+    typeof result.purged_conversation_id === "string"
+      ? result.purged_conversation_id
+      : typeof result.deleted_conversation_id === "string"
+        ? result.deleted_conversation_id
+        : null;
+
+  return result.conversation_deleted === true || purgedConversationId === conversationId;
+}
+
 export default function ConversationLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -222,6 +237,7 @@ export default function ConversationLayout() {
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
+  const [purchaseRequestTitle, setPurchaseRequestTitle] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
   );
@@ -238,6 +254,48 @@ export default function ConversationLayout() {
   );
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
+  const purchaseOfferId = conversationView?.conversation.purchase_offer_id ?? null;
+
+  useEffect(() => {
+    if (!purchaseRequestId && !purchaseOfferId) {
+      setPurchaseRequestTitle(null);
+      return;
+    }
+
+    let active = true;
+
+    const loadPurchaseRequestTitle = async () => {
+      let resolvedPurchaseRequestId = purchaseRequestId;
+
+      if (!resolvedPurchaseRequestId && purchaseOfferId) {
+        const offerResult = await getPurchaseOfferById(purchaseOfferId);
+        if (offerResult?.ok) {
+          resolvedPurchaseRequestId = offerResult.data.purchase_request_id;
+        }
+      }
+
+      if (!resolvedPurchaseRequestId) {
+        if (active) setPurchaseRequestTitle(null);
+        return;
+      }
+
+      const result = await getPurchaseRequestById(resolvedPurchaseRequestId);
+      if (!active) return;
+
+      if (!result || result.ok === false) {
+        setPurchaseRequestTitle(null);
+        return;
+      }
+
+      setPurchaseRequestTitle(result.data.title?.trim() || null);
+    };
+
+    void loadPurchaseRequestTitle();
+
+    return () => {
+      active = false;
+    };
+  }, [purchaseOfferId, purchaseRequestId]);
 
   useEffect(() => {
     setOptimisticMessages([]);
@@ -477,6 +535,13 @@ export default function ConversationLayout() {
       }
 
       const shouldRefresh = action.executor?.requires_refresh ?? true;
+      const conversationWasPurged = didPurgeConversationResult(result.data, conversationId);
+      if (conversationWasPurged) {
+        showSuccess("Acción completada");
+        router.replace("/(tabs)/chats");
+        return;
+      }
+
       if (shouldRefresh) {
         await refreshConversation();
         setMessageRefreshTick((prev) => prev + 1);
@@ -679,7 +744,7 @@ export default function ConversationLayout() {
   const contentBottomInset = showComposer
     ? composerOverlayHeight || composerOverlayFallbackHeight
     : 0;
-  const title = routeTitle ?? "Conversación";
+  const title = purchaseRequestTitle ?? routeTitle ?? "Conversación";
 
   const providerValue: ConversationLayoutContextValue = {
     conversationId,

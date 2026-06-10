@@ -131,6 +131,7 @@ export default function SellerHomeGroupScreen() {
             subtitle={item.category_name ?? "-"}
             views={item.views_count}
             statusLabel={item.status_label ?? item.status}
+            statusStyleCode={item.status_style_code}
             offersLabel={formatPublishedLabel(item.published_at ?? item.created_at)}
             onPress={() => void openRequestConversation(item)}
           />

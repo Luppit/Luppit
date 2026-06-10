@@ -89,6 +89,7 @@ export type PopupFilterDateRangeConfig = {
 export type PopupFilterChipOption = {
   id: string;
   label: string;
+  styleCode?: string;
 };
 
 export type PopupFilterChipGroupConfig = {

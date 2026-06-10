@@ -8,11 +8,13 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 - Grouped home payloads may now include `status_label` for card presentation, but detail-screen logic must continue using raw `purchase_request.status`.
 - Purchase-request detail visualization count must reflect `purchase_request_visualization` rows for that request; do not infer it from stale card params or local counters.
 - `purchase_request.status` controls offer list mode:
-  - `active`: render all offers and the count label (`Ofertas (n)`).
+  - `active`: render active offers returned by `public.get_buyer_purchase_request_offers(...)` and the count label (`Ofertas (n)`).
   - `offer_accepted`: render only the accepted offer and label `Oferta seleccionada`.
+- Buyer detail offer lists must remain DB-filtered through `public.get_buyer_purchase_request_offers(...)`; the RPC should exclude offers whose linked conversation is discarded, rejected, canceled, or otherwise inactive instead of filtering those states in client code.
 - Accepted offer resolution must come from DB-backed conversation data (acceptance transition), not local heuristics.
 - Offer timeline must come from `public.get_conversation_timeline(...)`.
 - Seller reputation shown on offer cards must come from the DB-backed rating view/summary relation (`business_with_rating` or equivalent), not from removed `business.rating` / `business.num_ratings` columns.
+- Purchase-offer card overflow menus inside buyer purchase-request detail must not show `Añadir como favorito`; favorites apply to purchase requests through the detail/home request menus, not individual offer cards.
 - Buyer purchase-request detail ellipsis favorite state must come from buyer favorite RPC state, not from route params or local-only assumptions.
 - The detail ellipsis favorite option must toggle copy/icon by current state:
   - not favorited: `Añadir como favorito` with `star`

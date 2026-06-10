@@ -27,7 +27,6 @@ import {
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
-import { getPurchaseOffersCountByPurchaseRequestIds } from "@/src/services/purchase.offer.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   addCurrentBuyerPurchaseRequestFavorite,
@@ -89,7 +88,6 @@ function BuyerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
   const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
-  const [offerCountsByRequestId, setOfferCountsByRequestId] = useState<Record<string, number>>({});
   const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
@@ -103,7 +101,6 @@ function BuyerHomeContent() {
     if (!emailSetupResult.ok) {
       setEmailSetupStatus(null);
       setGroups([]);
-      setOfferCountsByRequestId({});
       setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
@@ -112,7 +109,6 @@ function BuyerHomeContent() {
     setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
       setGroups([]);
-      setOfferCountsByRequestId({});
       setFavoriteRequestIds(new Set());
       setIsLoading(false);
       return;
@@ -124,10 +120,6 @@ function BuyerHomeContent() {
     );
     const nextGroups = result.ok ? result.data : [];
     setGroups(nextGroups);
-
-    const requestIds = nextGroups.flatMap((group) => group.items.map((item) => item.id));
-    const countsResult = await getPurchaseOffersCountByPurchaseRequestIds(requestIds);
-    setOfferCountsByRequestId(countsResult.ok ? countsResult.data : {});
 
     const favoritesResult = await getCurrentBuyerPurchaseRequestFavorites();
     if (favoritesResult.ok) {
@@ -253,7 +245,6 @@ function BuyerHomeContent() {
             <BuyerHomeRequestCard
               key={item.id}
               item={item}
-              offersCount={offerCountsByRequestId[item.id] ?? 0}
               isFavorite={favoriteRequestIds.has(item.id)}
               onFavoriteChange={handleFavoriteChange}
             />
@@ -525,12 +516,10 @@ function HomeGroupSection({
 
 function BuyerHomeRequestCard({
   item,
-  offersCount,
   isFavorite,
   onFavoriteChange,
 }: {
   item: BuyerHomePurchaseRequestItem;
-  offersCount: number;
   isFavorite: boolean;
   onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
 }) {
@@ -608,6 +597,8 @@ function BuyerHomeRequestCard({
     });
   }, [isFavorite, item.category_path, toggleFavorite]);
 
+  const offersCount = typeof item.offers_count === "number" ? item.offers_count : 0;
+
   return (
     <View style={{ width: 286 }}>
       <ProductCard
@@ -615,6 +606,7 @@ function BuyerHomeRequestCard({
         subtitle={item.category_name ?? "-"}
         views={item.views_count}
         statusLabel={item.status_label ?? item.status}
+        statusStyleCode={item.status_style_code}
         offersLabel={
           offersCount <= 0
             ? "Sin ofertas"

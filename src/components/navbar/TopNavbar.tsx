@@ -66,11 +66,6 @@ const segmentSvgModules: Record<string, number> = {
   herramientas: require("../../../assets/segments/herramientas.svg"),
 };
 
-const BUYER_FILTER_STATUS_FALLBACKS: PurchaseRequestStatusUiOption[] = [
-  { statusCode: "active", label: "Activa" },
-  { statusCode: "offer_accepted", label: "Oferta aceptada" },
-];
-
 const SELLER_INTERACTION_OPTIONS: {
   id: SellerHomeInteractionState;
   label: string;
@@ -85,12 +80,12 @@ function mergeBuyerStatusOptions(
 ): PurchaseRequestStatusUiOption[] {
   const map = new Map<string, PurchaseRequestStatusUiOption>();
 
-  [...sources, BUYER_FILTER_STATUS_FALLBACKS].forEach((items) => {
+  sources.forEach((items) => {
     items.forEach((item) => {
       const statusCode = item.statusCode?.trim();
       const label = item.label?.trim();
       if (!statusCode || !label || map.has(statusCode)) return;
-      map.set(statusCode, { statusCode, label });
+      map.set(statusCode, { statusCode, label, styleCode: item.styleCode?.trim() || null });
     });
   });
 
@@ -110,6 +105,7 @@ function buildFallbackBuyerStatusOptions(
       map.set(statusCode, {
         statusCode,
         label,
+        styleCode: item.status_style_code?.trim() || null,
       });
     });
   });
@@ -317,6 +313,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           options: statusOptions.map((status) => ({
             id: status.statusCode,
             label: status.label,
+            styleCode: status.styleCode ?? undefined,
           })),
           initialSelectedIds: homeFilters.selectedChipIds,
         },

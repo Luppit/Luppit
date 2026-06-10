@@ -14,6 +14,7 @@ export type PurchaseRequest = Row<"purchase_request">;
 export type PurchaseRequestStatusUiOption = {
   statusCode: string;
   label: string;
+  styleCode: string | null;
 };
 export type AddPurchaseRequestFavoriteResult = {
   favoriteId: string | null;
@@ -46,6 +47,7 @@ export type SellerHomePurchaseRequestItem = {
   category_path: string | null;
   status: string;
   status_label: string | null;
+  status_style_code: string | null;
   published_at: string | null;
   created_at: string;
   views_count: number;
@@ -148,6 +150,15 @@ function parseSellerHomeInteractionState(raw: unknown): SellerHomeInteractionSta
   return raw;
 }
 
+function parseCount(raw: unknown): number {
+  if (typeof raw === "number" && Number.isFinite(raw)) return Math.max(0, Math.floor(raw));
+  if (typeof raw !== "string") return 0;
+
+  const count = Number(raw);
+  if (!Number.isFinite(count)) return 0;
+  return Math.max(0, Math.floor(count));
+}
+
 function parseSellerHomePurchaseRequestItem(
   raw: unknown
 ): SellerHomePurchaseRequestItem | null {
@@ -167,9 +178,20 @@ function parseSellerHomePurchaseRequestItem(
     category_path: typeof value.category_path === "string" ? value.category_path : null,
     status,
     status_label: typeof value.status_label === "string" ? value.status_label : null,
+    status_style_code:
+      typeof value.status_style_code === "string"
+        ? value.status_style_code
+        : typeof value.style_code === "string"
+          ? value.style_code
+          : null,
     published_at: typeof value.published_at === "string" ? value.published_at : null,
     created_at: createdAt,
-    views_count: typeof value.views_count === "number" ? value.views_count : 0,
+    views_count: parseCount(
+      value.views_count ??
+        value.view_count ??
+        value.visualization_count ??
+        value.visualizations_count
+    ),
     offers_count: typeof value.offers_count === "number" ? value.offers_count : null,
     seller_interaction_state: parseSellerHomeInteractionState(value.seller_interaction_state),
   };
@@ -394,6 +416,7 @@ function mapPurchaseRequestStatusUiOption(
   return {
     statusCode,
     label,
+    styleCode: typeof value.style_code === "string" ? value.style_code : null,
   };
 }
 
@@ -778,9 +801,19 @@ export async function getCurrentSellerHomeFilterCategoryOptions(
 export async function getPurchaseRequestStatusUiOptions(): Promise<
   { ok: true; data: PurchaseRequestStatusUiOption[] } | { ok: false; error: AppError }
 > {
-  const { data, error } = await (supabase as any)
+  let { data, error } = await (supabase as any)
     .from("purchase_request_status_ui")
-    .select("status_code, ui_text");
+    .select("status_code, ui_text, style_code");
+
+  if (error) {
+    const legacyResult = await (supabase as any)
+      .from("purchase_request_status_ui")
+      .select("status_code, ui_text");
+
+    if (legacyResult.error) return { ok: false, error: fromSupabaseError(error) };
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
