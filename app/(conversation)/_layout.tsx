@@ -132,7 +132,6 @@ function toMenuOptionConfig(action: ConversationViewAction): PopupOption {
     id: action.id,
     label: action.label || action.code || "",
     icon: normalizeOptionalIcon(action.icon),
-    backgroundColorKey: "backgroudWhite",
     textColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
   };
@@ -514,6 +513,11 @@ export default function ConversationLayout() {
               ...(purchaseRequestId ? { purchaseRequestId } : null),
             },
           });
+        } else if (action.executor.target === "detail.faq") {
+          router.push({
+            pathname: "/(detail)/faq",
+            params: { title: "Ayuda", hideMenu: "true" },
+          });
         } else if (action.executor.target !== "popup.close") {
           showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
         }
@@ -654,7 +658,7 @@ export default function ConversationLayout() {
                       ? "Selecciona una calificación en estrellas."
                     : `${invalidInput.label} es obligatorio.`;
                 showError("Dato inválido", message);
-                return;
+                return false;
               }
 
               const payload =

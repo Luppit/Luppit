@@ -8,11 +8,13 @@ import { Text } from "@/src/components/Text";
 import {
   closePopup,
   PopupFilterConfig,
+  PopupHelperConfig,
   PopupOption,
   PopupProfileSwitcherConfig,
   PopupSortConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
+  PopupSummaryInput,
   subscribePopup,
 } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
@@ -68,6 +70,71 @@ function formatUnreadNotificationCount(count?: number) {
   return `Tienes ${safeCount} notificaciones`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function toOptionalText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getOtpHelperConfig(input: PopupSummaryInput): PopupHelperConfig | null {
+  if (!isRecord(input.component_config)) return null;
+
+  const rawHelper =
+    input.component_config.helper_popup ?? input.component_config.helper;
+  if (!isRecord(rawHelper)) return null;
+
+  const rawSections = Array.isArray(rawHelper.sections) ? rawHelper.sections : [];
+  const sections = rawSections
+    .map((section, index) => {
+      if (!isRecord(section)) return null;
+
+      const title = toOptionalText(section.title);
+      const subtitle = toOptionalText(section.subtitle);
+      const body =
+        toOptionalText(section.body) ??
+        toOptionalText(section.text) ??
+        toOptionalText(section.description);
+
+      if (!title && !subtitle && !body) return null;
+
+      return {
+        id: toOptionalText(section.id) ?? `${input.id}-helper-${index}`,
+        title,
+        subtitle,
+        body,
+      };
+    })
+    .filter(
+      (section): section is NonNullable<typeof section> => Boolean(section)
+    );
+
+  const body =
+    toOptionalText(rawHelper.body) ??
+    toOptionalText(rawHelper.text) ??
+    toOptionalText(rawHelper.description);
+  const normalizedSections =
+    sections.length > 0 || !body ? sections : [{ id: `${input.id}-helper-body`, body }];
+
+  if (normalizedSections.length === 0) return null;
+
+  return {
+    type: "helper",
+    title:
+      toOptionalText(rawHelper.title) ??
+      toOptionalText(input.helper_text) ??
+      input.label,
+    subtitle: toOptionalText(rawHelper.subtitle),
+    sections: normalizedSections,
+    closeLabel: toOptionalText(rawHelper.close_label),
+    dismissOnBackdropPress:
+      typeof rawHelper.dismiss_on_backdrop_press === "boolean"
+        ? rawHelper.dismiss_on_backdrop_press
+        : undefined,
+  };
+}
+
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -77,6 +144,10 @@ export default function GlobalPopupHost() {
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
   const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
+  const [helperConfig, setHelperConfig] = useState<PopupHelperConfig | null>(null);
+  const [inlineHelperConfig, setInlineHelperConfig] =
+    useState<PopupHelperConfig | null>(null);
+  const [expandedHelperSectionIds, setExpandedHelperSectionIds] = useState<string[]>([]);
   const [profileSwitcherConfig, setProfileSwitcherConfig] =
     useState<PopupProfileSwitcherConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
@@ -101,6 +172,7 @@ export default function GlobalPopupHost() {
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
   const summaryDescriptionMaxHeight = Math.round(windowHeight * 0.45);
+  const helperContentMaxHeight = Math.round(windowHeight * 0.62);
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -168,6 +240,9 @@ export default function GlobalPopupHost() {
             setFilterConfig(null);
             setSortConfig(null);
             setSummaryConfig(null);
+            setHelperConfig(null);
+            setInlineHelperConfig(null);
+            setExpandedHelperSectionIds([]);
             setProfileSwitcherConfig(null);
             setPendingSummaryActionId(null);
           }
@@ -175,14 +250,25 @@ export default function GlobalPopupHost() {
         return;
       }
 
+      setInlineHelperConfig(null);
+      setExpandedHelperSectionIds([]);
       if (config.type === "summary") {
         setSummaryConfig(config);
+        setHelperConfig(null);
+        setProfileSwitcherConfig(null);
+        setFilterConfig(null);
+        setSortConfig(null);
+        setOptions([]);
+      } else if (config.type === "helper") {
+        setSummaryConfig(null);
+        setHelperConfig(config);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions([]);
       } else if (config.type === "filters") {
         setSummaryConfig(null);
+        setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(config);
         setSortConfig(null);
@@ -202,6 +288,7 @@ export default function GlobalPopupHost() {
         setActiveDateField(null);
       } else if (config.type === "sort") {
         setSummaryConfig(null);
+        setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(config);
@@ -209,12 +296,14 @@ export default function GlobalPopupHost() {
         setSelectedSortOptionId(config.initialSelectedId ?? config.options[0]?.id ?? "");
       } else if (config.type === "profileSwitcher") {
         setSummaryConfig(null);
+        setHelperConfig(null);
         setProfileSwitcherConfig(config);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions([]);
       } else {
         setSummaryConfig(null);
+        setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(null);
@@ -276,13 +365,25 @@ export default function GlobalPopupHost() {
     setPendingSummaryActionId(action.id);
     try {
       const result = action.onPress?.();
-      if (result && typeof (result as Promise<void>).then === "function") {
-        await result;
+      let shouldClose = result !== false;
+      if (result && typeof (result as Promise<void | boolean>).then === "function") {
+        const resolvedResult = await result;
+        shouldClose = resolvedResult !== false;
       }
-      closePopup();
+      if (shouldClose) {
+        closePopup();
+      }
     } finally {
       setPendingSummaryActionId(null);
     }
+  };
+
+  const toggleHelperSection = (sectionId: string) => {
+    setExpandedHelperSectionIds((current) =>
+      current.includes(sectionId)
+        ? current.filter((value) => value !== sectionId)
+        : [...current, sectionId]
+    );
   };
 
   const renderSummaryDescription = () => {
@@ -306,6 +407,163 @@ export default function GlobalPopupHost() {
       </ScrollView>
     );
   };
+
+  const renderHelperContent = (
+    config: PopupHelperConfig,
+    onClose: () => void,
+    scrollMaxHeight = helperContentMaxHeight,
+    actions?: PopupSummaryAction[]
+  ) => (
+    <>
+      <View style={s.section}>
+        <View style={s.summaryHeaderBlock}>
+          <View style={s.summaryHeader}>
+            <Text variant="subtitle" style={s.summaryTitle}>
+              {config.title}
+            </Text>
+          </View>
+          <View style={s.summaryHeaderSeparator} />
+        </View>
+
+        {config.subtitle ? (
+          <Text variant="body" style={s.summaryDescription}>
+            {config.subtitle}
+          </Text>
+        ) : null}
+
+        <ScrollView
+          style={[s.helperContentScroll, { maxHeight: scrollMaxHeight }]}
+          contentContainerStyle={s.helperContentScrollContent}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          <View style={s.helperSectionsList}>
+            {config.sections.map((section, index) => {
+              const sectionId = section.id ?? `${config.title}-${index}`;
+              const body = section.body ?? section.text;
+              const title = section.title ?? section.subtitle ?? body ?? "";
+              const answerSubtitle = section.title ? section.subtitle : undefined;
+              const answerBody = section.title ? body : section.subtitle ? body : undefined;
+              const hasAnswer = Boolean(answerSubtitle || answerBody);
+              const isExpanded = expandedHelperSectionIds.includes(sectionId);
+
+              return (
+                <React.Fragment key={sectionId}>
+                  {index > 0 ? <View style={s.helperRowSeparator} /> : null}
+                  <View style={s.helperSectionBlock}>
+                    <Pressable
+                      disabled={!hasAnswer}
+                      style={s.helperSectionHeader}
+                      onPress={() => toggleHelperSection(sectionId)}
+                      accessibilityRole={hasAnswer ? "button" : undefined}
+                      accessibilityState={hasAnswer ? { expanded: isExpanded } : undefined}
+                    >
+                      <Text variant="subtitleRegular" style={s.helperSectionTitle}>
+                        {title}
+                      </Text>
+                      {hasAnswer ? (
+                        <Icon
+                          name={isExpanded ? "chevron-down" : "chevron-right"}
+                          size={20}
+                          color={t.colors.stateAnulated}
+                        />
+                      ) : null}
+                    </Pressable>
+
+                    {isExpanded ? (
+                      <View style={s.helperSectionAnswer}>
+                        {answerSubtitle ? (
+                          <Text variant="body" style={s.helperSectionSubtitle}>
+                            {answerSubtitle}
+                          </Text>
+                        ) : null}
+                        {answerBody ? (
+                          <Text variant="body" style={s.helperBody}>
+                            {answerBody}
+                          </Text>
+                        ) : null}
+                      </View>
+                    ) : null}
+                  </View>
+                </React.Fragment>
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+
+      <View style={s.summaryActionsRow}>
+        {actions && actions.length > 0
+          ? actions.slice(0, 2).map((action, index) => {
+              const textColor =
+                action.textColorKey != null
+                  ? t.colors[action.textColorKey]
+                  : t.colors.textDark;
+              const iconColor =
+                action.iconColorKey != null
+                  ? t.colors[action.iconColorKey]
+                  : textColor;
+              const backgroundColor =
+                action.backgroundColorKey != null
+                  ? t.colors[action.backgroundColorKey]
+                  : t.colors.backgroudWhite;
+              const isSingle = actions.length === 1;
+              const isPending = pendingSummaryActionId === action.id;
+              const isDisabled = pendingSummaryActionId != null;
+
+              return (
+                <Pressable
+                  key={action.id}
+                  disabled={isDisabled}
+                  style={[
+                    s.summaryActionButton,
+                    isSingle ? s.summaryActionButtonSingle : null,
+                    { backgroundColor },
+                    isDisabled && !isPending ? { opacity: 0.55 } : null,
+                  ]}
+                  onPress={() => {
+                    if (index === 0) {
+                      onClose();
+                      return;
+                    }
+                    onClose();
+                    void handleSummaryActionPress(action);
+                  }}
+                >
+                  {isPending ? (
+                    <ActivityIndicator size="small" color={iconColor} />
+                  ) : action.icon ? (
+                    <Icon name={action.icon} size={20} color={iconColor} />
+                  ) : null}
+                  <Text
+                    variant="body"
+                    style={[s.summaryActionLabel, { color: textColor }]}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              );
+            })
+          : (
+            <Pressable
+              style={[
+                s.summaryActionButton,
+                s.summaryActionButtonSingle,
+                { backgroundColor: t.colors.primary, borderColor: t.colors.primary },
+              ]}
+              onPress={onClose}
+            >
+              <Text
+                variant="body"
+                style={[s.summaryActionLabel, { color: t.colors.backgroudWhite }]}
+              >
+                {config.closeLabel ?? "Entendido"}
+              </Text>
+            </Pressable>
+          )}
+      </View>
+    </>
+  );
 
   const handleFilterChipPress = (chipId: string) => {
     Keyboard.dismiss();
@@ -596,6 +854,8 @@ export default function GlobalPopupHost() {
                       </Pressable>
                     </View>
                   </>
+                ) : helperConfig ? (
+                  renderHelperContent(helperConfig, closePopup)
                 ) : sortConfig ? (
                   <View style={s.section}>
                     <View style={s.summaryHeaderBlock}>
@@ -729,12 +989,23 @@ export default function GlobalPopupHost() {
                       <View style={s.summaryInputsList}>
                         {summaryConfig.inputs.map((input) => {
                           if (input.kind === "otp") {
+                            const helper = getOtpHelperConfig(input);
+
                             return (
                               <OtpValidator
                                 key={input.id}
                                 label={input.label}
                                 helperText={input.helper_text}
                                 otpLength={input.otp_length ?? 4}
+                                onHelperPress={
+                                  helper
+                                    ? () => {
+                                        Keyboard.dismiss();
+                                        setExpandedHelperSectionIds([]);
+                                        setInlineHelperConfig(helper);
+                                      }
+                                    : undefined
+                                }
                                 onChange={(value) => input.onValueChange?.(value)}
                               />
                             );
@@ -867,6 +1138,48 @@ export default function GlobalPopupHost() {
           </View>
         </KeyboardAvoidingView>
       </View>
+
+      <Modal
+        transparent
+        visible={inlineHelperConfig != null}
+        animationType="fade"
+        onRequestClose={() => setInlineHelperConfig(null)}
+      >
+        <View style={s.helperOverlayBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => {
+              if (inlineHelperConfig?.dismissOnBackdropPress ?? true) {
+                setInlineHelperConfig(null);
+              }
+            }}
+          />
+          <GlassSurface
+            variant="sheet"
+            blur="sheet"
+            highlight
+            highlightStyle={s.bottomSheetHighlight}
+            clipStyle={s.bottomSheetClip}
+            style={[
+              s.bottomSheet,
+              s.helperOverlaySheet,
+              { paddingBottom: Math.max(insets.bottom, t.spacing.sm) },
+            ]}
+          >
+            <View style={s.indicatorTouchArea}>
+              <View style={s.indicator} />
+            </View>
+            {inlineHelperConfig
+              ? renderHelperContent(
+                  inlineHelperConfig,
+                  () => setInlineHelperConfig(null),
+                  Math.round(windowHeight * 0.46),
+                  summaryConfig?.actions
+                )
+              : null}
+          </GlassSurface>
+        </View>
+      </Modal>
 
       <Modal
         transparent

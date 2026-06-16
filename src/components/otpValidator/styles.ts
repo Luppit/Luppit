@@ -4,6 +4,7 @@ import { Platform, TextStyle, ViewStyle } from "react-native";
 export type OtpValidatorStyles = {
   container: ViewStyle;
   label: TextStyle;
+  helperButton: ViewStyle;
   helperText: TextStyle;
   inputRow: ViewStyle;
   inputRowStretch: ViewStyle;
@@ -22,6 +23,9 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
     },
     label: {
       color: t.colors.textDark,
+    },
+    helperButton: {
+      alignSelf: "center",
     },
     helperText: {
       color: t.colors.stateAnulated,

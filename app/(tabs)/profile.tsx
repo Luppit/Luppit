@@ -11,7 +11,7 @@ import {
   getCurrentSellerProfileOverview,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showInfo } from "@/src/utils/useToast";
+import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
@@ -148,14 +148,14 @@ function BuyerProfileContent() {
               }
             />
             <ActionRow
-              icon="life-buoy"
-              label="Contactar soporte"
-              onPress={() => showInfo("Soporte", "Estamos preparando este canal de ayuda.")}
-            />
-            <ActionRow
               icon="help-circle"
               label="Ayuda"
-              onPress={() => showInfo("Ayuda", "Pronto tendrás más información aquí.")}
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/faq",
+                  params: { title: "Ayuda", hideMenu: "true" },
+                })
+              }
             />
             <ActionRow
               icon="log-out"
@@ -281,14 +281,14 @@ function SellerProfileContent() {
               }
             />
             <ActionRow
-              icon="life-buoy"
-              label="Contactar soporte"
-              onPress={() => showInfo("Soporte", "Estamos preparando este canal de ayuda.")}
-            />
-            <ActionRow
               icon="help-circle"
               label="Ayuda"
-              onPress={() => showInfo("Ayuda", "Pronto tendrás más información aquí.")}
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/faq",
+                  params: { title: "Ayuda", hideMenu: "true" },
+                })
+              }
             />
             <ActionRow
               icon="log-out"
@@ -442,7 +442,7 @@ function ActionRow({
   destructive = false,
   onPress,
 }: {
-  icon: "bell" | "life-buoy" | "help-circle" | "log-out";
+  icon: "bell" | "help-circle" | "log-out";
   label: string;
   unreadCount?: number;
   accessibilityLabel?: string;

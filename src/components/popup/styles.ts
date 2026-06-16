@@ -67,6 +67,18 @@ export type GlobalPopupStyles = {
   summaryActionButton: ViewStyle;
   summaryActionButtonSingle: ViewStyle;
   summaryActionLabel: TextStyle;
+  helperContentScroll: ViewStyle;
+  helperContentScrollContent: ViewStyle;
+  helperSectionsList: ViewStyle;
+  helperSectionBlock: ViewStyle;
+  helperSectionHeader: ViewStyle;
+  helperSectionAnswer: ViewStyle;
+  helperSectionTitle: TextStyle;
+  helperSectionSubtitle: TextStyle;
+  helperBody: TextStyle;
+  helperRowSeparator: ViewStyle;
+  helperOverlayBackdrop: ViewStyle;
+  helperOverlaySheet: ViewStyle;
   profileSwitcherSection: ViewStyle;
   profileSwitcherRow: ViewStyle;
   profileSwitcherRowActive: ViewStyle;
@@ -415,6 +427,51 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       width: "100%",
     },
     summaryActionLabel: {},
+    helperContentScroll: {
+      borderRadius: t.borders.md,
+      backgroundColor: t.colors.background,
+    },
+    helperContentScrollContent: {},
+    helperSectionsList: {
+      gap: 0,
+    },
+    helperSectionBlock: {},
+    helperSectionHeader: {
+      minHeight: 62,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      paddingVertical: t.spacing.md,
+    },
+    helperSectionAnswer: {
+      paddingBottom: t.spacing.md,
+      paddingRight: t.spacing.lg,
+    },
+    helperSectionTitle: {
+      flex: 1,
+      minWidth: 0,
+      color: t.colors.textDark,
+    },
+    helperSectionSubtitle: {
+      color: t.colors.textMedium,
+      lineHeight: 22,
+    },
+    helperBody: {
+      color: t.colors.textMedium,
+      lineHeight: 22,
+    },
+    helperRowSeparator: {
+      borderTopWidth: 1,
+      borderTopColor: t.colors.border,
+    },
+    helperOverlayBackdrop: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(0,0,0,0.24)",
+    },
+    helperOverlaySheet: {
+      width: "100%",
+    },
     profileSwitcherSection: {
       paddingHorizontal: t.spacing.md,
       paddingBottom: t.spacing.lg,

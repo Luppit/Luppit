@@ -109,6 +109,77 @@ export type EditablePurchaseOfferDraft = {
 
 const purchaseOffersByRequestCache = new Map<string, PurchaseOfferCardData[]>();
 
+function normalizeSellerOfferRequestTitle(value: unknown) {
+  if (typeof value !== "string") return null;
+
+  const title = value.trim();
+  if (!title) return null;
+
+  const normalizedTitle = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return normalizedTitle === "solicitud" ? null : title;
+}
+
+function getRpcItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  const items = (payload as Record<string, unknown>).items;
+  return Array.isArray(items) ? items : [];
+}
+
+async function fillSellerOfferTitlesFromConversations(
+  profileId: string,
+  offers: SellerPurchaseOfferCardData[]
+) {
+  const missingTitleOfferIds = new Set(
+    offers
+      .filter((offer) => !normalizeSellerOfferRequestTitle(offer.request_title))
+      .map((offer) => offer.id)
+      .filter((id) => typeof id === "string" && id.length > 0)
+  );
+
+  if (missingTitleOfferIds.size === 0) return offers;
+
+  const rpcResult: any = await (supabase as any).rpc("get_current_profile_conversations", {
+    p_profile_id: profileId,
+    p_search_text: null,
+    p_start_date: null,
+    p_end_date: null,
+    p_category_ids: null,
+  });
+
+  if (rpcResult?.error) return offers;
+
+  const titleByOfferId = new Map<string, string>();
+  for (const item of getRpcItems(rpcResult?.data)) {
+    if (!item || typeof item !== "object") continue;
+
+    const value = item as Record<string, unknown>;
+    const offerId = typeof value.purchase_offer_id === "string" ? value.purchase_offer_id : null;
+    if (!offerId || !missingTitleOfferIds.has(offerId)) continue;
+
+    const requestTitle =
+      normalizeSellerOfferRequestTitle(value.request_title) ??
+      normalizeSellerOfferRequestTitle(value.purchase_request_title) ??
+      normalizeSellerOfferRequestTitle(value.title);
+    if (requestTitle) titleByOfferId.set(offerId, requestTitle);
+  }
+
+  if (titleByOfferId.size === 0) return offers;
+
+  return offers.map((offer) => ({
+    ...offer,
+    request_title:
+      normalizeSellerOfferRequestTitle(offer.request_title) ??
+      titleByOfferId.get(offer.id) ??
+      null,
+  }));
+}
+
 export function getCachedPurchaseOffersByPurchaseRequestId(
   purchaseRequestId: string
 ): PurchaseOfferCardData[] | null {
@@ -292,20 +363,25 @@ export async function getCurrentSellerPurchaseOffers(
 
   if (!rpcResult?.error) {
     const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+    const parsedRows = rows.map((row: any) => ({
+      ...row,
+      request_category_id:
+        typeof row.request_category_id === "string" ? row.request_category_id : null,
+      request_title:
+        normalizeSellerOfferRequestTitle(row.request_title) ??
+        normalizeSellerOfferRequestTitle(row.purchase_request_title) ??
+        normalizeSellerOfferRequestTitle(row.title),
+      request_category_name:
+        typeof row.request_category_name === "string" ? row.request_category_name : null,
+      request_profile_name:
+        typeof row.request_profile_name === "string" ? row.request_profile_name : null,
+      offer_currency_code:
+        typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+    })) as SellerPurchaseOfferCardData[];
+
     return {
       ok: true,
-      data: rows.map((row: any) => ({
-        ...row,
-        request_category_id:
-          typeof row.request_category_id === "string" ? row.request_category_id : null,
-        request_title: typeof row.request_title === "string" ? row.request_title : null,
-        request_category_name:
-          typeof row.request_category_name === "string" ? row.request_category_name : null,
-        request_profile_name:
-          typeof row.request_profile_name === "string" ? row.request_profile_name : null,
-        offer_currency_code:
-          typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
-      })) as SellerPurchaseOfferCardData[],
+      data: await fillSellerOfferTitlesFromConversations(profile.data.id, parsedRows),
     };
   }
 
@@ -422,7 +498,7 @@ export async function getCurrentSellerPurchaseOffers(
     } as SellerPurchaseOfferCardData;
   });
 
-  return { ok: true, data: parsed };
+  return { ok: true, data: await fillSellerOfferTitlesFromConversations(profile.data.id, parsed) };
 }
 
 export async function getPurchaseOfferById(
