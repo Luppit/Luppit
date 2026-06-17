@@ -11,6 +11,7 @@ type OtpValidatorProps = {
   otpLength?: number;
   stretch?: boolean;
   onChange?: (value: string) => void;
+  onHelperPress?: () => void;
 };
 
 export default function OtpValidator({
@@ -19,6 +20,7 @@ export default function OtpValidator({
   otpLength = 4,
   stretch = false,
   onChange,
+  onHelperPress,
 }: OtpValidatorProps) {
   const t = useTheme();
   const s = useMemo(() => createOtpValidatorStyles(t), [t]);
@@ -84,7 +86,18 @@ export default function OtpValidator({
           </View>
         ))}
       </Pressable>
-      {helperText ? (
+      {helperText && onHelperPress ? (
+        <Pressable
+          onPress={onHelperPress}
+          style={s.helperButton}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text variant="body" style={s.helperText}>
+            {helperText}
+          </Text>
+        </Pressable>
+      ) : helperText ? (
         <Text variant="body" style={s.helperText}>
           {helperText}
         </Text>

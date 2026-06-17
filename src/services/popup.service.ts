@@ -35,7 +35,7 @@ export type PopupSummaryAction = {
   backgroundColorKey?: ThemeColorKey;
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;
-  onPress?: () => void | Promise<void>;
+  onPress?: () => void | boolean | Promise<void | boolean>;
 };
 
 export type PopupSummaryInput = {
@@ -48,6 +48,23 @@ export type PopupSummaryInput = {
   is_required?: boolean;
   component_config?: Record<string, unknown> | null;
   onValueChange?: (value: unknown) => void;
+};
+
+export type PopupHelperSection = {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  body?: string;
+  text?: string;
+};
+
+export type PopupHelperConfig = {
+  type: "helper";
+  title: string;
+  subtitle?: string;
+  sections: PopupHelperSection[];
+  closeLabel?: string;
+  dismissOnBackdropPress?: boolean;
 };
 
 export type PopupSummaryConfig = {
@@ -144,6 +161,7 @@ export type PopupProfileSwitcherConfig = {
 
 export type PopupConfig =
   | PopupMenuConfig
+  | PopupHelperConfig
   | PopupSummaryConfig
   | PopupFilterConfig
   | PopupSortConfig

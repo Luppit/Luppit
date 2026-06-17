@@ -1282,6 +1282,36 @@ export type Database = {
         }
         Relationships: []
       }
+      faq: {
+        Row: {
+          answer: string
+          created_at: string
+          id: string
+          is_active: boolean
+          question: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          answer: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          question: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          answer?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          question?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       home_group: {
         Row: {
           code: string
@@ -2315,18 +2345,24 @@ export type Database = {
           code: string
           created_at: string
           description: string | null
+          is_buyer_home_visible: boolean
+          is_seller_home_visible: boolean
           is_terminal: boolean
         }
         Insert: {
           code: string
           created_at?: string
           description?: string | null
+          is_buyer_home_visible?: boolean
+          is_seller_home_visible?: boolean
           is_terminal?: boolean
         }
         Update: {
           code?: string
           created_at?: string
           description?: string | null
+          is_buyer_home_visible?: boolean
+          is_seller_home_visible?: boolean
           is_terminal?: boolean
         }
         Relationships: []
@@ -2336,6 +2372,7 @@ export type Database = {
           created_at: string
           id: string
           status_code: string
+          style_code: string | null
           ui_text: string
           updated_at: string
         }
@@ -2343,6 +2380,7 @@ export type Database = {
           created_at?: string
           id?: string
           status_code: string
+          style_code?: string | null
           ui_text: string
           updated_at?: string
         }
@@ -2350,6 +2388,7 @@ export type Database = {
           created_at?: string
           id?: string
           status_code?: string
+          style_code?: string | null
           ui_text?: string
           updated_at?: string
         }
@@ -2359,6 +2398,13 @@ export type Database = {
             columns: ["status_code"]
             isOneToOne: true
             referencedRelation: "purchase_request_status"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "purchase_request_status_ui_style_code_fkey"
+            columns: ["style_code"]
+            isOneToOne: false
+            referencedRelation: "action_style_catalog"
             referencedColumns: ["code"]
           },
         ]
@@ -2708,6 +2754,12 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      build_purchase_request_first_message: {
+        Args: {
+          p_request: Database["public"]["Tables"]["purchase_request"]["Row"]
+        }
+        Returns: string
+      }
       buyer_accept_offer: {
         Args: {
           p_action_code?: string
@@ -2748,6 +2800,7 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      cleanup_empty_request_opened_conversations: { Args: never; Returns: Json }
       create_seller_offer_from_conversation:
         | {
             Args: {
@@ -2802,6 +2855,32 @@ export type Database = {
           p_status_codes?: string[]
         }
         Returns: Json
+      }
+      get_buyer_purchase_request_offers: {
+        Args: {
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_num_ratings: number
+          business_province: string
+          business_rating: number
+          created_at: string
+          currency_id: string
+          delivery_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+        }[]
       }
       get_category_children: {
         Args: { category_id_input: string }

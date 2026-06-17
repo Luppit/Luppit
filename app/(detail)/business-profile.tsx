@@ -1,27 +1,18 @@
-import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { formatLocationLabel } from "@/src/services/location.service";
 import {
-  BusinessCategoryOption,
   SellerBusinessCategoryPreference,
   SellerProfileOverview,
-  getCurrentBusinessCategoryOptions,
   getCurrentSellerProfileOverview,
-  updateCurrentBusinessCategoryPreferences,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -34,18 +25,11 @@ export default function BusinessProfileScreen() {
     [t, topContentInset]
   );
   const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
-  const [categoryOptions, setCategoryOptions] = useState<BusinessCategoryOption[]>([]);
-  const [selectedCategories, setSelectedCategories] = useState<SellerBusinessCategoryPreference[]>([]);
-  const [initialCategoryIds, setInitialCategoryIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
-    const [profileResult, categoryResult] = await Promise.all([
-      getCurrentSellerProfileOverview(),
-      getCurrentBusinessCategoryOptions(),
-    ]);
+    const profileResult = await getCurrentSellerProfileOverview();
 
     if (!profileResult.ok) {
       setOverview(null);
@@ -54,17 +38,7 @@ export default function BusinessProfileScreen() {
       return;
     }
 
-    if (!categoryResult.ok) {
-      setCategoryOptions([]);
-      showError("No se pudieron cargar las categorías", categoryResult.error.message);
-    } else {
-      setCategoryOptions(categoryResult.data);
-    }
-
-    const nextSelectedCategories = profileResult.data.business?.categoryPreferences ?? [];
     setOverview(profileResult.data);
-    setSelectedCategories(nextSelectedCategories);
-    setInitialCategoryIds(nextSelectedCategories.map((preference) => preference.categoryId));
     setIsLoading(false);
   }, []);
 
@@ -76,64 +50,25 @@ export default function BusinessProfileScreen() {
   );
 
   const business = overview?.business ?? null;
-  const selectedCategoryIds = useMemo(
-    () => new Set(selectedCategories.map((preference) => preference.categoryId)),
-    [selectedCategories]
+  const selectedCategories = business?.categoryPreferences ?? [];
+  const categoryLabel = getCategoryCountLabel(selectedCategories.length);
+  const categoryPreview = getCategoryPreviewLabel(
+    selectedCategories.map((preference) => preference.categoryName)
   );
-  const availableCategories = useMemo(
-    () => categoryOptions.filter((category) => !selectedCategoryIds.has(category.id)),
-    [categoryOptions, selectedCategoryIds]
-  );
-  const categoryLabel = getCategoryLabel(selectedCategories);
   const locationLabel = formatLocationLabel(business?.location);
   const ratingLabel =
     typeof business?.rating === "number" && business.numRatings > 0
       ? `${business.rating.toFixed(1)} (${business.numRatings} calificaciones)`
       : "Sin calificaciones";
-  const hasCategoryChanges = haveCategoryIdsChanged(
-    initialCategoryIds,
-    selectedCategories.map((preference) => preference.categoryId)
-  );
 
-  const addCategory = (category: BusinessCategoryOption) => {
-    setSelectedCategories((current) => {
-      if (current.some((preference) => preference.categoryId === category.id)) {
-        return current;
-      }
-
-      return [
-        ...current,
-        {
-          id: `local-${category.id}`,
-          categoryId: category.id,
-          categoryName: category.name,
-          categoryPath: category.path,
-        },
-      ];
+  const openCategoryEditor = () => {
+    router.push({
+      pathname: "/(detail)/business-categories",
+      params: {
+        title: "Categorías de venta",
+        hideMenu: "true",
+      },
     });
-  };
-
-  const removeCategory = (categoryId: string) => {
-    setSelectedCategories((current) =>
-      current.filter((preference) => preference.categoryId !== categoryId)
-    );
-  };
-
-  const saveCategoryPreferences = async () => {
-    if (!hasCategoryChanges || isSaving) return;
-
-    const nextCategoryIds = selectedCategories.map((preference) => preference.categoryId);
-    setIsSaving(true);
-    const result = await updateCurrentBusinessCategoryPreferences(nextCategoryIds);
-    setIsSaving(false);
-
-    if (!result.ok) {
-      showError("No se pudieron actualizar las categorías", result.error.message);
-      return;
-    }
-
-    setInitialCategoryIds(result.data.categoryIds);
-    showSuccess("Categorías actualizadas");
   };
 
   if (isLoading) {
@@ -170,7 +105,7 @@ export default function BusinessProfileScreen() {
             {business.name || "Negocio sin nombre"}
           </Text>
           <Text color="stateAnulated" maxLines={2}>
-            {categoryLabel}
+            {categoryPreview || categoryLabel}
           </Text>
         </View>
       </View>
@@ -203,48 +138,22 @@ export default function BusinessProfileScreen() {
       </BusinessSection>
 
       <BusinessSection title="Preferencias de oportunidades">
-        <InfoRow label="Categorías activas" value={categoryLabel} />
+        <InfoRow
+          label="Categorías de venta"
+          value={categoryLabel}
+          onPress={openCategoryEditor}
+        />
         {selectedCategories.length === 0 ? (
           <View style={s.emptyCategoryRow}>
             <Text color="stateAnulated">Sin categorías configuradas.</Text>
+            <Text variant="caption" color="stateAnulated">
+              Toca la fila para elegir dónde quieres recibir oportunidades.
+            </Text>
           </View>
         ) : (
-          selectedCategories.map((preference) => (
-            <CategoryPreferenceRow
-              key={preference.categoryId}
-              preference={preference}
-              onRemove={() => removeCategory(preference.categoryId)}
-            />
-          ))
+          <CategoryPreview preferences={selectedCategories} />
         )}
       </BusinessSection>
-
-      <BusinessSection title="Agregar categorías">
-        {availableCategories.length === 0 ? (
-          <View style={s.emptyCategoryRow}>
-            <Text color="stateAnulated">No hay más categorías disponibles.</Text>
-          </View>
-        ) : (
-          availableCategories.map((category) => (
-            <CategoryOptionRow
-              key={category.id}
-              category={category}
-              onAdd={() => addCategory(category)}
-            />
-          ))
-        )}
-      </BusinessSection>
-
-      {hasCategoryChanges ? (
-        <View style={s.footerAction}>
-          <Button
-            title="Guardar cambios"
-            loading={isSaving}
-            disabled={isSaving}
-            onPress={() => void saveCategoryPreferences()}
-          />
-        </View>
-      ) : null}
     </ScrollView>
   );
 }
@@ -305,80 +214,51 @@ function InfoRow({
   );
 }
 
-function CategoryPreferenceRow({
-  preference,
-  onRemove,
+function CategoryPreview({
+  preferences,
 }: {
-  preference: SellerBusinessCategoryPreference;
-  onRemove: () => void;
+  preferences: SellerBusinessCategoryPreference[];
 }) {
   const t = useTheme();
   const s = useMemo(() => createBusinessProfileStyles(t), [t]);
+  const visiblePreferences = preferences.slice(0, 3);
+  const hiddenCount = preferences.length - visiblePreferences.length;
 
   return (
-    <View style={s.categoryRow}>
-      <View style={s.categoryIcon}>
-        <Icon name="tag" size={18} color={t.colors.secondary} />
+    <View style={s.previewRow}>
+      <View style={s.previewChips}>
+        {visiblePreferences.map((preference) => (
+          <View key={preference.categoryId} style={s.previewChip}>
+            <Icon name="tag" size={14} color={t.colors.secondary} />
+            <Text variant="caption" maxLines={1} style={s.previewChipLabel}>
+              {preference.categoryName}
+            </Text>
+          </View>
+        ))}
+        {hiddenCount > 0 ? (
+          <View style={s.previewChip}>
+            <Text variant="caption" style={s.previewChipLabel}>
+              +{hiddenCount}
+            </Text>
+          </View>
+        ) : null}
       </View>
-      <View style={s.rowText}>
-        <Text maxLines={1}>{preference.categoryName}</Text>
-        <Text variant="caption" color="stateAnulated" maxLines={2}>
-          {preference.categoryPath || "Sin ruta configurada"}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        hitSlop={10}
-        onPress={onRemove}
-        style={s.categoryActionButton}
-      >
-        <Icon name="x" size={18} color={t.colors.error} />
-      </Pressable>
     </View>
   );
 }
 
-function CategoryOptionRow({
-  category,
-  onAdd,
-}: {
-  category: BusinessCategoryOption;
-  onAdd: () => void;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessProfileStyles(t), [t]);
-
-  return (
-    <Pressable accessibilityRole="button" onPress={onAdd} style={s.categoryRow}>
-      <View style={s.categoryIcon}>
-        <Icon name="tag" size={18} color={t.colors.secondary} />
-      </View>
-      <View style={s.rowText}>
-        <Text maxLines={1}>{category.name}</Text>
-        <Text variant="caption" color="stateAnulated" maxLines={2}>
-          {category.path || "Sin ruta configurada"}
-        </Text>
-      </View>
-      <View style={s.categoryActionButton}>
-        <Icon name="plus" size={18} color={t.colors.primary} />
-      </View>
-    </Pressable>
-  );
+function getCategoryCountLabel(count: number) {
+  if (count === 0) return "Sin categorías configuradas";
+  if (count === 1) return "1 categoría seleccionada";
+  return `${count} categorías seleccionadas`;
 }
 
-function getCategoryLabel(preferences: SellerBusinessCategoryPreference[]) {
-  const names = preferences
-    .map((preference) => preference.categoryName.trim())
-    .filter(Boolean);
+function getCategoryPreviewLabel(names: string[]) {
+  if (names.length === 0) return "";
 
-  return names.length > 0 ? names.join(", ") : "Sin categoría configurada";
-}
-
-function haveCategoryIdsChanged(initialIds: string[], currentIds: string[]) {
-  if (initialIds.length !== currentIds.length) return true;
-
-  const currentSet = new Set(currentIds);
-  return initialIds.some((id) => !currentSet.has(id));
+  const previewNames = names.slice(0, 3);
+  const remainingCount = names.length - previewNames.length;
+  return `${previewNames.join(", ")}${remainingCount > 0 ? `, +${remainingCount}` : ""}`;
 }
 
 function formatDate(value: string) {
@@ -468,39 +348,39 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
       flex: 1,
       gap: 2,
     },
-    categoryRow: {
+    emptyCategoryRow: {
       minHeight: 64,
       paddingVertical: t.spacing.sm,
       borderBottomWidth: 1,
       borderBottomColor: t.colors.border,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
+      justifyContent: "center",
+      gap: 2,
     },
-    emptyCategoryRow: {
+    previewRow: {
       minHeight: 56,
       paddingVertical: t.spacing.sm,
       borderBottomWidth: 1,
       borderBottomColor: t.colors.border,
       justifyContent: "center",
     },
-    categoryIcon: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
-      backgroundColor: "rgba(202,115,48,0.14)",
-      alignItems: "center",
-      justifyContent: "center",
+    previewChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: t.spacing.sm,
     },
-    categoryActionButton: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
+    previewChip: {
+      maxWidth: "100%",
+      minHeight: 32,
+      borderRadius: 999,
+      ...t.glass.chip,
+      paddingHorizontal: t.spacing.sm,
+      flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
+      gap: t.spacing.xs,
     },
-    footerAction: {
-      paddingTop: t.spacing.sm,
+    previewChipLabel: {
+      color: t.colors.textDark,
+      flexShrink: 1,
     },
   });
 }

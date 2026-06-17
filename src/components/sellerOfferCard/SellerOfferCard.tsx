@@ -39,7 +39,7 @@ export default function SellerOfferCard({
   const t = useTheme();
   const s = useMemo(() => createSellerOfferCardStyles(t), [t]);
 
-  const requestTitle = offer.request_title?.trim() || "Solicitud";
+  const requestTitle = offer.request_title?.trim() || offer.description?.trim() || "";
   const description = offer.description?.trim();
   const categoryName = offer.request_category_name?.trim();
   const profileName = offer.request_profile_name?.trim();
