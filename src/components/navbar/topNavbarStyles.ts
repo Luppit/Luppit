@@ -1,5 +1,5 @@
 import { Theme } from "@/src/themes";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
 export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
   return StyleSheet.create({
@@ -9,7 +9,7 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       right: 0,
       top: 0,
       zIndex: 10,
-      elevation: 10,
+      elevation: Platform.OS === "android" ? 4 : 10,
       borderTopLeftRadius: 0,
       borderTopRightRadius: 0,
       borderBottomLeftRadius: t.glass.radius.chrome,

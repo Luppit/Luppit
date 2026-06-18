@@ -783,7 +783,7 @@ export default function ConversationLayout() {
               left: 0,
               right: 0,
               zIndex: 10,
-              elevation: 10,
+              elevation: Platform.OS === "android" ? 4 : 10,
               height: headerChromeHeight,
               borderTopLeftRadius: 0,
               borderTopRightRadius: 0,
@@ -852,7 +852,7 @@ export default function ConversationLayout() {
                 left: 0,
                 right: 0,
                 zIndex: 10,
-                elevation: 10,
+                elevation: Platform.OS === "android" ? 4 : 10,
                 alignItems: "center",
                 backgroundColor: "transparent",
               }}

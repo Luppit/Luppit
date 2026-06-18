@@ -1,5 +1,5 @@
 import { Theme } from "@/src/themes";
-import { TextStyle, ViewStyle } from "react-native";
+import { Platform, TextStyle, ViewStyle } from "react-native";
 
 export type ConversationActionButtonsStyles = {
   shadowWrapper: ViewStyle;
@@ -21,7 +21,7 @@ export function createConversationActionButtonsStyles(
       shadowOpacity: 0.18,
       shadowOffset: { width: 0, height: 6 },
       shadowRadius: 10,
-      elevation: 10,
+      elevation: Platform.OS === "android" ? 4 : 10,
       backgroundColor: "transparent",
     },
     container: {

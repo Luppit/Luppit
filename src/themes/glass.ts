@@ -26,6 +26,10 @@ function createShadow(
   }) ?? {};
 }
 
+function platformValue<T>(defaultValue: T, androidValue: T) {
+  return Platform.OS === "android" ? androidValue : defaultValue;
+}
+
 const edge = {
   borderWidth: 1,
   borderColor: "rgba(221,221,221,0.62)",
@@ -37,50 +41,51 @@ const edge = {
 
 const contentShadow = createShadow("rgba(2,6,23,0.08)", { width: 0, height: 2 }, 7, 2);
 const chromeShadow = createShadow("rgba(2,6,23,0.1)", { width: 0, height: 8 }, 18, 5);
+const navShadow = createShadow("rgba(2,6,23,0.1)", { width: 0, height: 8 }, 18, 3);
 const sheetShadow = createShadow("rgba(2,6,23,0.16)", { width: 0, height: -3 }, 18, 8);
 const activeSegmentShadow = createShadow("rgba(2,6,23,0.07)", { width: 0, height: 1 }, 3, 1);
 
 export const glass = {
   surface: {
-    backgroundColor: "rgba(248,252,255,0.72)",
+    backgroundColor: platformValue("rgba(248,252,255,0.72)", "#F8FCFF"),
     ...edge,
     ...contentShadow,
   } satisfies ViewStyle,
   chrome: {
-    backgroundColor: "rgba(255,255,255,0.14)",
+    backgroundColor: platformValue("rgba(255,255,255,0.14)", "#F9FAFB"),
     ...edge,
     borderColor: "rgba(255,255,255,0.4)",
     borderBottomColor: "rgba(180,190,200,0.28)",
     ...chromeShadow,
   } satisfies ViewStyle,
   nav: {
-    backgroundColor: "rgba(255,255,255,0.24)",
+    backgroundColor: platformValue("rgba(255,255,255,0.24)", "#FFFFFF"),
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.48)",
     borderBottomColor: "rgba(148,163,184,0.28)",
-    ...chromeShadow,
+    ...navShadow,
   } satisfies ViewStyle,
   sheet: {
-    backgroundColor: "rgba(255,255,255,0.94)",
+    backgroundColor: platformValue("rgba(255,255,255,0.94)", "#FFFFFF"),
     ...edge,
     borderColor: "rgba(221,221,221,0.66)",
     borderBottomColor: "rgba(255,255,255,0.94)",
     ...sheetShadow,
   } satisfies ViewStyle,
   chip: {
-    backgroundColor: "rgba(248,252,255,0.78)",
+    backgroundColor: platformValue("rgba(248,252,255,0.78)", "#F8FCFF"),
     borderWidth: 1,
     borderColor: "rgba(221,221,221,0.56)",
     borderTopColor: "rgba(255,255,255,0.84)",
   } satisfies ViewStyle,
   control: {
-    backgroundColor: "rgba(255,255,255,0.18)",
+    backgroundColor: platformValue("rgba(255,255,255,0.18)", "#FFFFFF"),
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.42)",
     borderTopColor: "rgba(255,255,255,0.72)",
   } satisfies ViewStyle,
   headerControl: {
-    backgroundColor: "rgba(255,255,255,0.26)",
+    backgroundColor: platformValue("rgba(255,255,255,0.26)", "#FFFFFF"),
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.34)",
   } satisfies ViewStyle,
@@ -97,8 +102,8 @@ export const glass = {
     width: "84%",
     height: 7,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.42)",
-    opacity: 0.78,
+    backgroundColor: platformValue("rgba(255,255,255,0.42)", "rgba(255,255,255,0.2)"),
+    opacity: platformValue(0.78, 0),
   } satisfies ViewStyle,
   radius: {
     surface: 24,

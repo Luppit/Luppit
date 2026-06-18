@@ -14,7 +14,7 @@ import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMPTY_CHAT_FILTERS: ConversationListFilters = {
@@ -454,7 +454,7 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       left: 0,
       right: 0,
       zIndex: 10,
-      elevation: 10,
+      elevation: Platform.OS === "android" ? 4 : 10,
       height: topBarHeight,
       marginHorizontal: -t.spacing.md,
       marginTop: -topOffset,

@@ -2,7 +2,7 @@ import { LucideIconName } from "@/src/icons/lucide";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { useTheme } from "@/src/themes";
 import React, { useMemo } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 
@@ -34,7 +34,7 @@ export default function ChatTopBar({
         left: 0,
         right: 0,
         zIndex: 10,
-        elevation: 10,
+        elevation: Platform.OS === "android" ? 4 : 10,
         height: CHAT_TOP_BAR_VISIBLE_HEIGHT + topInset,
         paddingTop: topInset,
         borderTopLeftRadius: 0,

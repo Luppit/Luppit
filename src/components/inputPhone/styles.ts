@@ -29,6 +29,7 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
     baseInputContainer: {
         paddingHorizontal: t.spacing.sm,
         flex: 1,
+        justifyContent: "center",
     },
     inputContainer: {
       borderWidth: 1,
@@ -53,6 +54,12 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
       flex: 1,
       fontFamily: t.typography.body.fontFamily,
       ...Platform.select({
+        android: {
+          height: "100%",
+          includeFontPadding: false,
+          paddingVertical: 0,
+          textAlignVertical: "center",
+        } as TextStyle,
         web: {
           outlineWidth: 0,
           outlineColor: "transparent",

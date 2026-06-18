@@ -14,9 +14,11 @@ import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   View,
@@ -67,6 +69,8 @@ export default function BusinessCategoriesScreen() {
   const [didCategoryLoadFail, setDidCategoryLoadFail] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const listRef = useRef<FlatList<CategoryBrowserItem> | null>(null);
+  const searchRowOffsetRef = useRef(0);
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
@@ -209,129 +213,161 @@ export default function BusinessCategoriesScreen() {
     return "No hay categorías disponibles aquí.";
   };
 
+  const scrollToCategorySearch = useCallback(() => {
+    const scrollToSearch = () => {
+      listRef.current?.scrollToOffset({
+        offset: Math.max(searchRowOffsetRef.current - t.spacing.md, 0),
+        animated: true,
+      });
+    };
+
+    requestAnimationFrame(scrollToSearch);
+    setTimeout(scrollToSearch, 250);
+  }, [t.spacing.md]);
+
+  const handleCategorySearchFocus = useCallback(() => {
+    scrollToCategorySearch();
+  }, [scrollToCategorySearch]);
+
   if (isLoading) {
     return <LoadingState label="Cargando categorías..." style={s.loadingBox} />;
   }
 
   return (
-    <View style={s.screen}>
-      <FlatList
-        data={categoryBrowserItems}
-        keyExtractor={getCategoryBrowserItemKey}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.content}
-        keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <View style={s.headerContent}>
-            <View style={s.summary}>
-              <View style={s.summaryIcon}>
-                <Icon name="tag" size={22} color={t.colors.primary} />
+    <KeyboardAvoidingView
+      style={s.screen}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={0}
+    >
+      <View style={s.screen}>
+        <FlatList
+          ref={listRef}
+          data={categoryBrowserItems}
+          keyExtractor={getCategoryBrowserItemKey}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.content}
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+          ListHeaderComponent={
+            <View style={s.headerContent}>
+              <View style={s.summary}>
+                <View style={s.summaryIcon}>
+                  <Icon name="tag" size={22} color={t.colors.primary} />
+                </View>
+                <View style={s.summaryText}>
+                  <Text variant="subtitle">Categorías activas</Text>
+                  <Text color="stateAnulated">{categoryLabel}</Text>
+                  {hasCategoryChanges ? (
+                    <View style={s.unsavedInline}>
+                      <Icon name="alert-circle" size={14} color={t.colors.secondary} />
+                      <Text variant="caption" color="secondary">
+                        Cambios sin guardar
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
-              <View style={s.summaryText}>
-                <Text variant="subtitle">Categorías activas</Text>
-                <Text color="stateAnulated">{categoryLabel}</Text>
-                {hasCategoryChanges ? (
-                  <View style={s.unsavedInline}>
-                    <Icon name="alert-circle" size={14} color={t.colors.secondary} />
-                    <Text variant="caption" color="secondary">
-                      Cambios sin guardar
+
+              <CategorySection title="Seleccionadas">
+                {selectedCategoryRows.length === 0 ? (
+                  <View style={s.emptyCategoryRow}>
+                    <Text color="stateAnulated">Aún no has elegido categorías.</Text>
+                    <Text variant="caption" color="stateAnulated">
+                      Selecciona las líneas de productos que vende tu negocio.
                     </Text>
                   </View>
-                ) : null}
+                ) : (
+                  selectedCategoryRows.map((category) => (
+                    <SelectedCategoryRow
+                      key={category.id}
+                      category={category}
+                      onRemove={() => removeCategory(category.id)}
+                    />
+                  ))
+                )}
+              </CategorySection>
+
+              <View
+                onLayout={(event) => {
+                  searchRowOffsetRef.current = event.nativeEvent.layout.y;
+                }}
+              >
+                <CategorySection title="Explorar categorías">
+                  <View style={s.searchRow}>
+                    <TextField
+                      value={categorySearchValue}
+                      onChangeText={setCategorySearchValue}
+                      onFocus={handleCategorySearchFocus}
+                      placeholder="Buscar categoría"
+                      leftIcon="search"
+                      baseContainerStyle={s.searchFieldBase}
+                      inputContainerStyle={s.searchField}
+                    />
+                  </View>
+                  {categorySearchValue.trim().length === 0 ? (
+                    <CategoryBrowserHeader
+                      title={categoryBrowserTitle}
+                      canGoBack={categoryBrowserPath.length > 0}
+                      onBack={() => setCategoryBrowserPath((current) => current.slice(0, -1))}
+                    />
+                  ) : null}
+                </CategorySection>
               </View>
             </View>
-
-            <CategorySection title="Seleccionadas">
-              {selectedCategoryRows.length === 0 ? (
-                <View style={s.emptyCategoryRow}>
-                  <Text color="stateAnulated">Aún no has elegido categorías.</Text>
-                  <Text variant="caption" color="stateAnulated">
-                    Selecciona las líneas de productos que vende tu negocio.
-                  </Text>
-                </View>
-              ) : (
-                selectedCategoryRows.map((category) => (
-                  <SelectedCategoryRow
-                    key={category.id}
-                    category={category}
-                    onRemove={() => removeCategory(category.id)}
-                  />
-                ))
-              )}
-            </CategorySection>
-
-            <CategorySection title="Explorar categorías">
-              <View style={s.searchRow}>
-                <TextField
-                  value={categorySearchValue}
-                  onChangeText={setCategorySearchValue}
-                  placeholder="Buscar categoría"
-                  leftIcon="search"
-                  baseContainerStyle={s.searchFieldBase}
-                  inputContainerStyle={s.searchField}
+          }
+          ListEmptyComponent={
+            <View style={s.emptyCategoryRow}>
+              <Text color="stateAnulated">
+                {getEmptyCategoryBrowserCopy()}
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            if (item.type === "branch") {
+              return (
+                <CategoryBranchRow
+                  item={item}
+                  onPress={() => setCategoryBrowserPath(item.node.pathSegments)}
                 />
-              </View>
-              {categorySearchValue.trim().length === 0 ? (
-                <CategoryBrowserHeader
-                  title={categoryBrowserTitle}
-                  canGoBack={categoryBrowserPath.length > 0}
-                  onBack={() => setCategoryBrowserPath((current) => current.slice(0, -1))}
-                />
-              ) : null}
-            </CategorySection>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={s.emptyCategoryRow}>
-            <Text color="stateAnulated">
-              {getEmptyCategoryBrowserCopy()}
-            </Text>
-          </View>
-        }
-        renderItem={({ item }) => {
-          if (item.type === "branch") {
+              );
+            }
+
             return (
-              <CategoryBranchRow
-                item={item}
-                onPress={() => setCategoryBrowserPath(item.node.pathSegments)}
+              <CategoryToggleRow
+                category={item.category}
+                breadcrumb={item.breadcrumb}
+                isSelected={selectedCategoryIds.has(item.category.id)}
+                onPress={() => toggleCategory(item.category)}
               />
             );
-          }
+          }}
+        />
 
-          return (
-            <CategoryToggleRow
-              category={item.category}
-              breadcrumb={item.breadcrumb}
-              isSelected={selectedCategoryIds.has(item.category.id)}
-              onPress={() => toggleCategory(item.category)}
-            />
-          );
-        }}
-      />
-
-      <View style={s.footer}>
-        <View style={s.footerActions}>
-          {hasCategoryChanges ? (
+        <View style={s.footer}>
+          <View style={s.footerActions}>
+            {hasCategoryChanges ? (
+              <View style={s.footerButton}>
+                <Button
+                  title="Descartar"
+                  variant="white"
+                  disabled={isSaving}
+                  onPress={discardCategoryChanges}
+                />
+              </View>
+            ) : null}
             <View style={s.footerButton}>
               <Button
-                title="Descartar"
-                variant="white"
-                disabled={isSaving}
-                onPress={discardCategoryChanges}
+                title="Guardar cambios"
+                loading={isSaving}
+                disabled={!hasCategoryChanges || isSaving}
+                onPress={() => void saveCategoryPreferences()}
               />
             </View>
-          ) : null}
-          <View style={s.footerButton}>
-            <Button
-              title="Guardar cambios"
-              loading={isSaving}
-              disabled={!hasCategoryChanges || isSaving}
-              onPress={() => void saveCategoryPreferences()}
-            />
           </View>
         </View>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

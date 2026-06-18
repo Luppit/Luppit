@@ -16,6 +16,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -328,14 +329,18 @@ function StatCard({
         <Icon name={icon} size={20} color={toneStyle.color} />
       </View>
       <View style={s.statBody}>
-        <Text color="textMedium" maxLines={1}>
+        <Text color="textMedium" maxLines={1} style={s.flexText}>
           {label}
         </Text>
         <View style={wide ? s.statWideValueRow : null}>
           <Text variant="subtitle" maxLines={1} style={s.statValue}>
             {value}
           </Text>
-          <Text color="stateAnulated" maxLines={1} style={wide ? s.statWideDetail : null}>
+          <Text
+            color="stateAnulated"
+            maxLines={1}
+            style={[s.flexText, wide ? s.statWideDetail : null]}
+          >
             {detail}
           </Text>
         </View>
@@ -526,6 +531,7 @@ function createProfileStyles(t: Theme) {
     },
     phoneText: {
       flex: 1,
+      minWidth: 0,
       gap: 2,
     },
     businessCard: {
@@ -540,6 +546,7 @@ function createProfileStyles(t: Theme) {
     },
     businessText: {
       flex: 1,
+      minWidth: 0,
       gap: t.spacing.xs,
     },
     flexText: {
@@ -552,14 +559,16 @@ function createProfileStyles(t: Theme) {
     },
     statCard: {
       minHeight: 136,
-      width: "47.6%",
+      flex: 1,
+      minWidth: 0,
       borderRadius: t.borders.md,
       ...cardSurface,
       padding: t.spacing.md,
-      justifyContent: "space-between",
-      gap: t.spacing.lg,
+      justifyContent: Platform.OS === "android" ? "flex-start" : "space-between",
+      gap: Platform.OS === "android" ? t.spacing.md : t.spacing.lg,
     },
     statCardWide: {
+      flexBasis: "100%",
       width: "100%",
       minHeight: 112,
       flexDirection: "row",
@@ -580,9 +589,11 @@ function createProfileStyles(t: Theme) {
     statBody: {
       gap: t.spacing.xs,
       flex: 1,
+      minWidth: 0,
     },
     statValue: {
       color: t.colors.textDark,
+      flexShrink: 1,
     },
     statWideValueRow: {
       flexDirection: "row",

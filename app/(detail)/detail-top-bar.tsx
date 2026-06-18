@@ -11,7 +11,7 @@ import { useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 
 type DetailTopBarProps = {
   title?: string;
@@ -110,7 +110,7 @@ export default function DetailTopBar({
         left: 0,
         right: 0,
         zIndex: 10,
-        elevation: 10,
+        elevation: Platform.OS === "android" ? 4 : 10,
         height: topInset + DETAIL_TOP_BAR_VISIBLE_HEIGHT,
         borderTopLeftRadius: 0,
         borderTopRightRadius: 0,

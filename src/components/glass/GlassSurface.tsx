@@ -2,6 +2,7 @@ import { useTheme, Theme } from "@/src/themes";
 import { BlurView } from "expo-blur";
 import React from "react";
 import {
+  Platform,
   StyleProp,
   StyleSheet,
   useColorScheme,
@@ -38,6 +39,8 @@ export default function GlassSurface({
   const variantStyle = t.glass[variant];
   const radius = t.glass.radius[variant];
   const blurKey = blur === false ? null : blur ?? (variant === "chip" ? "surface" : variant);
+  const shouldUseLayeredMaterial = Boolean(blurKey) && Platform.OS !== "android";
+  const layeredBlurKey = shouldUseLayeredMaterial ? blurKey : null;
   const tintStyle =
     typeof variantStyle.backgroundColor === "string"
       ? { backgroundColor: variantStyle.backgroundColor }
@@ -48,12 +51,12 @@ export default function GlassSurface({
       {...viewProps}
       style={[
         variantStyle,
-        blurKey ? { backgroundColor: "transparent" } : null,
+        shouldUseLayeredMaterial ? { backgroundColor: "transparent" } : null,
         { borderRadius: radius },
         style,
       ]}
     >
-      {blurKey ? (
+      {layeredBlurKey ? (
         <View
           pointerEvents="none"
           style={[
@@ -63,11 +66,11 @@ export default function GlassSurface({
           ]}
         >
           <BlurView
-            intensity={t.glass.blurIntensity[blurKey]}
+            intensity={t.glass.blurIntensity[layeredBlurKey]}
             tint={
               colorScheme === "dark"
                 ? "systemUltraThinMaterialDark"
-                : t.glass.blurTint[blurKey]
+                : t.glass.blurTint[layeredBlurKey]
             }
             style={StyleSheet.absoluteFillObject}
           />
