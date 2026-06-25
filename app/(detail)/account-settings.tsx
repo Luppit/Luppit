@@ -97,7 +97,6 @@ function BuyerAccountSettingsContent() {
   );
 
   const profile = overview?.profile;
-  const preset = overview?.buyerHomePreset;
 
   if (isLoading) {
     return <LoadingState label="Cargando configuración..." style={s.loadingBox} />;
@@ -109,24 +108,6 @@ function BuyerAccountSettingsContent() {
       contentContainerStyle={s.content}
     >
       <PersonalSettingsSection profile={profile} />
-
-      <SettingsSection title="Preferencias">
-        <SettingsRow
-          label="Vista de inicio"
-          value={preset?.name || "Default"}
-          description={preset?.description ?? null}
-          onPress={() =>
-            router.push({
-              pathname: "/(detail)/home-preset",
-              params: {
-                title: "Vista de inicio",
-                hideMenu: "true",
-                surface: "buyer_home",
-              },
-            })
-          }
-        />
-      </SettingsSection>
     </ScrollView>
   );
 }
@@ -167,32 +148,12 @@ function SellerAccountSettingsContent() {
     return <LoadingState label="Cargando configuración..." style={s.loadingBox} />;
   }
 
-  const preset = overview?.sellerHomePreset;
-
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
       <PersonalSettingsSection profile={overview?.profile} />
-
-      <SettingsSection title="Preferencias">
-        <SettingsRow
-          label="Vista de inicio"
-          value={preset?.name || "Default"}
-          description={preset?.description ?? null}
-          onPress={() =>
-            router.push({
-              pathname: "/(detail)/home-preset",
-              params: {
-                title: "Vista de inicio",
-                hideMenu: "true",
-                surface: "seller_home",
-              },
-            })
-          }
-        />
-      </SettingsSection>
     </ScrollView>
   );
 }
