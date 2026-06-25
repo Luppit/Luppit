@@ -2,19 +2,30 @@ import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
-import ProductCard from "@/src/components/productCard/ProductCard";
+import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
+import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
+import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
-import {
-  getCurrentProfileEmailSetupStatus,
-  ProfileEmailSetupStatus,
-} from "@/src/services/profile.service";
 import {
   BuyerHomeFilters,
   getBuyerHomeFilters,
   hasBuyerHomeFilters,
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
+import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
+import {
+  getCurrentProfileEmailSetupStatus,
+  ProfileEmailSetupStatus,
+} from "@/src/services/profile.service";
+import {
+  getCurrentBuyerMarketplaceHub,
+  getCurrentSellerMarketplaceHub,
+  MarketplaceHub,
+  MarketplaceHubItem,
+  MarketplaceHubRole,
+  MarketplaceHubStage,
+} from "@/src/services/purchase.request.service";
 import {
   getSellerHomeFilters,
   hasSellerHomeFilters,
@@ -26,34 +37,21 @@ import {
   getSelectedSegmentSvgName,
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
-import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
-import { openPopup } from "@/src/services/popup.service";
-import {
-  addCurrentBuyerPurchaseRequestFavorite,
-  addCurrentSellerPurchaseRequestFavorite,
-  BuyerHomePurchaseRequestGroup,
-  BuyerHomePurchaseRequestItem,
-  getCurrentBuyerHomePurchaseRequestGroups,
-  getCurrentBuyerPurchaseRequestFavorites,
-  getCurrentSellerHomePurchaseRequestGroups,
-  getCurrentSellerPurchaseRequestFavorites,
-  removeCurrentBuyerPurchaseRequestFavorite,
-  removeCurrentSellerPurchaseRequestFavorite,
-  SellerHomePurchaseRequestGroup,
-  SellerHomePurchaseRequestItem,
-} from "@/src/services/purchase.request.service";
-import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
 import { type Theme, useTheme } from "@/src/themes";
-import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
+import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Image, Pressable, ScrollView, View } from "react-native";
+import { FlatList, Image, Pressable, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
+
+const BUYER_DEFAULT_STAGE = "all";
+const SELLER_DEFAULT_STAGE = "for_you";
 
 export default function HomeScreen() {
   const t = useTheme();
+
   return (
     <View style={{ flex: 1, padding: t.spacing.xs }}>
       <RoleGate
@@ -82,262 +80,279 @@ function getHomeTopContentInset(t: Theme, hasFilterChip: boolean) {
   return headerHeight + filterChipHeight + t.spacing.md;
 }
 
+function toPurchaseRequestParam(item: MarketplaceHubItem) {
+  return {
+    id: item.id,
+    profile_id: "",
+    draft_id: null,
+    category_id: item.category_id,
+    category_path: item.category_path,
+    category_name: item.category_name,
+    title: item.title,
+    summary_text: item.summary_text,
+    contract: {},
+    status: item.status,
+    created_at: item.created_at,
+    published_at: item.published_at ?? item.created_at,
+    updated_at: item.created_at,
+  };
+}
+
+function openBuyerRequest(item: MarketplaceHubItem) {
+  router.push({
+    pathname: "/(detail)/purchase-request",
+    params: {
+      title: item.title ?? "Detalle de solicitud",
+      purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
+    },
+  });
+}
+
+async function openSellerRequest(item: MarketplaceHubItem) {
+  if (item.navigation?.target === "conversation" && item.navigation.conversation_id) {
+    router.push({
+      pathname: "/(conversation)/offer",
+      params: {
+        conversationId: item.navigation.conversation_id,
+        title: item.title ?? "Conversación",
+      },
+    });
+    return;
+  }
+
+  const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
+  if (!conversation?.ok) {
+    showError(
+      "No se pudo abrir la conversación",
+      conversation?.error.message ?? "Ocurrió un error, intenta de nuevo."
+    );
+    return;
+  }
+
+  router.push({
+    pathname: "/(conversation)/offer",
+    params: {
+      conversationId: conversation.data.id,
+      title: item.title ?? "Conversación",
+    },
+  });
+}
+
+function openHubListing({
+  role,
+  stage,
+  segmentSvgName,
+  filters,
+  fallbackTitle,
+}: {
+  role: MarketplaceHubRole;
+  stage: MarketplaceHubStage | null;
+  segmentSvgName: string;
+  filters: BuyerHomeFilters | SellerHomeFilters;
+  fallbackTitle?: string;
+}) {
+  const stageCode = stage?.code ?? (role === "buyer" ? BUYER_DEFAULT_STAGE : SELLER_DEFAULT_STAGE);
+
+  router.push({
+    pathname: "/(detail)/marketplace-hub-section",
+    params: {
+      title: fallbackTitle ?? stage?.name ?? (role === "buyer" ? "Tus solicitudes" : "Para ti"),
+      hideMenu: "true",
+      role,
+      stageCode,
+      segmentSvgName,
+      filters: JSON.stringify(filters),
+      ...(stage?.description ? { description: stage.description } : {}),
+    },
+  });
+}
+
 function BuyerHomeContent() {
-  const t = useTheme();
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const [isLoading, setIsLoading] = useState(true);
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
-  const [groups, setGroups] = useState<BuyerHomePurchaseRequestGroup[]>([]);
-  const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
+  const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
+  const [selectedStageCode, setSelectedStageCode] = useState(BUYER_DEFAULT_STAGE);
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
     getSelectedSegmentSvgName()
   );
-  const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
-  const loadGroups = useCallback(async () => {
+  const loadHub = useCallback(async () => {
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
     if (!emailSetupResult.ok) {
       setEmailSetupStatus(null);
-      setGroups([]);
-      setFavoriteRequestIds(new Set());
+      setHub(null);
       setIsLoading(false);
       return;
     }
 
     setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
-      setGroups([]);
-      setFavoriteRequestIds(new Set());
+      setHub(null);
       setIsLoading(false);
       return;
     }
 
-    const result = await getCurrentBuyerHomePurchaseRequestGroups(
+    const result = await getCurrentBuyerMarketplaceHub(
       filters,
-      selectedSegmentSvgName
+      selectedSegmentSvgName,
+      selectedStageCode
     );
-    const nextGroups = result.ok ? result.data : [];
-    setGroups(nextGroups);
-
-    const favoritesResult = await getCurrentBuyerPurchaseRequestFavorites();
-    if (favoritesResult.ok) {
-      setFavoriteRequestIds(new Set(favoritesResult.data.map((item) => item.id)));
-    } else {
-      setFavoriteRequestIds(new Set());
-    }
+    setHub(result.ok ? result.data : null);
     setIsLoading(false);
-  }, [filters, selectedSegmentSvgName]);
+  }, [filters, selectedSegmentSvgName, selectedStageCode]);
 
-  useEffect(() => {
-    return subscribeBuyerHomeFilters(setFilters);
-  }, []);
-
-  useEffect(() => {
-    return subscribeSelectedSegment(setSelectedSegmentSvgName);
-  }, []);
+  useEffect(() => subscribeBuyerHomeFilters(setFilters), []);
+  useEffect(() => subscribeSelectedSegment(setSelectedSegmentSvgName), []);
 
   useFocusEffect(
     useCallback(() => {
-      void loadGroups();
+      void loadHub();
       return () => {};
-    }, [loadGroups])
+    }, [loadHub])
   );
-
-  const hasAnyItems = useMemo(
-    () => groups.some((group) => group.items.length > 0),
-    [groups]
-  );
-  const hasActiveFilters = useMemo(
-    () =>
-      hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
-    [filters, selectedSegmentSvgName]
-  );
-  const topContentInset = useMemo(
-    () => getHomeTopContentInset(t, hasBuyerHomeFilters(filters)),
-    [filters, t]
-  );
-  const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
-    setFavoriteRequestIds((current) => {
-      const next = new Set(current);
-      if (nextIsFavorite) next.add(purchaseRequestId);
-      else next.delete(purchaseRequestId);
-      return next;
-    });
-  }, []);
-
-  if (isLoading) {
-    return <LoadingState label="Cargando solicitudes..." />;
-  }
-
-  if (emailSetupStatus && !emailSetupStatus.isComplete) {
-    return <AccountSetupRequiredState topContentInset={topContentInset} />;
-  }
-
-  if (!hasAnyItems) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          gap: t.spacing.md,
-          paddingTop: topContentInset,
-          paddingHorizontal: t.spacing.lg,
-          paddingBottom: 96,
-        }}
-      >
-        {emptyBoxAsset?.uri ? (
-          <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
-        ) : (
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={{ width: 84, height: 84 }}
-            resizeMode="contain"
-          />
-        )}
-        <Text align="center" variant="body">
-          {hasActiveFilters
-            ? "No encontramos solicitudes con los filtros aplicados."
-            : "Cuéntanos qué necesitas y te ayudamos a encontrarlo!"}
-        </Text>
-        {!hasActiveFilters ? (
-          <View style={{ width: "100%" }}>
-            <Button
-              variant="dark"
-              icon="plus"
-              title="Crear nueva solicitud"
-              onPress={() => router.push("/(chat)/chat")}
-            />
-          </View>
-        ) : null}
-      </View>
-    );
-  }
 
   return (
-    <ScrollView
-      style={{ marginHorizontal: -fullBleedOffset }}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        gap: t.spacing.md,
-        paddingTop: topContentInset,
-        paddingBottom: t.spacing.xl,
-      }}
-    >
-      {groups.map((group) => (
-        <HomeGroupSection
-          key={group.code}
-          group={group}
-          headerInset={fullBleedOffset}
-          onOpenGroup={() =>
-            router.push({
-              pathname: "/(detail)/buyer-home-group",
-              params: {
-                title: group.name,
-                groupCode: group.code,
-                segmentSvgName: selectedSegmentSvgName,
-              },
-            })
-          }
-          renderItem={(item) => (
-            <BuyerHomeRequestCard
-              key={item.id}
-              item={item}
-              isFavorite={favoriteRequestIds.has(item.id)}
-              onFavoriteChange={handleFavoriteChange}
-            />
-          )}
-        />
-      ))}
-    </ScrollView>
+    <MarketplaceHomeContent
+      role="buyer"
+      isLoading={isLoading}
+      emailSetupStatus={emailSetupStatus}
+      hub={hub}
+      filters={filters}
+      selectedStageCode={selectedStageCode}
+      selectedSegmentSvgName={selectedSegmentSvgName}
+      hasFilterChip={hasBuyerHomeFilters(filters)}
+      hasActiveFilters={
+        hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
+      }
+      onSelectStage={setSelectedStageCode}
+    />
   );
 }
 
 function SellerHomeContent() {
-  const t = useTheme();
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const [isLoading, setIsLoading] = useState(true);
   const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
-  const [groups, setGroups] = useState<SellerHomePurchaseRequestGroup[]>([]);
-  const [favoriteRequestIds, setFavoriteRequestIds] = useState<Set<string>>(new Set());
+  const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
+  const [selectedStageCode, setSelectedStageCode] = useState(SELLER_DEFAULT_STAGE);
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
     getSelectedSegmentSvgName()
   );
-  const fullBleedOffset = t.spacing.md + t.spacing.xs;
 
-  const loadGroups = useCallback(async () => {
+  const loadHub = useCallback(async () => {
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
     if (!emailSetupResult.ok) {
       setEmailSetupStatus(null);
-      setGroups([]);
-      setFavoriteRequestIds(new Set());
+      setHub(null);
       setIsLoading(false);
       return;
     }
 
     setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
-      setGroups([]);
-      setFavoriteRequestIds(new Set());
+      setHub(null);
       setIsLoading(false);
       return;
     }
 
-    const result = await getCurrentSellerHomePurchaseRequestGroups(
+    const result = await getCurrentSellerMarketplaceHub(
       filters,
-      selectedSegmentSvgName
+      selectedSegmentSvgName,
+      selectedStageCode
     );
-    setGroups(result.ok ? result.data : []);
-
-    const favoritesResult = await getCurrentSellerPurchaseRequestFavorites();
-    if (favoritesResult.ok) {
-      setFavoriteRequestIds(new Set(favoritesResult.data.map((item) => item.id)));
-    } else {
-      setFavoriteRequestIds(new Set());
-    }
+    setHub(result.ok ? result.data : null);
     setIsLoading(false);
-  }, [filters, selectedSegmentSvgName]);
+  }, [filters, selectedSegmentSvgName, selectedStageCode]);
 
-  useEffect(() => {
-    return subscribeSellerHomeFilters(setFilters);
-  }, []);
-
-  useEffect(() => {
-    return subscribeSelectedSegment(setSelectedSegmentSvgName);
-  }, []);
+  useEffect(() => subscribeSellerHomeFilters(setFilters), []);
+  useEffect(() => subscribeSelectedSegment(setSelectedSegmentSvgName), []);
 
   useFocusEffect(
     useCallback(() => {
-      void loadGroups();
+      void loadHub();
       return () => {};
-    }, [loadGroups])
+    }, [loadHub])
   );
 
-  const hasAnyItems = useMemo(
-    () => groups.some((group) => group.items.length > 0),
-    [groups]
+  return (
+    <MarketplaceHomeContent
+      role="seller"
+      isLoading={isLoading}
+      emailSetupStatus={emailSetupStatus}
+      hub={hub}
+      filters={filters}
+      selectedStageCode={selectedStageCode}
+      selectedSegmentSvgName={selectedSegmentSvgName}
+      hasFilterChip={hasSellerHomeFilters(filters)}
+      hasActiveFilters={
+        hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
+      }
+      onSelectStage={setSelectedStageCode}
+    />
   );
-  const hasActiveFilters = useMemo(
-    () =>
-      hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME,
-    [filters, selectedSegmentSvgName]
-  );
+}
+
+function MarketplaceHomeContent({
+  role,
+  isLoading,
+  emailSetupStatus,
+  hub,
+  filters,
+  selectedStageCode,
+  selectedSegmentSvgName,
+  hasFilterChip,
+  hasActiveFilters,
+  onSelectStage,
+}: {
+  role: MarketplaceHubRole;
+  isLoading: boolean;
+  emailSetupStatus: ProfileEmailSetupStatus | null;
+  hub: MarketplaceHub | null;
+  filters: BuyerHomeFilters | SellerHomeFilters;
+  selectedStageCode: string;
+  selectedSegmentSvgName: string;
+  hasFilterChip: boolean;
+  hasActiveFilters: boolean;
+  onSelectStage: (stageCode: string) => void;
+}) {
+  const t = useTheme();
+  const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
+  const stageScrollRef = useRef<ScrollView | null>(null);
+  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const topContentInset = useMemo(
-    () => getHomeTopContentInset(t, hasSellerHomeFilters(filters)),
-    [filters, t]
+    () => getHomeTopContentInset(t, hasFilterChip),
+    [hasFilterChip, t]
   );
-  const handleFavoriteChange = useCallback((purchaseRequestId: string, nextIsFavorite: boolean) => {
-    setFavoriteRequestIds((current) => {
-      const next = new Set(current);
-      if (nextIsFavorite) next.add(purchaseRequestId);
-      else next.delete(purchaseRequestId);
-      return next;
-    });
-  }, []);
+  const selectedStage =
+    hub?.stages.find((stage) => stage.code === selectedStageCode) ?? hub?.stages[0] ?? null;
+  const items = hub?.rail.items ?? [];
+  const attentionCount = hub?.overview.attention_request_count ?? 0;
+  const unreadConversationCount = hub?.overview.unread_conversation_count ?? 0;
+  const unreadMessageCount = hub?.overview.unread_message_count ?? 0;
+  const activeRequestCount = hub?.overview.active_request_count ?? 0;
+  const orderedStages = useMemo(() => {
+    const stages = hub?.stages ?? [];
+    const selected = stages.find((stage) => stage.code === selectedStageCode);
+    if (!selected) return stages;
+
+    return [selected, ...stages.filter((stage) => stage.code !== selectedStageCode)];
+  }, [hub?.stages, selectedStageCode]);
+
+  useEffect(() => {
+    if (!hub || hub.stages.some((stage) => stage.code === selectedStageCode)) return;
+    onSelectStage(role === "buyer" ? BUYER_DEFAULT_STAGE : SELLER_DEFAULT_STAGE);
+  }, [hub, onSelectStage, role, selectedStageCode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      stageScrollRef.current?.scrollTo({ x: 0, animated: true });
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [selectedStageCode]);
 
   if (isLoading) {
     return <LoadingState label="Cargando solicitudes..." />;
@@ -347,73 +362,292 @@ function SellerHomeContent() {
     return <AccountSetupRequiredState topContentInset={topContentInset} />;
   }
 
-  if (!hasAnyItems) {
+  if (!hub || (hub.stages.length === 0 && items.length === 0)) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          gap: t.spacing.md,
-          paddingTop: topContentInset,
-          paddingHorizontal: t.spacing.lg,
-          paddingBottom: 96,
-        }}
-      >
-        {emptyBoxAsset?.uri ? (
-          <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
-        ) : (
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={{ width: 84, height: 84 }}
-            resizeMode="contain"
-          />
-        )}
-        <Text align="center" variant="body">
-          {hasActiveFilters
+      <HomeEmptyState
+        topContentInset={topContentInset}
+        message={
+          hasActiveFilters
             ? "No encontramos solicitudes con los filtros aplicados."
-            : "Aún no hay solicitudes en ninguna categoría, pero tranquilo: ¡las oportunidades están por llegar!"}
-        </Text>
-      </View>
+            : role === "buyer"
+              ? "Crea tu primera solicitud y empieza a recibir ofertas."
+              : "Aún no hay oportunidades para tus categorías."
+        }
+      />
     );
   }
 
+  const attentionStage = hub.stages.find((stage) => stage.code === "needs_attention") ?? null;
+
   return (
     <ScrollView
-      style={{ marginHorizontal: -fullBleedOffset }}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{
-        gap: t.spacing.md,
         paddingTop: topContentInset,
-        paddingBottom: t.spacing.xl,
+        paddingBottom: 112,
+        gap: t.spacing.lg,
       }}
     >
-      {groups.map((group) => (
-        <HomeGroupSection
-          key={group.code}
-          group={group}
-          headerInset={fullBleedOffset}
-          onOpenGroup={() =>
-            router.push({
-              pathname: "/(detail)/seller-home-group",
-              params: {
-                title: group.name,
-                groupCode: group.code,
-                segmentSvgName: selectedSegmentSvgName,
-              },
+      <View style={{ gap: t.spacing.xs }}>
+        <Text variant="label" color="stateAnulated">
+          Resumen
+        </Text>
+        <Text variant="subtitleRegular">
+          {activeRequestCount}{" "}
+          {role === "buyer"
+            ? activeRequestCount === 1
+              ? "solicitud en movimiento"
+              : "solicitudes en movimiento"
+            : activeRequestCount === 1
+              ? "oportunidad disponible"
+              : "oportunidades disponibles"}
+        </Text>
+        <Text variant="body" color="stateAnulated">
+          {attentionCount > 0
+            ? attentionCount === 1
+              ? "Una necesita atención."
+              : `${attentionCount} necesitan atención.`
+            : role === "buyer"
+              ? "No tienes acciones pendientes."
+              : "No tienes negociaciones pendientes."}
+        </Text>
+      </View>
+
+      {attentionCount > 0 ? (
+        <HomeShortcut
+          icon="alert-circle"
+          title={
+            attentionCount === 1
+              ? "1 solicitud necesita tu atención"
+              : `${attentionCount} solicitudes necesitan tu atención`
+          }
+          description={
+            role === "buyer"
+              ? "Revisa el próximo paso pendiente."
+              : "Responde antes de perder la oportunidad."
+          }
+          onPress={() =>
+            openHubListing({
+              role,
+              stage: attentionStage,
+              segmentSvgName: selectedSegmentSvgName,
+              filters,
+              fallbackTitle: "Necesitan tu atención",
             })
           }
-          renderItem={(item) => (
-            <SellerHomeRequestCard
-              key={item.id}
-              item={item}
-              isFavorite={favoriteRequestIds.has(item.id)}
-              onFavoriteChange={handleFavoriteChange}
-            />
-          )}
         />
-      ))}
+      ) : null}
+
+      {unreadConversationCount > 0 ? (
+        <HomeShortcut
+          icon="message-circle"
+          title={
+            unreadConversationCount === 1
+              ? "Tienes una conversación sin leer"
+              : `Tienes ${unreadConversationCount} conversaciones sin leer`
+          }
+          description={`${unreadMessageCount} ${unreadMessageCount === 1 ? "mensaje nuevo" : "mensajes nuevos"}`}
+          onPress={() => router.push("/(tabs)/chats")}
+        />
+      ) : null}
+
+      <ScrollView
+        ref={stageScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: t.spacing.sm, paddingRight: t.spacing.md }}
+      >
+        {orderedStages.map((stage) => {
+          const isSelected = stage.code === selectedStageCode;
+
+          return (
+            <Pressable
+              key={stage.code}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
+              onPress={() => onSelectStage(stage.code)}
+              style={{
+                minHeight: 38,
+                borderRadius: 19,
+                paddingLeft: t.spacing.md,
+                paddingRight: t.spacing.sm,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: t.spacing.sm,
+                backgroundColor: isSelected ? t.colors.textDark : t.colors.backgroudWhite,
+                borderWidth: 1,
+                borderColor: isSelected ? t.colors.textDark : t.colors.border,
+              }}
+            >
+              <Text
+                variant="body"
+                style={{ color: isSelected ? t.colors.backgroudWhite : t.colors.textDark }}
+              >
+                {stage.name}
+              </Text>
+              <View
+                style={{
+                  minWidth: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  paddingHorizontal: 6,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: isSelected
+                    ? "rgba(255,255,255,0.16)"
+                    : t.colors.background,
+                }}
+              >
+                <Text
+                  variant="caption"
+                  style={{
+                    color: isSelected ? t.colors.backgroudWhite : t.colors.textMedium,
+                    fontFamily: t.typography.label.fontFamily,
+                  }}
+                >
+                  {stage.count}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      <View style={{ gap: t.spacing.md }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: t.spacing.md,
+          }}
+        >
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="subtitleRegular">{hub.rail.title}</Text>
+            {selectedStage?.description ? (
+              <Text variant="body" color="stateAnulated" maxLines={1}>
+                {selectedStage.description}
+              </Text>
+            ) : null}
+          </View>
+          {hub.rail.total > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                openHubListing({
+                  role,
+                  stage: selectedStage,
+                  segmentSvgName: selectedSegmentSvgName,
+                  filters,
+                  fallbackTitle: hub.rail.title,
+                })
+              }
+              style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
+            >
+              <Text variant="body">Ver todas</Text>
+              <Icon name="chevron-right" size={18} color={t.colors.textDark} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {items.length > 0 ? (
+          <FlatList
+            horizontal
+            data={items}
+            keyExtractor={(item) => item.purchase_request_id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: t.spacing.md, paddingRight: t.spacing.md }}
+            renderItem={({ item }) => (
+              <MarketplaceRequestCard
+                compact
+                item={item}
+                onPress={() =>
+                  role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item)
+                }
+                onLongPress={() =>
+                  openPurchaseRequestCardMenu({
+                    item,
+                    role,
+                    isFavorite: favoriteIds.has(item.id),
+                    onToggleFavorite: () => void toggleFavorite(item.id),
+                  })
+                }
+              />
+            )}
+          />
+        ) : (
+          <View
+            style={{
+              minHeight: 156,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            {emptyBoxAsset?.uri ? (
+              <SvgUri uri={emptyBoxAsset.uri} width={170} height={140} />
+            ) : (
+              <Image
+                source={require("../../assets/images/icon.png")}
+                style={{ width: 72, height: 72 }}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        )}
+      </View>
     </ScrollView>
+  );
+}
+
+function HomeShortcut({
+  icon,
+  title,
+  description,
+  onPress,
+}: {
+  icon: "alert-circle" | "message-circle";
+  title: string;
+  description: string;
+  onPress: () => void;
+}) {
+  const t = useTheme();
+
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress}>
+      <GlassSurface
+        variant="surface"
+        style={{ borderRadius: 16 }}
+        contentStyle={{
+          borderRadius: 16,
+          padding: t.spacing.md,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: t.spacing.md,
+        }}
+      >
+        <View
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: t.colors.primaryLight,
+          }}
+        >
+          <Icon name={icon} size={20} color={t.colors.primary} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="label" maxLines={1}>
+            {title}
+          </Text>
+          <Text variant="body" color="stateAnulated" maxLines={1}>
+            {description}
+          </Text>
+        </View>
+        <Icon name="chevron-right" size={20} color={t.colors.stateAnulated} />
+      </GlassSurface>
+    </Pressable>
   );
 }
 
@@ -443,7 +677,8 @@ function AccountSetupRequiredState({ topContentInset }: { topContentInset: numbe
         />
       )}
       <Text align="center" variant="body">
-        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar.
+        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir
+        emails de Luppit para continuar.
       </Text>
       <View style={{ width: "100%" }}>
         <Button
@@ -461,486 +696,40 @@ function AccountSetupRequiredState({ topContentInset }: { topContentInset: numbe
   );
 }
 
-function HomeGroupSection({
-  group,
-  headerInset,
-  onOpenGroup,
-  renderItem,
+function HomeEmptyState({
+  topContentInset,
+  message,
 }: {
-  group: BuyerHomePurchaseRequestGroup | SellerHomePurchaseRequestGroup;
-  headerInset: number;
-  onOpenGroup: () => void;
-  renderItem: (
-    item: BuyerHomePurchaseRequestItem | SellerHomePurchaseRequestItem
-  ) => React.ReactNode;
+  topContentInset: number;
+  message: string;
 }) {
   const t = useTheme();
+  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
   return (
-    <View style={{ gap: t.spacing.sm }}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onOpenGroup}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: t.spacing.xs,
-          alignSelf: "flex-start",
-          paddingHorizontal: headerInset,
-        }}
-      >
-        <Text variant="subtitleRegular">{group.name}</Text>
-        <Icon name="arrow-right" size={16} color={t.colors.textDark} />
-      </Pressable>
-
-      {group.items.length === 0 ? (
-        <View style={{ paddingHorizontal: headerInset }}>
-          <Text color="stateAnulated">No hay solicitudes en este grupo.</Text>
-        </View>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{
-            gap: t.spacing.md,
-            paddingHorizontal: headerInset,
-            paddingVertical: t.spacing.sm,
-          }}
-        >
-          {group.items.map((item) => renderItem(item))}
-        </ScrollView>
-      )}
-    </View>
-  );
-}
-
-function BuyerHomeRequestCard({
-  item,
-  isFavorite,
-  onFavoriteChange,
-}: {
-  item: BuyerHomePurchaseRequestItem;
-  isFavorite: boolean;
-  onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
-}) {
-  const openRequestDetail = useCallback(() => {
-    router.push({
-      pathname: "/(detail)/purchase-request",
-      params: {
-        title: item.title ?? "Detalle de solicitud",
-        purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
-      },
-    });
-  }, [item]);
-
-  const toggleFavorite = useCallback(async () => {
-    if (isFavorite) {
-      const result = await removeCurrentBuyerPurchaseRequestFavorite(item.id);
-
-      if (!result.ok) {
-        showError("No se pudo quitar de favoritos", result.error.message);
-        return;
-      }
-
-      onFavoriteChange(item.id, false);
-      showSuccess(result.data.removed ? "Favorito eliminado" : "Ya no estaba en favoritos");
-      return;
-    }
-
-    const result = await addCurrentBuyerPurchaseRequestFavorite(item.id);
-
-    if (!result.ok) {
-      showError("No se pudo agregar a favoritos", result.error.message);
-      return;
-    }
-
-    onFavoriteChange(item.id, true);
-    showSuccess(result.data.alreadyExists ? "Ya estaba en favoritos" : "Favorito agregado");
-  }, [isFavorite, item.id, onFavoriteChange]);
-
-  const openCardOptions = useCallback(() => {
-    openPopup({
-      options: [
-        {
-          id: "favorite",
-          label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
-          icon: isFavorite ? "star-off" : "star",
-          textColorKey: "textDark",
-          iconColorKey: "textDark",
-          onPress: () => void toggleFavorite(),
-        },
-        {
-          id: "category-info",
-          label: "Información sobre categorías",
-          icon: "circle-help",
-          textColorKey: "textDark",
-          iconColorKey: "textDark",
-          onPress: () => showInfo("Categoría", item.category_path ?? "-"),
-        },
-        {
-          id: "share",
-          label: "Compartir",
-          icon: "share-2",
-          textColorKey: "textDark",
-          iconColorKey: "textDark",
-          onPress: () => console.log("buyer home card popup: share"),
-        },
-        {
-          id: "cancel-request",
-          label: "Cancelar solicitud",
-          icon: "trash-2",
-          textColorKey: "error",
-          iconColorKey: "error",
-          onPress: () => console.log("buyer home card popup: cancel request"),
-        },
-      ],
-    });
-  }, [isFavorite, item.category_path, toggleFavorite]);
-
-  const offersCount = typeof item.offers_count === "number" ? item.offers_count : 0;
-
-  return (
-    <View style={{ width: 286 }}>
-      <ProductCard
-        title={item.title ?? "Solicitud"}
-        subtitle={item.category_name ?? "-"}
-        views={item.views_count}
-        statusLabel={item.status_label ?? item.status}
-        statusStyleCode={item.status_style_code}
-        offersLabel={
-          offersCount <= 0
-            ? "Sin ofertas"
-            : `${offersCount} ${offersCount === 1 ? "oferta" : "ofertas"}`
-        }
-        offersCount={offersCount}
-        onPress={openRequestDetail}
-        onLongPress={openCardOptions}
-      />
-    </View>
-  );
-}
-
-function SellerHomeRequestCard({
-  item,
-  isFavorite,
-  onFavoriteChange,
-}: {
-  item: SellerHomePurchaseRequestItem;
-  isFavorite: boolean;
-  onFavoriteChange: (purchaseRequestId: string, nextIsFavorite: boolean) => void;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createSellerHomeRequestCardStyles(t), [t]);
-  const publishedLabel = formatPublishedLabel(item.published_at ?? item.created_at);
-  const statusLabel = item.status_label?.trim();
-  const summaryText = item.summary_text?.trim();
-  const categoryName = item.category_name?.trim();
-  const offersCount = typeof item.offers_count === "number" ? item.offers_count : null;
-  const liftScale = useRef(new Animated.Value(1)).current;
-  const liftTranslateY = useRef(new Animated.Value(0)).current;
-  const didLongPressRef = useRef(false);
-
-  const settleCard = useCallback(() => {
-    Animated.parallel([
-      Animated.spring(liftScale, {
-        toValue: 1,
-        damping: 16,
-        stiffness: 220,
-        mass: 0.7,
-        useNativeDriver: true,
-      }),
-      Animated.spring(liftTranslateY, {
-        toValue: 0,
-        damping: 16,
-        stiffness: 220,
-        mass: 0.7,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [liftScale, liftTranslateY]);
-
-  const liftCard = useCallback(() => {
-    didLongPressRef.current = false;
-    liftScale.stopAnimation();
-    liftTranslateY.stopAnimation();
-    Animated.parallel([
-      Animated.timing(liftScale, {
-        toValue: 1.025,
-        duration: 110,
-        useNativeDriver: true,
-      }),
-      Animated.timing(liftTranslateY, {
-        toValue: -3,
-        duration: 110,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [liftScale, liftTranslateY]);
-
-  const handlePressOut = useCallback(() => {
-    if (didLongPressRef.current) return;
-    settleCard();
-  }, [settleCard]);
-
-  const openRequestConversation = useCallback(async () => {
-    await registerPurchaseRequestVisualization(item.id);
-    const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
-
-    if (!conversation) {
-      showInfo("Sin conversación", "No se pudo preparar el chat para esta solicitud.");
-      return;
-    }
-
-    if (!conversation.ok) {
-      showError("No se pudo abrir la conversación", conversation.error.message);
-      return;
-    }
-
-    router.push({
-      pathname: "/(conversation)/offer",
-      params: {
-        conversationId: conversation.data.id,
-        title: item.title ?? "Conversación",
-      },
-    });
-  }, [item.id, item.title]);
-
-  const toggleFavorite = useCallback(async () => {
-    if (isFavorite) {
-      const result = await removeCurrentSellerPurchaseRequestFavorite(item.id);
-
-      if (!result.ok) {
-        showError("No se pudo quitar de favoritos", result.error.message);
-        return;
-      }
-
-      onFavoriteChange(item.id, false);
-      showSuccess(result.data.removed ? "Favorito eliminado" : "Ya no estaba en favoritos");
-      return;
-    }
-
-    const result = await addCurrentSellerPurchaseRequestFavorite(item.id);
-
-    if (!result.ok) {
-      showError("No se pudo agregar a favoritos", result.error.message);
-      return;
-    }
-
-    onFavoriteChange(item.id, true);
-    showSuccess(result.data.alreadyExists ? "Ya estaba en favoritos" : "Favorito agregado");
-  }, [isFavorite, item.id, onFavoriteChange]);
-
-  const openCardOptions = useCallback(() => {
-    didLongPressRef.current = true;
-    openPopup({
-      options: [
-        {
-          id: "favorite",
-          label: isFavorite ? "Quitar de favoritos" : "Añadir como favorito",
-          icon: isFavorite ? "star-off" : "star",
-          textColorKey: "textDark",
-          iconColorKey: "textDark",
-          onPress: () => void toggleFavorite(),
-        },
-      ],
-    });
-    settleCard();
-  }, [isFavorite, settleCard, toggleFavorite]);
-
-  return (
-    <Animated.View
+    <View
       style={{
-        transform: [{ translateY: liftTranslateY }, { scale: liftScale }],
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        gap: t.spacing.md,
+        paddingTop: topContentInset,
+        paddingHorizontal: t.spacing.lg,
+        paddingBottom: 96,
       }}
     >
-      <Pressable
-        onPress={() => void openRequestConversation()}
-        onPressIn={liftCard}
-        onPressOut={handlePressOut}
-        onLongPress={openCardOptions}
-        accessibilityRole="button"
-        style={s.pressable}
-      >
-        <GlassSurface
-          variant="surface"
-          highlight
-          style={s.surface}
-          contentStyle={s.card}
-        >
-          <View>
-            <Text variant="subtitle" maxLines={1} style={s.title}>
-              {item.title ?? "Solicitud"}
-            </Text>
-            {categoryName ? (
-              <Text variant="body" maxLines={1} style={s.category}>
-                {categoryName}
-              </Text>
-            ) : null}
-          </View>
-
-          <View style={s.summarySlot}>
-            {summaryText ? (
-              <Text variant="body" maxLines={1} style={s.summary}>
-                {summaryText}
-              </Text>
-            ) : null}
-          </View>
-
-          {statusLabel ? (
-            <View style={s.statusPill}>
-              <View style={s.statusDot} />
-              <Text variant="body" maxLines={1} style={s.statusText}>
-                {statusLabel}
-              </Text>
-            </View>
-          ) : null}
-
-          <View style={s.metaRow}>
-            <View style={s.metaLeftRow}>
-              <View style={s.metaItemRow}>
-                <Icon name="eye" size={18} color={t.colors.stateAnulated} />
-                <Text variant="body" color="stateAnulated" maxLines={1}>
-                  {item.views_count}
-                </Text>
-              </View>
-
-              {isFavorite ? (
-                <View style={s.metaItemRow}>
-                  <Icon name="star" size={16} color={t.colors.accentYellow} />
-                  <Text variant="body" color="stateAnulated" maxLines={1}>
-                    Favorita
-                  </Text>
-                </View>
-              ) : null}
-
-              {offersCount != null ? (
-                <View style={s.metaItemRow}>
-                  <Icon name="message-circle" size={16} color={t.colors.stateAnulated} />
-                  <Text variant="body" color="stateAnulated" maxLines={1}>
-                    {offersCount}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-
-            <Text variant="body" color="stateAnulated" maxLines={1}>
-              {publishedLabel}
-            </Text>
-          </View>
-        </GlassSurface>
-      </Pressable>
-    </Animated.View>
+      {emptyBoxAsset?.uri ? (
+        <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
+      ) : (
+        <Image
+          source={require("../../assets/images/icon.png")}
+          style={{ width: 84, height: 84 }}
+          resizeMode="contain"
+        />
+      )}
+      <Text align="center" variant="body">
+        {message}
+      </Text>
+    </View>
   );
-}
-
-function formatPublishedLabel(rawDate: string | null): string {
-  if (!rawDate) return "Ahora";
-  const date = new Date(rawDate);
-  if (Number.isNaN(date.getTime())) return "Ahora";
-
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin <= 1) return "Justo ahora";
-  if (diffMin < 60) return `Hace ${diffMin} min`;
-  const diffHours = Math.floor(diffMin / 60);
-  if (diffHours < 24) return `Hace ${diffHours} h`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `Hace ${diffDays} d`;
-  return date.toLocaleDateString("es-CR");
-}
-
-function createSellerHomeRequestCardStyles(t: Theme) {
-  return {
-    pressable: {
-      width: 270,
-      height: 176,
-      borderRadius: 24,
-    },
-    surface: {
-      height: 176,
-      borderRadius: 24,
-    },
-    card: {
-      height: 176,
-      borderRadius: 24,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      gap: 8,
-      overflow: "hidden",
-    },
-    title: {
-      color: t.colors.textDark,
-    },
-    category: {
-      color: t.colors.textMedium,
-    },
-    summarySlot: {
-      minHeight: t.typography.body.lineHeight,
-    },
-    summary: {
-      color: t.colors.stateAnulated,
-    },
-    statusPill: {
-      ...t.glass.chip,
-      alignSelf: "flex-start",
-      maxWidth: "100%",
-      minHeight: 30,
-      backgroundColor: t.colors.primaryLight,
-      borderRadius: 999,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      flexDirection: "row",
-      gap: 6,
-      alignItems: "center",
-    },
-    statusDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 999,
-      backgroundColor: t.colors.primary,
-      flexShrink: 0,
-    },
-    statusText: {
-      color: t.colors.textDark,
-      flexShrink: 1,
-    },
-    metaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      minHeight: 24,
-      gap: t.spacing.sm,
-    },
-    metaLeftRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
-      flexShrink: 1,
-    },
-    metaItemRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      flexShrink: 1,
-    },
-  } as const;
-}
-
-function toPurchaseRequestParam(item: BuyerHomePurchaseRequestItem) {
-  return {
-    id: item.id,
-    profile_id: "",
-    draft_id: null,
-    category_id: item.category_id,
-    category_path: item.category_path,
-    category_name: item.category_name,
-    title: item.title,
-    summary_text: item.summary_text,
-    contract: {},
-    status: item.status,
-    created_at: item.created_at,
-    published_at: item.published_at ?? item.created_at,
-    updated_at: item.created_at,
-  };
 }

@@ -1,6 +1,7 @@
 import LoadingState from "@/src/components/loading/LoadingState";
 import GlassSurface from "@/src/components/glass/GlassSurface";
-import ProductCard from "@/src/components/productCard/ProductCard";
+import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
+import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
@@ -11,9 +12,11 @@ import {
   getCurrentSellerPurchaseRequestFavorites,
   PurchaseRequestFavoriteFilters,
   PurchaseRequestFavoriteItem,
+  removeCurrentBuyerPurchaseRequestFavorite,
+  removeCurrentSellerPurchaseRequestFavorite,
 } from "@/src/services/purchase.request.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showInfo } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
@@ -67,6 +70,15 @@ function countFavoriteFilterGroups(filters: PurchaseRequestFavoriteFilters) {
 
 function getSortLabel(sortId: string) {
   return FAVORITE_SORT_OPTIONS.find((option) => option.id === sortId)?.label ?? "Orden";
+}
+
+function formatFavoritedAt(rawDate: string) {
+  const date = new Date(rawDate);
+  if (Number.isNaN(date.getTime())) return "Guardada";
+  return `Guardada ${date.toLocaleDateString("es-CR", {
+    day: "numeric",
+    month: "short",
+  })}`;
 }
 
 function toPurchaseRequestParam(item: PurchaseRequestFavoriteItem) {
@@ -132,6 +144,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
     EMPTY_FAVORITE_FILTERS
   );
   const [selectedSortId, setSelectedSortId] = React.useState(DEFAULT_FAVORITE_SORT_ID);
+  const [pendingFavoriteIds, setPendingFavoriteIds] = React.useState<Set<string>>(new Set());
   const isMountedRef = React.useRef(true);
 
   React.useEffect(() => {
@@ -244,6 +257,38 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
       });
     },
     [role]
+  );
+
+  const removeFavorite = React.useCallback(
+    async (item: PurchaseRequestFavoriteItem) => {
+      if (pendingFavoriteIds.has(item.id)) return;
+
+      setPendingFavoriteIds((current) => new Set(current).add(item.id));
+      try {
+        const result =
+          role === "buyer"
+            ? await removeCurrentBuyerPurchaseRequestFavorite(item.id)
+            : await removeCurrentSellerPurchaseRequestFavorite(item.id);
+
+        if (!result.ok) {
+          showError("No se pudo quitar de favoritos", result.error.message);
+          return;
+        }
+
+        setFavorites((current) => current.filter((favorite) => favorite.id !== item.id));
+        setFilterOptionsSource((current) =>
+          current.filter((favorite) => favorite.id !== item.id)
+        );
+        showSuccess("Favorito eliminado");
+      } finally {
+        setPendingFavoriteIds((current) => {
+          const next = new Set(current);
+          next.delete(item.id);
+          return next;
+        });
+      }
+    },
+    [pendingFavoriteIds, role]
   );
 
   const hasActiveFilters = React.useMemo(() => hasFavoriteFilters(filters), [filters]);
@@ -374,22 +419,30 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
         ) : null}
 
         {favorites.map((item) => (
-          <ProductCard
+          <MarketplaceRequestCard
             key={item.favorite_id}
-            title={item.title ?? "Solicitud"}
-            subtitle={item.category_name ?? "-"}
-            views={item.views_count}
-            statusLabel={item.status_label ?? item.status}
-            statusStyleCode={item.status_style_code}
-            offersLabel={
-              item.offers_count <= 0
-                ? "Sin ofertas"
-                : `${item.offers_count} ${
-                    item.offers_count === 1 ? "oferta" : "ofertas"
-                  }`
+            item={item}
+            contextLabel={
+              role === "buyer"
+                ? item.offers_count > 0
+                  ? `${item.offers_count} ${
+                      item.offers_count === 1
+                        ? "oferta para revisar"
+                        : "ofertas para revisar"
+                    }`
+                  : "Esperando ofertas"
+                : item.status_label?.trim() || "Solicitud guardada"
             }
-            offersCount={item.offers_count}
+            metricLabel={formatFavoritedAt(item.favorited_at)}
             onPress={() => void openFavorite(item)}
+            onLongPress={() =>
+              openPurchaseRequestCardMenu({
+                item,
+                role,
+                isFavorite: true,
+                onToggleFavorite: () => void removeFavorite(item),
+              })
+            }
           />
         ))}
       </ScrollView>

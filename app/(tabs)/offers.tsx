@@ -1,6 +1,8 @@
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import RoleGate from "@/src/components/role/RoleGate";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
+import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
 import { Text } from "@/src/components/Text";
 import { Icon } from "@/src/components/Icon";
@@ -156,6 +158,7 @@ export default function OffersScreen() {
 function SellerOffersContent() {
   const t = useTheme();
   const s = React.useMemo(() => createOffersScreenStyles(t, 0, true), [t]);
+  const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites("seller");
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [offers, setOffers] = React.useState<SellerPurchaseOfferCardData[]>([]);
@@ -456,6 +459,22 @@ function SellerOffersContent() {
             key={offer.id}
             offer={offer}
             onPress={() => void openOfferConversation(offer)}
+            onLongPress={
+              offer.purchase_request_id
+                ? () =>
+                    openPurchaseRequestCardMenu({
+                      item: {
+                        id: offer.purchase_request_id!,
+                        title: offer.request_title,
+                        category_name: offer.request_category_name,
+                      },
+                      role: "seller",
+                      isFavorite: favoriteIds.has(offer.purchase_request_id!),
+                      onToggleFavorite: () =>
+                        void toggleFavorite(offer.purchase_request_id!),
+                    })
+                : undefined
+            }
           />
         ))}
       </ScrollView>

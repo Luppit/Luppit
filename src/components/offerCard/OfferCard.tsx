@@ -1,13 +1,11 @@
 import { Icon } from "@/src/components/Icon";
+import MarketplaceCardFrame from "@/src/components/marketplaceHub/MarketplaceCardFrame";
 import { Text } from "@/src/components/Text";
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import { LucideIconName } from "@/src/icons/lucide";
-import { openPopup } from "@/src/services/popup.service";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { useTheme } from "@/src/themes";
-import React, { useMemo } from "react";
+import React from "react";
 import { Pressable, View } from "react-native";
-import { createOfferCardStyles } from "./styles";
 
 export type OfferCardTimelineItem = {
   code: string;
@@ -24,6 +22,7 @@ type OfferCardProps = {
   offer: PurchaseOfferCardData;
   onConnect?: () => void;
   connectLabel?: string;
+  onMenuPress?: () => void;
   timeline?: OfferCardTimelineItem[];
 };
 
@@ -38,142 +37,180 @@ function normalize(value: string | null | undefined) {
 export default function OfferCard({
   offer,
   onConnect,
-  connectLabel = "Conectar",
+  connectLabel = "Ver conversación",
+  onMenuPress,
   timeline = [],
 }: OfferCardProps) {
   const t = useTheme();
-  const s = useMemo(() => createOfferCardStyles(t), [t]);
   const businessName = offer.business_name?.trim() || "Negocio";
   const province = offer.business_province?.trim();
-  const rating = offer.business_rating ?? 0;
-  const numRatings = offer.business_num_ratings ?? 0;
+  const rating = offer.business_rating;
+  const numRatings = offer.business_num_ratings;
   const currencyCode = offer.offer_currency_code ?? "CRC";
   const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
   const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("en-US")}`;
-  const badgeText = rating >= 4.7 ? "Mejor reputación" : "Mejor oferta";
+  const description = offer.description?.trim();
 
   return (
-    <GlassSurface
-      variant="surface"
-      highlight
-      style={s.surface}
-      contentStyle={s.container}
-    >
-      <View style={s.topRow}>
-        <View style={s.businessBlock}>
-          <Text variant="subtitleRegular" maxLines={1} style={s.businessName}>
-            {businessName}
-          </Text>
-          {province ? (
-            <Text variant="body" maxLines={1} style={s.province}>
-              {province}
+    <MarketplaceCardFrame
+      title={businessName}
+      subtitle={province}
+      accessibilityLabel={`Oferta de ${businessName} por ${formattedPrice}`}
+      body={
+        <View style={{ gap: t.spacing.md }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: t.spacing.md,
+            }}
+          >
+            <Text
+              variant="subtitle"
+              maxLines={1}
+              style={{ color: t.colors.primary, flex: 1 }}
+            >
+              {formattedPrice}
+            </Text>
+            {rating != null ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                <Icon name="star" size={16} color={t.colors.accentYellow} />
+                <Text variant="body" maxLines={1}>
+                  {rating.toFixed(1)}
+                  {numRatings != null ? ` (${numRatings})` : ""}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {description ? (
+            <Text variant="body" color="textMedium" maxLines={2}>
+              {description}
             </Text>
           ) : null}
-        </View>
 
-        <View style={s.priceBlock}>
-          <Text variant="subtitle" maxLines={1} style={s.priceText}>
-            {formattedPrice}
-          </Text>
-        </View>
-      </View>
+          {timeline.length > 0 ? (
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: t.colors.border,
+                paddingTop: t.spacing.md,
+                gap: t.spacing.md,
+              }}
+            >
+              {timeline.map((step, index) => {
+                const isLast = index === timeline.length - 1;
+                const iconBackground = step.is_next
+                  ? t.colors.stateAnulated
+                  : t.colors.success;
 
-      <View style={s.metaRow}>
-        <View style={s.ratingRow}>
-          <Icon name="star" size={16} color={t.colors.accentYellow} />
-          <Text variant="body" maxLines={1} style={s.ratingText}>
-            {rating.toFixed(1)}
-          </Text>
-          <Text variant="body" maxLines={1} color="stateAnulated">
-            ({numRatings})
-          </Text>
-        </View>
-
-        <View style={s.badge}>
-          <View style={s.badgeDot} />
-          <Text variant="body" maxLines={1} style={s.badgeText}>
-            {badgeText}
-          </Text>
-        </View>
-      </View>
-
-      {timeline.length > 0 ? (
-        <>
-          <View style={s.separator} />
-          <View style={s.timelineContainer}>
-            {timeline.map((step, index) => {
-              const isLast = index === timeline.length - 1;
-              const iconColor = t.colors.backgroudWhite;
-              const iconContainerStyle = step.is_next
-                ? [s.timelineIconCircle, s.timelineIconCirclePending]
-                : [s.timelineIconCircle, { backgroundColor: t.colors.success }];
-
-              return (
-                <View key={`${step.code}-${index}`} style={s.timelineRow}>
-                  <View style={s.timelineIconColumn}>
-                    <View style={iconContainerStyle}>
-                      <Icon name={step.icon} size={18} color={iconColor} />
-                    </View>
-                    {!isLast ? (
+                return (
+                  <View
+                    key={`${step.code}-${index}`}
+                    style={{ flexDirection: "row", alignItems: "stretch", gap: t.spacing.sm }}
+                  >
+                    <View
+                      style={{
+                        width: 24,
+                        position: "relative",
+                        alignItems: "center",
+                      }}
+                    >
                       <View
-                        style={[
-                          s.timelineConnector,
-                          {
-                            backgroundColor: t.colors.border,
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          backgroundColor: iconBackground,
+                        }}
+                      >
+                        <Icon
+                          name={step.icon}
+                          size={16}
+                          color={t.colors.backgroudWhite}
+                        />
+                      </View>
+                      {!isLast ? (
+                        <View
+                          style={{
+                            position: "absolute",
+                            left: 11,
+                            top: 32,
                             bottom: -t.spacing.sm,
-                          },
-                        ]}
-                      />
-                    ) : null}
+                            width: 2,
+                            borderRadius: 1,
+                            backgroundColor: t.colors.border,
+                          }}
+                        />
+                      ) : null}
+                    </View>
+
+                    <View style={{ flex: 1, paddingBottom: t.spacing.sm }}>
+                      {step.is_next ? (
+                        <Text color="stateAnulated">
+                          {step.pre_label?.trim() || "A la espera de:"}
+                        </Text>
+                      ) : step.reached_at_label || step.reached_at ? (
+                        <Text color="stateAnulated">
+                          {step.reached_at_label?.trim() || step.reached_at}
+                        </Text>
+                      ) : null}
+                      <Text variant="label">{step.label}</Text>
+                    </View>
                   </View>
+                );
+              })}
+            </View>
+          ) : null}
+        </View>
+      }
+      footerLeft={
+        <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+          {onMenuPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Más opciones de la oferta"
+              onPress={onMenuPress}
+              style={{
+                width: 46,
+                height: 44,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: t.colors.border,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon name="ellipsis" size={22} color={t.colors.textDark} />
+            </Pressable>
+          ) : null}
 
-                  <View style={s.timelineTextContainer}>
-                    {step.is_next ? (
-                      <Text color="stateAnulated" style={s.timelineDateText}>
-                        {step.pre_label?.trim() || "A la espera de:"}
-                      </Text>
-                    ) : step.reached_at_label || step.reached_at ? (
-                      <Text color="stateAnulated" style={s.timelineDateText}>
-                        {step.reached_at_label?.trim() || step.reached_at}
-                      </Text>
-                    ) : null}
-                    <Text variant="subtitle" style={s.timelineLabelText}>
-                      {step.label}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-
-      <View style={s.actionsRow}>
-        <Pressable
-          style={s.menuButton}
-          onPress={() =>
-            openPopup({
-              options: [
-                {
-                  id: "reject",
-                  label: "Rechazar oferta",
-                  icon: "trash-2",
-                  textColorKey: "error",
-                  iconColorKey: "error",
-                },
-              ],
-            })
-          }
-        >
-          <Icon name="ellipsis" size={24} color={t.colors.backgroudWhite} />
-        </Pressable>
-
-        <Pressable style={s.connectButton} onPress={onConnect}>
-          <Text variant="body" style={s.connectText}>
-            {connectLabel}
-          </Text>
-        </Pressable>
-      </View>
-    </GlassSurface>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={connectLabel}
+            onPress={onConnect}
+            style={{
+              flex: 1,
+              minHeight: 44,
+              borderRadius: 14,
+              backgroundColor: t.colors.textDark,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: t.spacing.xs,
+              paddingHorizontal: t.spacing.md,
+            }}
+          >
+            <Icon name="message-circle" size={18} color={t.colors.backgroudWhite} />
+            <Text variant="label" maxLines={1} style={{ color: t.colors.backgroudWhite }}>
+              {connectLabel}
+            </Text>
+          </Pressable>
+        </View>
+      }
+    />
   );
 }

@@ -1,15 +1,15 @@
-import GlassSurface from "@/src/components/glass/GlassSurface";
+import { Icon } from "@/src/components/Icon";
+import MarketplaceCardFrame from "@/src/components/marketplaceHub/MarketplaceCardFrame";
 import { Text } from "@/src/components/Text";
 import { SellerPurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { useTheme } from "@/src/themes";
-import React, { useMemo } from "react";
-import { Pressable, View } from "react-native";
-import { createSellerOfferCardStyles } from "./styles";
+import React from "react";
+import { View } from "react-native";
 
 type SellerOfferCardProps = {
   offer: SellerPurchaseOfferCardData;
-  statusLabel?: string;
   onPress?: () => void;
+  onLongPress?: () => void;
 };
 
 function normalize(value: string | null | undefined) {
@@ -33,14 +33,12 @@ function formatOfferDate(rawDate: string | null | undefined) {
 
 export default function SellerOfferCard({
   offer,
-  statusLabel,
   onPress,
+  onLongPress,
 }: SellerOfferCardProps) {
   const t = useTheme();
-  const s = useMemo(() => createSellerOfferCardStyles(t), [t]);
 
   const requestTitle = offer.request_title?.trim() || offer.description?.trim() || "";
-  const description = offer.description?.trim();
   const categoryName = offer.request_category_name?.trim();
   const profileName = offer.request_profile_name?.trim();
   const offerDate = formatOfferDate(offer.created_at);
@@ -53,63 +51,44 @@ export default function SellerOfferCard({
       maximumFractionDigits: 2,
     }
   )}`;
-  const resolvedStatusLabel = statusLabel?.trim();
-  const metaItems = [
-    profileName ? `Para ${profileName}` : null,
-    categoryName,
-    offerDate,
-  ].filter((item): item is string => Boolean(item));
-  const showDescription =
-    Boolean(description) && normalize(description) !== normalize(requestTitle);
 
   return (
-    <Pressable
-      style={s.wrapper}
+    <MarketplaceCardFrame
+      title={requestTitle || "Solicitud"}
+      subtitle={categoryName}
       onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole="button"
-    >
-      <GlassSurface
-        variant="surface"
-        highlight
-        style={s.surface}
-        contentStyle={s.card}
-      >
-        <View>
-          <View style={s.titleRow}>
-            <Text variant="subtitleRegular" maxLines={1} style={s.title}>
-              {requestTitle}
-            </Text>
-            <Text variant="subtitleRegular" maxLines={1} style={s.priceText}>
-              {formattedPrice}
+      onLongPress={onLongPress}
+      accessibilityLabel={`Abrir oferta para ${requestTitle || "solicitud"}`}
+      body={
+        <View style={{ gap: t.spacing.sm }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+            <Icon name="user" size={16} color={t.colors.primary} />
+            <Text variant="body" maxLines={1} style={{ flex: 1 }}>
+              Comprador:{" "}
+              <Text variant="label" style={{ color: t.colors.textDark }}>
+                {profileName || "Sin nombre"}
+              </Text>
             </Text>
           </View>
-
-          {metaItems.length > 0 ? (
-            <Text variant="body" maxLines={1} style={s.metaText}>
-              {metaItems.join(" · ")}
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={s.detailRow}>
-          {showDescription ? (
-            <Text variant="body" maxLines={2} style={s.description}>
-              {description}
-            </Text>
-          ) : (
-            <View style={s.descriptionSpacer} />
-          )}
-          {resolvedStatusLabel ? (
-            <View style={s.statusPill}>
-              <View style={s.statusDot} />
-              <Text variant="body" maxLines={1} style={s.statusText}>
-                {resolvedStatusLabel}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+            <Icon name="tag" size={16} color={t.colors.primary} />
+            <Text variant="body" maxLines={1} style={{ flex: 1 }}>
+              Tu oferta:{" "}
+              <Text variant="label" style={{ color: t.colors.textDark }}>
+                {formattedPrice}
               </Text>
-            </View>
-          ) : null}
+            </Text>
+          </View>
         </View>
-      </GlassSurface>
-    </Pressable>
+      }
+      footerLeft={
+        offerDate ? (
+          <Text variant="body" color="stateAnulated" maxLines={1}>
+            {offerDate}
+          </Text>
+        ) : null
+      }
+      footerRight={<Icon name="arrow-right" size={18} color={t.colors.textMedium} />}
+    />
   );
 }

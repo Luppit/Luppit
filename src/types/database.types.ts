@@ -1414,6 +1414,130 @@ export type Database = {
           },
         ]
       }
+      home_hub_reason: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          is_active: boolean
+          label: string
+          role_code: string
+          style_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          label: string
+          role_code: string
+          style_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          label?: string
+          role_code?: string
+          style_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_hub_reason_style_code_fkey"
+            columns: ["style_code"]
+            isOneToOne: false
+            referencedRelation: "action_style_catalog"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      home_hub_reason_rule: {
+        Row: {
+          action_code: string | null
+          conversation_status_code: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          priority: number
+          reason_code: string
+          role_code: string
+          stage_code: string | null
+        }
+        Insert: {
+          action_code?: string | null
+          conversation_status_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          reason_code: string
+          role_code: string
+          stage_code?: string | null
+        }
+        Update: {
+          action_code?: string | null
+          conversation_status_code?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          priority?: number
+          reason_code?: string
+          role_code?: string
+          stage_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "home_hub_reason_rule_role_code_reason_code_fkey"
+            columns: ["role_code", "reason_code"]
+            isOneToOne: false
+            referencedRelation: "home_hub_reason"
+            referencedColumns: ["role_code", "code"]
+          },
+        ]
+      }
+      home_hub_section: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          is_active: boolean
+          name: string
+          preview_limit: number
+          role_code: string
+          rule_config: Json
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          name: string
+          preview_limit?: number
+          role_code: string
+          rule_config?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          is_active?: boolean
+          name?: string
+          preview_limit?: number
+          role_code?: string
+          rule_config?: Json
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       location: {
         Row: {
           canton: string | null
@@ -2844,6 +2968,44 @@ export type Database = {
         }
         Returns: Json
       }
+      get_buyer_marketplace_hub:
+        | {
+            Args: {
+              p_end_date?: string
+              p_profile_id: string
+              p_search_text?: string
+              p_segment_svg_name?: string
+              p_start_date?: string
+              p_status_codes?: string[]
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_end_date?: string
+              p_profile_id: string
+              p_search_text?: string
+              p_segment_svg_name?: string
+              p_stage_code?: string
+              p_start_date?: string
+              p_status_codes?: string[]
+            }
+            Returns: Json
+          }
+      get_buyer_marketplace_hub_items: {
+        Args: {
+          p_end_date?: string
+          p_page?: number
+          p_page_size?: number
+          p_profile_id: string
+          p_search_text?: string
+          p_segment_svg_name?: string
+          p_stage_code?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
+        Returns: Json
+      }
       get_buyer_purchase_request_favorites: {
         Args: {
           p_category_ids?: string[]
@@ -3042,6 +3204,47 @@ export type Database = {
           p_search_text?: string
           p_segment_svg_name?: string
           p_seller_interaction_states?: string[]
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      get_seller_marketplace_hub:
+        | {
+            Args: {
+              p_category_ids?: string[]
+              p_end_date?: string
+              p_profile_id: string
+              p_search_text?: string
+              p_segment_svg_name?: string
+              p_seller_interaction_states?: string[]
+              p_start_date?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_category_ids?: string[]
+              p_end_date?: string
+              p_profile_id: string
+              p_search_text?: string
+              p_segment_svg_name?: string
+              p_seller_interaction_states?: string[]
+              p_stage_code?: string
+              p_start_date?: string
+            }
+            Returns: Json
+          }
+      get_seller_marketplace_hub_items: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_page?: number
+          p_page_size?: number
+          p_profile_id: string
+          p_search_text?: string
+          p_segment_svg_name?: string
+          p_seller_interaction_states?: string[]
+          p_stage_code?: string
           p_start_date?: string
         }
         Returns: Json

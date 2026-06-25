@@ -650,7 +650,7 @@ export default function PurchaseRequestDetailScreen() {
                 <OfferCard
                   key={offer.id}
                   offer={offer}
-                  connectLabel={isAcceptedRequest ? "Ver chat" : "Conectar"}
+                  connectLabel={isAcceptedRequest ? "Ver chat" : "Ver conversación"}
                   timeline={
                     isAcceptedRequest && offer.id === selectedOfferId
                       ? selectedOfferTimeline
