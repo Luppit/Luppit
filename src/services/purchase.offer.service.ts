@@ -131,18 +131,22 @@ function getRpcItems(payload: unknown): unknown[] {
   return Array.isArray(items) ? items : [];
 }
 
-async function fillSellerOfferTitlesFromConversations(
+async function fillSellerOfferContextFromConversations(
   profileId: string,
   offers: SellerPurchaseOfferCardData[]
 ) {
-  const missingTitleOfferIds = new Set(
+  const offerIdsNeedingContext = new Set(
     offers
-      .filter((offer) => !normalizeSellerOfferRequestTitle(offer.request_title))
+      .filter(
+        (offer) =>
+          !normalizeSellerOfferRequestTitle(offer.request_title) ||
+          !offer.request_profile_name?.trim()
+      )
       .map((offer) => offer.id)
       .filter((id) => typeof id === "string" && id.length > 0)
   );
 
-  if (missingTitleOfferIds.size === 0) return offers;
+  if (offerIdsNeedingContext.size === 0) return offers;
 
   const rpcResult: any = await (supabase as any).rpc("get_current_profile_conversations", {
     p_profile_id: profileId,
@@ -155,21 +159,34 @@ async function fillSellerOfferTitlesFromConversations(
   if (rpcResult?.error) return offers;
 
   const titleByOfferId = new Map<string, string>();
+  const buyerNameByOfferId = new Map<string, string>();
   for (const item of getRpcItems(rpcResult?.data)) {
     if (!item || typeof item !== "object") continue;
 
     const value = item as Record<string, unknown>;
     const offerId = typeof value.purchase_offer_id === "string" ? value.purchase_offer_id : null;
-    if (!offerId || !missingTitleOfferIds.has(offerId)) continue;
+    if (!offerId || !offerIdsNeedingContext.has(offerId)) continue;
 
     const requestTitle =
       normalizeSellerOfferRequestTitle(value.request_title) ??
       normalizeSellerOfferRequestTitle(value.purchase_request_title) ??
       normalizeSellerOfferRequestTitle(value.title);
     if (requestTitle) titleByOfferId.set(offerId, requestTitle);
+
+    const buyerName =
+      typeof value.buyer_profile_name === "string" && value.buyer_profile_name.trim()
+        ? value.buyer_profile_name.trim()
+        : typeof value.request_profile_name === "string" && value.request_profile_name.trim()
+          ? value.request_profile_name.trim()
+          : typeof value.display_name === "string" &&
+              value.display_name.trim() &&
+              value.display_name.trim().toLowerCase() !== "comprador"
+            ? value.display_name.trim()
+            : null;
+    if (buyerName) buyerNameByOfferId.set(offerId, buyerName);
   }
 
-  if (titleByOfferId.size === 0) return offers;
+  if (titleByOfferId.size === 0 && buyerNameByOfferId.size === 0) return offers;
 
   return offers.map((offer) => ({
     ...offer,
@@ -177,6 +194,8 @@ async function fillSellerOfferTitlesFromConversations(
       normalizeSellerOfferRequestTitle(offer.request_title) ??
       titleByOfferId.get(offer.id) ??
       null,
+    request_profile_name:
+      offer.request_profile_name?.trim() || buyerNameByOfferId.get(offer.id) || null,
   }));
 }
 
@@ -374,14 +393,18 @@ export async function getCurrentSellerPurchaseOffers(
       request_category_name:
         typeof row.request_category_name === "string" ? row.request_category_name : null,
       request_profile_name:
-        typeof row.request_profile_name === "string" ? row.request_profile_name : null,
+        typeof row.request_profile_name === "string"
+          ? row.request_profile_name
+          : typeof row.buyer_profile_name === "string"
+            ? row.buyer_profile_name
+            : null,
       offer_currency_code:
         typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
     })) as SellerPurchaseOfferCardData[];
 
     return {
       ok: true,
-      data: await fillSellerOfferTitlesFromConversations(profile.data.id, parsedRows),
+      data: await fillSellerOfferContextFromConversations(profile.data.id, parsedRows),
     };
   }
 
@@ -498,7 +521,10 @@ export async function getCurrentSellerPurchaseOffers(
     } as SellerPurchaseOfferCardData;
   });
 
-  return { ok: true, data: await fillSellerOfferTitlesFromConversations(profile.data.id, parsed) };
+  return {
+    ok: true,
+    data: await fillSellerOfferContextFromConversations(profile.data.id, parsed),
+  };
 }
 
 export async function getPurchaseOfferById(

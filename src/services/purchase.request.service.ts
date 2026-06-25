@@ -67,6 +67,83 @@ export type SellerHomeFilterCategoryOption = {
   id: string;
   label: string;
 };
+export type MarketplaceHubRole = "buyer" | "seller";
+export type MarketplaceHubOverview = {
+  active_request_count: number;
+  attention_request_count: number;
+  unread_conversation_count: number;
+  unread_message_count: number;
+};
+export type MarketplaceHubPriority = {
+  code: string | null;
+  label: string | null;
+  style_code: string | null;
+  rank: number;
+};
+export type MarketplaceHubReason = {
+  code: string | null;
+  label: string | null;
+  detail: string | null;
+};
+export type MarketplaceHubAction = {
+  code: string | null;
+  label: string | null;
+  icon: string | null;
+  style_code: string | null;
+  ui_slot: string | null;
+  execution_type: string | null;
+  target: string | null;
+};
+export type MarketplaceHubNavigation = {
+  target: "purchase_request" | "seller_opportunity" | "conversation" | string;
+  conversation_id: string | null;
+  purchase_request_id: string | null;
+};
+export type MarketplaceHubItem = SellerHomePurchaseRequestItem & {
+  hub_item_id: string;
+  entity_type: string | null;
+  purchase_request_id: string;
+  conversation_id: string | null;
+  purchase_offer_id: string | null;
+  event_at: string | null;
+  unread_count: number;
+  has_unopened: boolean;
+  due_at: string | null;
+  is_overdue: boolean;
+  priority: MarketplaceHubPriority | null;
+  reason: MarketplaceHubReason | null;
+  action: MarketplaceHubAction | null;
+  navigation: MarketplaceHubNavigation | null;
+  ranking_score: number;
+};
+export type MarketplaceHubStage = {
+  code: string;
+  name: string;
+  description: string | null;
+  count: number;
+  is_selected: boolean;
+};
+export type MarketplaceHubRail = {
+  title: string;
+  description: string | null;
+  total: number;
+  items: MarketplaceHubItem[];
+};
+export type MarketplaceHub = {
+  version: number;
+  role_code: MarketplaceHubRole;
+  generated_at: string | null;
+  overview: MarketplaceHubOverview;
+  stages: MarketplaceHubStage[];
+  rail: MarketplaceHubRail;
+};
+export type MarketplaceHubItemsPage = {
+  items: MarketplaceHubItem[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+};
 const PURCHASE_REQUEST_SELECT = [
   "id",
   "profile_id",
@@ -159,6 +236,10 @@ function parseCount(raw: unknown): number {
   return Math.max(0, Math.floor(count));
 }
 
+function normalizeNullableString(raw: unknown): string | null {
+  return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
+}
+
 function parseSellerHomePurchaseRequestItem(
   raw: unknown
 ): SellerHomePurchaseRequestItem | null {
@@ -232,6 +313,180 @@ function parsePurchaseRequestFavoriteItem(raw: unknown): PurchaseRequestFavorite
     favorite_id: favoriteId,
     favorited_at: favoritedAt,
     offers_count: typeof value.offers_count === "number" ? value.offers_count : 0,
+  };
+}
+
+function parseMarketplaceHubPriority(raw: unknown): MarketplaceHubPriority | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  return {
+    code: normalizeNullableString(value.code),
+    label: normalizeNullableString(value.label),
+    style_code: normalizeNullableString(value.style_code),
+    rank: parseCount(value.rank),
+  };
+}
+
+function parseMarketplaceHubReason(raw: unknown): MarketplaceHubReason | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  return {
+    code: normalizeNullableString(value.code),
+    label: normalizeNullableString(value.label),
+    detail: normalizeNullableString(value.detail),
+  };
+}
+
+function parseMarketplaceHubAction(raw: unknown): MarketplaceHubAction | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+
+  return {
+    code: normalizeNullableString(value.code),
+    label: normalizeNullableString(value.label),
+    icon: normalizeNullableString(value.icon),
+    style_code: normalizeNullableString(value.style_code),
+    ui_slot: normalizeNullableString(value.ui_slot),
+    execution_type: normalizeNullableString(value.execution_type),
+    target: normalizeNullableString(value.target),
+  };
+}
+
+function parseMarketplaceHubNavigation(raw: unknown): MarketplaceHubNavigation | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const target = normalizeNullableString(value.target);
+  if (!target) return null;
+
+  return {
+    target,
+    conversation_id: normalizeNullableString(value.conversation_id),
+    purchase_request_id: normalizeNullableString(value.purchase_request_id),
+  };
+}
+
+function parseMarketplaceHubItem(raw: unknown): MarketplaceHubItem | null {
+  const item = parseSellerHomePurchaseRequestItem(raw);
+  if (!item || !raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const hubItemId = normalizeNullableString(value.hub_item_id) ?? item.id;
+  const purchaseRequestId =
+    normalizeNullableString(value.purchase_request_id) ?? item.id;
+
+  return {
+    ...item,
+    hub_item_id: hubItemId,
+    entity_type: normalizeNullableString(value.entity_type),
+    purchase_request_id: purchaseRequestId,
+    conversation_id: normalizeNullableString(value.conversation_id),
+    purchase_offer_id: normalizeNullableString(value.purchase_offer_id),
+    event_at: normalizeNullableString(value.event_at),
+    unread_count: parseCount(value.unread_count),
+    has_unopened: value.has_unopened === true || parseCount(value.unread_count) > 0,
+    due_at: normalizeNullableString(value.due_at),
+    is_overdue: value.is_overdue === true,
+    priority: parseMarketplaceHubPriority(value.priority),
+    reason: parseMarketplaceHubReason(value.reason),
+    action: parseMarketplaceHubAction(value.action),
+    navigation: parseMarketplaceHubNavigation(value.navigation),
+    ranking_score: parseCount(value.ranking_score),
+  };
+}
+
+function parseMarketplaceHubStage(raw: unknown): MarketplaceHubStage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const code = normalizeNullableString(value.code) ?? "";
+  const name = normalizeNullableString(value.name) ?? "";
+  if (!code || !name) return null;
+
+  return {
+    code,
+    name,
+    description: normalizeNullableString(value.description),
+    count: parseCount(value.count),
+    is_selected: value.is_selected === true,
+  };
+}
+
+function parseMarketplaceHubOverview(raw: unknown): MarketplaceHubOverview {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    active_request_count: parseCount(value.active_request_count),
+    attention_request_count: parseCount(value.attention_request_count),
+    unread_conversation_count: parseCount(value.unread_conversation_count),
+    unread_message_count: parseCount(value.unread_message_count),
+  };
+}
+
+function parseMarketplaceHubRail(raw: unknown): MarketplaceHubRail {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const rawItems = Array.isArray(value.items) ? value.items : [];
+  const items = rawItems
+    .map(parseMarketplaceHubItem)
+    .filter((item): item is MarketplaceHubItem => item !== null);
+
+  return {
+    title: normalizeNullableString(value.title) ?? "",
+    description: normalizeNullableString(value.description),
+    total: parseCount(value.total),
+    items,
+  };
+}
+
+function extractMarketplaceHub(
+  payload: unknown,
+  fallbackRole: MarketplaceHubRole
+): MarketplaceHub {
+  const value = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const rawStages = Array.isArray(value.stages) ? value.stages : [];
+  const roleCode = value.role_code === "seller" || value.role_code === "buyer"
+    ? value.role_code
+    : fallbackRole;
+
+  return {
+    version: parseCount(value.version) || 2,
+    role_code: roleCode,
+    generated_at: normalizeNullableString(value.generated_at),
+    overview: parseMarketplaceHubOverview(value.overview),
+    stages: rawStages
+      .map(parseMarketplaceHubStage)
+      .filter((stage): stage is MarketplaceHubStage => stage !== null),
+    rail: parseMarketplaceHubRail(value.rail),
+  };
+}
+
+function parsePositiveInteger(raw: unknown, fallback: number): number {
+  const value = parseCount(raw);
+  return value > 0 ? value : fallback;
+}
+
+function extractMarketplaceHubItemsPage(
+  payload: unknown,
+  fallbackPage: number,
+  fallbackPageSize: number
+): MarketplaceHubItemsPage {
+  const value = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  const rawItems = Array.isArray(value.items) ? value.items : [];
+  const items = rawItems
+    .map(parseMarketplaceHubItem)
+    .filter((item): item is MarketplaceHubItem => item !== null);
+  const total = parseCount(value.total);
+  const page = parsePositiveInteger(value.page, fallbackPage);
+  const pageSize = parsePositiveInteger(value.page_size, fallbackPageSize);
+
+  return {
+    items,
+    total,
+    page,
+    page_size: pageSize,
+    has_more:
+      typeof value.has_more === "boolean"
+        ? value.has_more
+        : page * pageSize < total,
   };
 }
 
@@ -578,6 +833,206 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
   }
 
   return { ok: true, data: extractBuyerHomePurchaseRequestGroups(rpcResult?.data) };
+}
+
+export async function getCurrentSellerMarketplaceHub(
+  filters?: SellerHomeFilters,
+  segmentSvgName?: string,
+  stageCode?: string
+): Promise<{ ok: true; data: MarketplaceHub } | { ok: false; error: AppError }> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) {
+    return { ok: true, data: extractMarketplaceHub(null, "seller") };
+  }
+
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const rpcArgs = {
+    p_profile_id: profile.data.id,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_category_ids:
+      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+        ? filters.selectedCategoryIds
+        : null,
+    p_seller_interaction_states:
+      filters?.selectedInteractionStates && filters.selectedInteractionStates.length > 0
+        ? filters.selectedInteractionStates
+        : null,
+    p_stage_code: stageCode?.trim() || "for_you",
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
+  };
+
+  const rpcResult: any = await (supabase as any).rpc("get_seller_marketplace_hub", rpcArgs);
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: extractMarketplaceHub(rpcResult?.data, "seller") };
+}
+
+export async function getCurrentBuyerMarketplaceHub(
+  filters?: BuyerHomeFilters,
+  segmentSvgName?: string,
+  stageCode?: string
+): Promise<{ ok: true; data: MarketplaceHub } | { ok: false; error: AppError }> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) {
+    return { ok: true, data: extractMarketplaceHub(null, "buyer") };
+  }
+
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const rpcArgs = {
+    p_profile_id: profile.data.id,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_status_codes:
+      filters?.selectedChipIds && filters.selectedChipIds.length > 0
+        ? filters.selectedChipIds
+        : null,
+    p_stage_code: stageCode?.trim() || "all",
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
+  };
+
+  const rpcResult: any = await (supabase as any).rpc("get_buyer_marketplace_hub", rpcArgs);
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return { ok: true, data: extractMarketplaceHub(rpcResult?.data, "buyer") };
+}
+
+export async function getCurrentSellerMarketplaceHubItems(
+  filters?: SellerHomeFilters,
+  segmentSvgName?: string,
+  stageCode?: string,
+  page?: number,
+  pageSize?: number
+): Promise<
+  { ok: true; data: MarketplaceHubItemsPage } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+
+  const normalizedPage = parsePositiveInteger(page, 1);
+  const normalizedPageSize = parsePositiveInteger(pageSize, 20);
+  if (!profile) {
+    return {
+      ok: true,
+      data: extractMarketplaceHubItemsPage(null, normalizedPage, normalizedPageSize),
+    };
+  }
+
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const rpcArgs = {
+    p_profile_id: profile.data.id,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_category_ids:
+      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+        ? filters.selectedCategoryIds
+        : null,
+    p_seller_interaction_states:
+      filters?.selectedInteractionStates && filters.selectedInteractionStates.length > 0
+        ? filters.selectedInteractionStates
+        : null,
+    p_stage_code: stageCode?.trim() || "for_you",
+    p_page: normalizedPage,
+    p_page_size: normalizedPageSize,
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
+  };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "get_seller_marketplace_hub_items",
+    rpcArgs
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return {
+    ok: true,
+    data: extractMarketplaceHubItemsPage(
+      rpcResult?.data,
+      normalizedPage,
+      normalizedPageSize
+    ),
+  };
+}
+
+export async function getCurrentBuyerMarketplaceHubItems(
+  filters?: BuyerHomeFilters,
+  segmentSvgName?: string,
+  stageCode?: string,
+  page?: number,
+  pageSize?: number
+): Promise<
+  { ok: true; data: MarketplaceHubItemsPage } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+
+  const normalizedPage = parsePositiveInteger(page, 1);
+  const normalizedPageSize = parsePositiveInteger(pageSize, 20);
+  if (!profile) {
+    return {
+      ok: true,
+      data: extractMarketplaceHubItemsPage(null, normalizedPage, normalizedPageSize),
+    };
+  }
+
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const rpcArgs = {
+    p_profile_id: profile.data.id,
+    p_search_text: filters?.searchValue?.trim() || null,
+    p_start_date: filters?.startDate?.trim() || null,
+    p_end_date: filters?.endDate?.trim() || null,
+    p_status_codes:
+      filters?.selectedChipIds && filters.selectedChipIds.length > 0
+        ? filters.selectedChipIds
+        : null,
+    p_stage_code: stageCode?.trim() || "all",
+    p_page: normalizedPage,
+    p_page_size: normalizedPageSize,
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
+  };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "get_buyer_marketplace_hub_items",
+    rpcArgs
+  );
+
+  if (rpcResult?.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return {
+    ok: true,
+    data: extractMarketplaceHubItemsPage(
+      rpcResult?.data,
+      normalizedPage,
+      normalizedPageSize
+    ),
+  };
 }
 
 export async function addCurrentBuyerPurchaseRequestFavorite(
