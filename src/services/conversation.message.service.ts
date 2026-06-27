@@ -22,6 +22,25 @@ type SendConversationMessageInput = {
   images?: ConversationMessageImage[];
 };
 
+const storageUriPrefix = "storage://";
+
+function parseStorageImagePath(imagePath: string, fallbackBucket: string) {
+  if (!imagePath.startsWith(storageUriPrefix)) {
+    return { bucket: fallbackBucket, path: imagePath };
+  }
+
+  const withoutScheme = imagePath.slice(storageUriPrefix.length);
+  const slashIndex = withoutScheme.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
+    return { bucket: fallbackBucket, path: imagePath };
+  }
+
+  return {
+    bucket: withoutScheme.slice(0, slashIndex),
+    path: withoutScheme.slice(slashIndex + 1),
+  };
+}
+
 function getFileExtension(file: ConversationMessageImage, fallback = "jpg") {
   const fromName = file.name?.split(".").pop()?.toLowerCase();
   if (fromName) return fromName;
@@ -85,13 +104,15 @@ async function withSignedImageUrls(
       continue;
     }
 
+    const storageImage = parseStorageImagePath(imagePath, "conversations");
+
     const signed = await supabase.storage
-      .from("conversations")
-      .createSignedUrl(imagePath, 60 * 60);
+      .from(storageImage.bucket)
+      .createSignedUrl(storageImage.path, 60 * 60);
 
     const fallbackPublic = supabase.storage
-      .from("conversations")
-      .getPublicUrl(imagePath);
+      .from(storageImage.bucket)
+      .getPublicUrl(storageImage.path);
 
     const signedData: any = signed.data;
     const rawSignedUrl = signed.error

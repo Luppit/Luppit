@@ -2,7 +2,9 @@ import {
   useChatSession,
 } from "./chat-session.context";
 import Button from "@/src/components/button/Button";
+import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import React, { useEffect, useRef } from "react";
@@ -12,8 +14,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
 
 function AssistantTextBlock({ text }: { text: string }) {
+  const t = useTheme();
+
   return (
-    <View style={{ maxWidth: "96%", alignSelf: "flex-start" }}>
+    <View style={{ maxWidth: "96%", alignSelf: "flex-start", paddingVertical: t.spacing.xs }}>
       <Text variant="body">{text}</Text>
     </View>
   );
@@ -96,55 +100,226 @@ function AssistantThinkingBlock() {
   );
 }
 
-function PublishRequestCard({
-  title,
-  description,
-  disabled,
-  loading,
-  onPublish,
+function hasSummaryValue(value: string | number | null | undefined) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function formatSummaryValue(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "Sí" : "No";
+  if (Array.isArray(value)) {
+    const formatted = value
+      .map(formatSummaryValue)
+      .filter((item): item is string => Boolean(item));
+    return formatted.length > 0 ? formatted.join(", ") : null;
+  }
+  return null;
+}
+
+function humanizeAttributeLabel(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function SummaryDetailPill({
+  label,
+  value,
 }: {
-  title: string;
-  description: string;
-  disabled: boolean;
-  loading: boolean;
-  onPublish: () => void;
+  label: string;
+  value: string | number | null | undefined;
 }) {
   const t = useTheme();
+  const displayValue = String(value);
+
+  return (
+    <View
+      style={{
+        flexGrow: 1,
+        flexBasis: "47%",
+        borderRadius: 16,
+        backgroundColor: t.colors.background,
+        paddingHorizontal: t.spacing.sm,
+        paddingVertical: t.spacing.sm,
+        gap: 2,
+      }}
+    >
+      <Text variant="caption" color="stateAnulated">
+        {label}
+      </Text>
+      <Text variant="body" maxLines={2}>
+        {displayValue}
+      </Text>
+    </View>
+  );
+}
+
+function PublishRequestCard({
+  summary,
+  description,
+  disabled,
+  continueDisabled,
+  loading,
+  onPublish,
+  onContinue,
+}: {
+  summary: PurchaseRequestAssistantSummary | null;
+  description: string | null;
+  disabled: boolean;
+  continueDisabled: boolean;
+  loading: boolean;
+  onPublish: () => void;
+  onContinue: () => void;
+}) {
+  const t = useTheme();
+  const attributeDetails = Object.entries(summary?.atributos ?? {})
+    .map(([label, value]) => ({
+      label: humanizeAttributeLabel(label),
+      value: formatSummaryValue(value),
+    }))
+    .filter((item) => hasSummaryValue(item.value));
+  const details = [
+    { label: "Categoría", value: summary?.categoria },
+    {
+      label: "Marca",
+      value: summary?.marca && summary.marca.length > 0
+        ? summary.marca.join(", ")
+        : null,
+    },
+    ...attributeDetails,
+  ].filter((item) => hasSummaryValue(item.value));
 
   return (
     <View
       style={{
         alignSelf: "stretch",
-        borderRadius: 18,
+        borderRadius: 24,
         borderWidth: 1,
         borderColor: t.colors.border,
         backgroundColor: t.colors.backgroudWhite,
-        padding: t.spacing.sm,
-        gap: t.spacing.sm,
+        padding: t.spacing.md,
+        gap: t.spacing.md,
+        shadowColor: t.colors.shadow,
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 12,
+        elevation: 2,
       }}
     >
-      <View style={{ gap: t.spacing.xs }}>
-        <Text variant="body" color="stateAnulated">
-          Título:
-        </Text>
-        <Text variant="body">{title}</Text>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: t.spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: t.colors.primaryLight,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="sparkles" size={22} color={t.colors.primary} />
+        </View>
+
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="label" color="textDark">
+            Solicitud lista
+          </Text>
+          <Text variant="body">Revisa el resumen antes de publicarla</Text>
+          <Text variant="caption" color="stateAnulated">
+            Confirma producto, categoría y detalles.
+          </Text>
+        </View>
       </View>
 
-      <View style={{ gap: t.spacing.xs }}>
-        <Text variant="body" color="stateAnulated">
-          Descripción
+      <View style={{ gap: t.spacing.sm }}>
+        <Text variant="label" color="stateAnulated">
+          Resumen de la solicitud
         </Text>
-        <Text variant="body">{description}</Text>
+        <Text variant="subtitle">{summary?.titulo ?? "Solicitud"}</Text>
+        {description ? (
+          <Text variant="body">{description}</Text>
+        ) : null}
       </View>
 
-      <Button
-        title="Publicar solicitud"
-        icon="check"
-        variant="dark"
-        disabled={disabled}
-        loading={loading}
-        onPress={onPublish}
-      />
+      {details.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+          {details.map((item) => (
+            <SummaryDetailPill
+              key={item.label}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      <View style={{ gap: t.spacing.sm }}>
+        <Button
+          title="Publicar solicitud"
+          icon="check"
+          variant="dark"
+          disabled={disabled}
+          loading={loading}
+          onPress={onPublish}
+        />
+        <Button
+          title="Seguir ajustando"
+          icon="sliders-horizontal"
+          variant="white"
+          disabled={continueDisabled}
+          onPress={onContinue}
+        />
+      </View>
+    </View>
+  );
+}
+
+function EmptyRequestAssistantState() {
+  const t = useTheme();
+  const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: t.spacing.sm,
+        paddingHorizontal: t.spacing.lg,
+      }}
+    >
+      <View
+        style={{
+          width: 58,
+          height: 58,
+          borderRadius: 999,
+          backgroundColor: t.colors.primaryLight,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {logoAsset.uri ? (
+          <SvgUri uri={logoAsset.uri} width={40} height={40} />
+        ) : (
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={{ width: 40, height: 40 }}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+      <Text variant="body" align="center">
+        ¿Qué estás buscando hoy?
+      </Text>
     </View>
   );
 }
@@ -153,45 +328,19 @@ export default function ChatScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
-  const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
   const {
     messages,
     uiState,
     canPublish,
     isSendingMessage,
     isExecutingControl,
+    continueClarifying,
     summary,
     summaryText,
     publishDraft,
     status,
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl;
-
-  if (messages.length === 0 && !isAssistantBusy) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          gap: t.spacing.md,
-        }}
-      >
-        {logoAsset.uri ? (
-          <SvgUri uri={logoAsset.uri} width={64} height={64} />
-        ) : (
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={{ width: 64, height: 64 }}
-            resizeMode="contain"
-          />
-        )}
-        <Text variant="body" align="center">
-          ¿Qué estás buscando hoy?
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <ScrollView
@@ -202,12 +351,15 @@ export default function ChatScreen() {
         scrollRef.current?.scrollToEnd({ animated: true });
       }}
       contentContainerStyle={{
-        paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT + t.spacing.sm,
-        gap: t.spacing.sm,
+        paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT + t.spacing.lg,
+        gap: t.spacing.md,
         paddingBottom: t.spacing.lg,
+        flexGrow: 1,
       }}
       showsVerticalScrollIndicator={false}
     >
+      {messages.length === 0 && !isAssistantBusy ? <EmptyRequestAssistantState /> : null}
+
       {messages.map((message) => (
         message.sender === "user" ? (
           <View
@@ -219,6 +371,7 @@ export default function ChatScreen() {
               paddingHorizontal: t.spacing.md,
               paddingVertical: t.spacing.sm,
               backgroundColor: t.colors.primaryLight,
+              gap: t.spacing.xs,
             }}
           >
             <Text variant="body">{message.text}</Text>
@@ -233,10 +386,12 @@ export default function ChatScreen() {
       {uiState === "review" ? (
         <>
           <PublishRequestCard
-            title={summary?.titulo ?? "Solicitud"}
-            description={summaryText ?? "Sin descripción"}
+            summary={summary}
+            description={summaryText}
             disabled={!canPublish || isAssistantBusy}
+            continueDisabled={isAssistantBusy}
             loading={isExecutingControl}
+            onContinue={() => void continueClarifying()}
             onPublish={() => void publishDraft()}
           />
           {status === "published" ? (

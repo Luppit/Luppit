@@ -3,6 +3,8 @@ import ExpandableInfoCard from "@/src/components/expandableInfoCard/ExpandableIn
 import FilePicker, {
   SelectedFile,
 } from "@/src/components/filePicker/FilePicker";
+import { Icon } from "@/src/components/Icon";
+import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
 import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
 import { Currency, getCurrencies } from "@/src/services/currency.service";
 import {
@@ -10,13 +12,18 @@ import {
   getDeliveryCatalog,
 } from "@/src/services/delivery.catalog.service";
 import {
-  createPurchaseOffer,
-  CreatePurchaseOfferInput,
   EditablePurchaseOfferDraft,
   getEditablePurchaseOfferDraftByConversationId,
   updatePurchaseOffer,
   UpdatePurchaseOfferInput,
 } from "@/src/services/purchase.offer.service";
+import {
+  callSellerOfferAssistant,
+  createSellerOfferAssistantRequestIdentity,
+  SellerOfferAssistantRequest,
+  SellerOfferAssistantResult,
+  SellerOfferAssistantSummary,
+} from "@/src/services/purchase.offer.assistant.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   getPurchaseRequestById,
@@ -28,15 +35,21 @@ import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
+import { MODAL_TOP_BAR_HEIGHT } from "./modal-top-bar";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
+  Animated,
+  Image,
   Keyboard,
+  Platform,
+  Pressable,
   ScrollView,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type DeliveryTimeOption = "horas" | "dias";
 type OfferPurchaseRequest = Pick<PurchaseRequest, "id" | "title">;
@@ -74,6 +87,773 @@ function buildFallbackPurchaseRequest(
   return { id: purchaseRequestId, title: null };
 }
 
+type AssistantMessage = {
+  id: string;
+  sender: "user" | "assistant";
+  text: string;
+  images?: ChatImage[];
+  uiKind?: "ready" | "summary";
+};
+
+type PendingAssistantRetry = {
+  input: SellerOfferAssistantRequest;
+  successfulImageCount: number;
+};
+
+function normalizeCurrency(value: string | null | undefined) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function formatSummaryMoney(
+  amount: number | null | undefined,
+  currency: string | null | undefined
+) {
+  if (amount == null || !Number.isFinite(amount)) return null;
+  const currencyCode = normalizeCurrency(currency);
+  const prefix = currencyCode === "usd" || currencyCode === "dollar" || currencyCode === "dolares"
+    ? "$"
+    : "₡";
+
+  return `${prefix}${Number(amount).toLocaleString("en-US", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function createLocalId(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+}
+
+function AssistantThinkingBlock() {
+  const t = useTheme();
+  const dotOpacities = useRef([
+    new Animated.Value(0.35),
+    new Animated.Value(0.35),
+    new Animated.Value(0.35),
+  ]).current;
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.stagger(
+        140,
+        dotOpacities.map((opacity) =>
+          Animated.sequence([
+            Animated.timing(opacity, {
+              toValue: 1,
+              duration: 360,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacity, {
+              toValue: 0.35,
+              duration: 360,
+              useNativeDriver: true,
+            }),
+          ])
+        )
+      )
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [dotOpacities]);
+
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLiveRegion="polite"
+      accessibilityLabel="Pensando"
+      style={{
+        maxWidth: "96%",
+        alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: t.spacing.xs,
+        paddingVertical: t.spacing.xs,
+      }}
+    >
+      <Text variant="body" color="stateAnulated">
+        Pensando
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+        {dotOpacities.map((opacity, index) => (
+          <Animated.View
+            key={index}
+            style={{
+              width: 4,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: t.colors.stateAnulated,
+              opacity,
+              transform: [
+                {
+                  translateY: opacity.interpolate({
+                    inputRange: [0.35, 1],
+                    outputRange: [1, -2],
+                  }),
+                },
+              ],
+            }}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
+  const t = useTheme();
+  const isUser = message.sender === "user";
+
+  if (!isUser) {
+    return (
+      <View style={{ maxWidth: "96%", alignSelf: "flex-start", paddingVertical: t.spacing.xs }}>
+        <Text variant="body">{message.text}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={{
+        maxWidth: "88%",
+        alignSelf: "flex-end",
+        borderRadius: t.borders.md,
+        paddingHorizontal: t.spacing.md,
+        paddingVertical: t.spacing.sm,
+        backgroundColor: t.colors.primaryLight,
+        gap: t.spacing.xs,
+      }}
+    >
+      {message.text.trim().length > 0 ? (
+        <Text variant="body">{message.text}</Text>
+      ) : null}
+
+      {message.images && message.images.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
+          {message.images.map((image, index) => (
+            <Image
+              key={`${image.uri}-${index}`}
+              source={{ uri: image.uri }}
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: 16,
+                backgroundColor: t.colors.border,
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function OfferAssistantEmptyState() {
+  const t = useTheme();
+
+  return (
+    <View
+      style={{
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: t.spacing.sm,
+        paddingHorizontal: t.spacing.lg,
+      }}
+    >
+      <View
+        style={{
+          width: 54,
+          height: 54,
+          borderRadius: 999,
+          backgroundColor: t.colors.primaryLight,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name="sparkles" size={28} color={t.colors.primary} />
+      </View>
+      <Text variant="body" align="center">
+        Describe tu oferta y adjunta fotos reales
+      </Text>
+    </View>
+  );
+}
+
+function SummaryDetailPill({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+}) {
+  const t = useTheme();
+  const displayValue = String(value);
+
+  return (
+    <View
+      style={{
+        flexGrow: 1,
+        flexBasis: "47%",
+        borderRadius: 16,
+        backgroundColor: t.colors.background,
+        paddingHorizontal: t.spacing.sm,
+        paddingVertical: t.spacing.sm,
+        gap: 2,
+      }}
+    >
+      <Text variant="caption" color="stateAnulated">
+        {label}
+      </Text>
+      <Text variant="body" maxLines={2}>
+        {displayValue}
+      </Text>
+    </View>
+  );
+}
+
+function hasSummaryValue(value: string | number | null | undefined) {
+  return value !== null && value !== undefined && value !== "";
+}
+
+function OfferSummaryCard({
+  summary,
+  missingFields,
+  hasOfferPhoto,
+  disabled,
+  loading,
+  onContinue,
+  onPublish,
+}: {
+  summary: SellerOfferAssistantSummary | null;
+  missingFields: string[];
+  hasOfferPhoto: boolean;
+  disabled: boolean;
+  loading: boolean;
+  onContinue: () => void;
+  onPublish: () => void;
+}) {
+  const t = useTheme();
+  const formattedPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
+  const formattedShippingPrice = formatSummaryMoney(
+    summary?.precioEnvio,
+    summary?.moneda
+  );
+  const deliveryText = summary?.entrega ?? null;
+  const pickupText = summary?.retiroDespuesDeDias
+    ? `${summary.retiroDespuesDeDias} día(s)`
+    : null;
+  const shippingText = summary?.envioMaximoDias
+    ? `${summary.envioMaximoDias} día(s)`
+    : null;
+  const details = [
+    { label: "Entrega", value: deliveryText },
+    { label: "Moneda", value: summary?.moneda },
+    { label: "Retiro después de", value: pickupText },
+    { label: "Envío máximo", value: shippingText },
+    { label: "Costo de envío", value: formattedShippingPrice },
+  ].filter((item) => hasSummaryValue(item.value));
+
+  return (
+    <View
+      style={{
+        alignSelf: "stretch",
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: t.colors.border,
+        backgroundColor: t.colors.backgroudWhite,
+        padding: t.spacing.md,
+        gap: t.spacing.md,
+      }}
+    >
+      <View
+        style={{
+          gap: t.spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: t.spacing.md,
+          }}
+        >
+          <Text variant="label" color="stateAnulated">
+            Resumen de la oferta
+          </Text>
+          <Text
+            variant="subtitle"
+            maxLines={1}
+            style={{ color: t.colors.primary, flexShrink: 0 }}
+          >
+            {formattedPrice ?? "Precio pendiente"}
+          </Text>
+        </View>
+        <Text variant="body">
+          {summary?.descripcion ?? "Sin descripción todavía"}
+        </Text>
+      </View>
+
+      {details.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+          {details.map((item) => (
+            <SummaryDetailPill
+              key={item.label}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </View>
+      ) : null}
+
+      {missingFields.length > 0 ? (
+        <View
+          style={{
+            borderRadius: 16,
+            backgroundColor: t.colors.primaryLight,
+            padding: t.spacing.sm,
+            gap: t.spacing.xs,
+          }}
+        >
+          <Text variant="caption" color="stateAnulated">
+            Falta
+          </Text>
+          <Text variant="body">{missingFields.join(", ")}</Text>
+        </View>
+      ) : null}
+
+      {!hasOfferPhoto ? (
+        <View
+          style={{
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: t.colors.error,
+            padding: t.spacing.sm,
+          }}
+        >
+          <Text variant="body" color="error">
+            Adjunta al menos una foto real de la oferta antes de enviarla.
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={{ gap: t.spacing.sm }}>
+        <Button
+          title="Enviar oferta"
+          icon="check"
+          variant="dark"
+          disabled={disabled || !hasOfferPhoto}
+          loading={loading}
+          onPress={onPublish}
+        />
+        <Button
+          title="Seguir ajustando"
+          icon="sliders-horizontal"
+          variant="white"
+          disabled={disabled}
+          onPress={onContinue}
+        />
+      </View>
+    </View>
+  );
+}
+
+function ReadyToReviewCard({
+  disabled,
+  onPress,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const t = useTheme();
+
+  return (
+    <View
+      style={{
+        alignSelf: "stretch",
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: t.colors.border,
+        backgroundColor: t.colors.backgroudWhite,
+        padding: t.spacing.md,
+        gap: t.spacing.md,
+        shadowColor: t.colors.shadow,
+        shadowOpacity: 0.08,
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 12,
+        elevation: 2,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: t.spacing.sm,
+        }}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: t.colors.primaryLight,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon name="sparkles" size={22} color={t.colors.primary} />
+        </View>
+
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text variant="label" color="textDark">
+            Oferta lista
+          </Text>
+          <Text variant="body">Revisa el resumen antes de enviarla</Text>
+          <Text variant="caption" color="stateAnulated">
+            Confirma precio, entrega y fotos.
+          </Text>
+        </View>
+      </View>
+
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        onPress={onPress}
+        style={({ pressed }) => [
+          {
+            height: 46,
+            borderRadius: t.borders.md,
+            backgroundColor: t.colors.textDark,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: t.spacing.xs,
+            opacity: disabled ? 0.6 : 1,
+          },
+          pressed && !disabled ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : null,
+        ]}
+      >
+        <Text variant="label" style={{ color: t.colors.backgroudWhite }}>
+          Revisar resumen
+        </Text>
+        <Icon name="arrow-right" size={18} color={t.colors.backgroudWhite} />
+      </Pressable>
+    </View>
+  );
+}
+
+function OfferAssistantScreen({
+  conversationId,
+}: {
+  conversationId: string | null | undefined;
+}) {
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [offerDraftId, setOfferDraftId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [isReadyToSend, setIsReadyToSend] = useState(false);
+  const [summary, setSummary] = useState<SellerOfferAssistantSummary | null>(null);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [successfulOfferPhotoCount, setSuccessfulOfferPhotoCount] = useState(0);
+  const [showSummary, setShowSummary] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
+  const [pendingRetry, setPendingRetry] = useState<PendingAssistantRetry | null>(null);
+
+  const hasOfferPhoto = successfulOfferPhotoCount > 0;
+
+  const clearReviewState = useCallback(() => {
+    setShowSummary(false);
+    setIsReadyToSend(false);
+    setSummary(null);
+    setMissingFields([]);
+    setPendingRetry(null);
+    setMessages((current) =>
+      current.filter((message) => message.uiKind !== "ready" && message.uiKind !== "summary")
+    );
+  }, []);
+
+  const appendAssistantMessage = useCallback(
+    (text: string | null, uiKind?: AssistantMessage["uiKind"]) => {
+      if (!text) return;
+      setMessages((current) => [
+        ...current,
+        {
+          id: createLocalId("assistant"),
+          sender: "assistant",
+          text,
+          uiKind,
+        },
+      ]);
+    },
+    []
+  );
+
+  const applyAssistantResult = useCallback(
+    (
+      result: SellerOfferAssistantResult,
+      input: SellerOfferAssistantRequest,
+      successfulImageCount: number
+    ) => {
+      if (!result.ok) {
+        setPendingRetry({ input, successfulImageCount });
+        const retryText = result.retryAfterSeconds
+          ? ` Puedes intentarlo de nuevo en ${result.retryAfterSeconds} segundo(s).`
+          : "";
+        showError("No se pudo procesar la oferta", `${result.error.message}${retryText}`);
+        return;
+      }
+
+      setPendingRetry(null);
+      if (result.offerDraftId) setOfferDraftId(result.offerDraftId);
+      if (result.status) setStatus(result.status);
+      const isContinueAction = input.uiAction === "CONTINUE";
+      const isSummaryAction = input.uiAction === "SHOW_SUMMARY";
+      const isReadyResult =
+        result.isReadyToSend || result.status === "ready" || result.status === "sent";
+      setIsReadyToSend(isContinueAction ? false : isReadyResult);
+      setMissingFields(isContinueAction ? [] : result.missingFields);
+      if (isContinueAction) {
+        setSummary(null);
+      } else if (result.summary) {
+        setSummary(result.summary);
+      }
+      if (successfulImageCount > 0) {
+        setSuccessfulOfferPhotoCount((current) => current + successfulImageCount);
+      }
+
+      appendAssistantMessage(
+        result.assistantMessage,
+        isSummaryAction ? "summary" : isReadyResult && !isContinueAction ? "ready" : undefined
+      );
+
+      if (result.status === "sent") {
+        if (result.purchaseOfferId) {
+          showSuccess("Oferta enviada");
+          router.back();
+          return;
+        }
+
+        showError(
+          "No se pudo confirmar la oferta",
+          "El asistente respondió como enviada, pero no devolvió la oferta final."
+        );
+      }
+    },
+    [appendAssistantMessage]
+  );
+
+  const executeAssistantRequest = useCallback(
+    async (input: SellerOfferAssistantRequest, successfulImageCount = 0) => {
+      setIsBusy(true);
+      const result = await callSellerOfferAssistant(input);
+      applyAssistantResult(result, input, successfulImageCount);
+      setIsBusy(false);
+    },
+    [applyAssistantResult]
+  );
+
+  const handleSend = useCallback(
+    async ({ text, images }: { text: string; images: ChatImage[] }) => {
+      if (!conversationId) {
+        showError("No se pudo crear la oferta", "No encontramos la conversación asociada.");
+        return;
+      }
+
+      const userText = text.trim();
+      if (!userText && images.length === 0) return;
+
+      clearReviewState();
+      setMessages((current) => [
+        ...current,
+        {
+          id: createLocalId("user"),
+          sender: "user",
+          text: userText,
+          images,
+        },
+      ]);
+
+      const input: SellerOfferAssistantRequest = {
+        prompt: userText || "Adjunto fotos reales de la oferta.",
+        conversationId: offerDraftId ? null : conversationId,
+        offerDraftId,
+        uiAction: null,
+        images,
+        identity: createSellerOfferAssistantRequestIdentity("seller-offer-message"),
+      };
+
+      await executeAssistantRequest(input, images.length);
+    },
+    [clearReviewState, conversationId, executeAssistantRequest, offerDraftId]
+  );
+
+  const handleShowSummary = useCallback(async () => {
+    if (!offerDraftId) {
+      showError("No hay resumen todavía", "Primero cuéntale al asistente los detalles de la oferta.");
+      return;
+    }
+
+    setShowSummary(true);
+    await executeAssistantRequest({
+      prompt: "",
+      offerDraftId,
+      uiAction: "SHOW_SUMMARY",
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-summary"),
+    });
+  }, [executeAssistantRequest, offerDraftId]);
+
+  const handleContinue = useCallback(async () => {
+    clearReviewState();
+    if (!offerDraftId) return;
+
+    await executeAssistantRequest({
+      prompt: "",
+      offerDraftId,
+      uiAction: "CONTINUE",
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-continue"),
+    });
+  }, [clearReviewState, executeAssistantRequest, offerDraftId]);
+
+  const handlePublish = useCallback(async () => {
+    if (!offerDraftId) {
+      showError("No se pudo enviar", "Primero crea el borrador de la oferta.");
+      return;
+    }
+
+    if (!hasOfferPhoto) {
+      showError("Falta una foto", "Adjunta al menos una foto real de la oferta antes de enviarla.");
+      return;
+    }
+
+    await executeAssistantRequest({
+      prompt: "",
+      offerDraftId,
+      uiAction: "PUBLISH",
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-publish"),
+    });
+  }, [executeAssistantRequest, hasOfferPhoto, offerDraftId]);
+
+  const handleRetry = useCallback(async () => {
+    if (!pendingRetry) return;
+    await executeAssistantRequest(pendingRetry.input, pendingRetry.successfulImageCount);
+  }, [executeAssistantRequest, pendingRetry]);
+
+  if (!conversationId) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: t.spacing.lg,
+          gap: t.spacing.md,
+        }}
+      >
+        <Text align="center" color="stateAnulated">
+          No encontramos la conversación asociada.
+        </Text>
+        <Button title="Volver" onPress={() => router.back()} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        ref={scrollRef}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        onContentSizeChange={() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }}
+        contentContainerStyle={{
+          paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
+          paddingBottom: t.spacing.lg,
+          gap: t.spacing.md,
+          flexGrow: 1,
+        }}
+      >
+        {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
+
+        {messages.map((message) => (
+          <AssistantMessageBubble key={message.id} message={message} />
+        ))}
+
+        {isBusy ? <AssistantThinkingBlock /> : null}
+
+        {pendingRetry ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={isBusy}
+            onPress={handleRetry}
+            style={{
+              alignSelf: "flex-start",
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: t.colors.border,
+              backgroundColor: t.colors.backgroudWhite,
+              paddingHorizontal: t.spacing.md,
+              paddingVertical: t.spacing.sm,
+              opacity: isBusy ? 0.6 : 1,
+            }}
+          >
+            <Text variant="body">Reintentar último mensaje</Text>
+          </Pressable>
+        ) : null}
+
+        {isReadyToSend && !showSummary && !isBusy && status !== "sent" ? (
+          <ReadyToReviewCard
+            disabled={isBusy}
+            onPress={handleShowSummary}
+          />
+        ) : null}
+
+        {showSummary ? (
+          <OfferSummaryCard
+            summary={summary}
+            missingFields={missingFields}
+            hasOfferPhoto={hasOfferPhoto}
+            disabled={isBusy || !isReadyToSend}
+            loading={isBusy}
+            onContinue={handleContinue}
+            onPublish={handlePublish}
+          />
+        ) : null}
+      </ScrollView>
+
+      <View
+        style={{
+          paddingTop: t.spacing.sm,
+          paddingBottom:
+            Platform.OS === "ios"
+              ? Math.max(insets.bottom + t.spacing.sm, t.spacing.lg)
+              : t.spacing.sm,
+        }}
+      >
+        <InputChat
+          clearOnSendStart
+          autoFocus={messages.length === 0}
+          disabled={isBusy}
+          busy={isBusy}
+          maxChars={4000}
+          maxImages={6}
+          placeholder="Describe tu oferta o adjunta fotos reales"
+          onSend={handleSend}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function OfferScreen() {
   const t = useTheme();
   const params = useLocalSearchParams<{
@@ -95,7 +875,7 @@ export default function OfferScreen() {
     initialPurchaseRequest ?? buildFallbackPurchaseRequest(purchaseRequestId)
   );
   const [requestLoading, setRequestLoading] = useState(
-    !initialPurchaseRequest && isEditMode && !!purchaseRequestId
+    !initialPurchaseRequest && !!purchaseRequestId
   );
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
@@ -166,12 +946,6 @@ export default function OfferScreen() {
       return;
     }
 
-    if (!isEditMode) {
-      setPurchaseRequest(buildFallbackPurchaseRequest(resolvedPurchaseRequestId));
-      setRequestLoading(false);
-      return;
-    }
-
     if (!resolvedPurchaseRequestId) {
       setRequestLoading(false);
       return;
@@ -202,7 +976,7 @@ export default function OfferScreen() {
     return () => {
       active = false;
     };
-  }, [initialPurchaseRequest, isEditMode, resolvedPurchaseRequestId]);
+  }, [initialPurchaseRequest, resolvedPurchaseRequestId]);
 
   useEffect(() => {
     void loadCatalogs();
@@ -410,35 +1184,7 @@ export default function OfferScreen() {
       return;
     }
 
-    if (!purchaseRequest) {
-      showError("No se pudo publicar la oferta", "No encontramos la solicitud asociada.");
-      return;
-    }
-
-    const payload: CreatePurchaseOfferInput = {
-      purchaseRequestId: purchaseRequest.id,
-      conversationId,
-      description,
-      price: Number(price),
-      currencyId,
-      primaryDeliveryCatalogId,
-      files,
-      deliveryMethods: selectedDeliveryMethods,
-      pickupDelay: pickupDelayValue,
-      pickupDelayUnit,
-      shippingCost: shippingCostValue,
-      shippingMaxTime: shippingMaxTimeValue,
-      shippingMaxTimeUnit,
-    };
-
-    const result = await createPurchaseOffer(payload);
-    if (!result.ok) {
-      showError("No se pudo publicar la oferta", result.error.message);
-      return;
-    }
-
-    showSuccess("Oferta publicada");
-    router.back();
+    showError("No se pudo guardar", "La creación de ofertas ahora se hace con el asistente.");
   }, [
     conversationId,
     currencyId,
@@ -483,6 +1229,14 @@ export default function OfferScreen() {
         </Text>
         <Button title="Volver" onPress={() => router.back()} />
       </View>
+    );
+  }
+
+  if (!isEditMode) {
+    return (
+      <OfferAssistantScreen
+        conversationId={conversationId}
+      />
     );
   }
 
