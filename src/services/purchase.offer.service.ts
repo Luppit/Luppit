@@ -108,6 +108,24 @@ export type EditablePurchaseOfferDraft = {
 };
 
 const purchaseOffersByRequestCache = new Map<string, PurchaseOfferCardData[]>();
+const storageUriPrefix = "storage://";
+
+function parseStorageImagePath(imagePath: string, fallbackBucket: string) {
+  if (!imagePath.startsWith(storageUriPrefix)) {
+    return { bucket: fallbackBucket, path: imagePath };
+  }
+
+  const withoutScheme = imagePath.slice(storageUriPrefix.length);
+  const slashIndex = withoutScheme.indexOf("/");
+  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
+    return { bucket: fallbackBucket, path: imagePath };
+  }
+
+  return {
+    bucket: withoutScheme.slice(0, slashIndex),
+    path: withoutScheme.slice(slashIndex + 1),
+  };
+}
 
 function normalizeSellerOfferRequestTitle(value: unknown) {
   if (typeof value !== "string") return null;
@@ -599,7 +617,10 @@ function resolveUploadContentType(
 
 function getFileNameFromPath(path: string | null | undefined) {
   if (!path) return null;
-  const normalized = path.split("?")[0] ?? path;
+  const parsedPath = path.startsWith(storageUriPrefix)
+    ? parseStorageImagePath(path, "offers").path
+    : path;
+  const normalized = parsedPath.split("?")[0] ?? parsedPath;
   const parts = normalized.split("/");
   return parts[parts.length - 1] ?? null;
 }
@@ -629,12 +650,17 @@ async function getOfferImagePreviewFiles(
 
   for (const image of images) {
     const imagePath = image.path;
-    const signed = await supabase.storage.from("offers").createSignedUrl(imagePath, 60 * 60);
+    const storageImage = parseStorageImagePath(imagePath, "offers");
+    const signed = await supabase.storage
+      .from(storageImage.bucket)
+      .createSignedUrl(storageImage.path, 60 * 60);
     const signedData: any = signed.data;
     const rawSignedUrl = signed.error
       ? null
       : signedData?.signedUrl ?? signedData?.signedURL ?? null;
-    const fallbackPublic = supabase.storage.from("offers").getPublicUrl(imagePath);
+    const fallbackPublic = supabase.storage
+      .from(storageImage.bucket)
+      .getPublicUrl(storageImage.path);
     const previewUri =
       toAbsoluteStorageUrl(rawSignedUrl) ?? fallbackPublic.data.publicUrl ?? imagePath;
 
@@ -756,6 +782,16 @@ function parseEditablePurchaseOfferDraft(
         parsed.isImage === true ||
         parsed.is_image === true ||
         (typeof mime === "string" && mime.startsWith("image/"));
+      const storagePath =
+        typeof parsed.storagePath === "string"
+          ? parsed.storagePath
+          : typeof parsed.storage_path === "string"
+            ? parsed.storage_path
+            : typeof parsed.path === "string"
+              ? parsed.path
+              : uri.startsWith(storageUriPrefix)
+                ? uri
+                : null;
       return {
         uri,
         name: typeof parsed.name === "string" ? parsed.name : null,
@@ -763,14 +799,7 @@ function parseEditablePurchaseOfferDraft(
         size: parseNumberValue(parsed.size),
         isImage,
         id: typeof parsed.id === "string" ? parsed.id : null,
-        storagePath:
-          typeof parsed.storagePath === "string"
-            ? parsed.storagePath
-            : typeof parsed.storage_path === "string"
-              ? parsed.storage_path
-              : typeof parsed.path === "string"
-                ? parsed.path
-                : null,
+        storagePath,
         isExisting: parsed.isExisting === true || parsed.is_existing === true,
       };
     })
@@ -802,6 +831,37 @@ function parseEditablePurchaseOfferDraft(
   };
 }
 
+async function withOfferFilePreviewUrls(files: OfferFile[]) {
+  const result: OfferFile[] = [];
+
+  for (const file of files) {
+    if (!file.uri.startsWith(storageUriPrefix)) {
+      result.push(file);
+      continue;
+    }
+
+    const storageImage = parseStorageImagePath(file.uri, "offers");
+    const signed = await supabase.storage
+      .from(storageImage.bucket)
+      .createSignedUrl(storageImage.path, 60 * 60);
+    const signedData: any = signed.data;
+    const rawSignedUrl = signed.error
+      ? null
+      : signedData?.signedUrl ?? signedData?.signedURL ?? null;
+    const fallbackPublic = supabase.storage
+      .from(storageImage.bucket)
+      .getPublicUrl(storageImage.path);
+
+    result.push({
+      ...file,
+      uri: toAbsoluteStorageUrl(rawSignedUrl) ?? fallbackPublic.data.publicUrl ?? file.uri,
+      storagePath: file.storagePath ?? file.uri,
+    });
+  }
+
+  return result;
+}
+
 export async function getEditablePurchaseOfferDraftByConversationId(
   conversationId: string
 ): Promise<{ ok: true; data: EditablePurchaseOfferDraft } | { ok: false; error: AppError } | null> {
@@ -823,7 +883,13 @@ export async function getEditablePurchaseOfferDraftByConversationId(
     const parsed = parseEditablePurchaseOfferDraft(v2RpcResult?.data);
     if (parsed) {
       if (parsed.files.length > 0) {
-        return { ok: true, data: parsed };
+        return {
+          ok: true,
+          data: {
+            ...parsed,
+            files: await withOfferFilePreviewUrls(parsed.files),
+          },
+        };
       }
 
       const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
@@ -850,7 +916,13 @@ export async function getEditablePurchaseOfferDraftByConversationId(
     const parsed = parseEditablePurchaseOfferDraft(rpcResult?.data);
     if (parsed) {
       if (parsed.files.length > 0) {
-        return { ok: true, data: parsed };
+        return {
+          ok: true,
+          data: {
+            ...parsed,
+            files: await withOfferFilePreviewUrls(parsed.files),
+          },
+        };
       }
 
       const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
