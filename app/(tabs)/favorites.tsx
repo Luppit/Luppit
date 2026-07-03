@@ -456,7 +456,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
           onPress={openSearchPopup}
           accessibilityRole="button"
         >
-          <Icon name="search" size={20} color={t.colors.textDark} />
+          <Icon name="search" size={20} color={t.colors.stateAnulated} />
           <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
             {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
           </Text>

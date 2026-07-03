@@ -188,9 +188,7 @@ export default function EmailSetupScreen() {
       emailInput: {
         flex: 1,
         minHeight: 56,
-        fontFamily: t.typography.body.fontFamily,
-        fontSize: t.fontSizes.md,
-        lineHeight: t.lineHeights.md,
+        ...t.typography.body,
         color: t.colors.textDark,
       },
       inputHelperRow: {
@@ -337,7 +335,7 @@ export default function EmailSetupScreen() {
       >
         <View style={styles.layout}>
           <View style={styles.stepRow}>
-            <Text variant="caption" color="stateAnulated">
+            <Text variant="small" color="stateAnulated">
               Paso {step === "email" ? "1" : "2"} de 2
             </Text>
             <View
@@ -394,7 +392,7 @@ export default function EmailSetupScreen() {
                     ) : null}
                   </View>
                   {emailError ? (
-                    <Text variant="caption" color="error" align="center">
+                    <Text variant="small" color="error" align="center">
                       {emailError}
                     </Text>
                   ) : null}
@@ -433,7 +431,7 @@ export default function EmailSetupScreen() {
                   </Pressable>
                 </View>
                 {consentError ? (
-                  <Text variant="caption" color="error" align="center">
+                  <Text variant="small" color="error" align="center">
                     {consentError}
                   </Text>
                 ) : null}
@@ -483,7 +481,7 @@ export default function EmailSetupScreen() {
                   />
                   {otpError ? (
                     <Text
-                      variant="caption"
+                      variant="small"
                       color="error"
                       align="center"
                       style={styles.otpError}
@@ -512,7 +510,7 @@ export default function EmailSetupScreen() {
                     style={styles.linkButton}
                   >
                     <Text
-                      variant="caption"
+                      variant="small"
                       color={
                         resendCountdown > 0 ? "stateAnulated" : "textDark"
                       }
@@ -523,7 +521,7 @@ export default function EmailSetupScreen() {
                 </View>
 
                 <Text
-                  variant="caption"
+                  variant="small"
                   color="stateAnulated"
                   align="center"
                   style={styles.footerNote}
@@ -543,7 +541,7 @@ export default function EmailSetupScreen() {
           </View>
 
           <Text
-            variant="caption"
+            variant="small"
             color="stateAnulated"
             align="center"
             style={styles.footerNote}

@@ -100,7 +100,7 @@ export default function TextFieldWithToggle<T extends string = string>({
                 ]}
               >
                 <Text
-                  variant="caption"
+                  variant="small"
                   style={[
                     s.toggleLabel,
                     { color: active ? t.colors.textDark : t.colors.stateAnulated },

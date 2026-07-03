@@ -1,11 +1,11 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import RoleGate from "@/src/components/role/RoleGate";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   BuyerHomeFilters,
@@ -43,7 +43,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Pressable, ScrollView, View } from "react-native";
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 const BUYER_DEFAULT_STAGE = "all";
@@ -51,9 +51,10 @@ const SELLER_DEFAULT_STAGE = "for_you";
 
 export default function HomeScreen() {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
 
   return (
-    <View style={{ flex: 1, padding: t.spacing.xs }}>
+    <View style={s.screen}>
       <RoleGate
         loading={<LoadingState label="Cargando contenido..." />}
         buyer={<BuyerHomeContent />}
@@ -319,6 +320,7 @@ function MarketplaceHomeContent({
   onSelectStage: (stageCode: string) => void;
 }) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
   const stageScrollRef = useRef<ScrollView | null>(null);
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
@@ -382,17 +384,13 @@ function MarketplaceHomeContent({
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingTop: topContentInset,
-        paddingBottom: 112,
-        gap: t.spacing.lg,
-      }}
+      contentContainerStyle={[s.scrollContent, { paddingTop: topContentInset }]}
     >
-      <View style={{ gap: t.spacing.xs }}>
-        <Text variant="label" color="stateAnulated">
+      <View style={s.summaryBlock}>
+        <Text variant="small" color="textMedium">
           Resumen
         </Text>
-        <Text variant="subtitleRegular">
+        <Text variant="subtitle">
           {activeRequestCount}{" "}
           {role === "buyer"
             ? activeRequestCount === 1
@@ -455,7 +453,7 @@ function MarketplaceHomeContent({
         ref={stageScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: t.spacing.sm, paddingRight: t.spacing.md }}
+        contentContainerStyle={s.stageListContent}
       >
         {orderedStages.map((stage) => {
           const isSelected = stage.code === selectedStageCode;
@@ -466,44 +464,18 @@ function MarketplaceHomeContent({
               accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
               onPress={() => onSelectStage(stage.code)}
-              style={{
-                minHeight: 38,
-                borderRadius: 19,
-                paddingLeft: t.spacing.md,
-                paddingRight: t.spacing.sm,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: t.spacing.sm,
-                backgroundColor: isSelected ? t.colors.textDark : t.colors.backgroudWhite,
-                borderWidth: 1,
-                borderColor: isSelected ? t.colors.textDark : t.colors.border,
-              }}
+              style={[s.stageChip, isSelected ? s.stageChipSelected : null]}
             >
               <Text
-                variant="body"
-                style={{ color: isSelected ? t.colors.backgroudWhite : t.colors.textDark }}
+                variant="small"
+                style={isSelected ? s.stageChipTextSelected : s.stageChipText}
               >
                 {stage.name}
               </Text>
-              <View
-                style={{
-                  minWidth: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  paddingHorizontal: 6,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: isSelected
-                    ? "rgba(255,255,255,0.16)"
-                    : t.colors.background,
-                }}
-              >
+              <View style={[s.stageCountBadge, isSelected ? s.stageCountBadgeSelected : null]}>
                 <Text
-                  variant="caption"
-                  style={{
-                    color: isSelected ? t.colors.backgroudWhite : t.colors.textMedium,
-                    fontFamily: t.typography.label.fontFamily,
-                  }}
+                  variant="small"
+                  style={isSelected ? s.stageCountTextSelected : s.stageCountText}
                 >
                   {stage.count}
                 </Text>
@@ -513,40 +485,37 @@ function MarketplaceHomeContent({
         })}
       </ScrollView>
 
-      <View style={{ gap: t.spacing.md }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: t.spacing.md,
-          }}
-        >
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text variant="subtitleRegular">{hub.rail.title}</Text>
-            {selectedStage?.description ? (
-              <Text variant="body" color="stateAnulated" maxLines={1}>
-                {selectedStage.description}
-              </Text>
+      <View style={s.railSection}>
+        <View style={s.railHeader}>
+          <View style={s.railHeaderTop}>
+            <Text variant="body" style={s.railTitle}>
+              {hub.rail.title}
+            </Text>
+            {hub.rail.total > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  openHubListing({
+                    role,
+                    stage: selectedStage,
+                    segmentSvgName: selectedSegmentSvgName,
+                    filters,
+                    fallbackTitle: hub.rail.title,
+                  })
+              }
+              style={s.viewAllLink}
+            >
+                <Text variant="small" style={s.viewAllText}>
+                  Ver todas
+                </Text>
+                <Icon name="chevron-right" size={16} color={t.colors.textDark} />
+              </Pressable>
             ) : null}
           </View>
-          {hub.rail.total > 0 ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() =>
-                openHubListing({
-                  role,
-                  stage: selectedStage,
-                  segmentSvgName: selectedSegmentSvgName,
-                  filters,
-                  fallbackTitle: hub.rail.title,
-                })
-              }
-              style={{ flexDirection: "row", alignItems: "center", gap: 2 }}
-            >
-              <Text variant="body">Ver todas</Text>
-              <Icon name="chevron-right" size={18} color={t.colors.textDark} />
-            </Pressable>
+          {selectedStage?.description ? (
+            <Text variant="small" color="textMedium" style={s.railDescription}>
+              {selectedStage.description}
+            </Text>
           ) : null}
         </View>
 
@@ -556,7 +525,7 @@ function MarketplaceHomeContent({
             data={items}
             keyExtractor={(item) => item.purchase_request_id}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: t.spacing.md, paddingRight: t.spacing.md }}
+            contentContainerStyle={s.cardRailContent}
             renderItem={({ item }) => (
               <MarketplaceRequestCard
                 compact
@@ -576,19 +545,13 @@ function MarketplaceHomeContent({
             )}
           />
         ) : (
-          <View
-            style={{
-              minHeight: 156,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
+          <View style={s.inlineEmptyState}>
             {emptyBoxAsset?.uri ? (
               <SvgUri uri={emptyBoxAsset.uri} width={170} height={140} />
             ) : (
               <Image
                 source={require("../../assets/images/icon.png")}
-                style={{ width: 72, height: 72 }}
+                style={s.inlineEmptyFallbackImage}
                 resizeMode="contain"
               />
             )}
@@ -611,34 +574,20 @@ function HomeShortcut({
   onPress: () => void;
 }) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
 
   return (
-    <Pressable accessibilityRole="button" onPress={onPress}>
-      <GlassSurface
-        variant="surface"
-        style={{ borderRadius: 16 }}
-        contentStyle={{
-          borderRadius: 16,
-          padding: t.spacing.md,
-          flexDirection: "row",
-          alignItems: "center",
-          gap: t.spacing.md,
-        }}
-      >
-        <View
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 19,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: t.colors.primaryLight,
-          }}
-        >
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [s.shortcut, pressed ? s.shortcutPressed : null]}
+    >
+      <View style={s.shortcutContent}>
+        <View style={s.shortcutIcon}>
           <Icon name={icon} size={20} color={t.colors.primary} />
         </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="label" maxLines={1}>
+        <View style={s.shortcutText}>
+          <Text variant="body" maxLines={1} style={s.shortcutTitle}>
             {title}
           </Text>
           <Text variant="body" color="stateAnulated" maxLines={1}>
@@ -646,33 +595,26 @@ function HomeShortcut({
           </Text>
         </View>
         <Icon name="chevron-right" size={20} color={t.colors.stateAnulated} />
-      </GlassSurface>
+      </View>
     </Pressable>
   );
 }
 
 function AccountSetupRequiredState({ topContentInset }: { topContentInset: number }) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
   return (
     <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: t.spacing.md,
-        paddingTop: topContentInset,
-        paddingHorizontal: t.spacing.lg,
-        paddingBottom: 96,
-      }}
+      style={[s.stateContent, { paddingTop: topContentInset }]}
     >
       {emptyBoxAsset?.uri ? (
         <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
       ) : (
         <Image
           source={require("../../assets/images/icon.png")}
-          style={{ width: 84, height: 84 }}
+          style={s.stateFallbackImage}
           resizeMode="contain"
         />
       )}
@@ -680,7 +622,7 @@ function AccountSetupRequiredState({ topContentInset }: { topContentInset: numbe
         Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir
         emails de Luppit para continuar.
       </Text>
-      <View style={{ width: "100%" }}>
+      <View style={s.stateAction}>
         <Button
           variant="dark"
           title="Completar configuración"
@@ -704,26 +646,19 @@ function HomeEmptyState({
   message: string;
 }) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
   return (
     <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        gap: t.spacing.md,
-        paddingTop: topContentInset,
-        paddingHorizontal: t.spacing.lg,
-        paddingBottom: 96,
-      }}
+      style={[s.stateContent, { paddingTop: topContentInset }]}
     >
       {emptyBoxAsset?.uri ? (
         <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
       ) : (
         <Image
           source={require("../../assets/images/icon.png")}
-          style={{ width: 84, height: 84 }}
+          style={s.stateFallbackImage}
           resizeMode="contain"
         />
       )}
@@ -732,4 +667,151 @@ function HomeEmptyState({
       </Text>
     </View>
   );
+}
+
+function createMarketplaceHomeStyles(t: Theme) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: t.colors.background,
+      padding: t.spacing.xs,
+    },
+    scrollContent: {
+      paddingBottom: 112,
+      gap: t.spacing.lg,
+    },
+    summaryBlock: {
+      gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.md,
+    },
+    stageListContent: {
+      gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
+    },
+    stageChip: {
+      ...createRoundedSurfaceStyle(t),
+      minHeight: 40,
+      borderRadius: 999,
+      paddingLeft: t.spacing.md,
+      paddingRight: t.spacing.sm,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    stageChipSelected: {
+      backgroundColor: t.colors.textDark,
+    },
+    stageChipText: {
+      color: t.colors.textDark,
+    },
+    stageChipTextSelected: {
+      color: t.colors.backgroudWhite,
+    },
+    stageCountBadge: {
+      minWidth: 24,
+      height: 24,
+      borderRadius: 12,
+      paddingHorizontal: 6,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.background,
+    },
+    stageCountBadgeSelected: {
+      backgroundColor: "rgba(255,255,255,0.16)",
+    },
+    stageCountText: {
+      color: t.colors.textMedium,
+    },
+    stageCountTextSelected: {
+      color: t.colors.backgroudWhite,
+    },
+    railSection: {
+      gap: t.spacing.md,
+    },
+    railHeader: {
+      gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.md,
+    },
+    railHeaderTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: t.spacing.md,
+    },
+    railTitle: {
+      flex: 1,
+    },
+    railDescription: {
+      paddingRight: t.spacing.xl,
+    },
+    viewAllLink: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 2,
+      minHeight: 24,
+      flexShrink: 0,
+    },
+    viewAllText: {
+      color: t.colors.textDark,
+    },
+    cardRailContent: {
+      gap: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
+    },
+    inlineEmptyState: {
+      minHeight: 156,
+      justifyContent: "center",
+      alignItems: "center",
+      marginHorizontal: t.spacing.md,
+      ...createRoundedSurfaceStyle(t),
+    },
+    inlineEmptyFallbackImage: {
+      width: 72,
+      height: 72,
+    },
+    shortcut: {
+      marginHorizontal: t.spacing.md,
+      ...createRoundedSurfaceStyle(t),
+    },
+    shortcutPressed: {
+      opacity: 0.78,
+    },
+    shortcutContent: {
+      minHeight: 72,
+      padding: t.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+    },
+    shortcutIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.primaryLight,
+    },
+    shortcutText: {
+      flex: 1,
+      gap: 2,
+    },
+    shortcutTitle: {
+      color: t.colors.textDark,
+    },
+    stateContent: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: t.spacing.md,
+      paddingHorizontal: t.spacing.lg,
+      paddingBottom: 96,
+    },
+    stateFallbackImage: {
+      width: 84,
+      height: 84,
+    },
+    stateAction: {
+      width: "100%",
+    },
+  });
 }

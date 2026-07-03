@@ -84,3 +84,12 @@ export function hasSellerHomeFilters(filters: SellerHomeFilters) {
       filters.selectedInteractionStates.length > 0
   );
 }
+
+export function countSellerHomeFilterGroups(filters: SellerHomeFilters) {
+  return [
+    filters.searchValue,
+    filters.startDate || filters.endDate,
+    filters.selectedCategoryIds.length > 0,
+    filters.selectedInteractionStates.length > 0,
+  ].filter(Boolean).length;
+}

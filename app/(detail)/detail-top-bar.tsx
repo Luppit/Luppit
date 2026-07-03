@@ -4,6 +4,7 @@ import GlassSurface from "@/src/components/glass/GlassSurface";
 import { openPopup } from "@/src/services/popup.service";
 import {
   addCurrentBuyerPurchaseRequestFavorite,
+  cancelCurrentBuyerPurchaseRequest,
   getCurrentBuyerPurchaseRequestFavoriteStatus,
   removeCurrentBuyerPurchaseRequestFavorite,
 } from "@/src/services/purchase.request.service";
@@ -11,12 +12,13 @@ import { useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Platform, Pressable, Share, View } from "react-native";
 
 type DetailTopBarProps = {
   title?: string;
   hideMenu?: boolean;
   purchaseRequestId?: string | null;
+  purchaseRequestStatus?: string | null;
   topInset: number;
 };
 
@@ -26,11 +28,14 @@ export default function DetailTopBar({
   title,
   hideMenu = false,
   purchaseRequestId,
+  purchaseRequestStatus,
   topInset,
 }: DetailTopBarProps) {
   const t = useTheme();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
+  const isCanceledRequest =
+    (purchaseRequestStatus ?? "").trim().toLowerCase() === "canceled";
 
   useEffect(() => {
     let active = true;
@@ -99,6 +104,86 @@ export default function DetailTopBar({
       setIsSavingFavorite(false);
     }
   }, [isFavorite, isSavingFavorite, purchaseRequestId]);
+
+  const openCategoryInfo = useCallback(() => {
+    if (!purchaseRequestId) {
+      showError("No se pudo abrir", "No encontramos esta solicitud.");
+      return;
+    }
+
+    router.push({
+      pathname: "/(detail)/category-info",
+      params: {
+        title: "Información de categoría",
+        hideMenu: "true",
+        purchaseRequestId,
+      },
+    });
+  }, [purchaseRequestId]);
+
+  const sharePurchaseRequest = useCallback(async () => {
+    if (!purchaseRequestId) {
+      showError("No se pudo compartir", "No encontramos esta solicitud.");
+      return;
+    }
+
+    const requestTitle = title?.trim() || "Solicitud en Luppit";
+    const url = `luppit://request/${purchaseRequestId}`;
+
+    try {
+      await Share.share({
+        message: `${requestTitle}\n${url}`,
+        url,
+        title: requestTitle,
+      });
+    } catch {
+      showError("No se pudo compartir", "Intenta nuevamente.");
+    }
+  }, [purchaseRequestId, title]);
+
+  const openCancelConfirmation = useCallback(() => {
+    if (!purchaseRequestId) {
+      showError("No se pudo cancelar", "No encontramos esta solicitud.");
+      return;
+    }
+
+    openPopup({
+      type: "summary",
+      title: "Cancelar solicitud",
+      icon: "trash-2",
+      description:
+        "La solicitud quedará cancelada. Los vendedores ya no podrán interactuar con ella y las conversaciones relacionadas se cerrarán.",
+      actions: [
+        {
+          id: "keep-request",
+          label: "Volver",
+          icon: "arrow-left",
+          backgroundColorKey: "backgroudWhite",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+        },
+        {
+          id: "confirm-cancel-request",
+          label: "Cancelar solicitud",
+          icon: "trash-2",
+          backgroundColorKey: "backgroudWhite",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: async () => {
+            const result = await cancelCurrentBuyerPurchaseRequest(purchaseRequestId);
+            if (!result.ok) {
+              showError("No se pudo cancelar", result.error.message);
+              return false;
+            }
+
+            showSuccess("Solicitud cancelada");
+            router.replace("/(tabs)");
+            return true;
+          },
+        },
+      ],
+    });
+  }, [purchaseRequestId]);
 
   return (
     <GlassSurface
@@ -172,7 +257,7 @@ export default function DetailTopBar({
                     icon: "circle-help",
                     textColorKey: "textDark",
                     iconColorKey: "textDark",
-                    onPress: () => console.log("detail popup: category info"),
+                    onPress: openCategoryInfo,
                   },
                   {
                     id: "share",
@@ -180,16 +265,20 @@ export default function DetailTopBar({
                     icon: "share-2",
                     textColorKey: "textDark",
                     iconColorKey: "textDark",
-                    onPress: () => console.log("detail popup: share"),
+                    onPress: () => void sharePurchaseRequest(),
                   },
-                  {
-                    id: "cancel-request",
-                    label: "Cancelar solicitud",
-                    icon: "trash-2",
-                    textColorKey: "error",
-                    iconColorKey: "error",
-                    onPress: () => console.log("detail popup: cancel request"),
-                  },
+                  ...(!isCanceledRequest
+                    ? [
+                        {
+                          id: "cancel-request",
+                          label: "Cancelar solicitud",
+                          icon: "trash-2" as const,
+                          textColorKey: "error" as const,
+                          iconColorKey: "error" as const,
+                          onPress: openCancelConfirmation,
+                        },
+                      ]
+                    : []),
                 ],
               })
             }

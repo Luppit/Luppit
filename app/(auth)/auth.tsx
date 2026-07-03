@@ -56,13 +56,13 @@ export default function auth() {
         </View>
 
         <View style={styles.footer}>
-          <Text variant="caption" align="center">
+          <Text variant="small" align="center">
             Al continuar, aceptas automáticamente los
           </Text>
           <Link href="https://google.com">
             <Text
-              variant="caption"
-              style={{ textDecorationLine: "underline", fontWeight: "bold" }}
+              variant="small"
+              style={{ textDecorationLine: "underline" }}
             >
               Términos y condiciones
             </Text>

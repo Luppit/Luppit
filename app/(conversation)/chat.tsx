@@ -672,7 +672,7 @@ export default function ConversationChatScreen() {
               paddingHorizontal: t.spacing.xs,
             }}
           >
-            <Text variant="caption" color="textDark" align="right">
+            <Text variant="small" color="textDark" align="right">
               {formatTime(message.created_at)}
             </Text>
           </View>
@@ -687,10 +687,10 @@ export default function ConversationChatScreen() {
               paddingHorizontal: t.spacing.xs,
             }}
           >
-            <Text variant="caption" color="textMedium">
+            <Text variant="small" color="textMedium">
               {senderName}
             </Text>
-            <Text variant="caption" color="stateAnulated">
+            <Text variant="small" color="stateAnulated">
               {formatTime(message.created_at)}
             </Text>
           </View>
@@ -930,7 +930,7 @@ export default function ConversationChatScreen() {
                 />
               </Pressable>
               <Text
-                variant="caption"
+                variant="small"
                 align="center"
                 style={{
                   color: t.colors.backgroudWhite,

@@ -1,80 +1,46 @@
 # AGENTS.md
 
 ## Purpose
-This is the entrypoint for agent guidance in this repository.
-Keep this file short and use scoped `AGENTS.md` files for domain-specific rules.
+Entrypoint for repository guidance. Keep this file compact; put only durable, high-risk rules here and use scoped `AGENTS.md` files for local behavior.
 
-## Global Principles
+## Core Principles
 - Prefer the smallest change that fully solves the task.
-- Preserve the existing architecture and naming patterns.
-- Do not change established app architecture or shared UI behavior without asking permission first.
-- Reuse shared UI component behavior exactly; for example, popup sheets must keep the established header, separator, spacing, and applied-chip conventions unless the user explicitly approves a redesign.
-- Reuse current services, RPCs, and tables before adding new abstractions.
-- Keep UI behavior DB-driven when DB configuration exists.
-- Keep buyer/seller ratings DB-driven via normalized rating tables/views; do not reintroduce rating-as-source-of-truth columns on `business`.
-- Keep buyer/seller home discovery and grouping DB-driven via shared home-group preset metadata.
-- Seller home discovery remains category-driven via `business_category_preference`; buyer home discovery remains profile-owned via `purchase_request.profile_id`.
-- Top-navbar segments are the parent scope for categories: `purchase_request.category_id -> category.segment_id -> segment.id`; buyer/seller home RPCs must apply the selected segment via `p_segment_svg_name`, with `todas` meaning all segments.
-- Keep buyer/seller home-card status copy DB-driven via purchase-request status metadata; home/group UIs must render RPC `status_label` and must not show raw lifecycle codes.
-- Keep buyer-home filtering DB-driven via `public.get_buyer_home_purchase_requests(...)`; do not rebuild buyer-home search/date/status filtering as a separate source of truth in screen components once the RPC supports it.
-- Keep seller-home filtering DB-driven via `public.get_seller_home_purchase_requests(...)`; do not rebuild seller-home search/date/category/interaction filtering as a separate source of truth in screen components once the RPC supports it.
-- Keep purchase-request favorites DB-driven via `purchase_request_favorite` and buyer/seller favorite RPCs; favorites are role-specific through `role_id`, not text flags or client-only state.
-- Keep seller-offers listing search/filter/sort DB-driven via `public.get_current_seller_purchase_offers(...)` once available; do not keep a separate client-side source of truth after the RPC supports the needed parameters.
-- Keep purchase-request visualization tracking DB-driven via `purchase_request_visualization` and RPCs; do not make home-card eye counts or seller-open side effects depend on client-only state.
-- Do not reintroduce buyer/seller home mock request data/actions when DB RPC is available.
-- Keep purchase-request lifecycle and selected-offer behavior DB-driven using status metadata and RPCs.
-- Keep purchase-request status presentation DB-driven: request-card text comes from RPC `status_label`, style comes from RPC `status_style_code` sourced from `purchase_request_status_ui.style_code`, and lifecycle visibility comes from `purchase_request_status` flags rather than hardcoded status lists.
-- Keep seller discard / buyer reject / seller cancel-offer / seller edit-offer flows DB-driven through conversation state, action metadata, and RPCs; do not recreate those flows as client-only state.
-- Never hardcode conversation action behavior when DB metadata exists.
-- Conversation action placement is DB-driven via `conversation_action.ui_slot` / `ui_slot_catalog`; supported action slots now include `TOP`, `AUX`, and `MENU`.
-- Conversation header ellipsis options must be sourced from DB `MENU` actions returned by `get_conversation_view`; do not hardcode menu items in client code.
-- Never hardcode double-rating prevention in client code when DB conversation-action resolution already knows whether the participant has rated.
-- Keep buyer/seller chat-list discovery DB-driven via `public.get_current_profile_conversations(...)`; do not rebuild chat listing/search/unread ordering from direct client table reads. Chat list `display_name` is the counterpart identity (seller sees buyer profile name, buyer sees seller business name), while conversation headers use the purchase request title.
-- Keep conversation message open/unopened state DB-driven via `conversation_message` buyer/seller open-state columns; only `public.get_conversation_messages(...)` marks visible non-system messages opened for the current viewer side.
-- Keep conversation realtime as a private Broadcast invalidation layer only; do not stream raw conversation rows to clients. Realtime should wake screens so they reload DB-owned RPCs (`get_conversation_messages`, `get_conversation_view`) rather than becoming a source of truth.
-- Keep conversation deadlines and overdue transitions DB-driven via `deadline_type_catalog` + `conversation_deadline`; do not hardcode deadline days, overdue copy, or expiry branching in client code.
-- Passive conversation status cards are DB-driven via `get_conversation_view(...).slots[]`; current informational slot `STATUS` is used for active deadline cards resolved from deadline metadata, not from `conversation_action`.
-- Never hardcode navbar items/routes/labels/icons when DB metadata exists.
-- Never hardcode top-navbar segment chips when DB `segment` configuration exists.
-- For conversation confirmations with conditional behavior (e.g. by actor role and/or delivery type), resolve conditions in DB and return resolved metadata in `get_conversation_view`; do not branch product logic by action code in client.
-- Keep delivery-specific OTP/deadline behavior DB-driven: shipping (`purchase_offer_delivery.max_days` plus `max_value`/`max_unit`) and store pickup (`purchase_offer_delivery.after_days` plus `after_value`/`after_unit`) are different flows and must not share the same OTP/deadline assumptions.
-- Keep account email setup and email-consent gating profile-driven via `profile.email`, `profile.email_opt_in`, and `profile.email_opt_in_at`; do not recreate a parallel client-only completion flag.
-- Keep buyer/seller profile/account data DB-driven: phone is read-only login identity, editable name/document go through profile service updates, email changes go through OTP verification, buyer rating comes from `profile_rating_summary`, seller business rating comes from `business_rating_summary`, and buyer/seller home preset assignment comes from `profile_home_group_preset`.
-- Keep saved-account/profile-switcher state device-only and non-sensitive: store only profile display payload such as profile id, user id, name, phone, saved timestamp, and last-known unread notification count. Never store OTPs, Supabase sessions, access tokens, refresh tokens, or secrets in saved profile snapshots.
-- Profile switching must use the existing phone OTP login flow: selecting a non-active saved profile signs out the current session, routes to `/(auth)/login` with the selected phone, auto-sends the OTP once, and lands on the OTP verification step. Do not create a parallel auth flow.
-- Keep buyer/seller home preset assignment profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
-- Keep seller business category preferences DB-driven via `business_category_preference` and `set_current_business_category_preferences`; category editing belongs on the business information detail page, not as a seller main-profile metric card.
-- Keep seller business location DB-driven via `business.location_id -> location.id` and `set_current_business_location`; location editing belongs on the seller business information detail page, not account settings or seller main-profile cards.
-- Keep profile notifications DB-driven via `notification`, `notification_type_catalog`, and `profile_notification`; unread state is `profile_notification.read_at`, and opening the notifications screen marks the current profile's notifications read through the DB RPC.
-- Saved-profile switcher notification counts are profile-owned: refresh the active authenticated profile count from DB, but show last-known device-saved counts for non-active profiles unless a DB/RPC contract explicitly permits cross-profile unread-count reads.
+- Preserve existing architecture, naming, shared UI behavior, and service/RPC boundaries.
+- Reuse current services, RPCs, tables, and shared components before adding new abstractions.
+- Ask before changing public APIs, schemas, navigation structure, or established app architecture.
+- Do not add dependencies unless they clearly reduce complexity.
+- Never log or expose secrets, tokens, API keys, OTPs, Supabase sessions, or refresh tokens.
+
+## Source Of Truth Rules
+- Keep product behavior DB-driven whenever DB metadata/RPCs exist; do not recreate parallel client-only state.
+- Buyer/seller home discovery, grouping, filters, status labels/styles, segment selection, favorites, visualization counts, and lifecycle visibility belong to their DB RPCs/configuration.
+- Conversation actions, menu items, confirmations, passive status/deadline cards, rating visibility, deadlines, transitions, and message open-state belong to DB metadata/RPCs.
+- Navigation/menu/segment labels and icons come from DB configuration; do not hardcode buyer/seller menus or segment arrays.
+- Profile/account data stays profile-driven: phone is read-only login identity, email changes use OTP verification, ratings come from summary tables/views, and saved profile snapshots are device-only non-sensitive display data.
 
 ## Shared Glass UI
-- Keep iOS-style glass materials centralized in `src/themes/glass.ts` and render blurred glass surfaces through `src/components/glass/GlassSurface.tsx`; do not create one-off rgba/shadow/blur recipes in individual screens.
-- Use the existing glass roles intentionally: `surface` for content cards, `chrome` for top navigation/header chrome, `nav` for the bottom tab navbar, `sheet` for popup sheets, `control` for search/date/input controls, `headerControl` for controls that live inside top chrome, and `chip` for applied filters/status-like pills.
-- `GlassSurface` owns the material: it composes `BlurView`, the translucent tint, radius, border, and shadow from the theme. Use `variant`, `blur`, `style`, `clipStyle`, and `contentStyle` instead of nesting ad hoc `BlurView`/rgba/shadow layers.
-- Header chrome should attach to the top and side edges of the screen, including the safe-area/status region, with only bottom corners rounded. Do not make top headers float as detached cards unless product explicitly asks for that.
-- Bottom nav chrome should use `GlassSurface` with the `nav` role, not a raw `BlurView`. Keep it visually separate from the content passing behind it with the shared `nav` tint/border/shadow; do not reintroduce a horizontal highlight streak inside the pill.
-- For glass to read correctly, keep blur under a translucent tint and place real content behind/under it when possible; avoid opaque white fills that flatten the material. Content should be able to scroll under chrome, but the foreground text/icons must remain readable.
-- Tune glass from `src/themes/glass.ts`: increase role `backgroundColor` alpha when the material is too transparent or busy, decrease `blurIntensity` when content underneath becomes too distorted/smeared, and strengthen `borderColor`/`borderBottomColor` for edge definition. Do this per role (`chrome`, `nav`, `headerControl`) rather than by adding one-off screen styles.
-- Controls inside glass should be plainer and more defined than their parent material. For example, search inputs in headers should use `headerControl` so they read as tappable controls instead of becoming "glass inside glass."
-- Preserve shared shadows and clipping behavior from `GlassSurface`; do not put `overflow: hidden` on the same view that owns the shadow unless using the component's `clipStyle` for the inner blur layer.
+- Render glass through `src/components/glass/GlassSurface.tsx` and tune material roles in `src/themes/glass.ts`; avoid one-off blur/rgba/shadow recipes.
+- Use glass roles intentionally: `surface`, `chrome`, `nav`, `sheet`, `control`, `headerControl`, and `chip`.
+- Header chrome attaches to the top/sides including safe area with only bottom corners rounded; bottom nav uses the shared `nav` material.
+- Controls inside glass should be plainer than their parent material; preserve shared shadows/clipping through `GlassSurface`.
 
-## Scoped Guidance Map
-- Buyer request-assistant chat behavior: `app/(chat)/AGENTS.md`
-- Conversation UI behavior: `app/(conversation)/AGENTS.md`
-- Purchase-request detail UI behavior: `app/(detail)/AGENTS.md`
-- Home tabs, buyer/seller home behavior, and profile tab behavior: `app/(tabs)/AGENTS.md`
-- Shared chat composer behavior: `src/components/inputChat/AGENTS.md`
-- Navbar UI behavior: `src/components/navbar/AGENTS.md`
-- RPC/runtime contracts and execution behavior: `src/services/AGENTS.md`
-- Data model and SQL transition/procedure constraints: `src/db/AGENTS.md`
+## Soft List UI
+- Settings/profile/help-style option lists should follow `src/components/AGENTS.md` and reuse `GroupedListSection`, `GroupedListRow`, and shared rounded surface helpers.
+- Keep compact rows calm and scannable, but give wrapped text and descriptions enough vertical room.
 
-## Testing & Verification
-- Run lint on changed files.
-- Run relevant TS checks/tests when possible.
-- Never claim checks passed unless they were executed.
-- If global checks fail due unrelated pre-existing issues, state that explicitly.
+## Scoped Guidance
+- Buyer request assistant: `app/(chat)/AGENTS.md`
+- Conversations: `app/(conversation)/AGENTS.md`
+- Detail/account screens: `app/(detail)/AGENTS.md`
+- Home/profile tabs: `app/(tabs)/AGENTS.md`
+- Shared components/style standards: `src/components/AGENTS.md`
+- Shared composer: `src/components/inputChat/AGENTS.md`
+- Navbar: `src/components/navbar/AGENTS.md`
+- Shared popup: `src/components/popup/AGENTS.md`
+- Services/RPC integration: `src/services/AGENTS.md`
+- DB/SQL contracts: `src/db/AGENTS.md`
 
-## Security
-- Never log secrets/tokens/keys.
-- Do not expose internal credentials in code, logs, or SQL snippets.
+## Verification
+- Run lint on changed files and relevant TS checks/tests when possible.
+- Never claim checks passed unless they actually ran.
+- If a global check fails for unrelated pre-existing reasons, say so explicitly.

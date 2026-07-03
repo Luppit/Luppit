@@ -9,6 +9,11 @@ export type ProfileEmailSetupStatus = {
     emailOptInAt: string | null;
     isComplete: boolean;
 };
+export type AccountDeletionRequestStatus = {
+    status: "pending" | "completed" | "canceled";
+    requestedAt: string;
+    completedAt: string | null;
+};
 export type BuyerProfileStats = {
     purchaseRequestsCount: number;
     offersReceivedCount: number;
@@ -92,6 +97,39 @@ function mapProfileEmailSetupStatus(profile: Profile | null): ProfileEmailSetupS
         emailOptIn,
         emailOptInAt,
         isComplete: Boolean(email) && emailOptIn && emailOptInAt !== null,
+    };
+}
+
+function mapAccountDeletionRequestStatus(
+    value: unknown
+): AccountDeletionRequestStatus | null {
+    if (!value || typeof value !== "object") return null;
+
+    const record = value as {
+        status?: unknown;
+        requested_at?: unknown;
+        requestedAt?: unknown;
+        completed_at?: unknown;
+        completedAt?: unknown;
+    };
+    const status = record.status;
+    const requestedAt = record.requested_at ?? record.requestedAt;
+    const completedAt = record.completed_at ?? record.completedAt;
+
+    if (status !== "pending" && status !== "completed" && status !== "canceled") {
+        return null;
+    }
+
+    if (typeof requestedAt !== "string" || requestedAt.length === 0) {
+        return null;
+    }
+
+    return {
+        status,
+        requestedAt,
+        completedAt: typeof completedAt === "string" && completedAt.length > 0
+            ? completedAt
+            : null,
     };
 }
 
@@ -919,4 +957,32 @@ export async function verifyCurrentProfileEmailSetup({
     }
 
     return await getCurrentProfileEmailSetupStatus();
+}
+
+export async function requestCurrentProfileAccountDeletion(): Promise<
+    { ok: true; data: AccountDeletionRequestStatus } | { ok: false; error: AppError }
+> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const rpcResult: any = await (supabase as any).rpc(
+        "request_current_profile_account_deletion",
+        {
+            p_profile_id: profileResult.data.id,
+        }
+    );
+
+    if (rpcResult?.error) {
+        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    }
+
+    const status = mapAccountDeletionRequestStatus(rpcResult?.data);
+    if (!status) {
+        return { ok: false, error: fromAppError("validation") };
+    }
+
+    return {
+        ok: true,
+        data: status,
+    };
 }

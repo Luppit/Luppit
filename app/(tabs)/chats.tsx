@@ -2,6 +2,7 @@ import { Icon } from "@/src/components/Icon";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   ConversationListFilters,
@@ -39,23 +40,9 @@ function hasChatFilters(filters: ConversationListFilters) {
   );
 }
 
-function countChatFilterGroups(filters: ConversationListFilters) {
-  return [
-    filters.searchValue,
-    filters.startDate || filters.endDate,
-    filters.selectedCategoryIds.length > 0,
-  ].filter(Boolean).length;
-}
-
 function getInitial(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
-}
-
-function parseDateTime(value: string | null | undefined) {
-  if (!value) return 0;
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function startOfDay(date: Date) {
@@ -97,6 +84,28 @@ function getMessagePreview(item: ConversationListItem) {
   if (kind === "IMAGE") return "Imagen";
   if (kind === "SYSTEM") return "Actualización de la conversación";
   return "Sin mensajes";
+}
+
+function formatFilterDate(value: string) {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("es-CR", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function getSelectedCategoryLabels(
+  selectedCategoryIds: string[],
+  categoryOptions: { id: string; label: string }[]
+) {
+  const labelById = new Map(categoryOptions.map((option) => [option.id, option.label]));
+  return selectedCategoryIds.map((id) => ({
+    id,
+    label: labelById.get(id) ?? "Categoría",
+  }));
 }
 
 export default function ChatsScreen() {
@@ -190,18 +199,14 @@ function ChatsContent() {
   }, [filterOptionsSource]);
 
   const visibleConversations = React.useMemo(
-    () =>
-      [...conversations].sort(
-        (first, second) =>
-          Number(second.has_unopened) - Number(first.has_unopened) ||
-          parseDateTime(second.last_message_at) - parseDateTime(first.last_message_at)
-      ),
+    () => conversations,
     [conversations]
   );
   const hasActiveFilters = React.useMemo(() => hasChatFilters(filters), [filters]);
-  const activeFilterCount = React.useMemo(() => countChatFilterGroups(filters), [
-    filters,
-  ]);
+  const selectedCategoryLabels = React.useMemo(
+    () => getSelectedCategoryLabels(filters.selectedCategoryIds, categoryOptions),
+    [categoryOptions, filters.selectedCategoryIds]
+  );
 
   const openSearchPopup = React.useCallback(() => {
     openPopup({
@@ -252,6 +257,29 @@ function ChatsContent() {
     });
   }, []);
 
+  const removeSearchFilter = React.useCallback(() => {
+    setFilters((current) => ({ ...current, searchValue: "" }));
+  }, []);
+
+  const removeStartDateFilter = React.useCallback(() => {
+    setFilters((current) => ({ ...current, startDate: "" }));
+  }, []);
+
+  const removeEndDateFilter = React.useCallback(() => {
+    setFilters((current) => ({ ...current, endDate: "" }));
+  }, []);
+
+  const removeCategoryFilter = React.useCallback((categoryId: string) => {
+    setFilters((current) => ({
+      ...current,
+      selectedCategoryIds: current.selectedCategoryIds.filter((id) => id !== categoryId),
+    }));
+  }, []);
+
+  const retryLoad = React.useCallback(() => {
+    void loadConversations();
+  }, [loadConversations]);
+
   const content = (() => {
     if (isLoading) {
       return (
@@ -264,13 +292,26 @@ function ChatsContent() {
     if (visibleConversations.length === 0) {
       return (
         <View style={s.stateContent}>
-          <Text color="stateAnulated">
-            {loadError
-              ? "No se pudieron cargar tus chats."
-              : hasActiveFilters
-                ? "No encontramos chats con los filtros aplicados."
-                : "Cuando tengas conversaciones, aparecerán aquí."}
-          </Text>
+          <EmptyChatsState
+            icon={loadError ? "alert-circle" : hasActiveFilters ? "search" : "message-circle"}
+            title={
+              loadError
+                ? "No se pudieron cargar tus chats"
+                : hasActiveFilters
+                  ? "No encontramos chats"
+                  : "Aún no tienes chats"
+            }
+            description={
+              loadError
+                ? loadError
+                : hasActiveFilters
+                  ? "Prueba cambiando la búsqueda o limpiando los filtros."
+                  : "Cuando tengas conversaciones activas, aparecerán aquí."
+            }
+            actionLabel={loadError ? "Reintentar" : hasActiveFilters ? "Limpiar filtros" : null}
+            actionIcon={loadError ? undefined : hasActiveFilters ? "x" : undefined}
+            onAction={loadError ? retryLoad : hasActiveFilters ? () => setFilters(EMPTY_CHAT_FILTERS) : undefined}
+          />
         </View>
       );
     }
@@ -282,27 +323,61 @@ function ChatsContent() {
       >
         {hasActiveFilters ? (
           <View style={s.activeChipsRow}>
-            <View style={s.activeChip}>
-              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeChipLabel}>
-                Filtros ({activeFilterCount})
+            {filters.searchValue ? (
+              <FilterChip
+                icon="search"
+                label={`Buscar: ${filters.searchValue}`}
+                accessibilityLabel="Quitar búsqueda"
+                onRemove={removeSearchFilter}
+              />
+            ) : null}
+
+            {filters.startDate ? (
+              <FilterChip
+                icon="sliders-horizontal"
+                label={`Desde ${formatFilterDate(filters.startDate)}`}
+                accessibilityLabel="Quitar fecha inicial"
+                onRemove={removeStartDateFilter}
+              />
+            ) : null}
+
+            {filters.endDate ? (
+              <FilterChip
+                icon="sliders-horizontal"
+                label={`Hasta ${formatFilterDate(filters.endDate)}`}
+                accessibilityLabel="Quitar fecha final"
+                onRemove={removeEndDateFilter}
+              />
+            ) : null}
+
+            {selectedCategoryLabels.map((category) => (
+              <FilterChip
+                key={category.id}
+                icon="tag"
+                label={category.label}
+                accessibilityLabel={`Quitar categoría ${category.label}`}
+                onRemove={() => removeCategoryFilter(category.id)}
+              />
+            ))}
+
+            <Pressable
+              style={s.clearFiltersChip}
+              onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
+              accessibilityRole="button"
+              accessibilityLabel="Limpiar filtros"
+            >
+              <Text variant="body" style={s.clearFiltersLabel}>
+                Limpiar
               </Text>
-              <Pressable
-                style={s.activeChipClose}
-                onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
-                accessibilityRole="button"
-                accessibilityLabel="Limpiar filtros"
-              >
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
+            </Pressable>
           </View>
         ) : null}
 
-        {visibleConversations.map((item) => (
+        {visibleConversations.map((item, index) => (
           <ChatListRow
             key={item.conversation_id}
             item={item}
+            showSeparator={index < visibleConversations.length - 1}
             onPress={() => openConversation(item)}
           />
         ))}
@@ -317,7 +392,7 @@ function ChatsContent() {
           onPress={openSearchPopup}
           accessibilityRole="button"
         >
-          <Icon name="search" size={20} color={t.colors.textDark} />
+          <Icon name="search" size={20} color={t.colors.stateAnulated} />
           <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
             {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
           </Text>
@@ -335,17 +410,52 @@ function ChatsContent() {
   );
 }
 
+function FilterChip({
+  icon,
+  label,
+  accessibilityLabel,
+  onRemove,
+}: {
+  icon: React.ComponentProps<typeof Icon>["name"];
+  label: string;
+  accessibilityLabel: string;
+  onRemove: () => void;
+}) {
+  const t = useTheme();
+  const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
+
+  return (
+    <View style={s.activeChip}>
+      <Icon name={icon} size={16} color={t.colors.textDark} />
+      <Text variant="body" style={s.activeChipLabel} maxLines={1}>
+        {label}
+      </Text>
+      <Pressable
+        style={s.activeChipClose}
+        onPress={onRemove}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+      >
+        <Icon name="x" size={16} color={t.colors.textDark} />
+      </Pressable>
+    </View>
+  );
+}
+
 function ChatListRow({
   item,
+  showSeparator,
   onPress,
 }: {
   item: ConversationListItem;
+  showSeparator: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
   const preview = getMessagePreview(item);
   const title = item.display_name || "Conversación";
+  const contextLabel = item.request_title?.trim() || item.request_category_name?.trim() || "";
 
   return (
     <Pressable
@@ -353,28 +463,31 @@ function ChatListRow({
       onPress={onPress}
       accessibilityRole="button"
     >
-      <View style={s.unreadMarkerSlot}>
-        {item.has_unopened ? <View style={s.unreadMarker} /> : null}
-      </View>
-
       <View style={s.avatar}>
         <Text variant="subtitle" style={s.avatarText}>
           {getInitial(title)}
         </Text>
+        {item.has_unopened ? <View style={s.unreadMarker} /> : null}
       </View>
 
       <View style={s.chatBody}>
         <Text
-          variant={item.has_unopened ? "subtitle" : "label"}
+          variant="body"
           maxLines={1}
-          style={s.chatName}
+          style={[s.chatName, item.has_unopened ? s.chatNameUnread : null]}
         >
           {title}
         </Text>
+        {contextLabel ? (
+          <Text variant="body" color="textMedium" maxLines={1} style={s.chatContext}>
+            {contextLabel}
+          </Text>
+        ) : null}
         <Text
-          variant={item.has_unopened ? "label" : "body"}
+          variant="body"
+          color="stateAnulated"
           maxLines={1}
-          style={s.chatPreview}
+          style={[s.chatPreview, item.has_unopened ? s.chatPreviewUnread : null]}
         >
           {preview}
         </Text>
@@ -386,7 +499,54 @@ function ChatListRow({
         </Text>
         <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
       </View>
+      {showSeparator ? <View style={s.chatRowSeparator} /> : null}
     </Pressable>
+  );
+}
+
+function EmptyChatsState({
+  icon,
+  title,
+  description,
+  actionLabel,
+  actionIcon,
+  onAction,
+}: {
+  icon: React.ComponentProps<typeof Icon>["name"];
+  title: string;
+  description: string;
+  actionLabel: string | null;
+  actionIcon?: React.ComponentProps<typeof Icon>["name"];
+  onAction?: () => void;
+}) {
+  const t = useTheme();
+  const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
+
+  return (
+    <View style={s.emptyState}>
+      <View style={s.emptyIconBadge}>
+        <Icon name={icon} size={24} color={t.colors.primary} />
+      </View>
+      <Text variant="body" style={s.emptyTitle} align="center">
+        {title}
+      </Text>
+      <Text variant="small" color="stateAnulated" align="center" style={s.emptyDescription}>
+        {description}
+      </Text>
+      {actionLabel && onAction ? (
+        <Pressable
+          style={s.emptyAction}
+          onPress={onAction}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
+        >
+          {actionIcon ? <Icon name={actionIcon} size={16} color={t.colors.textDark} /> : null}
+          <Text variant="body" style={s.emptyActionLabel}>
+            {actionLabel}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -501,6 +661,8 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
     stateContent: {
       flex: 1,
       paddingTop: topBarVisibleHeight + t.spacing.md,
+      paddingHorizontal: t.spacing.lg,
+      justifyContent: "center",
     },
     toolbar: {
       flexDirection: "row",
@@ -547,56 +709,81 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       alignItems: "center",
       justifyContent: "center",
     },
+    clearFiltersChip: {
+      minHeight: 36,
+      borderRadius: 999,
+      ...t.glass.headerControl,
+      paddingHorizontal: t.spacing.md,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    clearFiltersLabel: {
+      color: t.colors.textDark,
+    },
     chatList: {
-      gap: t.spacing.md,
+      gap: 0,
       paddingTop: topBarVisibleHeight + t.spacing.md,
       paddingBottom: 112,
     },
     chatRow: {
-      minHeight: 72,
+      position: "relative",
+      minHeight: 112,
       flexDirection: "row",
       alignItems: "center",
-      gap: t.spacing.sm,
-      paddingVertical: t.spacing.sm,
+      gap: t.spacing.md,
+      paddingLeft: t.spacing.lg,
+      paddingRight: t.spacing.md,
+      paddingVertical: t.spacing.md,
     },
     chatRowPressed: {
       opacity: 0.72,
     },
     avatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t.colors.primary,
-    },
-    unreadMarkerSlot: {
-      width: 10,
-      alignItems: "flex-start",
-      justifyContent: "center",
+      backgroundColor: t.colors.primaryLight,
+      position: "relative",
     },
     unreadMarker: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      position: "absolute",
+      top: 2,
+      right: 2,
+      width: 9,
+      height: 9,
+      borderRadius: 5,
       backgroundColor: t.colors.primary,
+      borderWidth: 2,
+      borderColor: t.colors.background,
     },
     avatarText: {
-      color: t.colors.backgroudWhite,
+      color: t.colors.primary,
     },
     chatBody: {
       flex: 1,
       minWidth: 0,
-      gap: 2,
+      gap: t.spacing.xs,
     },
     chatName: {
       color: t.colors.textDark,
     },
-    chatPreview: {
+    chatNameUnread: {
       color: t.colors.textDark,
     },
+    chatPreview: {
+      flexShrink: 1,
+    },
+    chatContext: {
+      flexShrink: 1,
+      lineHeight: t.typography.body.lineHeight,
+    },
+    chatPreviewUnread: {
+      color: t.colors.textMedium,
+    },
     chatMeta: {
-      minWidth: 82,
+      minWidth: 66,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
@@ -604,6 +791,50 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
     },
     chatTime: {
       flexShrink: 1,
+    },
+    chatRowSeparator: {
+      position: "absolute",
+      left: t.spacing.lg + 52 + t.spacing.md,
+      right: t.spacing.md,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: "rgba(0,0,0,0.08)",
+    },
+    emptyState: {
+      width: "100%",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      padding: t.spacing.lg,
+      ...createRoundedSurfaceStyle(t),
+    },
+    emptyIconBadge: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.primaryLight,
+      marginBottom: t.spacing.xs,
+    },
+    emptyTitle: {
+      color: t.colors.textDark,
+    },
+    emptyDescription: {
+      maxWidth: 260,
+    },
+    emptyAction: {
+      minHeight: 36,
+      borderRadius: 999,
+      ...t.glass.chip,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.md,
+      marginTop: t.spacing.xs,
+    },
+    emptyActionLabel: {
+      color: t.colors.textDark,
     },
   });
 }

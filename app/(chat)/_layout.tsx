@@ -90,10 +90,9 @@ function ChatLayoutContent() {
               autoFocus={messages.length === 0}
               disabled={!canCompose}
               busy={isAssistantBusy}
-              showAttachmentButton={false}
-              maxImages={0}
-              onSend={({ text }) => {
-                return sendMessage(text);
+              maxImages={3}
+              onSend={({ text, images }) => {
+                return sendMessage({ text, images });
               }}
             />
           </View>

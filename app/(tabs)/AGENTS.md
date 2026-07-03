@@ -1,154 +1,34 @@
 # AGENTS.md
 
 ## Scope
-Applies to tab screens, with special focus on home behavior for buyer/seller and the buyer/seller profile tab.
+Applies to tab screens, buyer/seller home behavior, profile tab, and standalone list tabs.
 
-## Buyer/Seller Home: DB-Driven Contract (Mandatory)
-- Seller home request discovery must come from `public.get_seller_home_purchase_requests(...)`.
-- Buyer home request discovery must come from `public.get_buyer_home_purchase_requests(...)`.
-- UI must render section groups from RPC `groups[]` payload (`code`, `name`, `total`, `items[]`) in DB-provided order.
-- Group visibility/order/limits are DB configuration (`home_group`, `home_group_preset`, `home_group_preset_item`), not client logic.
-- Buyer and seller preset assignment is profile-driven via `profile_home_group_preset`; do not use business-level seller preset assignment.
-- Seller category matching scope is DB-driven via `business_category_preference`; client must not replicate this filter logic.
-- Seller home filters (request-name text, date range, category selection, seller interaction state) must drive the same seller RPC, not a separate local grouping source.
-- Seller home segment selection must drive the same seller RPC via `p_segment_svg_name`; `todas` means no segment filter.
-- Buyer home request scope is DB-driven by the buyer RPC and resolves from `purchase_request.profile_id = p_profile_id` plus the DB-visible lifecycle set from `purchase_request_status.is_buyer_home_visible`.
-- Buyer home filters (request-name text, date range, status selection) must drive the same buyer RPC, not a separate local grouping source.
-- Buyer home segment selection must drive the same buyer RPC via `p_segment_svg_name`; `todas` means no segment filter.
-- Home-card status chip text is DB-driven by RPC item field `status_label`; `status` remains the raw lifecycle code and must not be shown directly in the card UI.
-- Home-card status chip style is DB-driven by RPC item field `status_style_code`, which must come from `purchase_request_status_ui.style_code`; do not make home screens query status UI metadata separately to paint cards.
-- Buyer/seller home visible lifecycle sets are DB-driven by `purchase_request_status` visibility flags; do not hardcode lifecycle status lists in app code or procedure logic.
-- Home-card eye count is DB-driven by RPC item field `views_count`; do not recompute visualization totals in home/group screens when the RPC already provides them.
-- Buyer home-card offer count is DB-driven by RPC item field `offers_count`; do not issue a separate client-side `purchase_offer` count for buyer home or buyer group listing cards.
-- Buyer home `offers_count` should represent only active buyer-visible offers, matching `public.get_buyer_purchase_request_offers(...)` by excluding offers whose linked conversation is discarded, rejected, canceled, or otherwise inactive.
-- Empty home state must render when all returned groups have `items.length = 0`.
-- Buyer empty-state behavior depends on filter state:
-  - with no active filters, show the default creation CTA
-  - with active filters, show a no-results message and hide the creation CTA
-- Seller empty-state behavior depends on filter state:
-  - with no active filters, show the default no-opportunities message
-  - with active filters, show a no-results message
-- Buyer and seller home screens must gate on email setup before loading groups:
-  - resolve profile email setup through `profile.service.ts`
-  - if incomplete, do not call home-group RPCs
-  - render the blocked account-setup state instead.
+## Buyer/Seller Home
+- Seller home uses `public.get_seller_home_purchase_requests(...)`; buyer home uses `public.get_buyer_home_purchase_requests(...)`.
+- Render `groups[]` in DB order. Group visibility, order, names, totals, and limits are DB configuration, not client logic.
+- Filters and selected top-navbar segment must reload the same home RPCs; `todas` means no segment filter.
+- Cards render RPC `status_label`, `status_style_code`, `views_count`, and buyer `offers_count`; do not recompute or enrich those values in screens.
+- Buyer cards open `/(detail)/purchase-request`; seller cards open `/(conversation)/offer` through `get_or_create_seller_purchase_request_conversation(...)`.
+- Seller open side effects, including visualization tracking, belong to the seller-open RPC.
+- Favorites are role-specific and must preload/mutate through buyer/seller favorite RPC wrappers.
+- Email setup gates buyer/seller home: if incomplete, do not call home RPCs; show the account-setup state and route the CTA to `/(modal)/email-setup`.
+- Keep home behavior presentation-only: loading/empty states, carousels, navigation, long-press menus, and shared card styling.
 
-## Implementation Rules
-- Do not hardcode buyer/seller home groups such as `Ver todas`, `Populares`, or `Nuevas` in product logic.
-- Do not pass custom limits from client; `max_items` per group is defined in DB.
-- Do not use local purchase-request mocks for buyer/seller home flows when RPC data exists.
-- Buyer request cards use shared glass card styling from `ProductCard`; keep card material changes in `ProductCard`/theme glass tokens rather than per-screen overrides.
-- Horizontal buyer card lists need enough padding for the shared glass shadow so card shadows are not clipped at list edges.
-- Keep client behavior presentation-only (horizontal carousels, navigation, loading/empty states).
-- Group header action should navigate to a dedicated group listing screen (for example with `groupCode` param) for both buyer and seller.
-- Buyer home and seller home may share the same grouped section layout, but buyer request cards must keep the buyer visual contract (`ProductCard` with status chip + footer offers label) instead of reusing the seller compact card.
-- Buyer and seller request cards must prefer `item.status_label` for the status pill and only fall back safely when the label is absent.
-- Request-card status pills must use `item.status_style_code` with shared `StatusChip`; the chip keeps dark text, uses the theme color for the dot, uses a light tint of the theme color for the background, and has no border.
-- Buyer grouped request cards and buyer group listing items must open `/(detail)/purchase-request`.
-- Seller request card press (home + group listing) must not navigate to purchase-request detail for seller role.
-- Seller request card press must open `/(conversation)/offer` and resolve conversation via DB RPC `public.get_or_create_seller_purchase_request_conversation(...)`.
-- Seller request-card open side effects, including one-row-per-profile visualization tracking, belong in `public.get_or_create_seller_purchase_request_conversation(...)`; do not rely on a separate client insert as the source of truth.
-- Buyer and seller home request cards may expose long-press menus, but favorite state must be preloaded from the role-specific favorite RPCs and mutations must use add/remove favorite RPC wrappers.
-- Buyer home card long-press menu should mirror purchase-request detail options, including favorite toggle copy/icon (`star` vs `star-off`), category info, share, and cancel placeholders unless product requirements change.
-- Seller home card long-press menu is intentionally minimal: only add/remove favorite for that seller/request, with `star` when adding and `star-off` when removing.
-- Long-press card animations should be subtle press-in lift/scale feedback and must not change card layout, carousel geometry, or normal tap navigation.
-- Buyer grouped home/group screens must render request-card offer counts from RPC item `offers_count`; do not enrich those counts client-side.
-- Buyer home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
-- Seller home must react to the shared top-navbar filter state so applying or clearing filters from the navbar popup reloads the grouped cards in place.
-- Buyer and seller home must react to shared top-navbar segment state so tapping a segment reloads grouped cards in place through the RPC, not through client-side filtering.
-- Buyer/seller home group listing screens carry the active `segmentSvgName` route param and reload that segment's group contents by `groupCode`; they intentionally do not inherit the rest of the active top-navbar filters unless product requirements explicitly change.
-- Carousel geometry convention for seller home:
-  - carousels can be full-bleed within seller-home screen context
-  - first card must align with the group header text at initial position
-  - after interaction, horizontal scrolling behavior is standard.
-- The blocked email-setup state belongs to the home screen layer, but the source of truth does not:
-  - completion logic comes from profile email fields / profile service
-  - the CTA should open the dedicated email setup modal (`/(modal)/email-setup`)
-  - do not duplicate email form state inside the home screen itself.
+## Profile And Account
+- Profile/settings-style rows and cards should follow the soft grouped-list style in `src/components/AGENTS.md`.
+- Hide the shared top navbar on `/profile`; keep the bottom navbar.
+- Phone is read-only login identity. Editable profile fields are `name` and `id_document`; email changes use the OTP verification modal.
+- Profile switcher uses saved device profile snapshots and the shared popup system. Active profile shows the shared `Activo` status chip.
+- Switching to a non-active saved profile must sign out and reuse the existing phone OTP login flow with prefilled phone and `autoSendOtp=true`.
+- Saved profile notification counts are last-known device snapshots for non-active profiles; refresh only the active authenticated profile from DB.
+- Notifications route to `/(detail)/notifications`; unread badge comes from `notification.service.ts`, refreshes on profile focus, and must not block screen render.
+- Buyer/seller profile stats and ratings are DB-backed through services/summary tables. Seller business category/location editing belongs on `/(detail)/business-profile`, not main profile metric cards.
+- Home preset settings read active DB presets for the current surface, preview metadata non-destructively, and save only on `Guardar cambios`.
 
-## Buyer/Seller Profile & Account Settings
-- Profile is a focused account surface; hide the shared top navbar on `/profile` and keep the bottom navbar.
-- Phone number is the read-only login identity. Show it as account information only; do not add phone edit flows unless auth/login requirements change.
-- The top-navbar profile switcher opens saved device profiles through the shared popup system. The active authenticated profile must show the shared request-card status chip with label `Activo`; inactive saved profiles must not show that chip.
-- Saved profile rows should display unread notification copy from their saved payload: when count is greater than zero, show the red notification dot and `Tienes N notificación(es)`; when count is zero or missing, hide the red dot and show `Sin notificaciones pendientes`.
-- Opening the profile switcher should refresh the active authenticated profile's unread notification count and persist it to the device snapshot. Non-active saved profiles should show their last-known device-saved count; do not query notification rows for other profiles under the current session.
-- Selecting a non-active saved profile must start the existing phone OTP login flow for that saved phone: set the pending profile switch, sign out, route to `/(auth)/login`, prefill the phone, auto-send OTP once, and show the OTP verification step.
-- Auth state transitions used by the tabs layout should trust Supabase's auth event `session` argument instead of re-reading `getSession()` inside the auth-change callback; re-reading can leave the mounted tabs route stale until refresh after sign-out.
-- The `Notificaciones` profile action must route to `/(detail)/notifications` with title `Notificaciones` and `hideMenu: "true"`; do not show a placeholder toast for this option.
-- The `Notificaciones` profile action unread badge is profile-owned and sourced from `notification.service.ts`; show a compact primary pill between the label and chevron only when unread count is greater than zero, cap display at `99+`, and keep the row accessibility label in Spanish (for example `Notificaciones, 3 sin leer`).
-- Notification unread-count loading must not block the profile screen. Refresh it on profile focus so the badge clears after the notifications detail screen marks rows read.
-- Buyer profile stats must use real DB-backed data:
-  - created requests from buyer-owned `purchase_request` rows
-  - offers received from offers attached to those requests
-  - buyer rating from `profile_rating_summary`, not recalculated in client code
-- Seller profile data must use real DB-backed data:
-  - seller profile identity from the current authenticated `profile`
-  - business membership from `profile_business`
-  - business display data from `business`
-  - business rating from `business_rating_summary`, not recalculated in client code
-- Seller main profile should show business summary/actions, but must not show a standalone category metric card. Business categories are managed on `/(detail)/business-profile`.
-- Seller business information entry points should route to `/(detail)/business-profile`, where category preferences and business location can be viewed and edited.
-- Editable buyer/seller profile fields:
-  - `name` and `id_document` may update through `profile.service.ts`
-  - email must update through the existing OTP verification modal (`/(modal)/email-setup`), not through a plain profile update
-- Account settings should keep rows simple and actionable; rows that change data should show a navigation arrow and route to the dedicated edit/verification flow.
-- The seller settings cog must route to the same role-aware account settings detail flow as the buyer; detail routes must not depend on tab-only role context being mounted.
-- Buyer/seller home preset settings:
-  - `Vista de inicio` reads active presets from `home_group_preset` for the current surface (`buyer_home` or `seller_home`)
-  - current assignment comes from `profile_home_group_preset`, falling back to active `default` for that surface
-  - preview cards must render DB group names/order and `home_group_preset_item.max_items`
-  - previewing a preset must not mutate DB; only `Guardar cambios` updates `profile_home_group_preset`
-  - do not hardcode preset names, descriptions, group names, order, or limits in the UI.
-
-## Seller Offers Listing
-- The seller `Ofertas` tab is a standalone listing surface, not the classic home layout:
-  - hide the home top navbar and bottom navbar on this route
-  - render the existing back-button + centered-title layout pattern
-  - keep title copy as `Todas mis ofertas` unless product copy changes.
-- The standalone listing header must use the shared top-attached glass header pattern, not a floating card: full width/top coverage, safe-area compensation, and bottom-only rounded corners.
-- Seller offers data should come from `public.get_current_seller_purchase_offers(...)` once that RPC is available.
-- Seller offers search/filter/sort must map to the offers RPC parameters instead of remaining a separate client-only filtering source:
-  - text search -> `p_search_text`
-  - offer creation date range -> `p_start_date` / `p_end_date`
-  - category chips -> `p_category_ids`
-  - currency chips -> `p_currency_ids`
-  - sort radio -> `p_sort_code`
-- Seller offers popup controls must reuse the existing `GlobalPopupHost` visual contract. Do not introduce a custom popup title alignment, missing separator, or alternate sheet spacing for this screen.
-- When seller-offers filters or non-default sort are active, show dismissible applied chips matching the home filter chip pattern.
-- Price sorting for seller offers must be currency-specific; never sort COL and USD offers together as one numeric list.
-- Supported seller-offer price sort codes are:
-  - `price_col_low_to_high`
-  - `price_col_high_to_low`
-  - `price_usd_low_to_high`
-  - `price_usd_high_to_low`
-
-## Favorites Tab
-- The `Favoritas` tab is a standalone list surface like seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
-- The Favorites top bar must follow the shared top-attached glass header pattern used by standalone list screens, not a floating pill/card.
-- Favorites listing data must come from role-specific RPC wrappers:
-  - buyer: `public.get_buyer_purchase_request_favorites(...)`
-  - seller: `public.get_seller_purchase_request_favorites(...)`
-- Favorites search/filter/sort should map to RPC parameters rather than remaining client-side:
-  - text search -> `p_search_text`
-  - favorited date range -> `p_start_date` / `p_end_date`
-  - category chips -> `p_category_ids`
-  - status chips -> `p_status_codes`
-  - sort radio -> `p_sort_code`
-- Expected favorite item payload includes request card fields plus `favorite_id`, `favorited_at`, and `offers_count`.
-- Buyer favorite rows open `/(detail)/purchase-request`; seller favorite rows open `/(conversation)/offer` through `get_or_create_seller_purchase_request_conversation(...)`.
-- Favorites popup controls must reuse `GlobalPopupHost` visual behavior and applied chips, matching seller offers.
-
-## Chats Tab
-- The `Chats` tab is a standalone list surface like `Favoritas` and seller `Ofertas`: hide the shared top navbar, render the back-button + centered-title top bar, and keep the bottom navbar unless product asks otherwise.
-- The Chats top bar must follow the shared top-attached glass header pattern used by standalone list screens, not a floating pill/card.
-- Buyer and seller chat-list data must come from `public.get_current_profile_conversations(...)` through `conversation.service.ts`; do not direct-query `conversation` / `conversation_message` from the screen.
-- Chat-list search/filter inputs map to RPC params:
-  - text search -> `p_search_text`
-  - last-message date range -> `p_start_date` / `p_end_date`
-  - category chips -> `p_category_ids`
-- Do not add status filtering to the chats popup unless the RPC contract changes.
-- Expected chat-list item payload includes `conversation_id`, `display_name`, `business_name`, `buyer_profile_name`/`request_profile_name`, `request_title`, request/category/status metadata, `last_message_text`, `last_message_kind`, `last_message_at`, `unopened_count`, and `has_unopened`.
-- Chat row `display_name` is the counterpart identity: sellers see the buyer profile name; buyers see the seller business name. Do not show generic role labels such as `Comprador` or `Vendedor` when the profile/business name is available.
-- Chat rows open `/(conversation)/offer` with `conversationId` and the purchase request title (`request_title`) as the header title. Do not use `display_name` for the conversation header title.
-- Unopened chats must render before opened chats, then sort by `last_message_at desc`. The app may preserve this ordering client-side, but the RPC is also expected to return that order.
-- The unopened indicator must use the app theme primary color (`t.colors.primary`), not a hardcoded blue. Avatar, text, spacing, search trigger, popup, and applied-chip styling must reuse the existing theme and the `Favoritas`/`Ofertas` standalone-list pattern.
+## Standalone List Tabs
+- Seller `Ofertas`, `Favoritas`, and `Chats` are standalone list surfaces: hide the home top navbar, use the shared top-attached glass header, and follow existing popup/applied-chip patterns.
+- Seller offers data should come from `public.get_current_seller_purchase_offers(...)`; filters/sort map to RPC params, and price sorting must be currency-specific.
+- Favorites data comes from role-specific favorite RPCs. Buyer favorites open purchase-request detail; seller favorites open the seller conversation through the seller-open RPC.
+- Chats data comes from `public.get_current_profile_conversations(...)`; search/date/category filters map to RPC params and status filtering should not be added unless the RPC changes.
+- Chat row `display_name` is counterpart identity; conversation route/header uses `request_title`.
+- Unopened chats render before opened chats, then by `last_message_at desc`; use theme colors and the standalone-list visual pattern.

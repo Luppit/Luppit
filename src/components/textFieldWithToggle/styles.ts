@@ -50,9 +50,7 @@ export function createTextFieldWithToggleStyles(t: Theme): TextFieldWithToggleSt
       borderColor: t.colors.error,
     },
     input: {
-      fontFamily: t.typography.body.fontFamily,
-      fontSize: t.typography.body.fontSize,
-      lineHeight: t.typography.body.lineHeight,
+      ...t.typography.body,
       color: t.colors.textDark,
       ...Platform.select({
         web: {

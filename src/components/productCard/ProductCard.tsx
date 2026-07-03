@@ -113,8 +113,6 @@ export default function ProductCard({
         accessibilityRole="button"
       >
         <View style={s.card}>
-          <View pointerEvents="none" style={s.topSheen} />
-
           <View>
             <Text variant="subtitle" maxLines={1} style={s.title}>
               {title}
