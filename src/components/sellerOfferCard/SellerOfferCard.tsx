@@ -65,7 +65,7 @@ export default function SellerOfferCard({
             <Icon name="user" size={16} color={t.colors.primary} />
             <Text variant="body" maxLines={1} style={{ flex: 1 }}>
               Comprador:{" "}
-              <Text variant="label" style={{ color: t.colors.textDark }}>
+              <Text variant="small" style={{ color: t.colors.textDark }}>
                 {profileName || "Sin nombre"}
               </Text>
             </Text>
@@ -74,7 +74,7 @@ export default function SellerOfferCard({
             <Icon name="tag" size={16} color={t.colors.primary} />
             <Text variant="body" maxLines={1} style={{ flex: 1 }}>
               Tu oferta:{" "}
-              <Text variant="label" style={{ color: t.colors.textDark }}>
+              <Text variant="small" style={{ color: t.colors.textDark }}>
                 {formattedPrice}
               </Text>
             </Text>

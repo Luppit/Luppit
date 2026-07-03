@@ -1,8 +1,8 @@
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
-import { useTheme } from "@/src/themes";
-import React from "react";
-import { View } from "react-native";
+import { Theme, useTheme } from "@/src/themes";
+import React, { useMemo } from "react";
+import { StyleSheet, View } from "react-native";
 import MarketplaceCardFrame from "./MarketplaceCardFrame";
 
 export type MarketplaceRequestCardItem = {
@@ -60,6 +60,7 @@ export default function MarketplaceRequestCard({
   onLongPress,
 }: MarketplaceRequestCardProps) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceRequestCardStyles(t), [t]);
   const reasonLabel = contextLabel?.trim() || item.reason?.label?.trim();
 
   return (
@@ -72,9 +73,9 @@ export default function MarketplaceRequestCard({
       accessibilityLabel={`Abrir ${item.title ?? "solicitud"}`}
       body={
         reasonLabel ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+          <View style={s.reasonRow}>
             <Icon name="sparkles" size={16} color={t.colors.primary} />
-            <Text variant="body" maxLines={compact ? 1 : 2} style={{ flex: 1 }}>
+            <Text variant="body" maxLines={compact ? 1 : 2} style={s.reasonText}>
               {reasonLabel}
             </Text>
           </View>
@@ -90,4 +91,17 @@ export default function MarketplaceRequestCard({
       footerRight={<Icon name="arrow-right" size={18} color={t.colors.textMedium} />}
     />
   );
+}
+
+function createMarketplaceRequestCardStyles(t: Theme) {
+  return StyleSheet.create({
+    reasonRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+    },
+    reasonText: {
+      flex: 1,
+    },
+  });
 }

@@ -307,7 +307,7 @@ function SummaryDetailPill({
         gap: 2,
       }}
     >
-      <Text variant="caption" color="stateAnulated">
+      <Text variant="small" color="stateAnulated">
         {label}
       </Text>
       <Text variant="body" maxLines={2}>
@@ -384,7 +384,7 @@ function OfferSummaryCard({
             gap: t.spacing.md,
           }}
         >
-          <Text variant="label" color="stateAnulated">
+          <Text variant="small" color="stateAnulated">
             Resumen de la oferta
           </Text>
           <Text
@@ -421,7 +421,7 @@ function OfferSummaryCard({
             gap: t.spacing.xs,
           }}
         >
-          <Text variant="caption" color="stateAnulated">
+          <Text variant="small" color="stateAnulated">
             Falta
           </Text>
           <Text variant="body">{missingFields.join(", ")}</Text>
@@ -511,11 +511,11 @@ function ReadyToReviewCard({
         </View>
 
         <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="label" color="textDark">
+          <Text variant="small" color="textDark">
             Oferta lista
           </Text>
           <Text variant="body">Revisa el resumen antes de enviarla</Text>
-          <Text variant="caption" color="stateAnulated">
+          <Text variant="small" color="stateAnulated">
             Confirma precio, entrega y fotos.
           </Text>
         </View>
@@ -539,7 +539,7 @@ function ReadyToReviewCard({
           pressed && !disabled ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : null,
         ]}
       >
-        <Text variant="label" style={{ color: t.colors.backgroudWhite }}>
+        <Text variant="small" style={{ color: t.colors.backgroudWhite }}>
           Revisar resumen
         </Text>
         <Icon name="arrow-right" size={18} color={t.colors.backgroudWhite} />

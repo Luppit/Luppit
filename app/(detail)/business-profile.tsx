@@ -1,4 +1,8 @@
 import { Icon } from "@/src/components/Icon";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { formatLocationLabel } from "@/src/services/location.service";
@@ -12,7 +16,7 @@ import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -110,13 +114,15 @@ export default function BusinessProfileScreen() {
         </View>
       </View>
 
-      <BusinessSection title="Datos generales">
-        <InfoRow label="Nombre comercial" value={business.name || "Sin nombre"} />
-        <InfoRow
+      <GroupedListSection title="Datos generales">
+        <GroupedListRow icon="house" label="Nombre comercial" value={business.name || "Sin nombre"} />
+        <GroupedListRow
+          icon="file-text"
           label="Documento de identificación"
           value={business.idDocument || "Sin documento"}
         />
-        <InfoRow
+        <GroupedListRow
+          icon="map-pin"
           label="Ubicación"
           value={locationLabel}
           onPress={() =>
@@ -130,15 +136,26 @@ export default function BusinessProfileScreen() {
             })
           }
         />
-        <InfoRow label="Fecha de creación" value={formatDate(business.createdAt)} />
-      </BusinessSection>
+        <GroupedListRow
+          icon="info"
+          label="Fecha de creación"
+          value={formatDate(business.createdAt)}
+          showSeparator={false}
+        />
+      </GroupedListSection>
 
-      <BusinessSection title="Reputación">
-        <InfoRow label="Rating del negocio" value={ratingLabel} />
-      </BusinessSection>
+      <GroupedListSection title="Reputación">
+        <GroupedListRow
+          icon="star"
+          label="Rating del negocio"
+          value={ratingLabel}
+          showSeparator={false}
+        />
+      </GroupedListSection>
 
-      <BusinessSection title="Preferencias de oportunidades">
-        <InfoRow
+      <GroupedListSection title="Preferencias de oportunidades">
+        <GroupedListRow
+          icon="tag"
           label="Categorías de venta"
           value={categoryLabel}
           onPress={openCategoryEditor}
@@ -146,71 +163,15 @@ export default function BusinessProfileScreen() {
         {selectedCategories.length === 0 ? (
           <View style={s.emptyCategoryRow}>
             <Text color="stateAnulated">Sin categorías configuradas.</Text>
-            <Text variant="caption" color="stateAnulated">
+            <Text variant="small" color="stateAnulated">
               Toca la fila para elegir dónde quieres recibir oportunidades.
             </Text>
           </View>
         ) : (
           <CategoryPreview preferences={selectedCategories} />
         )}
-      </BusinessSection>
+      </GroupedListSection>
     </ScrollView>
-  );
-}
-
-function BusinessSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessProfileStyles(t), [t]);
-
-  return (
-    <View style={s.section}>
-      <Text variant="subtitle">{title}</Text>
-      <View style={s.rowGroup}>{children}</View>
-    </View>
-  );
-}
-
-function InfoRow({
-  label,
-  value,
-  onPress,
-}: {
-  label: string;
-  value: string;
-  onPress?: () => void;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessProfileStyles(t), [t]);
-  const content = (
-    <>
-      <View style={s.rowText}>
-        <Text>{label}</Text>
-        <Text color="stateAnulated" maxLines={2}>
-          {value}
-        </Text>
-      </View>
-      {onPress ? <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} /> : null}
-    </>
-  );
-
-  if (onPress) {
-    return (
-      <Pressable accessibilityRole="button" onPress={onPress} style={s.row}>
-        {content}
-      </Pressable>
-    );
-  }
-
-  return (
-    <View style={s.row}>
-      {content}
-    </View>
   );
 }
 
@@ -230,14 +191,14 @@ function CategoryPreview({
         {visiblePreferences.map((preference) => (
           <View key={preference.categoryId} style={s.previewChip}>
             <Icon name="tag" size={14} color={t.colors.secondary} />
-            <Text variant="caption" maxLines={1} style={s.previewChipLabel}>
+            <Text variant="small" maxLines={1} style={s.previewChipLabel}>
               {preference.categoryName}
             </Text>
           </View>
         ))}
         {hiddenCount > 0 ? (
           <View style={s.previewChip}>
-            <Text variant="caption" style={s.previewChipLabel}>
+            <Text variant="small" style={s.previewChipLabel}>
               +{hiddenCount}
             </Text>
           </View>
@@ -328,39 +289,17 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
       flex: 1,
       gap: t.spacing.xs,
     },
-    section: {
-      gap: t.spacing.sm,
-    },
-    rowGroup: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-    },
-    row: {
-      minHeight: 64,
-      paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-    },
-    rowText: {
-      flex: 1,
-      gap: 2,
-    },
     emptyCategoryRow: {
       minHeight: 64,
-      paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.md,
       justifyContent: "center",
       gap: 2,
     },
     previewRow: {
       minHeight: 56,
-      paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.md,
       justifyContent: "center",
     },
     previewChips: {

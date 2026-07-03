@@ -3,63 +3,21 @@
 ## Scope
 Applies to purchase-request detail screens, selected-offer timeline behavior, and account-setting detail screens.
 
-## Purchase Request Detail: DB-Driven Contract (Mandatory)
-- Purchase-request detail may be opened from grouped buyer-home RPC items; the route must continue to work when the incoming serialized `purchaseRequest` payload contains the UI-required purchase-request fields but not extra enrichment.
-- Grouped home payloads may now include `status_label` for card presentation, but detail-screen logic must continue using raw `purchase_request.status`.
-- Purchase-request detail visualization count must reflect `purchase_request_visualization` rows for that request; do not infer it from stale card params or local counters.
-- `purchase_request.status` controls offer list mode:
-  - `active`: render active offers returned by `public.get_buyer_purchase_request_offers(...)` and the count label (`Ofertas (n)`).
-  - `offer_accepted`: render only the accepted offer and label `Oferta seleccionada`.
-- Buyer detail offer lists must remain DB-filtered through `public.get_buyer_purchase_request_offers(...)`; the RPC should exclude offers whose linked conversation is discarded, rejected, canceled, or otherwise inactive instead of filtering those states in client code.
-- Accepted offer resolution must come from DB-backed conversation data (acceptance transition), not local heuristics.
-- Offer timeline must come from `public.get_conversation_timeline(...)`.
-- Seller reputation shown on offer cards must come from the DB-backed rating view/summary relation (`business_with_rating` or equivalent), not from removed `business.rating` / `business.num_ratings` columns.
-- Purchase-offer card overflow menus inside buyer purchase-request detail must not show `Añadir como favorito`; favorites apply to purchase requests through the detail/home request menus, not individual offer cards.
-- Buyer purchase-request detail ellipsis favorite state must come from buyer favorite RPC state, not from route params or local-only assumptions.
-- The detail ellipsis favorite option must toggle copy/icon by current state:
-  - not favorited: `Añadir como favorito` with `star`
-  - favorited: `Quitar de favoritos` with `star-off`
-- Detail favorite actions must call the buyer add/remove favorite RPC wrappers and update local presentation only after the RPC result.
-- UI must consume timeline row metadata directly:
-  - `label`
-  - `icon`
-  - `reached_at_label`
-  - `is_next`
-  - `is_completed`
-  - `pre_label`
+## Purchase Request Detail
+- Detail routes must work from grouped buyer-home RPC items even when serialized params contain only UI-required request fields.
+- Use raw `purchase_request.status` for detail logic; grouped card `status_label` is presentation copy only.
+- Visualization counts, buyer offer lists, accepted-offer resolution, and selected-offer timeline must be DB-backed.
+- `active` requests render active offers from `public.get_buyer_purchase_request_offers(...)`; `offer_accepted` renders only the accepted offer and label `Oferta seleccionada`.
+- Offer timeline comes from `public.get_conversation_timeline(...)`; render row `label`, `icon`, `reached_at_label`, `is_next`, `is_completed`, and `pre_label` directly.
+- Seller reputation on offer cards comes from DB-backed rating views/summaries, not legacy `business.rating` fields.
+- Purchase-offer overflow menus must not expose request favorite actions; request favorite state/actions belong to the detail ellipsis and role-specific favorite RPCs.
+- Unknown timeline icons may fall back safely, but do not hardcode timeline ordering or pending text when DB metadata exists.
 
-## Implementation Rules
-- Do not hardcode conversation-state ordering in client code when timeline RPC exists.
-- Do not hardcode pending prefix text when `pre_label` is provided by DB.
-- If icon key is unknown, apply safe icon fallback (`circle-help`) without breaking render.
-- Timeline styling is presentation-only; product logic (which steps exist, completion, next step) is DB-resolved.
-
-## Account Settings Detail Screens
-- Account settings detail routes are not purchase-request detail routes; hide the purchase-request ellipsis/menu on these routes.
-- `/(detail)/account-settings` should display profile/account fields from `profile.service.ts` and route edits to dedicated flows.
-- `/(detail)/account-settings` must resolve the current role itself because detail routes can render outside the tab `RoleProvider`; do not leave buyer/seller rows blocked behind tab-only context.
-- `/(detail)/notifications` is the profile notification inbox:
-  - use the shared detail top bar with `hideMenu=true`; do not create a custom notification header.
-  - load notifications through `notification.service.ts`, ordered newest first.
-  - on successful screen open/load, call the mark-all-read RPC through the service when any loaded item is unread; do not mark notifications read from row press alone.
-  - keep notification rows compact with only a bottom separator, a leading unread dot when `readAt` is null, a type icon/tone, catalog label title, two-line message preview, timestamp, and a muted chevron.
-  - tapping a row opens the existing shared `GlobalPopupHost` summary sheet with the full message as plain description text, `Recibida` metadata, and `Listo` action; do not wrap the message in an input/control-like box.
-  - empty state should stay quiet and centered (`Sin notificaciones` plus explanatory copy), with no CTA unless product adds a real notification-management flow.
-- `/(detail)/home-preset` is the buyer/seller home preset chooser:
-  - load options from active preset metadata for the current surface (`buyer_home` or `seller_home`)
-  - render a visual blueprint from DB group names/order/max-items
-  - keep selection local until the user taps `Guardar cambios`
-  - save through the profile service upsert into `profile_home_group_preset`.
-- Do not make preset preview destructive by temporarily changing the user's actual assignment.
-- `/(detail)/business-profile` is the seller business information surface:
-  - show general business data resolved from the seller's `profile_business` membership
-  - show current business location from `business.location_id -> location`
-  - make the `Ubicación` row actionable and route edits to `/(modal)/business-location-edit`; do not edit business location inline in this screen.
-  - show business rating from `business_rating_summary`
-  - load editable category options from `category`
-  - show current preferences from `business_category_preference`
-  - keep category add/remove changes local until `Guardar cambios`
-  - save category changes through `profile.service.ts` using `set_current_business_category_preferences`.
-- Business location editing uses a dedicated modal with dependent province -> canton -> district selection from active `location` rows; save only a district-level `location.id` through `profile.service.ts` using `set_current_business_location`.
-- If the current business location is missing from active selectable locations, the modal must show that the saved location is no longer available and require selecting a valid district before saving.
-- Business categories belong on `/(detail)/business-profile`; do not duplicate them as a seller main-profile metric card.
+## Account Details
+- Detail help/settings/profile-adjacent surfaces should follow the soft grouped-list style in `src/components/AGENTS.md`.
+- Account-setting detail routes are not purchase-request details; hide the purchase-request ellipsis/menu.
+- `/(detail)/account-settings` loads profile/account fields through `profile.service.ts` and resolves role itself because tab role context may be unavailable.
+- `/(detail)/notifications` uses the shared detail top bar with `hideMenu=true`, loads through `notification.service.ts`, marks loaded unread notifications read through the service RPC on open, and shows full message text through the shared popup.
+- `/(detail)/home-preset` loads active preset metadata for the current surface, previews DB group names/order/max-items locally, and saves through `profile_home_group_preset` only on `Guardar cambios`.
+- `/(detail)/business-profile` resolves seller business data through `profile_business`, reads location from `business.location_id -> location`, shows rating from `business_rating_summary`, and edits category preferences through `set_current_business_category_preferences`.
+- Business location editing belongs in `/(modal)/business-location-edit`, uses active `location` rows, and saves only a valid district `location.id` through `set_current_business_location`.

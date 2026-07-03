@@ -1,8 +1,8 @@
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Text } from "@/src/components/Text";
-import { useTheme } from "@/src/themes";
-import React, { ReactNode, useRef } from "react";
-import { Pressable, View } from "react-native";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
+import { Theme, useTheme } from "@/src/themes";
+import React, { ReactNode, useMemo, useRef } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 
 type MarketplaceCardFrameProps = {
   title: string;
@@ -28,27 +28,17 @@ export default function MarketplaceCardFrame({
   accessibilityLabel,
 }: MarketplaceCardFrameProps) {
   const t = useTheme();
+  const s = useMemo(() => createMarketplaceCardFrameStyles(t, compact), [compact, t]);
   const didLongPressRef = useRef(false);
 
   const card = (
-    <GlassSurface
-      variant="surface"
-      highlight
-      style={{ borderRadius: 18 }}
-      contentStyle={{
-        minHeight: compact ? 154 : 142,
-        borderRadius: 18,
-        padding: t.spacing.md,
-        justifyContent: "space-between",
-        gap: t.spacing.md,
-      }}
-    >
-      <View style={{ gap: 4 }}>
-        <Text variant="subtitle" maxLines={2}>
+    <View style={s.card}>
+      <View style={s.heading}>
+        <Text variant="body" maxLines={2} style={s.title}>
           {title}
         </Text>
         {subtitle ? (
-          <Text variant="body" color="stateAnulated" maxLines={1}>
+          <Text variant="small" color="stateAnulated" maxLines={1}>
             {subtitle}
           </Text>
         ) : null}
@@ -57,19 +47,12 @@ export default function MarketplaceCardFrame({
       {body}
 
       {footerLeft || footerRight ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: t.spacing.sm,
-          }}
-        >
-          <View style={{ flex: 1, minWidth: 0 }}>{footerLeft}</View>
+        <View style={s.footer}>
+          <View style={s.footerLeft}>{footerLeft}</View>
           {footerRight}
         </View>
       ) : null}
-    </GlassSurface>
+    </View>
   );
 
   if (!onPress && !onLongPress) return card;
@@ -96,13 +79,46 @@ export default function MarketplaceCardFrame({
           didLongPressRef.current = false;
         }, 0);
       }}
-      style={({ pressed }) => ({
-        width: compact ? 270 : "100%",
-        opacity: pressed ? 0.88 : 1,
-        transform: [{ scale: pressed ? 0.985 : 1 }],
-      })}
+      style={({ pressed }) => [
+        s.pressable,
+        {
+          opacity: pressed ? 0.88 : 1,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
+      ]}
     >
       {card}
     </Pressable>
   );
+}
+
+function createMarketplaceCardFrameStyles(t: Theme, compact: boolean) {
+  return StyleSheet.create({
+    card: {
+      minHeight: compact ? 154 : 142,
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
+      justifyContent: "space-between",
+      gap: t.spacing.md,
+    },
+    heading: {
+      gap: 4,
+    },
+    title: {
+      color: t.colors.textDark,
+    },
+    footer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: t.spacing.sm,
+    },
+    footerLeft: {
+      flex: 1,
+      minWidth: 0,
+    },
+    pressable: {
+      width: compact ? 270 : "100%",
+    },
+  });
 }

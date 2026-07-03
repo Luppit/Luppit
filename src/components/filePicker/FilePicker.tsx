@@ -119,8 +119,8 @@ export default function FilePicker({
             <View style={s.emptyIconWrapper}>
               <Icon name="folder-closed" size={16} color={t.colors.textDark} />
             </View>
-            <Text variant="caption" style={s.emptyText} align="center">
-              <Text variant="caption" style={s.highlightText}>
+            <Text variant="small" style={s.emptyText} align="center">
+              <Text variant="small" style={s.highlightText}>
                 Presiona aquí
               </Text>{" "}
               para agregar imágenes.
@@ -160,7 +160,7 @@ export default function FilePicker({
                       color={t.colors.textMedium}
                     />
                     <Text
-                      variant="caption"
+                      variant="small"
                       maxLines={2}
                       style={s.fileFallbackText}
                     >

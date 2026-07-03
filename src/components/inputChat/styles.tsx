@@ -66,9 +66,7 @@ export function createInputChatStyles(t: Theme): InputChatStyles {
 
     textInput: {
       width: "100%",
-      fontFamily: t.typography.body.fontFamily,
-      fontSize: t.typography.body.fontSize,
-      lineHeight: t.typography.body.lineHeight,
+      ...t.typography.body,
       color: t.colors.textDark,
       paddingTop: 11,
       paddingBottom: 11,

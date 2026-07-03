@@ -337,13 +337,13 @@ export default function Signup() {
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
       <View style={styles.footer} pointerEvents="box-none">
-        <Text variant="caption" align="center">
+        <Text variant="small" align="center">
           Al ingresar tu número, aceptas automáticamente los
         </Text>
         <Link href="https://google.com">
           <Text
-            variant="caption"
-            style={{ textDecorationLine: "underline", fontWeight: "bold" }}
+            variant="small"
+            style={{ textDecorationLine: "underline" }}
           >
             Términos y condiciones
           </Text>

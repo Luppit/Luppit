@@ -212,10 +212,10 @@ function PresetBlueprintGroup({ group }: { group: HomePresetPreviewGroup }) {
   return (
     <View style={s.previewGroup}>
       <View style={s.previewGroupHeader}>
-        <Text variant="label" maxLines={1} style={s.previewGroupName}>
+        <Text variant="small" maxLines={1} style={s.previewGroupName}>
           {group.name}
         </Text>
-        <Text variant="caption" color="stateAnulated">
+        <Text variant="small" color="stateAnulated">
           Máx. {group.maxItems}
         </Text>
       </View>

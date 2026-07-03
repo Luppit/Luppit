@@ -158,7 +158,7 @@ export default function OfferCard({
                           {step.reached_at_label?.trim() || step.reached_at}
                         </Text>
                       ) : null}
-                      <Text variant="label">{step.label}</Text>
+                      <Text variant="small">{step.label}</Text>
                     </View>
                   </View>
                 );
@@ -205,7 +205,7 @@ export default function OfferCard({
             }}
           >
             <Icon name="message-circle" size={18} color={t.colors.backgroudWhite} />
-            <Text variant="label" maxLines={1} style={{ color: t.colors.backgroudWhite }}>
+            <Text variant="small" maxLines={1} style={{ color: t.colors.backgroudWhite }}>
               {connectLabel}
             </Text>
           </Pressable>

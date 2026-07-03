@@ -43,9 +43,7 @@ export function createTextAreaStyles(t: Theme): TextAreaStyles {
     input: {
       flex: 1,
       textAlignVertical: "top",
-      fontFamily: t.typography.body.fontFamily,
-      fontSize: t.typography.body.fontSize,
-      lineHeight: t.typography.body.lineHeight,
+      ...t.typography.body,
       color: t.colors.textDark,
       ...Platform.select({
         web: {

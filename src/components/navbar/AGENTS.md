@@ -3,57 +3,21 @@
 ## Scope
 Applies to navbar UI components and rendering behavior.
 
-## Navbar: DB-Driven Contract (Mandatory)
-- Bottom navbar items must be loaded from DB using the authenticated user profile, not hardcoded arrays in client code.
-- Role resolution for navbar must come from `profile_role -> role` in DB.
-- Menu definitions must come from `menu_item` and role assignment/order from `role_menu`.
-- Runtime fetch must use RPC `public.get_navbar_items_by_profile(p_profile_id uuid)`.
-- The client must render returned `label`, `route`, `icon`, and `sort_order` directly from RPC payload.
-- If RPC returns unknown icon keys, the client may omit icon rendering safely; it must not replace business behavior with hardcoded per-role menus.
-- No hardcoded buyer/seller navbar fallback is allowed.
+## DB-Driven Navbar
+- Bottom navbar items must come from `public.get_navbar_items_by_profile(p_profile_id uuid)`, using DB role/menu metadata. No hardcoded buyer/seller menu fallback.
+- Render returned `label`, `route`, `icon`, and `sort_order` directly; unknown icon keys may be omitted safely.
+- Top horizontal segment chips come from `segment`; render `name`, `svg_name`, and `is_disabled`.
+- Segment icons resolve to `assets/segments/{svg_name}.svg`; `svg_name='todas'` clears segment narrowing in home RPC wrappers.
+- Segment selection state is shared through `segment.service.ts`, not navbar-local state.
 
-## Top Navbar Segments: DB-Driven Contract (Mandatory)
-- Top horizontal segment chips (buyer and seller home) must be loaded from DB table `segment`.
-- Segment labels must render from `segment.name`.
-- Segment icon identity must render from `segment.svg_name`, resolved against bundled assets at `assets/segments/{svg_name}.svg`.
-- `segment.is_disabled=true` must render segment as disabled (greyed out) and non-clickable.
-- No hardcoded segment list fallback is allowed.
-- Segment chips are separate DB configuration from home-group presets. They now drive DB-backed buyer/seller home filtering through shared selected-segment state and home RPC `p_segment_svg_name`.
-- `segment.svg_name = 'todas'` means all segments and must clear segment narrowing in the RPC wrapper.
-- Segment selection state must be shared through `segment.service.ts`; do not keep segment selection as navbar-only local state.
-- Home request-card status labels are also DB-driven, but they come from the home RPC item payload (`status_label`), not from `segment` data.
-- The large home search control is a visual trigger, not a free-typing search field, on buyer/seller home routes.
-- Current home trigger behavior:
-  - buyer: opens a `Filtros` popup for buyer-home filtering
-  - seller: opens a `Filtros` popup for seller-home filtering
-- Buyer filter popup content should follow existing popup/theme patterns and currently includes:
-  - request-name field
-  - date-range fields
-  - status chips
-- Seller filter popup content should follow existing popup/theme patterns and currently includes:
-  - request-name field
-  - date-range fields
-  - seller category chips
-  - seller interaction-state chips
-- Buyer status filter options should prefer `purchase_request_status_ui` and may fall back safely to buyer-home RPC `status/status_label` values when needed for resilience.
-- Buyer status filter chips may carry `style_code` metadata for option identity, but the popup filter chips should stay plain text chips without status-color dots; colored status dots are reserved for request cards.
-- Seller category filter chips are currently derived from the seller-home RPC item payload for the active segment (`category_id` / `category_name`) and deduplicated client-side; this means only categories represented in visible returned home items are shown.
-- Seller interaction-state chips use stable client labels (`Sin abrir`, `En gestión`, `Descartadas`) mapped to DB-filter values (`new`, `opened`, `discarded`); do not use raw purchase-request lifecycle status for this seller filter.
-- When buyer-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
-- When seller-home filters are active, the navbar should show a dismissible applied-filter chip using localized label `Filtros (1)`.
-- The profile name row in the top navbar is a profile-switcher trigger, not a no-op. It should open the shared popup profile switcher using device-saved profile payloads.
-- Profile switcher presses should be ignored for the active profile. Pressing a non-active profile should set pending switch state, sign out, and route to `/(auth)/login` with that profile's phone and `autoSendOtp=true`.
-- Do not keep saved-profile switcher state as navbar-only local state. Persist saved profile payloads through `saved.profile.service.ts` and use `profile.switch.service.ts` only as the transient handoff during sign-out/login routing.
+## Home Header Behavior
+- The large home search control is a visual trigger, not a free-typing search field.
+- Buyer/seller filter popups should drive home RPC params through shared state, not client-only filtering.
+- Applied filters should show a dismissible localized chip such as `Filtros (1)`.
+- Profile name row opens the shared profile-switcher popup. Active profile presses are ignored; non-active presses start sign-out plus the existing OTP login handoff.
+- Saved profile state belongs to `saved.profile.service.ts`; `profile.switch.service.ts` is only the transient sign-out/login handoff.
 
-## Implementation Rules
-- Do not define static buyer/seller navbar lists in app code.
-- Do not hardcode role-to-menu mapping in client logic when `role_menu` exists.
-- Do not define static top-navbar segment arrays in app code when `segment` exists.
-- Top-navbar chrome must use the shared glass system (`GlassSurface` + `t.glass.chrome/control/chip`) instead of local shadows, borders, or translucent colors.
-- The home top navbar is a top-attached glass header: it should extend through the safe-area/status region and full screen sides, with only bottom corners rounded.
-- Keep the top-navbar search trigger as the lighter `control` material inside the `chrome` header; avoid stacking full `chrome` surfaces inside other `chrome` surfaces.
-- Load navbar config after session/profile resolution and render DB order (`sort_order`).
-- Keep client behavior presentation-only (active state, press handling, accessibility).
-- Do not convert the home search trigger back into a standalone local text input on home routes unless product requirements change.
-- Do not change shared popup sheet layout/keyboard behavior just to add buyer/seller filter fields; pass filter config into `GlobalPopupHost` and keep popup visual behavior consistent unless the product explicitly asks for a popup redesign.
-- Do not implement a custom profile-switcher sheet in navbar components; pass a `profileSwitcher` popup config to `GlobalPopupHost` so it keeps the shared bottom-sheet behavior.
+## Visual Rules
+- Top-navbar chrome must use shared glass (`GlassSurface` + `t.glass.chrome/control/chip`) and attach through the safe area with only bottom corners rounded.
+- Keep client behavior presentation-only: active state, press handling, accessibility, and popup config.
+- Do not build custom popup sheets in navbar components; pass configs to `GlobalPopupHost`.

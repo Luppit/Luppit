@@ -140,11 +140,10 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
                   ></ProgressCircle>
                   <View style={s.header.contentInfo}>
                     <Text variant="subtitle">{current.title}</Text>
-                    <Text variant="caption" color="stateAnulated">
+                    <Text variant="small" color="stateAnulated">
                       <Text
-                        variant="caption"
+                        variant="small"
                         color="stateAnulated"
-                        style={{ fontWeight: "bold" }}
                       >
                         Siguiente paso:{" "}
                       </Text>
@@ -216,7 +215,7 @@ function ProgressCircle({
         />
       </Svg>
       <View style={s.circle.counterCenter}>
-        <Text variant="caption">
+        <Text variant="small">
           {currentStep} / {totalSteps}
         </Text>
       </View>

@@ -6,6 +6,7 @@ import { getSession } from "@/src/lib/supabase";
 import { supabase } from "@/src/lib/supabase/client";
 import {
   clearBuyerHomeFilters,
+  countBuyerHomeFilterGroups,
   getBuyerHomeFilters,
   hasBuyerHomeFilters,
   setBuyerHomeFilters,
@@ -13,6 +14,7 @@ import {
 } from "@/src/services/buyer.home.filters.service";
 import {
   clearSellerHomeFilters,
+  countSellerHomeFilterGroups,
   getSellerHomeFilters,
   hasSellerHomeFilters,
   SellerHomeInteractionState,
@@ -64,6 +66,7 @@ const segmentSvgModules: Record<string, number> = {
   muebles: require("../../../assets/segments/muebles.svg"),
   plantas: require("../../../assets/segments/plantas.svg"),
   herramientas: require("../../../assets/segments/herramientas.svg"),
+  cosmeticos: require("../../../assets/segments/cosmeticos.svg"),
 };
 
 const SELLER_INTERACTION_OPTIONS: {
@@ -297,8 +300,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
         type: "filters",
         title: "Filtros",
         searchField: {
-          label: "Nombre de la solicitud",
-          placeholder: "Buscar",
+          label: "Buscar solicitud",
+          placeholder: "Nombre, detalle, categoría o estado",
           initialValue: homeFilters.searchValue,
         },
         dateRangeField: {
@@ -335,8 +338,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       type: "filters",
       title: "Filtros",
       searchField: {
-        label: "Nombre de la solicitud",
-        placeholder: "Buscar",
+        label: "Buscar oportunidad",
+        placeholder: "Nombre, detalle, categoría o estado",
         initialValue: sellerHomeFilters.searchValue,
       },
       dateRangeField: {
@@ -505,6 +508,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     !shouldBlockHomeControls &&
     role === "seller" &&
     hasSellerHomeFilters(sellerHomeFilters);
+  const buyerFilterCount = countBuyerHomeFilterGroups(homeFilters);
+  const sellerFilterCount = countSellerHomeFilterGroups(sellerHomeFilters);
 
   return (
     <GlassSurface
@@ -539,7 +544,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
             <View style={s.activeFilterChip}>
               <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
               <Text variant="body" style={s.activeFilterChipLabel}>
-                Filtros (1)
+                Filtros ({buyerFilterCount})
               </Text>
               <Pressable style={s.activeFilterChipClose} onPress={clearBuyerHomeFilters}>
                 <Icon name="x" size={16} color={t.colors.textDark} />
@@ -551,7 +556,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
             <View style={s.activeFilterChip}>
               <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
               <Text variant="body" style={s.activeFilterChipLabel}>
-                Filtros (1)
+                Filtros ({sellerFilterCount})
               </Text>
               <Pressable style={s.activeFilterChipClose} onPress={clearSellerHomeFilters}>
                 <Icon name="x" size={16} color={t.colors.textDark} />
@@ -583,6 +588,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           return (
             <Pressable
               key={segment.svgName}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected, disabled: shouldBlockHomeControls || segment.isDisabled }}
               disabled={shouldBlockHomeControls || segment.isDisabled}
               onPress={() => {
                 if (shouldBlockHomeControls || segment.isDisabled) return;
@@ -616,10 +623,12 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
                 )}
               </View>
               <Text
+                variant="small"
                 color={
                   shouldBlockHomeControls || segment.isDisabled ? "IconColorGray" : "textDark"
                 }
-                style={[isSelected && s.categoryLabelActive]}
+                maxLines={1}
+                style={isSelected ? s.categoryLabelSelected : null}
               >
                 {segment.name}
               </Text>

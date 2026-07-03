@@ -458,7 +458,7 @@ export default function GlobalPopupHost() {
                       accessibilityRole={hasAnswer ? "button" : undefined}
                       accessibilityState={hasAnswer ? { expanded: isExpanded } : undefined}
                     >
-                      <Text variant="subtitleRegular" style={s.helperSectionTitle}>
+                      <Text variant="body" style={s.helperSectionTitle}>
                         {title}
                       </Text>
                       {hasAnswer ? (
@@ -697,7 +697,7 @@ export default function GlobalPopupHost() {
 
                       {filterConfig.searchField ? (
                         <View style={s.filterSection}>
-                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                          <Text variant="small">
                             {filterConfig.searchField.label}
                           </Text>
                           <TextField
@@ -713,7 +713,7 @@ export default function GlobalPopupHost() {
 
                       {filterConfig.dateRangeField ? (
                         <View style={s.filterSection}>
-                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                          <Text variant="small">
                             {filterConfig.dateRangeField.label}
                           </Text>
                           <View style={s.filterDateRow}>
@@ -752,7 +752,7 @@ export default function GlobalPopupHost() {
 
                       {filterConfig.chipGroup ? (
                         <View style={s.filterSection}>
-                          <Text variant="subtitleRegular" style={s.filterLabel}>
+                          <Text variant="small">
                             {filterConfig.chipGroup.label}
                           </Text>
                           <View style={s.filterChipsRow}>
@@ -790,7 +790,7 @@ export default function GlobalPopupHost() {
 
                         return (
                           <View key={groupId} style={s.filterSection}>
-                            <Text variant="subtitleRegular" style={s.filterLabel}>
+                            <Text variant="small">
                               {group.label}
                             </Text>
                             <View style={s.filterChipsRow}>
@@ -917,7 +917,7 @@ export default function GlobalPopupHost() {
                             accessibilityRole="button"
                           >
                             <View style={s.profileSwitcherAvatar}>
-                              <Text variant="body" maxLines={1} style={s.profileSwitcherInitials}>
+                              <Text variant="subtitle" maxLines={1} style={s.profileSwitcherInitials}>
                                 {getInitials(profile.title)}
                               </Text>
                             </View>

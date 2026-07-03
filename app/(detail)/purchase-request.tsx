@@ -1,5 +1,8 @@
-import HintModal from "@/src/components/hintModal/HintModal";
 import { Icon } from "@/src/components/Icon";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import OfferCard, {
   OfferCardTimelineItem,
@@ -20,13 +23,14 @@ import {
   getPurchaseRequestById,
   PurchaseRequest,
 } from "@/src/services/purchase.request.service";
-import { useTheme } from "@/src/themes";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
+import { Theme, useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { Image } from "expo-image";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgUri } from "react-native-svg";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
@@ -100,7 +104,11 @@ function getBuyerOfferSortLabel(sortId: string) {
 export default function PurchaseRequestDetailScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const [showCategoryHint, setShowCategoryHint] = useState(false);
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createPurchaseRequestDetailStyles(t, topContentInset),
+    [t, topContentInset]
+  );
   const [offers, setOffers] = useState<PurchaseOfferCardData[]>([]);
   const [filterOptionsSource, setFilterOptionsSource] = useState<
     PurchaseOfferCardData[]
@@ -129,6 +137,8 @@ export default function PurchaseRequestDetailScreen() {
   const purchaseRequestId = purchaseRequest?.id ?? "";
   const isAcceptedRequest =
     (purchaseRequest?.status ?? "").trim().toLowerCase() === "offer_accepted";
+  const isCanceledRequest =
+    (purchaseRequest?.status ?? "").trim().toLowerCase() === "canceled";
   const offersCount = offers.length;
   const noOffersAsset = Asset.fromModule(
     require("../../assets/images/no_offers_request.svg"),
@@ -206,6 +216,12 @@ export default function PurchaseRequestDetailScreen() {
         return;
       }
 
+      if (isCanceledRequest) {
+        setOffers([]);
+        setOffersLoading(false);
+        return;
+      }
+
       setOffersLoading(true);
       const result = await getCurrentBuyerPurchaseRequestOffers(
         purchaseRequestId,
@@ -225,13 +241,18 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [filters, isAcceptedRequest, purchaseRequestId, selectedSortId]);
+  }, [filters, isAcceptedRequest, isCanceledRequest, purchaseRequestId, selectedSortId]);
 
   useEffect(() => {
     let active = true;
 
     const loadFilterOptions = async () => {
       if (!purchaseRequestId) {
+        setFilterOptionsSource([]);
+        return;
+      }
+
+      if (isCanceledRequest) {
         setFilterOptionsSource([]);
         return;
       }
@@ -249,13 +270,13 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [purchaseRequestId]);
+  }, [isCanceledRequest, purchaseRequestId]);
 
   useEffect(() => {
     let active = true;
 
     const resolveSelectedOffer = async () => {
-      if (!isAcceptedRequest) {
+      if (!isAcceptedRequest || isCanceledRequest) {
         setSelectedOfferId(null);
         setSelectedOfferTimeline([]);
         setSelectedOfferLoading(false);
@@ -312,7 +333,7 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [isAcceptedRequest, purchaseRequestId]);
+  }, [isAcceptedRequest, isCanceledRequest, purchaseRequestId]);
 
   const openOfferConversation = async (purchaseOfferId: string) => {
     if (!purchaseRequest) return;
@@ -325,6 +346,19 @@ export default function PurchaseRequestDetailScreen() {
       params: {
         conversationId: conversation.data.id,
         title: purchaseRequest.title ?? "Conversación",
+      },
+    });
+  };
+
+  const openCategoryInfo = () => {
+    if (!purchaseRequestId) return;
+
+    router.push({
+      pathname: "/(detail)/category-info",
+      params: {
+        title: "Información de categoría",
+        hideMenu: "true",
+        purchaseRequestId,
       },
     });
   };
@@ -400,15 +434,7 @@ export default function PurchaseRequestDetailScreen() {
 
   if (!purchaseRequest) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          paddingTop: insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT,
-          paddingHorizontal: t.spacing.lg,
-        }}
-      >
+      <View style={s.centerState}>
         <Text align="center" color="stateAnulated">
           No encontramos esta solicitud.
         </Text>
@@ -419,80 +445,68 @@ export default function PurchaseRequestDetailScreen() {
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingTop: insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT + t.spacing.md,
-        paddingBottom: t.spacing.xl,
-      }}
+      contentContainerStyle={s.content}
     >
-      <View style={{ flex: 1 }}>
-        <View>
-          <Text variant="body">{purchaseRequest.summary_text ?? ""}</Text>
-        </View>
+      <View style={s.body}>
+        <View style={s.summaryCard}>
+          <Text variant="body" color="textMedium">
+            {purchaseRequest.summary_text ?? ""}
+          </Text>
 
-        <View
-          style={{
-            marginTop: t.spacing.lg,
-            alignItems: "flex-end",
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            gap: t.spacing.xs,
-          }}
-        >
-          <Text color="stateAnulated">Visualizaciones:</Text>
-          <Icon name="eye" size={20} color={t.colors.stateAnulated} />
-          <Text color="stateAnulated">{String(viewsCount)}</Text>
-        </View>
-
-        <View
-          style={{
-            borderBottomWidth: 1,
-            borderBottomColor: t.colors.border,
-            marginTop: t.spacing.md,
-          }}
-        />
-
-        <View style={{ marginTop: t.spacing.lg, gap: t.spacing.sm }}>
-          <Text variant="subtitle">Categoría:</Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: t.spacing.xs,
-            }}
-          >
-            <Text variant="titleRegular">{purchaseRequest.category_name ?? "-"}</Text>
-            <Pressable hitSlop={8} onPress={() => setShowCategoryHint(true)}>
-              <Icon name="info" size={18} color={t.colors.primary} />
-            </Pressable>
+          <View style={s.viewsRow}>
+            <Text color="stateAnulated">Visualizaciones</Text>
+            <Icon name="eye" size={20} color={t.colors.stateAnulated} />
+            <Text color="stateAnulated">{String(viewsCount)}</Text>
           </View>
         </View>
 
-        <View
-          style={{
-            borderBottomWidth: 1,
-            borderBottomColor: t.colors.border,
-            marginTop: t.spacing.lg,
-          }}
-        />
-
-        <View style={{ marginTop: t.spacing.md }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: isAcceptedRequest ? "flex-start" : "space-between",
-            }}
-          >
-            <Text color="stateAnulated" variant="subtitle">
-              {isAcceptedRequest ? "Oferta seleccionada" : `Ofertas (${offersCount}):`}
+        {isCanceledRequest ? (
+          <View style={s.canceledCard}>
+            <View style={s.statusTitleRow}>
+              <Icon name="x-circle" size={20} color={t.colors.stateCanceled} />
+              <Text variant="subtitle" style={s.canceledTitle}>
+                Solicitud cancelada
+              </Text>
+            </View>
+            <Text color="stateAnulated">
+              Puedes revisar la información de esta solicitud, pero ya no está
+              disponible para recibir ofertas o continuar conversaciones.
             </Text>
-            {!isAcceptedRequest ? (
-              <View style={{ flexDirection: "row", gap: t.spacing.sm }}>
+          </View>
+        ) : null}
+
+        <GroupedListSection title="Categoría">
+          <GroupedListRow
+            icon="tag"
+            label={purchaseRequest.category_name ?? "Sin categoría"}
+            description="Ver cómo Luppit usa esta categoría"
+            showSeparator={false}
+            onPress={openCategoryInfo}
+          />
+        </GroupedListSection>
+
+        <View style={s.offersSection}>
+          <View
+            style={[
+              s.offerHeader,
+              isAcceptedRequest ? s.offerHeaderAccepted : null,
+            ]}
+          >
+            <Text color="textMedium" variant="small" style={s.offerHeaderTitle}>
+              {isCanceledRequest
+                ? "Ofertas cerradas"
+                : isAcceptedRequest
+                  ? "Oferta seleccionada"
+                  : `Ofertas (${offersCount}):`}
+            </Text>
+            {!isAcceptedRequest && !isCanceledRequest ? (
+              <View style={s.offerHeaderActions}>
                 <Pressable
                   hitSlop={10}
                   onPress={openFiltersPopup}
                   accessibilityRole="button"
                   accessibilityLabel="Filtrar ofertas"
+                  style={s.offerIconButton}
                 >
                   <Icon
                     name="sliders-horizontal"
@@ -505,6 +519,7 @@ export default function PurchaseRequestDetailScreen() {
                   onPress={openSortPopup}
                   accessibilityRole="button"
                   accessibilityLabel="Ordenar ofertas"
+                  style={s.offerIconButton}
                 >
                   <Icon
                     name="arrow-up-down"
@@ -516,44 +531,16 @@ export default function PurchaseRequestDetailScreen() {
             ) : null}
           </View>
 
-          {!isAcceptedRequest && (hasActiveFilters || hasCustomSort) ? (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: t.spacing.sm,
-                marginTop: t.spacing.md,
-              }}
-            >
+          {!isAcceptedRequest && !isCanceledRequest && (hasActiveFilters || hasCustomSort) ? (
+            <View style={s.activeChipsRow}>
               {hasActiveFilters ? (
-                <View
-                  style={{
-                    maxWidth: "100%",
-                    minHeight: 36,
-                    borderRadius: 999,
-                    ...t.glass.chip,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: t.spacing.xs,
-                    paddingLeft: t.spacing.sm,
-                    paddingRight: t.spacing.xs,
-                  }}
-                >
+                <View style={s.activeChip}>
                   <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-                  <Text
-                    variant="body"
-                    style={{ color: t.colors.textDark, flexShrink: 1 }}
-                  >
+                  <Text variant="body" style={s.activeChipLabel}>
                     Filtros ({activeFilterCount})
                   </Text>
                   <Pressable
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    style={s.activeChipClose}
                     onPress={() => setFilters(EMPTY_BUYER_OFFER_FILTERS)}
                     accessibilityRole="button"
                     accessibilityLabel="Limpiar filtros"
@@ -564,35 +551,13 @@ export default function PurchaseRequestDetailScreen() {
               ) : null}
 
               {hasCustomSort ? (
-                <View
-                  style={{
-                    maxWidth: "100%",
-                    minHeight: 36,
-                    borderRadius: 999,
-                    ...t.glass.chip,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: t.spacing.xs,
-                    paddingLeft: t.spacing.sm,
-                    paddingRight: t.spacing.xs,
-                  }}
-                >
+                <View style={s.activeChip}>
                   <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
-                  <Text
-                    variant="body"
-                    maxLines={1}
-                    style={{ color: t.colors.textDark, flexShrink: 1 }}
-                  >
+                  <Text variant="body" maxLines={1} style={s.activeChipLabel}>
                     {getBuyerOfferSortLabel(selectedSortId)}
                   </Text>
                   <Pressable
-                    style={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
+                    style={s.activeChipClose}
                     onPress={() => setSelectedSortId(DEFAULT_BUYER_OFFER_SORT_ID)}
                     accessibilityRole="button"
                     accessibilityLabel="Restablecer orden"
@@ -604,27 +569,26 @@ export default function PurchaseRequestDetailScreen() {
             </View>
           ) : null}
 
-          {offersLoading ? (
+          {isCanceledRequest ? (
+            <View style={s.closedOffersMessage}>
+              <Text color="stateAnulated">
+                Las ofertas relacionadas quedaron cerradas al cancelar la solicitud.
+              </Text>
+            </View>
+          ) : offersLoading ? (
             <LoadingState
               label="Cargando ofertas..."
               variant="inline"
-              style={{ marginTop: t.spacing.lg }}
+              style={s.inlineLoading}
             />
           ) : isAcceptedRequest && selectedOfferLoading ? (
             <LoadingState
               label="Cargando oferta seleccionada..."
               variant="inline"
-              style={{ marginTop: t.spacing.lg }}
+              style={s.inlineLoading}
             />
           ) : displayedOffersCount === 0 ? (
-            <View
-              style={{
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: t.spacing.xl,
-                gap: t.spacing.md,
-              }}
-            >
+            <View style={s.emptyOffers}>
               <Text color="stateAnulated" align="center">
                 {isAcceptedRequest
                   ? "No se encontró la oferta seleccionada para esta solicitud."
@@ -638,14 +602,14 @@ export default function PurchaseRequestDetailScreen() {
                 ) : (
                   <Image
                     source={require("../../assets/images/no_offers_request.svg")}
-                    style={{ width: 260, height: 340 }}
+                    style={s.noOffersImage}
                     contentFit="contain"
                   />
                 )
               ) : null}
             </View>
           ) : (
-            <View style={{ marginTop: t.spacing.lg, gap: t.spacing.md }}>
+            <View style={s.offersList}>
               {displayedOffers.map((offer) => (
                 <OfferCard
                   key={offer.id}
@@ -663,12 +627,120 @@ export default function PurchaseRequestDetailScreen() {
           )}
         </View>
       </View>
-
-      <HintModal
-        visible={showCategoryHint}
-        text={purchaseRequest.category_path ?? "-"}
-        onClose={() => setShowCategoryHint(false)}
-      />
     </ScrollView>
   );
+}
+
+function createPurchaseRequestDetailStyles(t: Theme, topContentInset = 0) {
+  return StyleSheet.create({
+    centerState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingTop: topContentInset,
+      paddingHorizontal: t.spacing.lg,
+    },
+    content: {
+      paddingTop: topContentInset + t.spacing.md,
+      paddingBottom: t.spacing.xl,
+    },
+    body: {
+      flex: 1,
+      gap: t.spacing.lg,
+    },
+    summaryCard: {
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
+      gap: t.spacing.md,
+    },
+    viewsRow: {
+      alignSelf: "flex-end",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+    },
+    canceledCard: {
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
+      gap: t.spacing.sm,
+    },
+    statusTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    canceledTitle: {
+      color: t.colors.stateCanceled,
+    },
+    offersSection: {
+      gap: t.spacing.md,
+    },
+    offerHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    offerHeaderAccepted: {
+      justifyContent: "flex-start",
+    },
+    offerHeaderTitle: {
+      flex: 1,
+    },
+    offerHeaderActions: {
+      flexDirection: "row",
+      gap: t.spacing.sm,
+    },
+    offerIconButton: {
+      width: 32,
+      height: 32,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    activeChipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: t.spacing.sm,
+    },
+    activeChip: {
+      maxWidth: "100%",
+      minHeight: 36,
+      borderRadius: 999,
+      ...t.glass.chip,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+      paddingLeft: t.spacing.sm,
+      paddingRight: t.spacing.xs,
+    },
+    activeChipLabel: {
+      color: t.colors.textDark,
+      flexShrink: 1,
+    },
+    activeChipClose: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    closedOffersMessage: {
+      marginTop: t.spacing.sm,
+    },
+    inlineLoading: {
+      marginTop: t.spacing.sm,
+    },
+    emptyOffers: {
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: t.spacing.md,
+      gap: t.spacing.md,
+    },
+    noOffersImage: {
+      width: 260,
+      height: 340,
+    },
+    offersList: {
+      gap: t.spacing.md,
+    },
+  });
 }

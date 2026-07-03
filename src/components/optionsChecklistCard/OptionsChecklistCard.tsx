@@ -71,7 +71,7 @@ export default function OptionsChecklistCard({
         </View>
         <View style={s.headerTextBlock}>
           <Text variant="body">{title}</Text>
-          <Text variant="caption">{description}</Text>
+          <Text variant="small">{description}</Text>
         </View>
       </View>
 

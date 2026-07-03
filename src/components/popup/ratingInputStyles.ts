@@ -4,7 +4,6 @@ import { Platform, TextStyle, ViewStyle } from "react-native";
 export type RatingInputStyles = {
   container: ViewStyle;
   helperText: TextStyle;
-  targetName: TextStyle;
   starsRow: ViewStyle;
   starButton: ViewStyle;
   chipsWrap: ViewStyle;
@@ -13,7 +12,6 @@ export type RatingInputStyles = {
   chipLabel: TextStyle;
   chipLabelActive: TextStyle;
   commentBlock: ViewStyle;
-  commentLabel: TextStyle;
   commentInputWrap: ViewStyle;
   commentInput: TextStyle;
 };
@@ -25,9 +23,6 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
     },
     helperText: {
       color: t.colors.stateAnulated,
-    },
-    targetName: {
-      color: t.colors.textDark,
     },
     starsRow: {
       flexDirection: "row",
@@ -68,9 +63,6 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
     commentBlock: {
       gap: t.spacing.sm,
     },
-    commentLabel: {
-      color: t.colors.stateAnulated,
-    },
     commentInputWrap: {
       minHeight: 150,
       borderWidth: 1,
@@ -83,9 +75,7 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
     commentInput: {
       flex: 1,
       textAlignVertical: "top",
-      fontFamily: t.typography.body.fontFamily,
-      fontSize: t.typography.body.fontSize,
-      lineHeight: t.typography.body.lineHeight,
+      ...t.typography.body,
       color: t.colors.textDark,
       ...Platform.select({
         web: {

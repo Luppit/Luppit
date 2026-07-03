@@ -13,11 +13,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getSession, onAuthChange } from "@/src/lib/supabase";
 import { getPendingProfileSwitch } from "@/src/services/profile.switch.service";
+import { consumePendingSharedPurchaseRequest } from "@/src/services/shared.purchase.request.service";
 
 export default function TabsLayout() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [isAuth, setAuth] = useState(false);
+  const [pendingSharedPurchaseRequestId, setPendingSharedPurchaseRequestId] =
+    useState<string | null>(null);
+  const [hasLoadedPendingSharedRequest, setHasLoadedPendingSharedRequest] =
+    useState(false);
   const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
   const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
   const isFavoritesTabScreen = pathname === "/favorites";
@@ -41,6 +46,29 @@ export default function TabsLayout() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadPendingSharedRequest = async () => {
+      if (!isAuth) {
+        setPendingSharedPurchaseRequestId(null);
+        setHasLoadedPendingSharedRequest(true);
+        return;
+      }
+
+      const purchaseRequestId = await consumePendingSharedPurchaseRequest();
+      if (!active) return;
+      setPendingSharedPurchaseRequestId(purchaseRequestId);
+      setHasLoadedPendingSharedRequest(true);
+    };
+
+    setHasLoadedPendingSharedRequest(false);
+    void loadPendingSharedRequest();
+    return () => {
+      active = false;
+    };
+  }, [isAuth]);
+
   if (!ready) return null;
 
   if (!isAuth) {
@@ -60,6 +88,19 @@ export default function TabsLayout() {
     }
 
     return <Redirect href="/(auth)/auth" />;
+  }
+
+  if (!hasLoadedPendingSharedRequest) return null;
+
+  if (pendingSharedPurchaseRequestId) {
+    return (
+      <Redirect
+        href={{
+          pathname: "/request/[purchaseRequestId]",
+          params: { purchaseRequestId: pendingSharedPurchaseRequestId },
+        }}
+      />
+    );
   }
 
   if (

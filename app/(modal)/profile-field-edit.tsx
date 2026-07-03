@@ -98,7 +98,7 @@ export default function ProfileFieldEditScreen() {
       >
         <View style={s.surface}>
           <View style={s.iconBadge}>
-            <Icon name={config.icon} size={22} color={t.colors.primary} />
+            <Icon name={config.icon} size={22} color={t.colors.textDark} />
           </View>
 
           <View style={s.titleBlock}>
@@ -145,20 +145,13 @@ function createProfileFieldEditStyles(t: Theme) {
     },
     surface: {
       backgroundColor: t.colors.backgroudWhite,
-      borderRadius: t.borders.md,
+      borderRadius: 28,
       padding: t.spacing.lg,
       gap: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 5,
-      elevation: 2,
     },
     iconBadge: {
-      width: 42,
-      height: 42,
-      borderRadius: 12,
-      backgroundColor: "rgba(131,163,30,0.14)",
+      width: 32,
+      height: 32,
       alignItems: "center",
       justifyContent: "center",
     },

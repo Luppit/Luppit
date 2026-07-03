@@ -66,3 +66,11 @@ export function hasBuyerHomeFilters(filters: BuyerHomeFilters) {
       filters.selectedChipIds.length > 0
   );
 }
+
+export function countBuyerHomeFilterGroups(filters: BuyerHomeFilters) {
+  return [
+    filters.searchValue,
+    filters.startDate || filters.endDate,
+    filters.selectedChipIds.length > 0,
+  ].filter(Boolean).length;
+}

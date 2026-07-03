@@ -1,7 +1,9 @@
+import type { ChatImage } from "../components/inputChat/inputChat";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
 
 const PURCHASE_REQUEST_ASSISTANT_EDGE_FUNCTION = "ai-completar";
+const MAX_IMAGES_PER_REQUEST = 3;
 
 export type PurchaseRequestAssistantUiAction =
   | "SHOW_SUMMARY"
@@ -83,6 +85,7 @@ type PurchaseRequestAssistantRequest = {
   ui_action?: PurchaseRequestAssistantUiAction | null;
   client_request_id?: string | null;
   idempotency_key?: string | null;
+  images?: ChatImage[];
 };
 
 function normalizeString(value: unknown): string | null {
@@ -229,9 +232,76 @@ function createRequestIdentity(prefix: string) {
   };
 }
 
+function getImageName(image: ChatImage, index: number) {
+  if (image.name && image.name.trim().length > 0) return image.name;
+  const extension = image.mime?.split("/")[1]?.split(";")[0] ?? "jpg";
+  return `request-image-${index + 1}.${extension}`;
+}
+
+function validateInput(input: PurchaseRequestAssistantRequest): AppError | null {
+  const images = input.images ?? [];
+  if (images.length > MAX_IMAGES_PER_REQUEST) {
+    return {
+      type: "validation",
+      message: "Puedes adjuntar máximo 3 fotos por mensaje.",
+    };
+  }
+
+  return null;
+}
+
+function buildJsonBody(
+  input: PurchaseRequestAssistantRequest,
+  clientRequestId: string,
+  idempotencyKey: string
+) {
+  return JSON.stringify({
+    prompt: input.prompt.trim(),
+    draft_id: input.draft_id ?? null,
+    ui_action: input.ui_action ?? null,
+    client_request_id: clientRequestId,
+    idempotency_key: idempotencyKey,
+  });
+}
+
+function buildFormDataBody(
+  input: PurchaseRequestAssistantRequest,
+  clientRequestId: string,
+  idempotencyKey: string
+) {
+  const formData = new FormData();
+  formData.append("prompt", input.prompt.trim());
+  if (input.draft_id) formData.append("draft_id", input.draft_id);
+  if (input.ui_action) formData.append("ui_action", input.ui_action);
+  formData.append("client_request_id", clientRequestId);
+  formData.append("idempotency_key", idempotencyKey);
+
+  (input.images ?? []).forEach((image, index) => {
+    formData.append("images", {
+      uri: image.uri,
+      type: image.mime ?? "image/jpeg",
+      name: getImageName(image, index),
+    } as any);
+  });
+
+  return formData;
+}
+
 export async function callPurchaseRequestAssistant(
   input: PurchaseRequestAssistantRequest
 ): Promise<PurchaseRequestAssistantResult> {
+  const validationError = validateInput(input);
+  if (validationError) {
+    return {
+      ok: false,
+      error: validationError,
+      statusCode: 400,
+      requestId: null,
+      retryAfterSeconds: null,
+      backendMessage: validationError.message,
+    };
+  }
+
   const session = await getSession();
   if (!session?.access_token) {
     return {
@@ -257,10 +327,10 @@ export async function callPurchaseRequestAssistant(
     };
   }
 
-  const trimmedPrompt = input.prompt.trim();
   const identity = createRequestIdentity(input.ui_action ?? "message");
   const clientRequestId = input.client_request_id ?? identity.clientRequestId;
   const idempotencyKey = input.idempotency_key ?? identity.idempotencyKey;
+  const hasImages = (input.images ?? []).length > 0;
 
   try {
     const response = await fetch(functionUrl, {
@@ -268,17 +338,13 @@ export async function callPurchaseRequestAssistant(
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         apikey: anonKey,
-        "Content-Type": "application/json",
+        ...(hasImages ? {} : { "Content-Type": "application/json" }),
         "Idempotency-Key": idempotencyKey,
         "x-request-id": clientRequestId,
       },
-      body: JSON.stringify({
-        prompt: trimmedPrompt,
-        draft_id: input.draft_id ?? null,
-        ui_action: input.ui_action ?? null,
-        client_request_id: clientRequestId,
-        idempotency_key: idempotencyKey,
-      }),
+      body: hasImages
+        ? buildFormDataBody(input, clientRequestId, idempotencyKey)
+        : buildJsonBody(input, clientRequestId, idempotencyKey),
     });
 
     const requestId = normalizeString(response.headers.get("x-request-id"));

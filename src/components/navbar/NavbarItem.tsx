@@ -1,8 +1,9 @@
 import { useTheme } from "@/src/themes/ThemeProvider";
 import { Link } from "expo-router";
 import React from "react";
-import { Platform, Pressable, StyleSheet, Text, TextStyle, View } from "react-native";
+import { Platform, Pressable, StyleSheet, TextStyle, View } from "react-native";
 import { Icon } from "../Icon";
+import { Text } from "../Text";
 import { createNavbarStyles } from "./styles";
 import type { NavItem } from "./useNavItems";
 
@@ -33,7 +34,8 @@ export default function NavbarItem({ item, active, disabled = false }: Props) {
       <View style={s.itemInner}>
         {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
         <Text
-          numberOfLines={1}
+          variant="small"
+          maxLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.85}
           style={[s.label, active && s.labelActive]}

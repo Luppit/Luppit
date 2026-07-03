@@ -30,7 +30,7 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
     },
     input: {
       flex: 1,
-      fontFamily: t.typography.body.fontFamily,
+      ...t.typography.body,
       ...Platform.select({
         web: {
           outlineWidth: 0,

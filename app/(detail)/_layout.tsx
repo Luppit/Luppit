@@ -19,6 +19,20 @@ function getPurchaseRequestId(raw: string | string[] | undefined): string | null
   }
 }
 
+function getPurchaseRequestStatus(raw: string | string[] | undefined): string | null {
+  if (!raw) return null;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object") return null;
+    const status = (parsed as { status?: unknown }).status;
+    return typeof status === "string" && status ? status : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function DetailLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -31,6 +45,7 @@ export default function DetailLayout() {
   const hideMenuParam = Array.isArray(params.hideMenu) ? params.hideMenu[0] : params.hideMenu;
   const hideMenu = hideMenuParam === "true";
   const purchaseRequestId = getPurchaseRequestId(params.purchaseRequest);
+  const purchaseRequestStatus = getPurchaseRequestStatus(params.purchaseRequest);
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
@@ -41,6 +56,7 @@ export default function DetailLayout() {
         title={title}
         hideMenu={hideMenu}
         purchaseRequestId={purchaseRequestId}
+        purchaseRequestStatus={purchaseRequestStatus}
         topInset={insets.top}
       />
     </View>

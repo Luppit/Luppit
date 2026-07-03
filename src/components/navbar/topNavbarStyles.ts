@@ -101,11 +101,6 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
     categoryButtonActive: {
       transform: [{ translateY: -1 }],
     },
-    categoryLabelActive: {
-      fontFamily: t.typography.label.fontFamily,
-      fontSize: t.typography.body.fontSize + 1,
-      lineHeight: t.typography.body.lineHeight + 1,
-    },
     categoryImageContainer: {
       width: 34,
       height: 34,
@@ -120,6 +115,9 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
     },
     categoryImageActive: {
       transform: [{ scale: 1.12 }],
+    },
+    categoryLabelSelected: {
+      fontFamily: t.typography.subtitle.fontFamily,
     },
   });
 };

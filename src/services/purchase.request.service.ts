@@ -144,6 +144,27 @@ export type MarketplaceHubItemsPage = {
   page_size: number;
   has_more: boolean;
 };
+export type PurchaseRequestCategoryRequirementInfo = {
+  categoryId: string;
+  requiredFields: string[];
+  optionalFields: string[];
+  version: number | null;
+};
+export type PurchaseRequestCategoryLineageItem = {
+  id: string;
+  name: string;
+  path: unknown;
+};
+export type PurchaseRequestCategoryInfo = {
+  purchaseRequest: PurchaseRequest;
+  lineage: PurchaseRequestCategoryLineageItem[];
+  requirements: PurchaseRequestCategoryRequirementInfo | null;
+};
+export type CancelPurchaseRequestResult = {
+  purchaseRequestId: string | null;
+  status: string | null;
+  conversationsCanceled: number;
+};
 const PURCHASE_REQUEST_SELECT = [
   "id",
   "profile_id",
@@ -174,6 +195,87 @@ export async function getPurchaseRequestById(
   if (error) return { ok: false, error: fromSupabaseError(error) };
   if (!data) return null;
   return { ok: true, data: data as unknown as PurchaseRequest };
+}
+
+export async function getCategoryInfoForPurchaseRequest(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: PurchaseRequestCategoryInfo } | { ok: false; error: AppError } | null
+> {
+  const purchaseRequest = await getPurchaseRequestById(purchaseRequestId);
+  if (!purchaseRequest || purchaseRequest.ok === false) return purchaseRequest;
+
+  const categoryId = purchaseRequest.data.category_id?.trim() ?? "";
+  if (!categoryId) {
+    return {
+      ok: true,
+      data: {
+        purchaseRequest: purchaseRequest.data,
+        lineage: [],
+        requirements: null,
+      },
+    };
+  }
+
+  const [lineageResult, requirementsResult] = await Promise.allSettled([
+    (supabase as any).rpc("get_category_lineage", { leaf_id: categoryId }),
+    (supabase as any).rpc("get_category_requirements", { category_ids: [categoryId] }),
+  ]);
+
+  const lineagePayload =
+    lineageResult.status === "fulfilled" && !lineageResult.value?.error
+      ? lineageResult.value?.data
+      : [];
+  const requirementsPayload =
+    requirementsResult.status === "fulfilled" && !requirementsResult.value?.error
+      ? requirementsResult.value?.data
+      : [];
+
+  const lineageRows: unknown[] = Array.isArray(lineagePayload) ? lineagePayload : [];
+  const requirementsRows: unknown[] = Array.isArray(requirementsPayload)
+    ? requirementsPayload
+    : [];
+
+  return {
+    ok: true,
+    data: {
+      purchaseRequest: purchaseRequest.data,
+      lineage: lineageRows
+        .map(mapCategoryLineageItem)
+        .filter((item): item is PurchaseRequestCategoryLineageItem => item !== null),
+      requirements:
+        requirementsRows
+          .map(mapCategoryRequirementInfo)
+          .find((item): item is PurchaseRequestCategoryRequirementInfo => item !== null) ??
+        null,
+    },
+  };
+}
+
+export async function cancelCurrentBuyerPurchaseRequest(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: CancelPurchaseRequestResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getProfileByUserId(session.user.id);
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const rpcResult: any = await (supabase as any).rpc(
+    "cancel_current_buyer_purchase_request",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (rpcResult?.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  return { ok: true, data: mapCancelPurchaseRequestResult(rpcResult?.data) };
 }
 
 export async function getPurchaseRequestByProfileId(
@@ -238,6 +340,75 @@ function parseCount(raw: unknown): number {
 
 function normalizeNullableString(raw: unknown): string | null {
   return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
+}
+
+function normalizeCategoryFieldLabel(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
+  if (!value) return null;
+
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (letter) => letter.toLocaleUpperCase("es"));
+}
+
+function normalizeCategoryFieldList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map(normalizeCategoryFieldLabel)
+    .filter((value): value is string => value !== null);
+}
+
+function mapCategoryLineageItem(raw: unknown): PurchaseRequestCategoryLineageItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const id = normalizeNullableString(value.id);
+  const name = normalizeNullableString(value.name);
+  if (!id || !name) return null;
+
+  return {
+    id,
+    name,
+    path: value.path ?? null,
+  };
+}
+
+function mapCategoryRequirementInfo(
+  raw: unknown
+): PurchaseRequestCategoryRequirementInfo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const categoryId = normalizeNullableString(value.category_id);
+  if (!categoryId) return null;
+
+  const version =
+    typeof value.version === "number" && Number.isFinite(value.version)
+      ? value.version
+      : null;
+
+  return {
+    categoryId,
+    requiredFields: normalizeCategoryFieldList(value.required_fields),
+    optionalFields: normalizeCategoryFieldList(value.optional_fields),
+    version,
+  };
+}
+
+function mapCancelPurchaseRequestResult(raw: unknown): CancelPurchaseRequestResult {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const count = value.conversations_canceled;
+
+  return {
+    purchaseRequestId: normalizeNullableString(value.purchase_request_id),
+    status: normalizeNullableString(value.status),
+    conversationsCanceled:
+      typeof count === "number" && Number.isFinite(count)
+        ? Math.max(0, Math.floor(count))
+        : 0,
+  };
 }
 
 function parseSellerHomePurchaseRequestItem(
@@ -536,6 +707,21 @@ function getBuyerHomeItemDate(item: BuyerHomePurchaseRequestItem): string {
   return "";
 }
 
+function getHomeItemSearchText(item: BuyerHomePurchaseRequestItem): string {
+  return [
+    item.title,
+    item.summary_text,
+    item.category_name,
+    item.category_path,
+    item.status_label,
+    item.status,
+    item.id,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+    .toLocaleLowerCase();
+}
+
 function applyBuyerHomeFiltersToGroups(
   groups: BuyerHomePurchaseRequestGroup[],
   filters?: BuyerHomeFilters
@@ -554,10 +740,10 @@ function applyBuyerHomeFiltersToGroups(
 
   return groups.map((group) => {
     const items = group.items.filter((item) => {
-      const title = item.title?.toLocaleLowerCase() ?? "";
+      const searchableText = getHomeItemSearchText(item);
       const itemDate = getBuyerHomeItemDate(item);
 
-      if (searchValue && !title.includes(searchValue)) return false;
+      if (searchValue && !searchableText.includes(searchValue)) return false;
       if (startDate && (!itemDate || itemDate < startDate)) return false;
       if (endDate && (!itemDate || itemDate > endDate)) return false;
       if (selectedStatuses.size > 0 && !selectedStatuses.has(item.status)) return false;
@@ -607,11 +793,11 @@ function applySellerHomeFiltersToGroups(
 
   return groups.map((group) => {
     const items = group.items.filter((item) => {
-      const title = item.title?.toLocaleLowerCase() ?? "";
+      const searchableText = getHomeItemSearchText(item);
       const itemDate = getBuyerHomeItemDate(item);
       const interactionState = inferLegacySellerInteractionState(group.code, item);
 
-      if (searchValue && !title.includes(searchValue)) return false;
+      if (searchValue && !searchableText.includes(searchValue)) return false;
       if (startDate && (!itemDate || itemDate < startDate)) return false;
       if (endDate && (!itemDate || itemDate > endDate)) return false;
       if (

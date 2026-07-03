@@ -1,6 +1,7 @@
 import {
   useChatSession,
 } from "./chat-session.context";
+import type { ChatMessage } from "./chat-session.context";
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
@@ -100,6 +101,45 @@ function AssistantThinkingBlock() {
   );
 }
 
+function UserMessageBlock({ message }: { message: ChatMessage }) {
+  const t = useTheme();
+
+  return (
+    <View
+      style={{
+        maxWidth: "88%",
+        alignSelf: "flex-end",
+        borderRadius: t.borders.md,
+        paddingHorizontal: t.spacing.md,
+        paddingVertical: t.spacing.sm,
+        backgroundColor: t.colors.primaryLight,
+        gap: t.spacing.xs,
+      }}
+    >
+      {message.text.trim().length > 0 ? (
+        <Text variant="body">{message.text}</Text>
+      ) : null}
+
+      {message.images && message.images.length > 0 ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
+          {message.images.map((image, index) => (
+            <Image
+              key={`${image.uri}-${index}`}
+              source={{ uri: image.uri }}
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: 16,
+                backgroundColor: t.colors.border,
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function hasSummaryValue(value: string | number | null | undefined) {
   return value !== null && value !== undefined && value !== "";
 }
@@ -147,7 +187,7 @@ function SummaryDetailPill({
         gap: 2,
       }}
     >
-      <Text variant="caption" color="stateAnulated">
+      <Text variant="small" color="stateAnulated">
         {label}
       </Text>
       <Text variant="body" maxLines={2}>
@@ -230,18 +270,18 @@ function PublishRequestCard({
         </View>
 
         <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="label" color="textDark">
+          <Text variant="small" color="textDark">
             Solicitud lista
           </Text>
           <Text variant="body">Revisa el resumen antes de publicarla</Text>
-          <Text variant="caption" color="stateAnulated">
+          <Text variant="small" color="stateAnulated">
             Confirma producto, categoría y detalles.
           </Text>
         </View>
       </View>
 
       <View style={{ gap: t.spacing.sm }}>
-        <Text variant="label" color="stateAnulated">
+        <Text variant="small" color="stateAnulated">
           Resumen de la solicitud
         </Text>
         <Text variant="subtitle">{summary?.titulo ?? "Solicitud"}</Text>
@@ -362,20 +402,7 @@ export default function ChatScreen() {
 
       {messages.map((message) => (
         message.sender === "user" ? (
-          <View
-            key={message.id}
-            style={{
-              maxWidth: "88%",
-              alignSelf: "flex-end",
-              borderRadius: t.borders.md,
-              paddingHorizontal: t.spacing.md,
-              paddingVertical: t.spacing.sm,
-              backgroundColor: t.colors.primaryLight,
-              gap: t.spacing.xs,
-            }}
-          >
-            <Text variant="body">{message.text}</Text>
-          </View>
+          <UserMessageBlock key={message.id} message={message} />
         ) : (
           <AssistantTextBlock key={message.id} text={message.text} />
         )

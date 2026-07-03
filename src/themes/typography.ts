@@ -8,12 +8,9 @@ export const fontFamilies = {
 
 export type TextVariant =
   | "title"
-  | "titleRegular"
   | "subtitle"
-  | "subtitleRegular"
   | "body"
-  | "label"
-  | "caption"
+  | "small"
   | "price";
 
 export const typography: Record<TextVariant, {
@@ -23,11 +20,8 @@ export const typography: Record<TextVariant, {
   letterSpacing?: number;
 }> = {
   title:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.xl, lineHeight: lineHeights.xl },
-  titleRegular: { fontFamily: fontFamilies.regular, fontSize: fontSizes.xl, lineHeight: lineHeights.xl },
   subtitle: { fontFamily: fontFamilies.semibold,   fontSize: fontSizes.lg, lineHeight: lineHeights.lg },
-  subtitleRegular: { fontFamily: fontFamilies.regular, fontSize: fontSizes.lg, lineHeight: lineHeights.lg },
   body:     { fontFamily: fontFamilies.regular,  fontSize: fontSizes.md, lineHeight: lineHeights.md },
-  label:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
-  caption:  { fontFamily: fontFamilies.regular,  fontSize: fontSizes.xs, lineHeight: lineHeights.xs, letterSpacing: 0.2 },
+  small:    { fontFamily: fontFamilies.regular,  fontSize: fontSizes.sm, lineHeight: lineHeights.sm },
   price:    { fontFamily: fontFamilies.semibold, fontSize: fontSizes.xxl, lineHeight: lineHeights.xxl },
 };

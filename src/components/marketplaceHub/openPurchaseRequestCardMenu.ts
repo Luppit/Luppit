@@ -60,7 +60,8 @@ export function openPurchaseRequestCardMenu({
         iconColorKey: "textDark",
         onPress: () =>
           void Share.share({
-            message: item.title?.trim() || "Solicitud en Luppit",
+            message: `${item.title?.trim() || "Solicitud en Luppit"}\nluppit://request/${item.id}`,
+            url: `luppit://request/${item.id}`,
           }),
       },
     ],
