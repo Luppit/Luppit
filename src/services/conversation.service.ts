@@ -671,12 +671,6 @@ export async function getCurrentProfileConversations(
     .map((item: unknown) => parseConversationListItem(item))
     .filter((item: ConversationListItem | null): item is ConversationListItem =>
       Boolean(item)
-    )
-    .sort(
-      (first: ConversationListItem, second: ConversationListItem) =>
-        Number(second.has_unopened) - Number(first.has_unopened) ||
-        new Date(second.last_message_at).getTime() -
-          new Date(first.last_message_at).getTime()
     );
 
   return { ok: true, data: items };

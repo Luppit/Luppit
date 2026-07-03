@@ -50,10 +50,8 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       borderColor: t.colors.primary,
     },
     otpCodeInput: {
+      ...t.typography.subtitle,
       textAlign: "center",
-      fontSize: t.fontSizes.lg,
-      lineHeight: t.fontSizes.lg + 10,
-      fontFamily: t.typography.body.fontFamily,
       color: t.colors.textDark,
       includeFontPadding: false,
     },

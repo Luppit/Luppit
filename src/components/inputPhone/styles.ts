@@ -52,7 +52,7 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
     },
     input: {
       flex: 1,
-      fontFamily: t.typography.body.fontFamily,
+      ...t.typography.body,
       ...Platform.select({
         android: {
           height: "100%",
@@ -78,7 +78,7 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
         alignItems: "center",
       },
       countryCodeText: {
-        fontFamily: t.typography.body.fontFamily,
+        ...t.typography.body,
       },
     },
   };

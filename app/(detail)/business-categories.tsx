@@ -261,7 +261,7 @@ export default function BusinessCategoriesScreen() {
                   {hasCategoryChanges ? (
                     <View style={s.unsavedInline}>
                       <Icon name="alert-circle" size={14} color={t.colors.secondary} />
-                      <Text variant="caption" color="secondary">
+                      <Text variant="small" color="secondary">
                         Cambios sin guardar
                       </Text>
                     </View>
@@ -273,7 +273,7 @@ export default function BusinessCategoriesScreen() {
                 {selectedCategoryRows.length === 0 ? (
                   <View style={s.emptyCategoryRow}>
                     <Text color="stateAnulated">Aún no has elegido categorías.</Text>
-                    <Text variant="caption" color="stateAnulated">
+                    <Text variant="small" color="stateAnulated">
                       Selecciona las líneas de productos que vende tu negocio.
                     </Text>
                   </View>
@@ -406,7 +406,7 @@ function SelectedCategoryRow({
       </View>
       <View style={s.rowText}>
         <Text maxLines={1}>{category.name}</Text>
-        <Text variant="caption" color="stateAnulated" maxLines={2}>
+        <Text variant="small" color="stateAnulated" maxLines={2}>
           {category.breadcrumb || "Categoría completa"}
         </Text>
       </View>
@@ -450,7 +450,7 @@ function CategoryBrowserHeader({
       ) : null}
       <View style={s.rowText}>
         <Text>{title}</Text>
-        <Text variant="caption" color="stateAnulated">
+        <Text variant="small" color="stateAnulated">
           {canGoBack ? "Explora subcategorías" : "Todas las categorías"}
         </Text>
       </View>
@@ -484,13 +484,13 @@ function CategoryBranchRow({
       </View>
       <View style={s.rowText}>
         <Text maxLines={1}>{item.node.name}</Text>
-        <Text variant="caption" color="stateAnulated" maxLines={1}>
+        <Text variant="small" color="stateAnulated" maxLines={1}>
           {item.preview}
         </Text>
       </View>
       {item.selectedCount > 0 ? (
         <View style={s.countPill}>
-          <Text variant="caption" color="primary">
+          <Text variant="small" color="primary">
             {item.selectedCount}
           </Text>
         </View>
@@ -527,7 +527,7 @@ function CategoryToggleRow({
       </View>
       <View style={s.rowText}>
         <Text maxLines={1}>{category.name}</Text>
-        <Text variant="caption" color="stateAnulated" maxLines={1}>
+        <Text variant="small" color="stateAnulated" maxLines={1}>
           {breadcrumb || "Categoría completa"}
         </Text>
       </View>

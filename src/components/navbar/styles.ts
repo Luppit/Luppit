@@ -51,8 +51,8 @@ export const createNavbarStyles = (t: Theme) => {
       justifyContent: "center",
       gap: 2,
     },
-    label: { fontSize: 13, color: COLORS.text, fontWeight: "500", fontFamily: t.typography.caption.fontFamily },
-    labelActive: { color: COLORS.active, fontWeight: "700" },
+    label: { width: "100%", color: COLORS.text, textAlign: "center" },
+    labelActive: { color: COLORS.active },
   });
 
   return { ...styles, _colors: COLORS };

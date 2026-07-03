@@ -13,7 +13,6 @@ export type GlobalPopupStyles = {
   separator: ViewStyle;
   section: ViewStyle;
   filterSection: ViewStyle;
-  filterLabel: TextStyle;
   filterInputContainer: ViewStyle;
   filterInput: TextStyle;
   filterDateRow: ViewStyle;
@@ -152,9 +151,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     filterSection: {
       gap: t.spacing.sm,
-    },
-    filterLabel: {
-      color: t.colors.textDark,
     },
     filterInputContainer: {
       height: 48,
@@ -450,7 +446,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     helperSectionTitle: {
       flex: 1,
       minWidth: 0,
-      color: t.colors.textDark,
     },
     helperSectionSubtitle: {
       color: t.colors.textMedium,
@@ -497,7 +492,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     profileSwitcherInitials: {
       color: t.colors.textDark,
-      fontFamily: t.typography.label.fontFamily,
     },
     profileSwitcherContent: {
       flex: 1,

@@ -1,5 +1,10 @@
 import { Icon } from "@/src/components/Icon";
+import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import {
+  createRoundedSurfaceStyle,
+  ROUNDED_SURFACE_RADIUS,
+} from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   getCurrentProfileNotifications,
@@ -193,19 +198,25 @@ export default function NotificationsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <View style={s.list}>
-        {notifications.map((notification) => (
-          <NotificationRow key={notification.notificationId} notification={notification} />
+      <GroupedList>
+        {notifications.map((notification, index) => (
+          <NotificationRow
+            key={notification.notificationId}
+            notification={notification}
+            showSeparator={index < notifications.length - 1}
+          />
         ))}
-      </View>
+      </GroupedList>
     </ScrollView>
   );
 }
 
 function NotificationRow({
   notification,
+  showSeparator,
 }: {
   notification: ProfileNotificationListItem;
+  showSeparator: boolean;
 }) {
   const t = useTheme();
   const s = React.useMemo(() => createNotificationsStyles(t), [t]);
@@ -249,7 +260,7 @@ function NotificationRow({
       <View style={s.unreadSlot}>
         {isUnread ? <View style={s.unreadDot} /> : null}
       </View>
-      <View style={[s.iconBadge, { backgroundColor: tone.backgroundColor }]}>
+      <View style={s.iconBadge}>
         <Icon name={tone.icon} size={22} color={tone.color} />
       </View>
       <View style={s.rowBody}>
@@ -262,7 +273,7 @@ function NotificationRow({
           >
             {title}
           </Text>
-          <Text variant="caption" color="stateAnulated" maxLines={1}>
+          <Text variant="small" color="stateAnulated" maxLines={1}>
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>
@@ -273,6 +284,7 @@ function NotificationRow({
       <View accessibilityElementsHidden importantForAccessibility="no">
         <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
       </View>
+      {showSeparator ? <View style={s.rowSeparator} /> : null}
     </Pressable>
   );
 }
@@ -290,20 +302,17 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       gap: t.spacing.sm,
       paddingTop: topContentInset,
     },
-    list: {
-      borderTopWidth: 0,
-    },
     row: {
-      minHeight: 76,
+      position: "relative",
+      minHeight: 72,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
     },
     unreadSlot: {
-      width: 10,
+      width: 8,
       alignItems: "center",
     },
     unreadDot: {
@@ -313,14 +322,15 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       backgroundColor: t.colors.primary,
     },
     iconBadge: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 32,
+      minHeight: 54,
       alignItems: "center",
       justifyContent: "center",
     },
     rowBody: {
       flex: 1,
+      minHeight: 54,
+      justifyContent: "center",
       gap: 3,
     },
     rowHeader: {
@@ -330,6 +340,14 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     },
     rowTitle: {
       flex: 1,
+    },
+    rowSeparator: {
+      position: "absolute",
+      left: t.spacing.md + 8 + t.spacing.sm + 32 + t.spacing.sm,
+      right: t.spacing.md,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: "rgba(0,0,0,0.08)",
     },
     centerState: {
       flex: 1,
@@ -342,16 +360,15 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     emptyIconBadge: {
       width: 56,
       height: 56,
-      borderRadius: 28,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t.colors.backgroudWhite,
+      ...createRoundedSurfaceStyle(t),
       borderWidth: 1,
       borderColor: t.colors.border,
     },
     emptyDescription: {
       maxWidth: 300,
-      lineHeight: 22,
     },
     retryButton: {
       minHeight: 40,

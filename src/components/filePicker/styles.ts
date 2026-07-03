@@ -103,8 +103,8 @@ export function createFilePickerStyles(t: Theme): FilePickerStyles {
       backgroundColor: t.colors.background,
     },
     fileFallbackText: {
+      ...t.typography.small,
       color: t.colors.textMedium,
-      fontSize: t.fontSizes.xs,
       textAlign: "center",
     },
     removeButton: {

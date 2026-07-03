@@ -5,6 +5,7 @@ export type Segment = {
   name: string;
   svgName: string;
   isDisabled: boolean;
+  sortOrder: number;
 };
 
 type SelectedSegmentListener = (segmentSvgName: string) => void;
@@ -20,6 +21,7 @@ function mapSegment(value: any): Segment | null {
   const name = typeof value.name === "string" ? value.name : "";
   const svgName = typeof value.svg_name === "string" ? value.svg_name : "";
   const isDisabled = typeof value.is_disabled === "boolean" ? value.is_disabled : false;
+  const sortOrder = typeof value.sort_order === "number" ? value.sort_order : 100;
 
   if (!name || !svgName) return null;
 
@@ -27,6 +29,7 @@ function mapSegment(value: any): Segment | null {
     name,
     svgName,
     isDisabled,
+    sortOrder,
   };
 }
 
@@ -35,7 +38,8 @@ export async function getSegments(): Promise<
 > {
   const { data, error } = await (supabase as any)
     .from("segment")
-    .select("name, svg_name, is_disabled, created_at")
+    .select("name, svg_name, is_disabled, sort_order")
+    .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };

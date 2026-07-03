@@ -1967,6 +1967,48 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_account_deletion_request: {
+        Row: {
+          admin_note: string | null
+          completed_at: string | null
+          id: string
+          profile_id: string
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          admin_note?: string | null
+          completed_at?: string | null
+          id?: string
+          profile_id: string
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          admin_note?: string | null
+          completed_at?: string | null
+          id?: string
+          profile_id?: string
+          requested_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_business: {
         Row: {
           business_id: string | null
@@ -2797,6 +2839,7 @@ export type Database = {
           id: string
           is_disabled: boolean
           name: string
+          sort_order: number
           svg_name: string
         }
         Insert: {
@@ -2804,6 +2847,7 @@ export type Database = {
           id?: string
           is_disabled?: boolean
           name: string
+          sort_order?: number
           svg_name: string
         }
         Update: {
@@ -2811,6 +2855,7 @@ export type Database = {
           id?: string
           is_disabled?: boolean
           name?: string
+          sort_order?: number
           svg_name?: string
         }
         Relationships: []
@@ -3278,6 +3323,10 @@ export type Database = {
         Returns: Json
       }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
+      request_current_profile_account_deletion: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
       publish_purchase_request: {
         Args: {
           p_category_id: string

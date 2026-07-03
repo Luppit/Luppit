@@ -1,6 +1,11 @@
 import { Icon } from "@/src/components/Icon";
+import {
+  GroupedList,
+  GroupedListRow,
+} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { signOut } from "@/src/lib/supabase";
 import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
@@ -99,8 +104,8 @@ function BuyerProfileContent() {
       ) : (
         <>
           <View style={s.phoneCard}>
-            <View style={[s.iconBadge, s.phoneIconBadge]}>
-              <Icon name="lock" size={20} color={t.colors.primary} />
+            <View style={s.iconBadge}>
+              <Icon name="lock" size={21} color={t.colors.textDark} />
             </View>
             <View style={s.phoneText}>
               <Text color="stateAnulated">Número telefónico</Text>
@@ -135,12 +140,12 @@ function BuyerProfileContent() {
             />
           </View>
 
-          <View style={s.actionList}>
-            <ActionRow
+          <GroupedList>
+            <GroupedListRow
               icon="bell"
               label="Notificaciones"
-              unreadCount={unreadNotificationsCount}
               accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
+              rightAccessory={<NotificationCountPill count={unreadNotificationsCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -148,7 +153,7 @@ function BuyerProfileContent() {
                 })
               }
             />
-            <ActionRow
+            <GroupedListRow
               icon="help-circle"
               label="Ayuda"
               onPress={() =>
@@ -158,13 +163,15 @@ function BuyerProfileContent() {
                 })
               }
             />
-            <ActionRow
+            <GroupedListRow
               icon="log-out"
               label="Cerrar sesión"
               destructive
+              showChevron={false}
+              showSeparator={false}
               onPress={signOut}
             />
-          </View>
+          </GroupedList>
         </>
       )}
     </ScrollView>
@@ -238,8 +245,8 @@ function SellerProfileContent() {
       ) : (
         <>
           <View style={s.phoneCard}>
-            <View style={[s.iconBadge, s.phoneIconBadge]}>
-              <Icon name="lock" size={20} color={t.colors.primary} />
+            <View style={s.iconBadge}>
+              <Icon name="lock" size={21} color={t.colors.textDark} />
             </View>
             <View style={s.phoneText}>
               <Text color="stateAnulated">Número telefónico</Text>
@@ -268,12 +275,12 @@ function SellerProfileContent() {
 
           <BusinessSummaryCard business={business} />
 
-          <View style={s.actionList}>
-            <ActionRow
+          <GroupedList>
+            <GroupedListRow
               icon="bell"
               label="Notificaciones"
-              unreadCount={unreadNotificationsCount}
               accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
+              rightAccessory={<NotificationCountPill count={unreadNotificationsCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -281,7 +288,7 @@ function SellerProfileContent() {
                 })
               }
             />
-            <ActionRow
+            <GroupedListRow
               icon="help-circle"
               label="Ayuda"
               onPress={() =>
@@ -291,13 +298,15 @@ function SellerProfileContent() {
                 })
               }
             />
-            <ActionRow
+            <GroupedListRow
               icon="log-out"
               label="Cerrar sesión"
               destructive
+              showChevron={false}
+              showSeparator={false}
               onPress={signOut}
             />
-          </View>
+          </GroupedList>
         </>
       )}
     </ScrollView>
@@ -325,7 +334,7 @@ function StatCard({
 
   return (
     <View style={[s.statCard, wide ? s.statCardWide : null]}>
-      <View style={[s.iconBadge, { backgroundColor: toneStyle.backgroundColor }]}>
+      <View style={s.iconBadge}>
         <Icon name={icon} size={20} color={toneStyle.color} />
       </View>
       <View style={s.statBody}>
@@ -354,49 +363,35 @@ function BusinessSummaryCard({
 }: {
   business: SellerProfileOverview["business"];
 }) {
-  const t = useTheme();
-  const s = useMemo(() => createProfileStyles(t), [t]);
-
   if (!business) {
     return (
-      <View style={s.businessCard}>
-        <View style={[s.iconBadge, s.phoneIconBadge]}>
-          <Icon name="house" size={20} color={t.colors.primary} />
-        </View>
-        <View style={s.businessText}>
-          <Text variant="subtitle">Información del negocio</Text>
-          <Text color="stateAnulated">
-            No encontramos un negocio asociado a este perfil.
-          </Text>
-        </View>
-      </View>
+      <GroupedList>
+        <GroupedListRow
+          icon="house"
+          label="Información del negocio"
+          description="No encontramos un negocio asociado a este perfil."
+          showChevron={false}
+          showSeparator={false}
+        />
+      </GroupedList>
     );
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() =>
-        router.push({
-          pathname: "/(detail)/business-profile",
-          params: { title: "Negocio", hideMenu: "true" },
-        })
-      }
-      style={s.businessCard}
-    >
-      <View style={[s.iconBadge, s.phoneIconBadge]}>
-        <Icon name="house" size={20} color={t.colors.primary} />
-      </View>
-      <View style={s.businessText}>
-        <Text variant="subtitle" maxLines={1} style={s.flexText}>
-          Información del negocio
-        </Text>
-        <Text color="stateAnulated" maxLines={2}>
-          {business.name || "Negocio sin nombre"} · Ver información del negocio
-        </Text>
-      </View>
-      <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} />
-    </Pressable>
+    <GroupedList>
+      <GroupedListRow
+        icon="house"
+        label="Información del negocio"
+        description={`${business.name || "Negocio sin nombre"} · Ver información del negocio`}
+        showSeparator={false}
+        onPress={() =>
+          router.push({
+            pathname: "/(detail)/business-profile",
+            params: { title: "Negocio", hideMenu: "true" },
+          })
+        }
+      />
+    </GroupedList>
   );
 }
 
@@ -439,58 +434,29 @@ async function refreshUnreadNotificationsCount(
   }
 }
 
-function ActionRow({
-  icon,
-  label,
-  unreadCount,
-  accessibilityLabel,
-  destructive = false,
-  onPress,
-}: {
-  icon: "bell" | "help-circle" | "log-out";
-  label: string;
-  unreadCount?: number;
-  accessibilityLabel?: string;
-  destructive?: boolean;
-  onPress: () => void;
-}) {
+function NotificationCountPill({ count }: { count: number }) {
   const t = useTheme();
   const s = useMemo(() => createProfileStyles(t), [t]);
-  const color = destructive ? t.colors.error : t.colors.textDark;
-  const displayCount = Math.max(0, unreadCount ?? 0);
+  const displayCount = Math.max(0, count);
   const displayCountLabel = displayCount > 99 ? "99+" : String(displayCount);
 
+  if (displayCount <= 0) return null;
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      onPress={onPress}
-      style={s.actionRow}
+    <View
+      style={s.actionCountPill}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
     >
-      <Icon name={icon} size={22} color={color} />
-      <Text style={[s.actionLabel, { color }]}>{label}</Text>
-      {displayCount > 0 ? (
-        <View
-          style={s.actionCountPill}
-          accessibilityElementsHidden
-          importantForAccessibility="no"
-        >
-          <Text variant="label" color="backgroudWhite" style={s.actionCountText}>
-            {displayCountLabel}
-          </Text>
-        </View>
-      ) : null}
-      {!destructive ? (
-        <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} />
-      ) : null}
-    </Pressable>
+      <Text variant="small" color="backgroudWhite" style={s.actionCountText}>
+        {displayCountLabel}
+      </Text>
+    </View>
   );
 }
 
 function createProfileStyles(t: Theme) {
-  const cardSurface = {
-    ...t.glass.surface,
-  };
+  const cardSurface = createRoundedSurfaceStyle(t);
 
   return StyleSheet.create({
     content: {
@@ -508,10 +474,10 @@ function createProfileStyles(t: Theme) {
     iconButton: {
       width: 44,
       height: 44,
-      borderRadius: 22,
+      ...cardSurface,
+      borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      ...cardSurface,
     },
     loadingBox: {
       minHeight: 180,
@@ -521,7 +487,6 @@ function createProfileStyles(t: Theme) {
     },
     phoneCard: {
       minHeight: 76,
-      borderRadius: t.borders.md,
       ...cardSurface,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.md,
@@ -533,21 +498,6 @@ function createProfileStyles(t: Theme) {
       flex: 1,
       minWidth: 0,
       gap: 2,
-    },
-    businessCard: {
-      minHeight: 84,
-      borderRadius: t.borders.md,
-      ...cardSurface,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm + t.spacing.xs,
-    },
-    businessText: {
-      flex: 1,
-      minWidth: 0,
-      gap: t.spacing.xs,
     },
     flexText: {
       flexShrink: 1,
@@ -561,7 +511,6 @@ function createProfileStyles(t: Theme) {
       minHeight: 136,
       flex: 1,
       minWidth: 0,
-      borderRadius: t.borders.md,
       ...cardSurface,
       padding: t.spacing.md,
       justifyContent: Platform.OS === "android" ? "flex-start" : "space-between",
@@ -577,14 +526,10 @@ function createProfileStyles(t: Theme) {
       gap: t.spacing.md,
     },
     iconBadge: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
+      width: 32,
+      minHeight: 32,
       alignItems: "center",
       justifyContent: "center",
-    },
-    phoneIconBadge: {
-      backgroundColor: "rgba(131,163,30,0.14)",
     },
     statBody: {
       gap: t.spacing.xs,
@@ -603,21 +548,6 @@ function createProfileStyles(t: Theme) {
     },
     statWideDetail: {
       flexShrink: 1,
-    },
-    actionList: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-    },
-    actionRow: {
-      minHeight: 56,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
-    },
-    actionLabel: {
-      flex: 1,
     },
     actionCountPill: {
       minWidth: 28,

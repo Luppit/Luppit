@@ -5,6 +5,7 @@ import {
   PurchaseRequestAssistantSummary,
   PurchaseRequestAssistantUiState,
 } from "@/src/services/purchase.request.assistant.service";
+import type { ChatImage } from "@/src/components/inputChat/inputChat";
 import { getPurchaseRequestById, PurchaseRequest } from "@/src/services/purchase.request.service";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { router } from "expo-router";
@@ -14,6 +15,7 @@ export type ChatMessage = {
   id: string;
   sender: "user" | "assistant";
   text: string;
+  images?: ChatImage[];
 };
 
 type ChatSessionContextValue = {
@@ -35,7 +37,7 @@ type ChatSessionContextValue = {
   canPublish: boolean;
   showComposer: boolean;
   canCompose: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (payload: { text: string; images: ChatImage[] }) => Promise<void>;
   continueClarifying: () => Promise<void>;
   publishDraft: () => Promise<void>;
 };
@@ -96,6 +98,8 @@ function shouldOpenSummaryFromReply(value: string) {
     "enséñame el resumen",
   ].some((option) => normalized === option || normalized.includes(option));
 }
+
+const imageOnlyPrompt = "Adjunto imágenes de referencia para mi solicitud.";
 
 function toDetailRoutePurchaseRequest(
   purchaseRequest: PurchaseRequest
@@ -209,20 +213,26 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async ({ text, images }: { text: string; images: ChatImage[] }) => {
       const trimmed = text.trim();
-      if (!trimmed || isSendingMessage || isExecutingControl || status === "published") {
+      if (
+        (!trimmed && images.length === 0) ||
+        isSendingMessage ||
+        isExecutingControl ||
+        status === "published"
+      ) {
         return;
       }
 
       setMessages((prev) => [
         ...prev,
-        { id: createMessageId("user"), sender: "user", text: trimmed },
+        { id: createMessageId("user"), sender: "user", text: trimmed, images },
       ]);
 
       setIsSendingMessage(true);
       try {
         if (
+          images.length === 0 &&
           status === "ready" &&
           uiState !== "review" &&
           pendingAction === "ASK_SHOW_SUMMARY" &&
@@ -249,8 +259,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         }
 
         const result = await callPurchaseRequestAssistant({
-          prompt: trimmed,
+          prompt: trimmed || imageOnlyPrompt,
           draft_id: draftId,
+          images,
         });
         await syncAssistantState(result);
       } finally {

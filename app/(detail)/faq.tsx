@@ -1,7 +1,15 @@
 import { Icon } from "@/src/components/Icon";
-import GlassSurface from "@/src/components/glass/GlassSurface";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import {
+  createRoundedSurfaceStyle,
+  ROUNDED_SURFACE_RADIUS,
+} from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
+import { SUPPORT_EMAIL } from "@/src/config/appInfo";
 import { FaqListItem, getActiveFaqItems } from "@/src/services/faq.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
@@ -19,8 +27,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
-
-const SUPPORT_EMAIL = "soporte@luppit.com";
 
 if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -115,41 +121,19 @@ export default function FaqScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <GlassSurface
-        variant="surface"
-        blur="surface"
-        style={s.intro}
-        contentStyle={s.introContent}
-      >
-        <View style={s.introIconBadge}>
-          <Icon name="book-open" size={22} color={t.colors.primary} />
-        </View>
-        <View style={s.introText}>
-          <Text variant="subtitle">Preguntas frecuentes</Text>
-          <Text color="textMedium">
-            Encuentra respuestas rápidas sobre tu cuenta, solicitudes, ofertas y chats.
-          </Text>
-        </View>
-      </GlassSurface>
-
-      <GlassSurface
-        variant="surface"
-        blur="surface"
-        style={s.faqPanel}
-        contentStyle={s.faqPanelContent}
-      >
+      <GroupedListSection title="Preguntas frecuentes">
         {items.map((item, index) => (
           <FaqAccordionRow
             key={item.id}
             item={item}
-            isFirst={index === 0}
+            isLast={index === items.length - 1}
             isExpanded={expandedItemId === item.id}
             onToggle={() =>
               setExpandedItemId((current) => (current === item.id ? null : item.id))
             }
           />
         ))}
-      </GlassSurface>
+      </GroupedListSection>
 
       <SupportSection />
     </ScrollView>
@@ -157,9 +141,6 @@ export default function FaqScreen() {
 }
 
 function SupportSection() {
-  const t = useTheme();
-  const s = React.useMemo(() => createFaqStyles(t), [t]);
-
   const openSupportEmail = async () => {
     const subject = encodeURIComponent("Ayuda Luppit");
     const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}`;
@@ -172,39 +153,27 @@ function SupportSection() {
   };
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Enviar correo a soporte"
-      onPress={openSupportEmail}
-    >
-      <GlassSurface
-        variant="surface"
-        blur="surface"
-        style={s.supportCard}
-        contentStyle={s.supportContent}
-      >
-        <View style={s.supportIconBadge}>
-          <Icon name="life-buoy" size={22} color={t.colors.primary} />
-        </View>
-        <View style={s.supportText}>
-          <Text variant="subtitle">¿Necesitas más ayuda?</Text>
-          <Text color="textMedium">
-            Escríbenos a {SUPPORT_EMAIL} y te ayudamos con tu cuenta.
-          </Text>
-        </View>
-      </GlassSurface>
-    </Pressable>
+    <GroupedListSection title="Soporte">
+      <GroupedListRow
+        icon="life-buoy"
+        label="Contactar soporte"
+        description={`Escríbenos a ${SUPPORT_EMAIL}.`}
+        showSeparator={false}
+        accessibilityLabel="Enviar correo a soporte"
+        onPress={openSupportEmail}
+      />
+    </GroupedListSection>
   );
 }
 
 function FaqAccordionRow({
   item,
-  isFirst,
+  isLast,
   isExpanded,
   onToggle,
 }: {
   item: FaqListItem;
-  isFirst: boolean;
+  isLast: boolean;
   isExpanded: boolean;
   onToggle: () => void;
 }) {
@@ -217,7 +186,7 @@ function FaqAccordionRow({
   };
 
   return (
-    <View style={isFirst ? null : s.rowSeparator}>
+    <View>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: isExpanded }}
@@ -225,23 +194,24 @@ function FaqAccordionRow({
         onPress={toggleExpanded}
         style={s.questionRow}
       >
-        <Text variant="subtitleRegular" style={s.questionText}>
+        <Text variant="body" style={s.questionText}>
           {item.question}
         </Text>
         <Icon
           name={isExpanded ? "chevron-down" : "chevron-right"}
-          size={20}
+          size={18}
           color={t.colors.stateAnulated}
         />
       </Pressable>
 
       {isExpanded ? (
         <View style={s.answerBlock}>
-          <Text color="textMedium" style={s.answerText}>
+          <Text variant="body" color="textMedium" style={s.answerText}>
             {item.answer}
           </Text>
         </View>
       ) : null}
+      {!isLast ? <View style={s.rowInsetSeparator} /> : null}
     </View>
   );
 }
@@ -249,8 +219,8 @@ function FaqAccordionRow({
 function createFaqStyles(t: Theme, topContentInset = 0) {
   return StyleSheet.create({
     content: {
-      gap: t.spacing.md,
-      paddingTop: topContentInset + t.spacing.sm,
+      gap: t.spacing.lg,
+      paddingTop: topContentInset + t.spacing.md,
       paddingBottom: t.spacing.xl,
     },
     loadingBox: {
@@ -260,67 +230,12 @@ function createFaqStyles(t: Theme, topContentInset = 0) {
       gap: t.spacing.sm,
       paddingTop: topContentInset,
     },
-    intro: {
-      borderRadius: t.borders.md,
-    },
-    introContent: {
-      minHeight: 84,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-    },
-    introIconBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(131,163,30,0.14)",
-    },
-    introText: {
-      flex: 1,
-      gap: t.spacing.xs,
-    },
-    faqPanel: {
-      borderRadius: t.borders.md,
-    },
-    faqPanelContent: {
-      paddingHorizontal: t.spacing.md,
-    },
-    supportCard: {
-      borderRadius: t.borders.md,
-    },
-    supportContent: {
-      minHeight: 84,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-    },
-    supportIconBadge: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(131,163,30,0.14)",
-    },
-    supportText: {
-      flex: 1,
-      gap: t.spacing.xs,
-    },
-    rowSeparator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-    },
     questionRow: {
-      minHeight: 62,
+      minHeight: 68,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.md,
     },
     questionText: {
@@ -329,11 +244,18 @@ function createFaqStyles(t: Theme, topContentInset = 0) {
       color: t.colors.textDark,
     },
     answerBlock: {
-      paddingBottom: t.spacing.md,
-      paddingRight: t.spacing.lg,
+      paddingTop: t.spacing.xs,
+      paddingBottom: t.spacing.lg,
+      paddingHorizontal: t.spacing.md,
     },
     answerText: {
-      lineHeight: 22,
+      flexShrink: 1,
+      color: t.colors.textMedium,
+    },
+    rowInsetSeparator: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: t.spacing.md,
+      backgroundColor: "rgba(0,0,0,0.08)",
     },
     centerState: {
       flex: 1,
@@ -346,16 +268,15 @@ function createFaqStyles(t: Theme, topContentInset = 0) {
     emptyIconBadge: {
       width: 56,
       height: 56,
-      borderRadius: 28,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t.colors.backgroudWhite,
+      ...createRoundedSurfaceStyle(t),
       borderWidth: 1,
       borderColor: t.colors.border,
     },
     emptyDescription: {
       maxWidth: 300,
-      lineHeight: 22,
     },
     retryButton: {
       minHeight: 40,

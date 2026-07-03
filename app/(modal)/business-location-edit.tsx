@@ -317,7 +317,7 @@ function LocationOptionRow({
       <View style={s.optionText}>
         <Text maxLines={1}>{label}</Text>
         {description ? (
-          <Text variant="caption" color="stateAnulated" maxLines={1}>
+          <Text variant="small" color="stateAnulated" maxLines={1}>
             {description}
           </Text>
         ) : null}

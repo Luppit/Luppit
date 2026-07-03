@@ -109,12 +109,12 @@ export default function RatingInput({
   return (
     <View style={s.container}>
       {targetName ? (
-        <Text variant="subtitleRegular" style={s.targetName}>
+        <Text variant="body">
           {targetName}
         </Text>
       ) : null}
       {helperText ? (
-        <Text variant="caption" style={s.helperText}>
+        <Text variant="small" style={s.helperText}>
           {helperText}
         </Text>
       ) : null}
@@ -163,7 +163,7 @@ export default function RatingInput({
       ) : null}
 
       <View style={s.commentBlock}>
-        <Text variant="subtitleRegular" style={s.commentLabel}>
+        <Text variant="small" color="stateAnulated">
           Comentarios
         </Text>
         <View style={s.commentInputWrap}>

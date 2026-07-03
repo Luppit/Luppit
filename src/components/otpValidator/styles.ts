@@ -61,12 +61,10 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       borderColor: t.colors.primary,
     },
     inputText: {
+      ...t.typography.title,
       width: "100%",
       textAlign: "center",
       color: t.colors.textDark,
-      fontSize: 22,
-      lineHeight: 32,
-      fontWeight: "600",
       paddingVertical: 0,
       includeFontPadding: false,
     },

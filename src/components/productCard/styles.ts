@@ -1,10 +1,13 @@
+import {
+  createRoundedSurfaceStyle,
+  ROUNDED_SURFACE_RADIUS,
+} from "@/src/components/surface/styles";
 import { Theme } from "@/src/themes";
 import { TextStyle, ViewStyle } from "react-native";
 
 export type ProductCardStyles = {
   wrapper: ViewStyle;
   card: ViewStyle;
-  topSheen: ViewStyle;
   title: TextStyle;
   subtitle: TextStyle;
   bottomRow: ViewStyle;
@@ -22,20 +25,16 @@ export function createProductCardStyles(t: Theme): ProductCardStyles {
     wrapper: {
       width: "100%",
       alignSelf: "stretch",
-      borderRadius: 24,
-      ...t.glass.surface,
+      ...createRoundedSurfaceStyle(t),
     },
     card: {
       minHeight: 144,
-      borderRadius: 24,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.md,
       backgroundColor: "transparent",
       overflow: "hidden",
       gap: 8,
-    },
-    topSheen: {
-      ...t.glass.topHighlight,
     },
     title: {
       color: t.colors.textDark,
@@ -73,7 +72,6 @@ export function createProductCardStyles(t: Theme): ProductCardStyles {
     },
     offersTextActive: {
       color: t.colors.textDark,
-      fontFamily: t.typography.label.fontFamily,
     },
     offersTextInactive: {
       color: t.colors.textDark,
