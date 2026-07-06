@@ -75,7 +75,7 @@ export default function MarketplaceRequestCard({
         reasonLabel ? (
           <View style={s.reasonRow}>
             <Icon name="sparkles" size={16} color={t.colors.primary} />
-            <Text variant="body" maxLines={compact ? 1 : 2} style={s.reasonText}>
+            <Text variant="body" style={s.reasonText}>
               {reasonLabel}
             </Text>
           </View>
@@ -97,7 +97,7 @@ function createMarketplaceRequestCardStyles(t: Theme) {
   return StyleSheet.create({
     reasonRow: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: t.spacing.xs,
     },
     reasonText: {

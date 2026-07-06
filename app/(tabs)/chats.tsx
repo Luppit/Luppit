@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import RoleGate from "@/src/components/role/RoleGate";
@@ -324,52 +325,47 @@ function ChatsContent() {
         {hasActiveFilters ? (
           <View style={s.activeChipsRow}>
             {filters.searchValue ? (
-              <FilterChip
+              <LuppitChip
                 icon="search"
                 label={`Buscar: ${filters.searchValue}`}
-                accessibilityLabel="Quitar búsqueda"
                 onRemove={removeSearchFilter}
+                removeAccessibilityLabel="Quitar búsqueda"
               />
             ) : null}
 
             {filters.startDate ? (
-              <FilterChip
+              <LuppitChip
                 icon="sliders-horizontal"
                 label={`Desde ${formatFilterDate(filters.startDate)}`}
-                accessibilityLabel="Quitar fecha inicial"
                 onRemove={removeStartDateFilter}
+                removeAccessibilityLabel="Quitar fecha inicial"
               />
             ) : null}
 
             {filters.endDate ? (
-              <FilterChip
+              <LuppitChip
                 icon="sliders-horizontal"
                 label={`Hasta ${formatFilterDate(filters.endDate)}`}
-                accessibilityLabel="Quitar fecha final"
                 onRemove={removeEndDateFilter}
+                removeAccessibilityLabel="Quitar fecha final"
               />
             ) : null}
 
             {selectedCategoryLabels.map((category) => (
-              <FilterChip
+              <LuppitChip
                 key={category.id}
                 icon="tag"
                 label={category.label}
-                accessibilityLabel={`Quitar categoría ${category.label}`}
                 onRemove={() => removeCategoryFilter(category.id)}
+                removeAccessibilityLabel={`Quitar categoría ${category.label}`}
               />
             ))}
 
-            <Pressable
-              style={s.clearFiltersChip}
+            <LuppitChip
+              label="Limpiar"
               onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
-              accessibilityRole="button"
               accessibilityLabel="Limpiar filtros"
-            >
-              <Text variant="body" style={s.clearFiltersLabel}>
-                Limpiar
-              </Text>
-            </Pressable>
+            />
           </View>
         ) : null}
 
@@ -407,38 +403,6 @@ function ChatsContent() {
       </View>
       <ChatsTopBar title="Chats" accessory={toolbar} />
     </>
-  );
-}
-
-function FilterChip({
-  icon,
-  label,
-  accessibilityLabel,
-  onRemove,
-}: {
-  icon: React.ComponentProps<typeof Icon>["name"];
-  label: string;
-  accessibilityLabel: string;
-  onRemove: () => void;
-}) {
-  const t = useTheme();
-  const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
-
-  return (
-    <View style={s.activeChip}>
-      <Icon name={icon} size={16} color={t.colors.textDark} />
-      <Text variant="body" style={s.activeChipLabel} maxLines={1}>
-        {label}
-      </Text>
-      <Pressable
-        style={s.activeChipClose}
-        onPress={onRemove}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-      >
-        <Icon name="x" size={16} color={t.colors.textDark} />
-      </Pressable>
-    </View>
   );
 }
 
@@ -686,39 +650,6 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       flexDirection: "row",
       flexWrap: "wrap",
       gap: t.spacing.sm,
-    },
-    activeChip: {
-      maxWidth: "100%",
-      minHeight: 36,
-      borderRadius: 999,
-      ...t.glass.chip,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      paddingLeft: t.spacing.sm,
-      paddingRight: t.spacing.xs,
-    },
-    activeChipLabel: {
-      color: t.colors.textDark,
-      flexShrink: 1,
-    },
-    activeChipClose: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    clearFiltersChip: {
-      minHeight: 36,
-      borderRadius: 999,
-      ...t.glass.headerControl,
-      paddingHorizontal: t.spacing.md,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    clearFiltersLabel: {
-      color: t.colors.textDark,
     },
     chatList: {
       gap: 0,

@@ -1,5 +1,10 @@
 import { insertRoleToProfile } from "@/src/services/profile.role.service";
-import { createProfile, getProfileByPhone, Profile } from "@/src/services/profile.service";
+import {
+  createProfile,
+  getProfileByPhone,
+  getProfileByUserId,
+  Profile,
+} from "@/src/services/profile.service";
 import { getRoleByName, Roles } from "@/src/services/role.service";
 import { router } from "expo-router";
 import { supabase } from "./client";
@@ -8,19 +13,21 @@ import { AppError, fromAppError } from "./errors";
 export type AuthMethod = "sms";
 export type AuthEvent = "SignIn" | "SignUp";
 
-async function getLoggedInUserId(): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
-  const session = await getSession();
-  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
-  return { ok: true, data: session.user.id };
-}
-
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
+  const isRegistered = shouldCreateUser
+    ? await isPhoneNumberRegistered(phone)
+    : false;
+  if (isRegistered) {
+    throw new Error("El número de teléfono ya está registrado.");
+  }
+
   const existingProfile = await getProfileByPhone(phone);
   if (existingProfile?.ok === false) throw new Error(existingProfile.error.message);
   if (shouldCreateUser && existingProfile?.ok === true) {
     throw new Error("El número de teléfono ya está registrado.");
   }
+
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
@@ -29,6 +36,15 @@ async function sendPhoneOtp(phone: string, event: AuthEvent) {
   });
   if (error) throw error;
   return data;
+}
+
+async function isPhoneNumberRegistered(phone: string) {
+  const { data, error } = await (supabase as any).rpc(
+    "phone_number_is_registered",
+    { p_phone: phone }
+  );
+  if (error) throw error;
+  return data === true;
 }
 
 async function VerifyPhoneOtpInternal(
@@ -45,22 +61,46 @@ async function VerifyPhoneOtpInternal(
   });
   if (error) throw error;
   if (!userProfile) return data;
-  await supabase.auth.refreshSession();
-  const profileResult = await updateUserProfile(userProfile);
+  const verifiedUserId = data.user?.id ?? data.session?.user.id;
+  if (!verifiedUserId) throw new Error(fromAppError("auth").message);
+  const profileResult = await createVerifiedUserProfile(userProfile, verifiedUserId);
   if (profileResult.ok === false) throw new Error(profileResult.error.message);
   await addRoleToProfile(profileResult.data.id, isSeller);
   if (onProfileCreated) {
     await onProfileCreated(profileResult.data);
   }
-  await supabase.auth.refreshSession();
   return data;
 }
 
-async function updateUserProfile(profileData: Profile) {
-  const userId = await getLoggedInUserId();
-  if (!userId.ok) throw new Error(userId.error.message);
-  profileData.user_id = userId.data;
-  return await createProfile(profileData);
+async function createVerifiedUserProfile(
+  profileData: Profile,
+  userId: string
+): Promise<{ ok: true; data: Profile } | { ok: false; error: AppError }> {
+  const existingProfile = await getProfileByUserId(userId);
+  if (existingProfile?.ok === false) return existingProfile;
+  if (existingProfile?.ok === true) {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        message: "El número de teléfono ya está registrado.",
+      } satisfies AppError,
+    };
+  }
+
+  const profileResult = await createProfile({ ...profileData, user_id: userId });
+  if (profileResult.ok === false && profileResult.error.code === "23505") {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        message: "El número de teléfono ya está registrado.",
+        code: profileResult.error.code,
+      } satisfies AppError,
+    };
+  }
+
+  return profileResult;
 }
 
 export async function signInWithPhoneOtp(phone: string) {

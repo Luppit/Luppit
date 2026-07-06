@@ -327,6 +327,10 @@ export default function ConversationLayout() {
           image_path: null,
           image_url: null,
           visible_to_role_id: null,
+          buyer_open_state: null,
+          buyer_opened_at: null,
+          seller_open_state: null,
+          seller_opened_at: null,
           created_at: new Date(now).toISOString(),
         });
       }
@@ -341,6 +345,10 @@ export default function ConversationLayout() {
           image_path: null,
           image_url: image.uri,
           visible_to_role_id: null,
+          buyer_open_state: null,
+          buyer_opened_at: null,
+          seller_open_state: null,
+          seller_opened_at: null,
           created_at: new Date(now + nextMessages.length).toISOString(),
         });
       });
@@ -517,6 +525,15 @@ export default function ConversationLayout() {
           router.push({
             pathname: "/(detail)/faq",
             params: { title: "Ayuda", hideMenu: "true" },
+          });
+        } else if (action.executor.target === "detail.seller_business") {
+          router.push({
+            pathname: "/(detail)/seller-business",
+            params: {
+              title: "Negocio",
+              hideMenu: "true",
+              conversationId,
+            },
           });
         } else if (action.executor.target !== "popup.close") {
           showInfo("Acción local", `Comando cliente: ${action.executor.target}`);

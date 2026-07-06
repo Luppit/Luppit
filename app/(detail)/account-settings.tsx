@@ -3,8 +3,9 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
-import { PRIVACY_POLICY_URL, SUPPORT_EMAIL, TERMS_URL } from "@/src/config/appInfo";
+import { SUPPORT_EMAIL } from "@/src/config/appInfo";
 import { signOut } from "@/src/lib/supabase";
+import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { formatLocationLabel } from "@/src/services/location.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
@@ -16,6 +17,7 @@ import {
   requestCurrentProfileAccountDeletion,
 } from "@/src/services/profile.service";
 import { Roles } from "@/src/services/role.service";
+import { openSupportEmail } from "@/src/services/support.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
@@ -24,7 +26,6 @@ import Constants from "expo-constants";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Linking,
   ScrollView,
   StyleSheet,
 } from "react-native";
@@ -178,7 +179,6 @@ function AccountSettingsContent({
   );
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const isSeller = role === Roles.SELLER;
-  const homePresetSurface = isSeller ? "seller_home" : "buyer_home";
 
   return (
     <ScrollView
@@ -232,67 +232,50 @@ function AccountSettingsContent({
         />
       </GroupedListSection>
 
-      <GroupedListSection title="Preferencias">
-        <GroupedListRow
-          icon="house"
-          label="Vista de inicio"
-          showSeparator={isSeller}
-          onPress={() =>
-            router.push({
-              pathname: "/(detail)/home-preset",
-              params: {
-                title: "Vista de inicio",
-                hideMenu: "true",
-                surface: homePresetSurface,
-              },
-            })
-          }
-        />
-        {isSeller ? (
-          <>
-            <GroupedListRow
-              icon="house"
-              label="Perfil del negocio"
-              onPress={() =>
+      {isSeller ? (
+        <GroupedListSection title="Preferencias">
+          <GroupedListRow
+            icon="house"
+            label="Perfil del negocio"
+            onPress={() =>
+              router.push({
+                pathname: "/(detail)/business-profile",
+                params: { title: "Negocio", hideMenu: "true" },
+              })
+            }
+          />
+          <GroupedListRow
+            icon="tag"
+            label="Categorías de venta"
+            onPress={business
+              ? () =>
                 router.push({
-                  pathname: "/(detail)/business-profile",
-                  params: { title: "Negocio", hideMenu: "true" },
+                  pathname: "/(detail)/business-categories",
+                  params: {
+                    title: "Categorías de venta",
+                    hideMenu: "true",
+                  },
                 })
-              }
-            />
-            <GroupedListRow
-              icon="tag"
-              label="Categorías de venta"
-              onPress={business
-                ? () =>
-                  router.push({
-                    pathname: "/(detail)/business-categories",
-                    params: {
-                      title: "Categorías de venta",
-                      hideMenu: "true",
-                    },
-                  })
-                : undefined}
-            />
-            <GroupedListRow
-              icon="map-pin"
-              label="Ubicación del negocio"
-              showSeparator={false}
-              onPress={business
-                ? () =>
-                  router.push({
-                    pathname: "/(modal)/business-location-edit",
-                    params: {
-                      title: "Editar ubicación",
-                      locationId: business.location?.id ?? "",
-                      locationLabel: formatLocationLabel(business.location),
-                    },
-                  })
-                : undefined}
-            />
-          </>
-        ) : null}
-      </GroupedListSection>
+              : undefined}
+          />
+          <GroupedListRow
+            icon="map-pin"
+            label="Ubicación del negocio"
+            showSeparator={false}
+            onPress={business
+              ? () =>
+                router.push({
+                  pathname: "/(modal)/business-location-edit",
+                  params: {
+                    title: "Editar ubicación",
+                    locationId: business.location?.id ?? "",
+                    locationLabel: formatLocationLabel(business.location),
+                  },
+                })
+              : undefined}
+          />
+        </GroupedListSection>
+      ) : null}
 
       <GroupedListSection title="Notificaciones y ayuda">
         <GroupedListRow
@@ -318,6 +301,7 @@ function AccountSettingsContent({
         <GroupedListRow
           icon="life-buoy"
           label="Contactar soporte"
+          description={`Escríbenos a ${SUPPORT_EMAIL}.`}
           showSeparator={false}
           onPress={() => void openSupportEmail()}
         />
@@ -327,12 +311,22 @@ function AccountSettingsContent({
         <GroupedListRow
           icon="file-text"
           label="Política de privacidad"
-          onPress={() => void openLegalUrl(PRIVACY_POLICY_URL, "política de privacidad")}
+          onPress={() =>
+            openLegalDocument(
+              LEGAL_DOCUMENT_CODES.privacyPolicy,
+              "Política de privacidad"
+            )
+          }
         />
         <GroupedListRow
           icon="file-pen-line"
           label="Términos y condiciones"
-          onPress={() => void openLegalUrl(TERMS_URL, "términos y condiciones")}
+          onPress={() =>
+            openLegalDocument(
+              LEGAL_DOCUMENT_CODES.termsConditions,
+              "Términos y condiciones"
+            )
+          }
         />
         <GroupedListRow
           icon="info"
@@ -361,28 +355,11 @@ function AccountSettingsContent({
   );
 }
 
-async function openSupportEmail() {
-  const subject = encodeURIComponent("Ayuda Luppit");
-  const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}`;
-
-  try {
-    await Linking.openURL(url);
-  } catch {
-    showError("No se pudo abrir el correo", `Escríbenos a ${SUPPORT_EMAIL}.`);
-  }
-}
-
-async function openLegalUrl(url: string, label: string) {
-  if (!url) {
-    showError("Enlace pendiente", `Configura la URL de ${label} antes del lanzamiento.`);
-    return;
-  }
-
-  try {
-    await Linking.openURL(url);
-  } catch {
-    showError("No se pudo abrir el enlace", "Intenta nuevamente.");
-  }
+function openLegalDocument(code: string, title: string) {
+  router.push({
+    pathname: "/(detail)/legal-document",
+    params: { code, title, hideMenu: "true" },
+  });
 }
 
 function openSignOutConfirmation() {

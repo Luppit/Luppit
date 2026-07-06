@@ -1,8 +1,11 @@
 import { Theme } from "@/src/themes";
 import { Platform, TextStyle, ViewStyle } from "react-native";
 
+const SOFT_BORDER_COLOR = "rgba(0,0,0,0.08)";
+
 export type RatingInputStyles = {
   container: ViewStyle;
+  label: TextStyle;
   helperText: TextStyle;
   starsRow: ViewStyle;
   starButton: ViewStyle;
@@ -21,12 +24,16 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
     container: {
       gap: t.spacing.md,
     },
+    label: {
+      color: t.colors.textDark,
+    },
     helperText: {
       color: t.colors.stateAnulated,
     },
     starsRow: {
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       gap: t.spacing.xs,
     },
     starButton: {
@@ -45,7 +52,7 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
       paddingHorizontal: t.spacing.md,
       borderRadius: 999,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.backgroudWhite,
@@ -64,12 +71,12 @@ export function createRatingInputStyles(t: Theme): RatingInputStyles {
       gap: t.spacing.sm,
     },
     commentInputWrap: {
-      minHeight: 150,
+      minHeight: 136,
       borderWidth: 1,
       borderRadius: t.borders.md,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.backgroudWhite,
-      paddingHorizontal: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
     },
     commentInput: {

@@ -1,6 +1,8 @@
 import { Theme } from "@/src/themes";
 import { Platform, TextStyle, ViewStyle } from "react-native";
 
+const SOFT_BORDER_COLOR = "rgba(0,0,0,0.08)";
+
 export type OtpValidatorStyles = {
   container: ViewStyle;
   label: TextStyle;
@@ -48,7 +50,7 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       height: 56,
       borderRadius: t.borders.md,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: t.colors.backgroudWhite,

@@ -108,6 +108,10 @@ export default function RatingInput({
 
   return (
     <View style={s.container}>
+      <Text variant="body" style={s.label}>
+        {label}
+      </Text>
+
       {targetName ? (
         <Text variant="body">
           {targetName}

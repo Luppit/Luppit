@@ -1,5 +1,5 @@
 import { Icon } from "@/src/components/Icon";
-import GlassSurface from "@/src/components/glass/GlassSurface";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
@@ -173,6 +173,12 @@ export default function GlobalPopupHost() {
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
   const summaryDescriptionMaxHeight = Math.round(windowHeight * 0.45);
   const helperContentMaxHeight = Math.round(windowHeight * 0.62);
+  const sheetMaxHeight = Math.round(windowHeight * 0.9);
+  const sheetContentMaxHeight = Math.round(windowHeight * 0.68);
+  const sheetTopPadding = Math.max(insets.top, t.spacing.md);
+  const sheetBottomPadding = isKeyboardVisible
+    ? t.spacing.sm
+    : Math.max(insets.bottom, t.spacing.md);
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -519,6 +525,9 @@ export default function GlobalPopupHost() {
                     s.summaryActionButton,
                     isSingle ? s.summaryActionButtonSingle : null,
                     { backgroundColor },
+                    backgroundColor !== t.colors.backgroudWhite
+                      ? { borderColor: backgroundColor }
+                      : null,
                     isDisabled && !isPending ? { opacity: 0.55 } : null,
                   ]}
                   onPress={() => {
@@ -652,24 +661,29 @@ export default function GlobalPopupHost() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={0}
         >
-          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <View
+            style={[
+              s.bottomSheetFrame,
+              {
+                paddingTop: sheetTopPadding,
+                paddingBottom: sheetBottomPadding,
+              },
+            ]}
+          >
             <Animated.View
-              style={{
-                transform: [{ translateY }],
-              }}
+              style={[
+                s.bottomSheet,
+                {
+                  maxHeight: sheetMaxHeight,
+                  transform: [{ translateY }],
+                },
+              ]}
             >
-              <GlassSurface
-                variant="sheet"
-                blur="sheet"
-                highlight
-                highlightStyle={s.bottomSheetHighlight}
-                clipStyle={s.bottomSheetClip}
+              <View
                 style={[
                   s.bottomSheet,
                   {
-                    paddingBottom: isKeyboardVisible
-                      ? t.spacing.sm
-                      : Math.max(insets.bottom, t.spacing.sm),
+                    paddingBottom: t.spacing.sm,
                   },
                 ]}
                 onTouchStart={Keyboard.dismiss}
@@ -685,146 +699,132 @@ export default function GlobalPopupHost() {
                 </View>
                 {filterConfig ? (
                   <>
-                    <View style={s.section}>
-                      <View style={s.summaryHeaderBlock}>
-                        <View style={s.summaryHeader}>
-                          <Text variant="subtitle" style={s.summaryTitle}>
-                            {filterConfig.title}
-                          </Text>
-                        </View>
-                        <View style={s.summaryHeaderSeparator} />
-                      </View>
-
-                      {filterConfig.searchField ? (
-                        <View style={s.filterSection}>
-                          <Text variant="small">
-                            {filterConfig.searchField.label}
-                          </Text>
-                          <TextField
-                            value={filterSearchValue}
-                            onChangeText={setFilterSearchValue}
-                            placeholder={filterConfig.searchField.placeholder}
-                            baseContainerStyle={{ marginBottom: 0 }}
-                            inputContainerStyle={s.filterInputContainer}
-                            inputStyle={s.filterInput}
-                          />
-                        </View>
-                      ) : null}
-
-                      {filterConfig.dateRangeField ? (
-                        <View style={s.filterSection}>
-                          <Text variant="small">
-                            {filterConfig.dateRangeField.label}
-                          </Text>
-                          <View style={s.filterDateRow}>
-                            <Pressable
-                              style={s.filterDateField}
-                              onPress={() => openDatePicker("start")}
-                            >
-                              <Text
-                                variant="body"
-                                style={s.filterDateFieldInput}
-                                color={filterStartDate ? "textDark" : "stateAnulated"}
-                                maxLines={1}
-                              >
-                                {filterStartDate || filterConfig.dateRangeField.startPlaceholder || ""}
-                              </Text>
-                              <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
-                            </Pressable>
-
-                            <Pressable
-                              style={s.filterDateField}
-                              onPress={() => openDatePicker("end")}
-                            >
-                              <Text
-                                variant="body"
-                                style={s.filterDateFieldInput}
-                                color={filterEndDate ? "textDark" : "stateAnulated"}
-                                maxLines={1}
-                              >
-                                {filterEndDate || filterConfig.dateRangeField.endPlaceholder || ""}
-                              </Text>
-                              <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
-                            </Pressable>
+                    <ScrollView
+                      style={[
+                        s.sheetContentScroll,
+                        { maxHeight: sheetContentMaxHeight },
+                      ]}
+                      contentContainerStyle={s.sheetContentScrollContent}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                    >
+                      <View style={s.section}>
+                        <View style={s.summaryHeaderBlock}>
+                          <View style={s.summaryHeader}>
+                            <Text variant="subtitle" style={s.summaryTitle}>
+                              {filterConfig.title}
+                            </Text>
                           </View>
+                          <View style={s.summaryHeaderSeparator} />
                         </View>
-                      ) : null}
 
-                      {filterConfig.chipGroup ? (
-                        <View style={s.filterSection}>
-                          <Text variant="small">
-                            {filterConfig.chipGroup.label}
-                          </Text>
-                          <View style={s.filterChipsRow}>
-                            {filterConfig.chipGroup.options.map((option) => {
-                              const isSelected = selectedFilterChipIds.includes(option.id);
-
-                              return (
-                                <Pressable
-                                  key={option.id}
-                                  onPress={() => handleFilterChipPress(option.id)}
-                                  style={[
-                                    s.filterChip,
-                                    isSelected ? s.filterChipSelected : null,
-                                  ]}
-                                >
-                                  <Text
-                                    variant="body"
-                                    style={[
-                                      s.filterChipLabel,
-                                      isSelected ? s.filterChipLabelSelected : null,
-                                    ]}
-                                  >
-                                    {option.label}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      ) : null}
-
-                      {filterConfig.chipGroups?.map((group) => {
-                        const groupId = group.id?.trim();
-                        if (!groupId) return null;
-
-                        return (
-                          <View key={groupId} style={s.filterSection}>
+                        {filterConfig.searchField ? (
+                          <View style={s.filterSection}>
                             <Text variant="small">
-                              {group.label}
+                              {filterConfig.searchField.label}
+                            </Text>
+                            <TextField
+                              value={filterSearchValue}
+                              onChangeText={setFilterSearchValue}
+                              placeholder={filterConfig.searchField.placeholder}
+                              baseContainerStyle={{ marginBottom: 0 }}
+                              inputContainerStyle={s.filterInputContainer}
+                              inputStyle={s.filterInput}
+                            />
+                          </View>
+                        ) : null}
+
+                        {filterConfig.dateRangeField ? (
+                          <View style={s.filterSection}>
+                            <Text variant="small">
+                              {filterConfig.dateRangeField.label}
+                            </Text>
+                            <View style={s.filterDateRow}>
+                              <Pressable
+                                style={s.filterDateField}
+                                onPress={() => openDatePicker("start")}
+                              >
+                                <Text
+                                  variant="body"
+                                  style={s.filterDateFieldInput}
+                                  color={filterStartDate ? "textDark" : "stateAnulated"}
+                                  maxLines={1}
+                                >
+                                  {filterStartDate || filterConfig.dateRangeField.startPlaceholder || ""}
+                                </Text>
+                                <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                              </Pressable>
+
+                              <Pressable
+                                style={s.filterDateField}
+                                onPress={() => openDatePicker("end")}
+                              >
+                                <Text
+                                  variant="body"
+                                  style={s.filterDateFieldInput}
+                                  color={filterEndDate ? "textDark" : "stateAnulated"}
+                                  maxLines={1}
+                                >
+                                  {filterEndDate || filterConfig.dateRangeField.endPlaceholder || ""}
+                                </Text>
+                                <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                              </Pressable>
+                            </View>
+                          </View>
+                        ) : null}
+
+                        {filterConfig.chipGroup ? (
+                          <View style={s.filterSection}>
+                            <Text variant="small">
+                              {filterConfig.chipGroup.label}
                             </Text>
                             <View style={s.filterChipsRow}>
-                              {group.options.map((option) => {
-                                const isSelected = (selectedFilterChipGroupIds[groupId] ?? []).includes(
-                                  option.id
-                                );
+                              {filterConfig.chipGroup.options.map((option) => {
+                                const isSelected = selectedFilterChipIds.includes(option.id);
 
                                 return (
-                                  <Pressable
+                                  <LuppitChip
                                     key={option.id}
-                                    onPress={() => handleFilterChipGroupPress(groupId, option.id)}
-                                    style={[
-                                      s.filterChip,
-                                      isSelected ? s.filterChipSelected : null,
-                                    ]}
-                                  >
-                                    <Text
-                                      variant="body"
-                                      style={[
-                                        s.filterChipLabel,
-                                        isSelected ? s.filterChipLabelSelected : null,
-                                      ]}
-                                    >
-                                      {option.label}
-                                    </Text>
-                                  </Pressable>
+                                    label={option.label}
+                                    selected={isSelected}
+                                    onPress={() => handleFilterChipPress(option.id)}
+                                  />
                                 );
                               })}
                             </View>
                           </View>
-                        );
-                      })}
-                    </View>
+                        ) : null}
+
+                        {filterConfig.chipGroups?.map((group) => {
+                          const groupId = group.id?.trim();
+                          if (!groupId) return null;
+
+                          return (
+                            <View key={groupId} style={s.filterSection}>
+                              <Text variant="small">
+                                {group.label}
+                              </Text>
+                              <View style={s.filterChipsRow}>
+                                {group.options.map((option) => {
+                                  const isSelected = (selectedFilterChipGroupIds[groupId] ?? []).includes(
+                                    option.id
+                                  );
+
+                                  return (
+                                    <LuppitChip
+                                      key={option.id}
+                                      label={option.label}
+                                      selected={isSelected}
+                                      onPress={() => handleFilterChipGroupPress(groupId, option.id)}
+                                    />
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
 
                     <View style={s.filterActionsRow}>
                       <Pressable
@@ -857,202 +857,232 @@ export default function GlobalPopupHost() {
                 ) : helperConfig ? (
                   renderHelperContent(helperConfig, closePopup)
                 ) : sortConfig ? (
-                  <View style={s.section}>
-                    <View style={s.summaryHeaderBlock}>
-                      <View style={s.summaryHeader}>
-                        <Text variant="subtitle" style={s.summaryTitle}>
-                          {sortConfig.title}
-                        </Text>
+                  <ScrollView
+                    style={[
+                      s.sheetContentScroll,
+                      { maxHeight: sheetContentMaxHeight },
+                    ]}
+                    contentContainerStyle={s.sheetContentScrollContent}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                  >
+                    <View style={s.section}>
+                      <View style={s.summaryHeaderBlock}>
+                        <View style={s.summaryHeader}>
+                          <Text variant="subtitle" style={s.summaryTitle}>
+                            {sortConfig.title}
+                          </Text>
+                        </View>
+                        <View style={s.summaryHeaderSeparator} />
                       </View>
-                      <View style={s.summaryHeaderSeparator} />
-                    </View>
 
-                    <View style={s.sortOptionsList}>
-                      {sortConfig.options.map((option, index) => {
-                        const isSelected = selectedSortOptionId === option.id;
+                      <View style={s.sortOptionsList}>
+                        {sortConfig.options.map((option, index) => {
+                          const isSelected = selectedSortOptionId === option.id;
+
+                          return (
+                            <React.Fragment key={option.id}>
+                              {index > 0 ? <View style={s.sortSeparator} /> : null}
+                              <Pressable
+                                style={s.sortOptionButton}
+                                onPress={() => handleSortOptionPress(option.id)}
+                                accessibilityRole="radio"
+                                accessibilityState={{ checked: isSelected }}
+                              >
+                                <View
+                                  style={[
+                                    s.sortRadioOuter,
+                                    isSelected ? s.sortRadioOuterSelected : null,
+                                  ]}
+                                >
+                                  {isSelected ? <View style={s.sortRadioInner} /> : null}
+                                </View>
+                                <Text variant="body" style={s.sortOptionLabel}>
+                                  {option.label}
+                                </Text>
+                              </Pressable>
+                            </React.Fragment>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </ScrollView>
+                ) : profileSwitcherConfig ? (
+                  <ScrollView
+                    style={[
+                      s.sheetContentScroll,
+                      { maxHeight: sheetContentMaxHeight },
+                    ]}
+                    contentContainerStyle={s.sheetContentScrollContent}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                  >
+                    <View style={s.profileSwitcherSection}>
+                      {profileSwitcherConfig.profiles.map((profile, index) => {
+                        const hasUnreadNotifications =
+                          typeof profile.unreadNotificationCount === "number" &&
+                          profile.unreadNotificationCount > 0;
 
                         return (
-                          <React.Fragment key={option.id}>
-                            {index > 0 ? <View style={s.sortSeparator} /> : null}
+                          <React.Fragment key={profile.id}>
+                            {index > 0 ? <View style={s.profileSwitcherSeparator} /> : null}
                             <Pressable
-                              style={s.sortOptionButton}
-                              onPress={() => handleSortOptionPress(option.id)}
-                              accessibilityRole="radio"
-                              accessibilityState={{ checked: isSelected }}
+                              disabled={profile.isActive}
+                              style={[
+                                s.profileSwitcherRow,
+                                profile.isActive ? s.profileSwitcherRowActive : null,
+                              ]}
+                              onPress={() => handleProfileSwitcherPress(index)}
+                              accessibilityRole="button"
                             >
-                              <View
-                                style={[
-                                  s.sortRadioOuter,
-                                  isSelected ? s.sortRadioOuterSelected : null,
-                                ]}
-                              >
-                                {isSelected ? <View style={s.sortRadioInner} /> : null}
+                              <View style={s.profileSwitcherAvatar}>
+                                <Text variant="subtitle" maxLines={1} style={s.profileSwitcherInitials}>
+                                  {getInitials(profile.title)}
+                                </Text>
                               </View>
-                              <Text variant="body" style={s.sortOptionLabel}>
-                                {option.label}
-                              </Text>
+
+                              <View style={s.profileSwitcherContent}>
+                                <View style={s.profileSwitcherTitleRow}>
+                                  <Text variant="subtitle" maxLines={1} style={s.profileSwitcherTitle}>
+                                    {profile.title}
+                                  </Text>
+                                  {profile.isActive ? <StatusChip label="Activo" /> : null}
+                                </View>
+                                <View style={s.profileSwitcherMetaRow}>
+                                  {hasUnreadNotifications ? (
+                                    <View style={s.profileSwitcherMetaDot} />
+                                  ) : null}
+                                  <Text
+                                    variant="body"
+                                    maxLines={1}
+                                    style={s.profileSwitcherMetaText}
+                                  >
+                                    {formatUnreadNotificationCount(profile.unreadNotificationCount)}
+                                  </Text>
+                                </View>
+                              </View>
                             </Pressable>
                           </React.Fragment>
                         );
                       })}
                     </View>
-                  </View>
-                ) : profileSwitcherConfig ? (
-                  <View style={s.profileSwitcherSection}>
-                    {profileSwitcherConfig.profiles.map((profile, index) => {
-                      const hasUnreadNotifications =
-                        typeof profile.unreadNotificationCount === "number" &&
-                        profile.unreadNotificationCount > 0;
-
-                      return (
-                        <React.Fragment key={profile.id}>
-                          {index > 0 ? <View style={s.profileSwitcherSeparator} /> : null}
-                          <Pressable
-                            disabled={profile.isActive}
-                            style={[
-                              s.profileSwitcherRow,
-                              profile.isActive ? s.profileSwitcherRowActive : null,
-                            ]}
-                            onPress={() => handleProfileSwitcherPress(index)}
-                            accessibilityRole="button"
-                          >
-                            <View style={s.profileSwitcherAvatar}>
-                              <Text variant="subtitle" maxLines={1} style={s.profileSwitcherInitials}>
-                                {getInitials(profile.title)}
-                              </Text>
-                            </View>
-
-                            <View style={s.profileSwitcherContent}>
-                              <View style={s.profileSwitcherTitleRow}>
-                                <Text variant="subtitle" maxLines={1} style={s.profileSwitcherTitle}>
-                                  {profile.title}
-                                </Text>
-                                {profile.isActive ? <StatusChip label="Activo" /> : null}
-                              </View>
-                              <View style={s.profileSwitcherMetaRow}>
-                                {hasUnreadNotifications ? (
-                                  <View style={s.profileSwitcherMetaDot} />
-                                ) : null}
-                                <Text
-                                  variant="body"
-                                  maxLines={1}
-                                  style={s.profileSwitcherMetaText}
-                                >
-                                  {formatUnreadNotificationCount(profile.unreadNotificationCount)}
-                                </Text>
-                              </View>
-                            </View>
-                          </Pressable>
-                        </React.Fragment>
-                      );
-                    })}
-                  </View>
+                  </ScrollView>
                 ) : summaryConfig ? (
                 <>
-                  <View style={s.section}>
-                    <View style={s.summaryHeaderBlock}>
-                      <View style={s.summaryHeader}>
-                        <Text variant="subtitle" style={s.summaryTitle}>
-                          {summaryConfig.title}
-                        </Text>
-                        {summaryConfig.icon ? (
-                          <Icon name={summaryConfig.icon} size={20} color={t.colors.textDark} />
-                        ) : null}
-                      </View>
-                      <View style={s.summaryHeaderSeparator} />
-                    </View>
-
-                    {summaryConfig.descriptionPlacement === "afterRows"
-                      ? null
-                      : renderSummaryDescription()}
-
-                    {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
-                      <View style={s.summaryRowsList}>
-                        {summaryConfig.rows.map((row) => (
-                          <View key={`${row.label}-${row.value}`} style={s.summaryRowBlock}>
-                            <Text variant="body" style={s.summaryRowLabel}>
-                              {row.label}
-                            </Text>
-                            <Text variant="body" style={s.summaryRowValue}>
-                              {row.value}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
-
-                    {summaryConfig.descriptionPlacement === "afterRows"
-                      ? renderSummaryDescription()
-                      : null}
-
-                    {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
-                      <View style={s.summaryInputsList}>
-                        {summaryConfig.inputs.map((input) => {
-                          if (input.kind === "otp") {
-                            const helper = getOtpHelperConfig(input);
-
-                            return (
-                              <OtpValidator
-                                key={input.id}
-                                label={input.label}
-                                helperText={input.helper_text}
-                                otpLength={input.otp_length ?? 4}
-                                onHelperPress={
-                                  helper
-                                    ? () => {
-                                        Keyboard.dismiss();
-                                        setExpandedHelperSectionIds([]);
-                                        setInlineHelperConfig(helper);
-                                      }
-                                    : undefined
-                                }
-                                onChange={(value) => input.onValueChange?.(value)}
-                              />
-                            );
-                          }
-
-                          if (input.kind === "rating") {
-                            return (
-                              <RatingInput
-                                key={input.id}
-                                label={input.label}
-                                helperText={input.helper_text}
-                                componentConfig={input.component_config}
-                                onChange={(value) => input.onValueChange?.(value)}
-                              />
-                            );
-                          }
-
-                          return null;
-                        })}
-                      </View>
-                    ) : null}
-
-                    {summaryConfig.images && summaryConfig.images.length > 0 ? (
-                      <View style={s.summaryImageBlock}>
-                        <Text variant="body" style={s.summaryRowLabel}>
-                          Imágenes
-                        </Text>
-                        <View style={s.summaryImageContainer}>
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={s.summaryImageScrollContent}
-                          >
-                            {summaryConfig.images.map((image, index) => (
-                              <Pressable
-                                key={`${image.uri}-${index}`}
-                                style={s.summaryImageItem}
-                                onPress={() => setPreviewUri(image.uri)}
-                              >
-                                <Image source={{ uri: image.uri }} style={s.summaryImage} />
-                              </Pressable>
-                            ))}
-                          </ScrollView>
+                  <ScrollView
+                    style={[
+                      s.sheetContentScroll,
+                      { maxHeight: sheetContentMaxHeight },
+                    ]}
+                    contentContainerStyle={s.sheetContentScrollContent}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled
+                  >
+                    <View style={s.section}>
+                      <View style={s.summaryHeaderBlock}>
+                        <View style={s.summaryHeader}>
+                          <Text variant="subtitle" style={s.summaryTitle}>
+                            {summaryConfig.title}
+                          </Text>
+                          {summaryConfig.icon ? (
+                            <Icon name={summaryConfig.icon} size={20} color={t.colors.textDark} />
+                          ) : null}
                         </View>
+                        <View style={s.summaryHeaderSeparator} />
                       </View>
-                    ) : null}
-                  </View>
+
+                      {summaryConfig.descriptionPlacement === "afterRows"
+                        ? null
+                        : renderSummaryDescription()}
+
+                      {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
+                        <View style={s.summaryRowsList}>
+                          {summaryConfig.rows.map((row) => (
+                            <View key={`${row.label}-${row.value}`} style={s.summaryRowBlock}>
+                              <Text variant="body" style={s.summaryRowLabel}>
+                                {row.label}
+                              </Text>
+                              <Text variant="body" style={s.summaryRowValue}>
+                                {row.value}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {summaryConfig.descriptionPlacement === "afterRows"
+                        ? renderSummaryDescription()
+                        : null}
+
+                      {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
+                        <View style={s.summaryInputsList}>
+                          {summaryConfig.inputs.map((input) => {
+                            if (input.kind === "otp") {
+                              const helper = getOtpHelperConfig(input);
+
+                              return (
+                                <OtpValidator
+                                  key={input.id}
+                                  label={input.label}
+                                  helperText={input.helper_text}
+                                  otpLength={input.otp_length ?? 4}
+                                  onHelperPress={
+                                    helper
+                                      ? () => {
+                                          Keyboard.dismiss();
+                                          setExpandedHelperSectionIds([]);
+                                          setInlineHelperConfig(helper);
+                                        }
+                                      : undefined
+                                  }
+                                  onChange={(value) => input.onValueChange?.(value)}
+                                />
+                              );
+                            }
+
+                            if (input.kind === "rating") {
+                              return (
+                                <RatingInput
+                                  key={input.id}
+                                  label={input.label}
+                                  helperText={input.helper_text}
+                                  componentConfig={input.component_config}
+                                  onChange={(value) => input.onValueChange?.(value)}
+                                />
+                              );
+                            }
+
+                            return null;
+                          })}
+                        </View>
+                      ) : null}
+
+                      {summaryConfig.images && summaryConfig.images.length > 0 ? (
+                        <View style={s.summaryImageBlock}>
+                          <Text variant="body" style={s.summaryRowLabel}>
+                            Imágenes
+                          </Text>
+                          <View style={s.summaryImageContainer}>
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={s.summaryImageScrollContent}
+                            >
+                              {summaryConfig.images.map((image, index) => (
+                                <Pressable
+                                  key={`${image.uri}-${index}`}
+                                  style={s.summaryImageItem}
+                                  onPress={() => setPreviewUri(image.uri)}
+                                >
+                                  <Image source={{ uri: image.uri }} style={s.summaryImage} />
+                                </Pressable>
+                              ))}
+                            </ScrollView>
+                          </View>
+                        </View>
+                      ) : null}
+                    </View>
+                  </ScrollView>
 
                   {summaryConfig.actions && summaryConfig.actions.length > 0 ? (
                     <View style={s.summaryActionsRow}>
@@ -1081,6 +1111,9 @@ export default function GlobalPopupHost() {
                               s.summaryActionButton,
                               isSingle ? s.summaryActionButtonSingle : null,
                               { backgroundColor },
+                              backgroundColor !== t.colors.backgroudWhite
+                                ? { borderColor: backgroundColor }
+                                : null,
                               isDisabled && !isPending ? { opacity: 0.55 } : null,
                             ]}
                             onPress={() => handleSummaryActionPress(action)}
@@ -1100,40 +1133,52 @@ export default function GlobalPopupHost() {
                   ) : null}
                 </>
               ) : (
-                options.map((option, index) => {
-                  const textColor =
-                    option.textColorKey != null
-                      ? t.colors[option.textColorKey]
-                      : t.colors.textDark;
-                  const iconColor =
-                    option.iconColorKey != null
-                      ? t.colors[option.iconColorKey]
-                      : textColor;
+                <ScrollView
+                  style={[
+                    s.sheetContentScroll,
+                    { maxHeight: sheetContentMaxHeight },
+                  ]}
+                  contentContainerStyle={s.sheetContentScrollContent}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled
+                >
+                  <View style={s.optionList}>
+                    {options.map((option, index) => {
+                      const textColor =
+                        option.textColorKey != null
+                          ? t.colors[option.textColorKey]
+                          : t.colors.textDark;
+                      const iconColor =
+                        option.iconColorKey != null
+                          ? t.colors[option.iconColorKey]
+                          : textColor;
 
-                  return (
-                    <React.Fragment key={option.id}>
-                      {index > 0 ? <View style={s.separator} /> : null}
-                      <Pressable
-                        onPress={() => handleOptionPress(option)}
-                        style={[
-                          s.optionButton,
-                          option.backgroundColorKey != null
-                            ? { backgroundColor: t.colors[option.backgroundColorKey] }
-                            : null,
-                        ]}
-                      >
-                        {option.icon ? (
-                          <Icon name={option.icon} size={22} color={iconColor} />
-                        ) : null}
-                        <Text variant="body" style={[s.optionLabel, { color: textColor }]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    </React.Fragment>
-                  );
-                })
+                      return (
+                        <React.Fragment key={option.id}>
+                          {index > 0 ? <View style={s.separator} /> : null}
+                          <Pressable
+                            onPress={() => handleOptionPress(option)}
+                            style={[
+                              s.optionButton,
+                              option.backgroundColorKey != null
+                                ? { backgroundColor: t.colors[option.backgroundColorKey] }
+                                : null,
+                            ]}
+                          >
+                            {option.icon ? (
+                              <Icon name={option.icon} size={22} color={iconColor} />
+                            ) : null}
+                            <Text variant="body" style={[s.optionLabel, { color: textColor }]}>
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        </React.Fragment>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
                 )}
-              </GlassSurface>
+              </View>
             </Animated.View>
           </View>
         </KeyboardAvoidingView>
@@ -1145,7 +1190,15 @@ export default function GlobalPopupHost() {
         animationType="fade"
         onRequestClose={() => setInlineHelperConfig(null)}
       >
-        <View style={s.helperOverlayBackdrop}>
+        <View
+          style={[
+            s.helperOverlayBackdrop,
+            {
+              paddingTop: Math.max(insets.top, t.spacing.md),
+              paddingBottom: Math.max(insets.bottom, t.spacing.md),
+            },
+          ]}
+        >
           <Pressable
             style={StyleSheet.absoluteFillObject}
             onPress={() => {
@@ -1154,16 +1207,14 @@ export default function GlobalPopupHost() {
               }
             }}
           />
-          <GlassSurface
-            variant="sheet"
-            blur="sheet"
-            highlight
-            highlightStyle={s.bottomSheetHighlight}
-            clipStyle={s.bottomSheetClip}
+          <View
             style={[
               s.bottomSheet,
               s.helperOverlaySheet,
-              { paddingBottom: Math.max(insets.bottom, t.spacing.sm) },
+              {
+                maxHeight: sheetMaxHeight,
+                paddingBottom: t.spacing.sm,
+              },
             ]}
           >
             <View style={s.indicatorTouchArea}>
@@ -1177,7 +1228,7 @@ export default function GlobalPopupHost() {
                   summaryConfig?.actions
                 )
               : null}
-          </GlassSurface>
+          </View>
         </View>
       </Modal>
 
@@ -1189,12 +1240,7 @@ export default function GlobalPopupHost() {
       >
         <Pressable style={s.datePickerBackdrop} onPress={() => setActiveDateField(null)}>
           <Pressable onPress={(event) => event.stopPropagation()}>
-            <GlassSurface
-              variant="sheet"
-              blur="sheet"
-              highlight
-              contentStyle={s.datePickerCard}
-            >
+            <View style={[s.datePickerSheet, s.datePickerCard]}>
               <View style={s.datePickerHeader}>
                 <Text variant="subtitle">
                   {activeDateField === "start" ? "Selecciona la fecha inicial" : "Selecciona la fecha final"}
@@ -1243,7 +1289,7 @@ export default function GlobalPopupHost() {
                   </Text>
                 </Pressable>
               </View>
-            </GlassSurface>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>

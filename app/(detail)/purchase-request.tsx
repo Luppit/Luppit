@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import {
   GroupedListRow,
   GroupedListSection,
@@ -363,6 +364,33 @@ export default function PurchaseRequestDetailScreen() {
     });
   };
 
+  const openOfferBusiness = (offer: PurchaseOfferCardData) => {
+    if (!purchaseRequestId) return;
+
+    router.push({
+      pathname: "/(detail)/seller-business",
+      params: {
+        title: "Negocio",
+        hideMenu: "true",
+        purchaseRequestId,
+        purchaseOfferId: offer.id,
+      },
+    });
+  };
+
+  const openOfferMenu = (offer: PurchaseOfferCardData) => {
+    openPopup({
+      options: [
+        {
+          id: "show-business",
+          label: "Mostrar negocio",
+          icon: "house",
+          onPress: () => openOfferBusiness(offer),
+        },
+      ],
+    });
+  };
+
   const openFiltersPopup = () => {
     openPopup({
       type: "filters",
@@ -534,37 +562,21 @@ export default function PurchaseRequestDetailScreen() {
           {!isAcceptedRequest && !isCanceledRequest && (hasActiveFilters || hasCustomSort) ? (
             <View style={s.activeChipsRow}>
               {hasActiveFilters ? (
-                <View style={s.activeChip}>
-                  <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-                  <Text variant="body" style={s.activeChipLabel}>
-                    Filtros ({activeFilterCount})
-                  </Text>
-                  <Pressable
-                    style={s.activeChipClose}
-                    onPress={() => setFilters(EMPTY_BUYER_OFFER_FILTERS)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Limpiar filtros"
-                  >
-                    <Icon name="x" size={16} color={t.colors.textDark} />
-                  </Pressable>
-                </View>
+                <LuppitChip
+                  icon="sliders-horizontal"
+                  label={`Filtros (${activeFilterCount})`}
+                  onRemove={() => setFilters(EMPTY_BUYER_OFFER_FILTERS)}
+                  removeAccessibilityLabel="Limpiar filtros"
+                />
               ) : null}
 
               {hasCustomSort ? (
-                <View style={s.activeChip}>
-                  <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
-                  <Text variant="body" maxLines={1} style={s.activeChipLabel}>
-                    {getBuyerOfferSortLabel(selectedSortId)}
-                  </Text>
-                  <Pressable
-                    style={s.activeChipClose}
-                    onPress={() => setSelectedSortId(DEFAULT_BUYER_OFFER_SORT_ID)}
-                    accessibilityRole="button"
-                    accessibilityLabel="Restablecer orden"
-                  >
-                    <Icon name="x" size={16} color={t.colors.textDark} />
-                  </Pressable>
-                </View>
+                <LuppitChip
+                  icon="arrow-up-down"
+                  label={getBuyerOfferSortLabel(selectedSortId)}
+                  onRemove={() => setSelectedSortId(DEFAULT_BUYER_OFFER_SORT_ID)}
+                  removeAccessibilityLabel="Restablecer orden"
+                />
               ) : null}
             </View>
           ) : null}
@@ -620,6 +632,7 @@ export default function PurchaseRequestDetailScreen() {
                       ? selectedOfferTimeline
                       : undefined
                   }
+                  onMenuPress={() => openOfferMenu(offer)}
                   onConnect={() => void openOfferConversation(offer.id)}
                 />
               ))}
@@ -700,28 +713,6 @@ function createPurchaseRequestDetailStyles(t: Theme, topContentInset = 0) {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: t.spacing.sm,
-    },
-    activeChip: {
-      maxWidth: "100%",
-      minHeight: 36,
-      borderRadius: 999,
-      ...t.glass.chip,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      paddingLeft: t.spacing.sm,
-      paddingRight: t.spacing.xs,
-    },
-    activeChipLabel: {
-      color: t.colors.textDark,
-      flexShrink: 1,
-    },
-    activeChipClose: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
     },
     closedOffersMessage: {
       marginTop: t.spacing.sm,

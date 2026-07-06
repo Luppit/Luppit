@@ -1312,6 +1312,77 @@ export type Database = {
         }
         Relationships: []
       }
+      legal_document: {
+        Row: {
+          code: string
+          created_at: string
+          effective_date: string | null
+          is_active: boolean
+          title: string
+          updated_at: string
+          version_label: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          effective_date?: string | null
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          version_label?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          effective_date?: string | null
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          version_label?: string | null
+        }
+        Relationships: []
+      }
+      legal_document_section: {
+        Row: {
+          body: string
+          created_at: string
+          document_code: string
+          heading: string | null
+          id: string
+          is_active: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          document_code: string
+          heading?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          document_code?: string
+          heading?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_section_document_code_fkey"
+            columns: ["document_code"]
+            isOneToOne: false
+            referencedRelation: "legal_document"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       home_group: {
         Row: {
           code: string

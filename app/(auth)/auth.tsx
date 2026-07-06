@@ -1,5 +1,6 @@
 import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
+import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { borders, colors, spacing } from "@/src/themes";
 import { Asset } from "expo-asset";
 import { Link, router } from "expo-router";
@@ -59,7 +60,16 @@ export default function auth() {
           <Text variant="small" align="center">
             Al continuar, aceptas automáticamente los
           </Text>
-          <Link href="https://google.com">
+          <Link
+            href={{
+              pathname: "/(detail)/legal-document",
+              params: {
+                code: LEGAL_DOCUMENT_CODES.termsConditions,
+                title: "Términos y condiciones",
+                hideMenu: "true",
+              },
+            }}
+          >
             <Text
               variant="small"
               style={{ textDecorationLine: "underline" }}

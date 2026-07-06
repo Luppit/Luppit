@@ -4,6 +4,7 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { formatLocationLabel } from "@/src/services/location.service";
 import {
@@ -265,17 +266,11 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
     },
     hero: {
       minHeight: 104,
-      borderRadius: t.borders.md,
-      backgroundColor: t.colors.backgroudWhite,
+      ...createRoundedSurfaceStyle(t),
       padding: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 5,
-      elevation: 2,
     },
     heroIcon: {
       width: 48,

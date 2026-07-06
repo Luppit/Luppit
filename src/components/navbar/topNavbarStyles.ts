@@ -63,24 +63,6 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
     },
     activeFilterChip: {
       alignSelf: "flex-start",
-      minHeight: 36,
-      borderRadius: 999,
-      ...t.glass.chip,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      paddingLeft: t.spacing.sm,
-      paddingRight: t.spacing.xs,
-    },
-    activeFilterChipLabel: {
-      color: t.colors.textDark,
-    },
-    activeFilterChipClose: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
     },
     categoryListContainer: {
       paddingRight: t.spacing.sm,
