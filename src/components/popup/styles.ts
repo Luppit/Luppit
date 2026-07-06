@@ -1,14 +1,23 @@
+import {
+  ROUNDED_SURFACE_RADIUS,
+  createRoundedSurfaceStyle,
+} from "@/src/components/surface/styles";
 import { Theme } from "@/src/themes";
-import { ImageStyle, TextStyle, ViewStyle } from "react-native";
+import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from "react-native";
+
+const SOFT_BORDER_COLOR = "rgba(0,0,0,0.08)";
+const SOFT_SEPARATOR_COLOR = "rgba(0,0,0,0.08)";
 
 export type GlobalPopupStyles = {
   backdrop: ViewStyle;
+  bottomSheetFrame: ViewStyle;
   bottomSheet: ViewStyle;
-  bottomSheetClip: ViewStyle;
-  bottomSheetHighlight: ViewStyle;
+  sheetContentScroll: ViewStyle;
+  sheetContentScrollContent: ViewStyle;
   indicatorTouchArea: ViewStyle;
   indicator: ViewStyle;
   optionButton: ViewStyle;
+  optionList: ViewStyle;
   optionLabel: TextStyle;
   separator: ViewStyle;
   section: ViewStyle;
@@ -19,10 +28,6 @@ export type GlobalPopupStyles = {
   filterDateField: ViewStyle;
   filterDateFieldInput: TextStyle;
   filterChipsRow: ViewStyle;
-  filterChip: ViewStyle;
-  filterChipSelected: ViewStyle;
-  filterChipLabel: TextStyle;
-  filterChipLabelSelected: TextStyle;
   filterActionsRow: ViewStyle;
   filterActionButton: ViewStyle;
   filterActionButtonPrimary: ViewStyle;
@@ -58,6 +63,7 @@ export type GlobalPopupStyles = {
   summaryImagePreviewBackdrop: ViewStyle;
   summaryImagePreviewClose: ViewStyle;
   datePickerBackdrop: ViewStyle;
+  datePickerSheet: ViewStyle;
   datePickerCard: ViewStyle;
   datePickerHeader: ViewStyle;
   datePicker: ViewStyle;
@@ -98,51 +104,57 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       flex: 1,
       backgroundColor: t.colors.shadow,
     },
+    bottomSheetFrame: {
+      flex: 1,
+      justifyContent: "flex-end",
+      alignItems: "center",
+      paddingHorizontal: t.spacing.sm,
+    },
     bottomSheet: {
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      borderBottomLeftRadius: 0,
-      borderBottomRightRadius: 0,
-    },
-    bottomSheetClip: {
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      borderBottomLeftRadius: 0,
-      borderBottomRightRadius: 0,
+      width: "100%",
+      maxWidth: 560,
+      alignSelf: "center",
       overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
-    bottomSheetHighlight: {
-      ...t.glass.topHighlight,
-      left: 16,
-      top: 8,
-      width: "72%",
+    sheetContentScroll: {
+      flexGrow: 0,
+    },
+    sheetContentScrollContent: {
+      paddingBottom: t.spacing.xs,
     },
     indicatorTouchArea: {
       alignItems: "center",
       paddingTop: t.spacing.sm,
-      paddingBottom: t.spacing.md,
+      paddingBottom: t.spacing.sm,
     },
     indicator: {
-      width: 96,
-      height: 4,
+      width: 44,
+      height: 5,
       borderRadius: 999,
       backgroundColor: t.colors.stateAnulated,
-      opacity: 0.7,
+      opacity: 0.45,
     },
     optionButton: {
-      minHeight: 56,
+      minHeight: 58,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },
+    optionList: {
+      marginHorizontal: t.spacing.md,
+      marginBottom: t.spacing.sm,
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
+    },
     optionLabel: {
       flex: 1,
     },
     separator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-      marginHorizontal: t.spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
+      marginLeft: 48,
     },
     section: {
       paddingHorizontal: t.spacing.md,
@@ -154,9 +166,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     filterInputContainer: {
       height: 48,
-      borderRadius: 999,
+      borderRadius: t.borders.md,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       justifyContent: "center",
@@ -172,9 +184,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     filterDateField: {
       flex: 1,
       height: 48,
-      borderRadius: 999,
+      borderRadius: t.borders.md,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
@@ -191,31 +203,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       flexWrap: "wrap",
       gap: t.spacing.sm,
     },
-    filterChip: {
-      minHeight: 40,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.backgroudWhite,
-      paddingHorizontal: t.spacing.md,
-      alignItems: "center",
-      justifyContent: "center",
-      flexDirection: "row",
-      gap: t.spacing.xs,
-    },
-    filterChipSelected: {
-      backgroundColor: t.colors.primary,
-      borderColor: t.colors.primary,
-    },
-    filterChipLabel: {
-      color: t.colors.textDark,
-    },
-    filterChipLabelSelected: {
-      color: t.colors.backgroudWhite,
-    },
     filterActionsRow: {
       paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.md,
+      paddingBottom: t.spacing.sm,
       paddingTop: t.spacing.sm,
       flexDirection: "row",
       gap: t.spacing.sm,
@@ -230,13 +220,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       gap: t.spacing.xs,
       paddingHorizontal: t.spacing.md,
       borderWidth: 1,
+      borderColor: SOFT_BORDER_COLOR,
     },
     filterActionButtonPrimary: {
       backgroundColor: t.colors.primary,
       borderColor: t.colors.primary,
     },
     filterActionButtonSecondary: {
-      borderColor: t.colors.border,
       backgroundColor: t.colors.backgroudWhite,
     },
     filterActionLabel: {
@@ -249,13 +239,15 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     sortOptionsList: {
-      backgroundColor: "transparent",
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
     sortOptionButton: {
       minHeight: 56,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
     },
     sortOptionLabel: {
       flex: 1,
@@ -266,23 +258,23 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       height: 24,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: t.colors.stateAnulated,
+      borderColor: SOFT_BORDER_COLOR,
       alignItems: "center",
       justifyContent: "center",
     },
     sortRadioOuterSelected: {
-      borderColor: t.colors.textDark,
+      borderColor: t.colors.primary,
     },
     sortRadioInner: {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: t.colors.textDark,
+      backgroundColor: t.colors.primary,
     },
     sortSeparator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-      marginLeft: 40,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
+      marginLeft: 56,
     },
     summaryHeaderBlock: {
       gap: t.spacing.xs,
@@ -295,8 +287,8 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       gap: t.spacing.sm,
     },
     summaryHeaderSeparator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
     },
     summaryTitle: {
       flex: 1,
@@ -305,16 +297,15 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     summaryDescriptionScroll: {
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      borderRadius: t.borders.sm,
-      backgroundColor: t.colors.backgroudWhite,
+      ...createRoundedSurfaceStyle(t),
     },
     summaryDescriptionScrollContent: {
       padding: t.spacing.md,
     },
     summaryRowsList: {
       gap: t.spacing.md,
+      padding: t.spacing.md,
+      ...createRoundedSurfaceStyle(t),
     },
     summaryInputsList: {
       gap: t.spacing.md,
@@ -332,9 +323,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     summaryImageContainer: {
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      borderRadius: t.borders.sm,
+      borderRadius: t.borders.md,
       paddingVertical: t.spacing.xs,
       backgroundColor: t.colors.backgroudWhite,
     },
@@ -348,7 +337,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderRadius: t.borders.sm,
       overflow: "hidden",
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.background,
     },
     summaryImage: {
@@ -384,6 +373,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       justifyContent: "center",
       paddingHorizontal: t.spacing.md,
     },
+    datePickerSheet: {
+      width: "100%",
+      maxWidth: 420,
+      alignSelf: "center",
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
+    },
     datePickerCard: {
       padding: t.spacing.md,
       gap: t.spacing.md,
@@ -401,7 +397,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryActionsRow: {
       paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.md,
+      paddingBottom: t.spacing.sm,
       paddingTop: t.spacing.md,
       flexDirection: "row",
       gap: t.spacing.sm,
@@ -415,7 +411,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       flexDirection: "row",
       gap: t.spacing.xs,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       paddingHorizontal: t.spacing.sm,
     },
     summaryActionButtonSingle: {
@@ -424,12 +420,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryActionLabel: {},
     helperContentScroll: {
-      borderRadius: t.borders.md,
-      backgroundColor: t.colors.background,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
     },
     helperContentScrollContent: {},
     helperSectionsList: {
       gap: 0,
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
     helperSectionBlock: {},
     helperSectionHeader: {
@@ -438,10 +435,12 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       alignItems: "center",
       gap: t.spacing.sm,
       paddingVertical: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
     },
     helperSectionAnswer: {
       paddingBottom: t.spacing.md,
       paddingRight: t.spacing.lg,
+      paddingLeft: t.spacing.md,
     },
     helperSectionTitle: {
       flex: 1,
@@ -456,20 +455,25 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       lineHeight: 22,
     },
     helperRowSeparator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
     },
     helperOverlayBackdrop: {
       flex: 1,
       justifyContent: "flex-end",
+      alignItems: "center",
+      paddingHorizontal: t.spacing.sm,
       backgroundColor: "rgba(0,0,0,0.24)",
     },
     helperOverlaySheet: {
       width: "100%",
+      maxWidth: 560,
     },
     profileSwitcherSection: {
-      paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.lg,
+      marginHorizontal: t.spacing.md,
+      marginBottom: t.spacing.sm,
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
     profileSwitcherRow: {
       minHeight: 92,
@@ -477,6 +481,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       alignItems: "center",
       gap: t.spacing.sm,
       paddingVertical: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
     },
     profileSwitcherRowActive: {},
     profileSwitcherAvatar: {
@@ -484,7 +489,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       height: 62,
       borderRadius: 31,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.backgroudWhite,
       alignItems: "center",
       justifyContent: "center",
@@ -527,9 +532,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       minWidth: 0,
     },
     profileSwitcherSeparator: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
-      marginLeft: 74,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
+      marginLeft: 90,
     },
   };
 }

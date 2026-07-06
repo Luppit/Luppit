@@ -2,6 +2,7 @@ import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   BusinessCategoryOption,
@@ -317,7 +318,7 @@ export default function BusinessCategoriesScreen() {
             </View>
           }
           ListEmptyComponent={
-            <View style={s.emptyCategoryRow}>
+            <View style={[s.emptyCategoryRow, s.resultRow]}>
               <Text color="stateAnulated">
                 {getEmptyCategoryBrowserCopy()}
               </Text>
@@ -383,7 +384,9 @@ function CategorySection({
 
   return (
     <View style={s.section}>
-      <Text variant="subtitle">{title}</Text>
+      <Text variant="small" color="textMedium" style={s.sectionTitle}>
+        {title}
+      </Text>
       <View style={s.rowGroup}>{children}</View>
     </View>
   );
@@ -400,12 +403,12 @@ function SelectedCategoryRow({
   const s = useMemo(() => createBusinessCategoriesStyles(t), [t]);
 
   return (
-    <View style={s.categoryRow}>
+    <View style={[s.categoryRow, s.groupedRow]}>
       <View style={s.categoryIcon}>
         <Icon name="tag" size={18} color={t.colors.secondary} />
       </View>
       <View style={s.rowText}>
-        <Text maxLines={1}>{category.name}</Text>
+        <Text>{category.name}</Text>
         <Text variant="small" color="stateAnulated" maxLines={2}>
           {category.breadcrumb || "Categoría completa"}
         </Text>
@@ -436,7 +439,7 @@ function CategoryBrowserHeader({
   const s = useMemo(() => createBusinessCategoriesStyles(t), [t]);
 
   return (
-    <View style={s.browserHeaderRow}>
+    <View style={[s.browserHeaderRow, s.groupedRow]}>
       {canGoBack ? (
         <Pressable
           accessibilityRole="button"
@@ -477,14 +480,14 @@ function CategoryBranchRow({
       accessibilityLabel={`${item.node.name}${item.selectedCount > 0 ? `, ${selectedCopy}` : ""}`}
       accessibilityHint="Abre subcategorías"
       onPress={onPress}
-      style={s.categoryRow}
+      style={[s.categoryRow, s.resultRow]}
     >
       <View style={s.categoryIcon}>
         <Icon name="folder-closed" size={18} color={t.colors.secondary} />
       </View>
       <View style={s.rowText}>
-        <Text maxLines={1}>{item.node.name}</Text>
-        <Text variant="small" color="stateAnulated" maxLines={1}>
+        <Text>{item.node.name}</Text>
+        <Text variant="small" color="stateAnulated">
           {item.preview}
         </Text>
       </View>
@@ -520,14 +523,14 @@ function CategoryToggleRow({
       accessibilityState={{ checked: isSelected }}
       accessibilityLabel={`${category.name}${breadcrumb ? `, ${breadcrumb}` : ""}`}
       onPress={onPress}
-      style={s.categoryRow}
+      style={[s.categoryRow, s.resultRow]}
     >
       <View style={s.categoryIcon}>
         <Icon name="tag" size={18} color={t.colors.secondary} />
       </View>
       <View style={s.rowText}>
-        <Text maxLines={1}>{category.name}</Text>
-        <Text variant="small" color="stateAnulated" maxLines={1}>
+        <Text>{category.name}</Text>
+        <Text variant="small" color="stateAnulated">
           {breadcrumb || "Categoría completa"}
         </Text>
       </View>
@@ -858,17 +861,11 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     },
     summary: {
       minHeight: 96,
-      borderRadius: t.borders.md,
-      backgroundColor: t.colors.backgroudWhite,
+      ...createRoundedSurfaceStyle(t),
       padding: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 5,
-      elevation: 2,
     },
     summaryIcon: {
       width: 46,
@@ -891,9 +888,12 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     section: {
       gap: t.spacing.sm,
     },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
     rowGroup: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
     rowText: {
       flex: 1,
@@ -901,18 +901,23 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     },
     categoryRow: {
       minHeight: 64,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
     },
+    groupedRow: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: "rgba(0,0,0,0.08)",
+    },
+    resultRow: {
+      ...createRoundedSurfaceStyle(t),
+    },
     emptyCategoryRow: {
       minHeight: 56,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
       justifyContent: "center",
       gap: 2,
     },
@@ -933,22 +938,22 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     },
     searchRow: {
       minHeight: 64,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: "rgba(0,0,0,0.08)",
       justifyContent: "center",
     },
     searchFieldBase: {
       marginBottom: 0,
     },
     searchField: {
-      backgroundColor: t.colors.backgroudWhite,
+      backgroundColor: t.colors.background,
     },
     browserHeaderRow: {
       minHeight: 56,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,

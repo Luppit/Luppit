@@ -51,6 +51,11 @@ export default function OtpValidator({
 
   return (
     <View style={s.container}>
+      {label.trim() ? (
+        <Text variant="body" style={s.label}>
+          {label}
+        </Text>
+      ) : null}
       <Pressable
         style={[s.inputRow, stretch ? s.inputRowStretch : null]}
         onPress={focus}

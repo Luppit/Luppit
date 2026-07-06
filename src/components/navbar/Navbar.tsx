@@ -21,8 +21,7 @@ export default function Navbar() {
   const items = useNavItems();
   const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
   const shouldRestrictTabs = isLoadingEmailSetupStatus || isAccountSetupBlocked;
-  const bottomPadding =
-    Platform.OS === "android" ? Math.max(insets.bottom + 8, 16) : insets.bottom + 8;
+  const bottomOffset = Math.max(insets.bottom, Platform.OS === "android" ? 10 : 12);
 
   const isActive = (href: string, path: string) => {
     const h = normalizeTabPath(href);
@@ -31,7 +30,11 @@ export default function Navbar() {
   };
 
   return (
-    <View style={[s.overlay, { paddingBottom: bottomPadding }]} accessibilityRole="tablist">
+    <View
+      pointerEvents="box-none"
+      style={[s.overlay, { bottom: bottomOffset }]}
+      accessibilityRole="tablist"
+    >
       <GlassSurface
         variant="nav"
         blur="nav"

@@ -1,4 +1,5 @@
 import { TextField } from "@/src/components/inputField/InputField";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
@@ -541,27 +542,23 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           </Pressable>
 
           {showBuyerFilterChip ? (
-            <View style={s.activeFilterChip}>
-              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeFilterChipLabel}>
-                Filtros ({buyerFilterCount})
-              </Text>
-              <Pressable style={s.activeFilterChipClose} onPress={clearBuyerHomeFilters}>
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
+            <LuppitChip
+              icon="sliders-horizontal"
+              label={`Filtros (${buyerFilterCount})`}
+              onRemove={clearBuyerHomeFilters}
+              removeAccessibilityLabel="Limpiar filtros"
+              style={s.activeFilterChip}
+            />
           ) : null}
 
           {showSellerFilterChip ? (
-            <View style={s.activeFilterChip}>
-              <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-              <Text variant="body" style={s.activeFilterChipLabel}>
-                Filtros ({sellerFilterCount})
-              </Text>
-              <Pressable style={s.activeFilterChipClose} onPress={clearSellerHomeFilters}>
-                <Icon name="x" size={16} color={t.colors.textDark} />
-              </Pressable>
-            </View>
+            <LuppitChip
+              icon="sliders-horizontal"
+              label={`Filtros (${sellerFilterCount})`}
+              onRemove={clearSellerHomeFilters}
+              removeAccessibilityLabel="Limpiar filtros"
+              style={s.activeFilterChip}
+            />
           ) : null}
         </>
       ) : (

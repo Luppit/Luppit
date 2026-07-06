@@ -1,6 +1,7 @@
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   LocationOption,
@@ -276,7 +277,9 @@ function LocationSection({
 
   return (
     <View style={s.section}>
-      <Text variant="subtitle">{title}</Text>
+      <Text variant="small" color="textMedium" style={s.sectionTitle}>
+        {title}
+      </Text>
       <View style={s.optionGroup}>{children}</View>
     </View>
   );
@@ -315,9 +318,9 @@ function LocationOptionRow({
       style={s.optionRow}
     >
       <View style={s.optionText}>
-        <Text maxLines={1}>{label}</Text>
+        <Text>{label}</Text>
         {description ? (
-          <Text variant="small" color="stateAnulated" maxLines={1}>
+          <Text variant="small" color="stateAnulated">
             {description}
           </Text>
         ) : null}
@@ -343,15 +346,7 @@ function createBusinessLocationEditStyles(t: Theme) {
       gap: t.spacing.sm,
     },
     surface: {
-      backgroundColor: t.colors.backgroudWhite,
-      borderRadius: t.borders.md,
-      padding: t.spacing.lg,
       gap: t.spacing.md,
-      shadowColor: t.colors.shadow,
-      shadowOpacity: 0.06,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 5,
-      elevation: 2,
     },
     iconBadge: {
       width: 42,
@@ -365,8 +360,6 @@ function createBusinessLocationEditStyles(t: Theme) {
       gap: t.spacing.xs,
     },
     warningBox: {
-      borderWidth: 1,
-      borderColor: "rgba(202,115,48,0.28)",
       borderRadius: t.borders.sm,
       backgroundColor: "rgba(202,115,48,0.08)",
       padding: t.spacing.sm,
@@ -387,24 +380,29 @@ function createBusinessLocationEditStyles(t: Theme) {
     section: {
       gap: t.spacing.sm,
     },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
     optionGroup: {
-      borderTopWidth: 1,
-      borderTopColor: t.colors.border,
+      overflow: "hidden",
+      ...createRoundedSurfaceStyle(t),
     },
     optionRow: {
       minHeight: 52,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: "rgba(0,0,0,0.08)",
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
     },
     disabledRow: {
       minHeight: 52,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: t.colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: "rgba(0,0,0,0.08)",
       justifyContent: "center",
     },
     optionText: {

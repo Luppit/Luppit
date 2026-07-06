@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
@@ -459,28 +460,13 @@ function MarketplaceHomeContent({
           const isSelected = stage.code === selectedStageCode;
 
           return (
-            <Pressable
+            <LuppitChip
               key={stage.code}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isSelected }}
+              label={stage.name}
+              count={stage.count}
+              selected={isSelected}
               onPress={() => onSelectStage(stage.code)}
-              style={[s.stageChip, isSelected ? s.stageChipSelected : null]}
-            >
-              <Text
-                variant="small"
-                style={isSelected ? s.stageChipTextSelected : s.stageChipText}
-              >
-                {stage.name}
-              </Text>
-              <View style={[s.stageCountBadge, isSelected ? s.stageCountBadgeSelected : null]}>
-                <Text
-                  variant="small"
-                  style={isSelected ? s.stageCountTextSelected : s.stageCountText}
-                >
-                  {stage.count}
-                </Text>
-              </View>
-            </Pressable>
+            />
           );
         })}
       </ScrollView>
@@ -587,10 +573,10 @@ function HomeShortcut({
           <Icon name={icon} size={20} color={t.colors.primary} />
         </View>
         <View style={s.shortcutText}>
-          <Text variant="body" maxLines={1} style={s.shortcutTitle}>
+          <Text variant="body" style={s.shortcutTitle}>
             {title}
           </Text>
-          <Text variant="body" color="stateAnulated" maxLines={1}>
+          <Text variant="body" color="stateAnulated">
             {description}
           </Text>
         </View>
@@ -688,43 +674,6 @@ function createMarketplaceHomeStyles(t: Theme) {
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },
-    stageChip: {
-      ...createRoundedSurfaceStyle(t),
-      minHeight: 40,
-      borderRadius: 999,
-      paddingLeft: t.spacing.md,
-      paddingRight: t.spacing.sm,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
-    },
-    stageChipSelected: {
-      backgroundColor: t.colors.textDark,
-    },
-    stageChipText: {
-      color: t.colors.textDark,
-    },
-    stageChipTextSelected: {
-      color: t.colors.backgroudWhite,
-    },
-    stageCountBadge: {
-      minWidth: 24,
-      height: 24,
-      borderRadius: 12,
-      paddingHorizontal: 6,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: t.colors.background,
-    },
-    stageCountBadgeSelected: {
-      backgroundColor: "rgba(255,255,255,0.16)",
-    },
-    stageCountText: {
-      color: t.colors.textMedium,
-    },
-    stageCountTextSelected: {
-      color: t.colors.backgroudWhite,
-    },
     railSection: {
       gap: t.spacing.md,
     },
@@ -777,7 +726,7 @@ function createMarketplaceHomeStyles(t: Theme) {
       opacity: 0.78,
     },
     shortcutContent: {
-      minHeight: 72,
+      minHeight: 80,
       padding: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",
@@ -793,7 +742,8 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     shortcutText: {
       flex: 1,
-      gap: 2,
+      minWidth: 0,
+      gap: 4,
     },
     shortcutTitle: {
       color: t.colors.textDark,

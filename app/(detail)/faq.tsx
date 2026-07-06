@@ -11,12 +11,12 @@ import {
 import { Text } from "@/src/components/Text";
 import { SUPPORT_EMAIL } from "@/src/config/appInfo";
 import { FaqListItem, getActiveFaqItems } from "@/src/services/faq.service";
+import { openSupportEmail } from "@/src/services/support.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
 import {
-  Linking,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -141,17 +141,6 @@ export default function FaqScreen() {
 }
 
 function SupportSection() {
-  const openSupportEmail = async () => {
-    const subject = encodeURIComponent("Ayuda Luppit");
-    const url = `mailto:${SUPPORT_EMAIL}?subject=${subject}`;
-
-    try {
-      await Linking.openURL(url);
-    } catch {
-      showError("No se pudo abrir el correo", `Escríbenos a ${SUPPORT_EMAIL}.`);
-    }
-  };
-
   return (
     <GroupedListSection title="Soporte">
       <GroupedListRow

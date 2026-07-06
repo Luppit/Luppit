@@ -13,7 +13,11 @@ export default function NavbarItem({ item, active, disabled = false }: Props) {
   const t = useTheme();
   const s = React.useMemo(() => createNavbarStyles(t), [t]);
 
-  const flat = StyleSheet.flatten([s.label, active && s.labelActive]) as TextStyle;
+  const flat = StyleSheet.flatten([
+    s.label,
+    active && s.labelActive,
+    disabled && s.labelDisabled,
+  ]) as TextStyle;
   const labelColor = (flat.color ?? s._colors.text) as string;
 
   const content = (
@@ -21,24 +25,27 @@ export default function NavbarItem({ item, active, disabled = false }: Props) {
       style={s.item}
       android_ripple={
         Platform.OS === "android"
-          ? { color: s._colors.ripple, borderless: true }
+          ? { color: s._colors.ripple, borderless: false }
           : undefined
       }
-      hitSlop={12}
+      hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
       accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled }}
       accessibilityLabel={item.label}
-      disabled={active}
+      disabled={active || disabled}
       testID={`tab-${item.name}`}
     >
-      <View style={s.itemInner}>
-        {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
+      <View style={[s.itemInner, active && s.itemInnerActive, disabled && s.itemInnerDisabled]}>
+        <View style={s.iconSlot}>
+          {item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null}
+        </View>
         <Text
           variant="small"
           maxLines={1}
+          ellipsizeMode="tail"
           adjustsFontSizeToFit
-          minimumFontScale={0.85}
-          style={[s.label, active && s.labelActive]}
+          minimumFontScale={0.8}
+          style={[s.label, active && s.labelActive, disabled && s.labelDisabled]}
         >
           {item.label}
         </Text>

@@ -71,6 +71,7 @@ export function GroupedListRow({
   const s = useMemo(() => createGroupedListStyles(t), [t]);
   const contentColor = destructive ? t.colors.error : t.colors.textDark;
   const hasDescription = Boolean(description);
+  const hasValue = Boolean(value);
   const hasRoomyDescription = hasDescription && descriptionMaxLines > 2;
   const shouldShowChevron = showChevron ?? (Boolean(onPress) && !destructive);
   const content = (
@@ -82,15 +83,20 @@ export function GroupedListRow({
         style={[
           s.rowText,
           hasDescription ? s.rowTextWithDescription : null,
+          hasValue ? s.rowTextWithValue : null,
           hasRoomyDescription ? s.rowTextWithRoomyDescription : null,
         ]}
       >
-        <View style={s.rowMainLine}>
-          <Text variant="body" style={[s.rowLabel, { color: contentColor }]} maxLines={1}>
+        <View style={[s.rowMainLine, hasValue ? s.rowMainLineWithValue : null]}>
+          <Text
+            variant="body"
+            style={[s.rowLabel, { color: contentColor }]}
+            maxLines={hasValue ? 2 : 1}
+          >
             {label}
           </Text>
           {value ? (
-            <Text color="stateAnulated" maxLines={1} style={s.rowValue}>
+            <Text color="stateAnulated" maxLines={2} style={s.rowValue}>
               {value}
             </Text>
           ) : null}
@@ -118,6 +124,7 @@ export function GroupedListRow({
         style={[
           s.row,
           hasDescription ? s.rowWithDescription : null,
+          hasValue ? s.rowWithValue : null,
           hasRoomyDescription ? s.rowWithRoomyDescription : null,
         ]}
       >
@@ -131,6 +138,7 @@ export function GroupedListRow({
       style={[
         s.row,
         hasDescription ? s.rowWithDescription : null,
+        hasValue ? s.rowWithValue : null,
         hasRoomyDescription ? s.rowWithRoomyDescription : null,
       ]}
     >
@@ -163,6 +171,10 @@ function createGroupedListStyles(t: Theme) {
       minHeight: 74,
       paddingVertical: t.spacing.sm,
     },
+    rowWithValue: {
+      minHeight: 66,
+      paddingVertical: t.spacing.sm,
+    },
     rowWithRoomyDescription: {
       minHeight: 96,
       paddingVertical: t.spacing.md,
@@ -182,6 +194,9 @@ function createGroupedListStyles(t: Theme) {
       minHeight: 58,
       gap: 2,
     },
+    rowTextWithValue: {
+      minHeight: 50,
+    },
     rowTextWithRoomyDescription: {
       minHeight: 72,
       gap: t.spacing.xs,
@@ -192,11 +207,16 @@ function createGroupedListStyles(t: Theme) {
       alignItems: "center",
       gap: t.spacing.sm,
     },
+    rowMainLineWithValue: {
+      alignItems: "flex-start",
+    },
     rowLabel: {
       flex: 1,
     },
     rowValue: {
-      maxWidth: 150,
+      maxWidth: 180,
+      flexShrink: 1,
+      textAlign: "right",
     },
     rowSeparator: {
       position: "absolute",

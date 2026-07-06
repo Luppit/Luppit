@@ -4,6 +4,7 @@ import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import { signUpWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase/auth";
 import { createBusiness } from "@/src/services/business.service";
+import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { insertProfileToBusiness } from "@/src/services/profile.business.service";
 import { Profile } from "@/src/services/profile.service";
 import { spacing } from "@/src/themes/spacing";
@@ -340,7 +341,16 @@ export default function Signup() {
         <Text variant="small" align="center">
           Al ingresar tu número, aceptas automáticamente los
         </Text>
-        <Link href="https://google.com">
+        <Link
+          href={{
+            pathname: "/(detail)/legal-document",
+            params: {
+              code: LEGAL_DOCUMENT_CODES.termsConditions,
+              title: "Términos y condiciones",
+              hideMenu: "true",
+            },
+          }}
+        >
           <Text
             variant="small"
             style={{ textDecorationLine: "underline" }}

@@ -1,5 +1,6 @@
 import LoadingState from "@/src/components/loading/LoadingState";
 import GlassSurface from "@/src/components/glass/GlassSurface";
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import RoleGate from "@/src/components/role/RoleGate";
@@ -383,37 +384,21 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
         {hasActiveFilters || hasCustomSort ? (
           <View style={s.activeChipsRow}>
             {hasActiveFilters ? (
-              <View style={s.activeChip}>
-                <Icon name="sliders-horizontal" size={16} color={t.colors.textDark} />
-                <Text variant="body" style={s.activeChipLabel}>
-                  Filtros ({activeFilterCount})
-                </Text>
-                <Pressable
-                  style={s.activeChipClose}
-                  onPress={() => setFilters(EMPTY_FAVORITE_FILTERS)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Limpiar filtros"
-                >
-                  <Icon name="x" size={16} color={t.colors.textDark} />
-                </Pressable>
-              </View>
+              <LuppitChip
+                icon="sliders-horizontal"
+                label={`Filtros (${activeFilterCount})`}
+                onRemove={() => setFilters(EMPTY_FAVORITE_FILTERS)}
+                removeAccessibilityLabel="Limpiar filtros"
+              />
             ) : null}
 
             {hasCustomSort ? (
-              <View style={s.activeChip}>
-                <Icon name="arrow-up-down" size={16} color={t.colors.textDark} />
-                <Text variant="body" style={s.activeChipLabel} maxLines={1}>
-                  {getSortLabel(selectedSortId)}
-                </Text>
-                <Pressable
-                  style={s.activeChipClose}
-                  onPress={() => setSelectedSortId(DEFAULT_FAVORITE_SORT_ID)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Restablecer orden"
-                >
-                  <Icon name="x" size={16} color={t.colors.textDark} />
-                </Pressable>
-              </View>
+              <LuppitChip
+                icon="arrow-up-down"
+                label={getSortLabel(selectedSortId)}
+                onRemove={() => setSelectedSortId(DEFAULT_FAVORITE_SORT_ID)}
+                removeAccessibilityLabel="Restablecer orden"
+              />
             ) : null}
           </View>
         ) : null}
@@ -617,28 +602,6 @@ function createFavoritesScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory 
       flexDirection: "row",
       flexWrap: "wrap",
       gap: t.spacing.sm,
-    },
-    activeChip: {
-      maxWidth: "100%",
-      minHeight: 36,
-      borderRadius: 999,
-      ...t.glass.chip,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      paddingLeft: t.spacing.sm,
-      paddingRight: t.spacing.xs,
-    },
-    activeChipLabel: {
-      color: t.colors.textDark,
-      flexShrink: 1,
-    },
-    activeChipClose: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
     },
     sortButton: {
       width: 48,
