@@ -1,4 +1,5 @@
 import GlobalPopupHost from "@/src/components/popup/GlobalPopupHost";
+import GlobalToastHost from "@/src/components/toast/GlobalToastHost";
 import { ThemeProvider } from "@/src/themes/ThemeProvider";
 import {
   Poppins_400Regular,
@@ -7,7 +8,6 @@ import {
   useFonts,
 } from "@expo-google-fonts/poppins";
 import { Slot } from "expo-router";
-import Toast from "react-native-toast-message";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -20,8 +20,8 @@ export default function RootLayout() {
     <ThemeProvider>
       <Slot />
       {!fontsLoaded && null}
-      <Toast />
       <GlobalPopupHost />
+      <GlobalToastHost />
     </ThemeProvider>
   );
 }

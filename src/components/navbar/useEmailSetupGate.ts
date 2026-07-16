@@ -1,10 +1,18 @@
-import { getCurrentProfileEmailSetupStatus } from "@/src/services/profile.service";
+import {
+  getCurrentProfileEmailSetupStatus,
+  getCurrentSellerBusinessCategorySetupStatus,
+} from "@/src/services/profile.service";
+import { Roles } from "@/src/services/role.service";
+import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
 
-type EmailSetupGateState = {
+export type AccountSetupBlockReason = "email" | "seller_categories";
+
+type AccountSetupGateState = {
   isAccountSetupBlocked: boolean;
-  isLoadingEmailSetupStatus: boolean;
+  isLoadingAccountSetupStatus: boolean;
+  blockReason: AccountSetupBlockReason | null;
 };
 
 export function normalizeTabPath(path: string) {
@@ -13,25 +21,30 @@ export function normalizeTabPath(path: string) {
   return withoutIndex || "/";
 }
 
-export function isEmailSetupAllowedTabPath(path: string) {
+export function isAccountSetupAllowedTabPath(path: string) {
   const normalizedPath = normalizeTabPath(path);
   return normalizedPath === "/" || normalizedPath === "/profile";
 }
 
-export function useEmailSetupGate(): EmailSetupGateState {
-  const [state, setState] = React.useState<EmailSetupGateState>({
+export function isEmailSetupAllowedTabPath(path: string) {
+  return isAccountSetupAllowedTabPath(path);
+}
+
+export function useAccountSetupGate(): AccountSetupGateState {
+  const [state, setState] = React.useState<AccountSetupGateState>({
     isAccountSetupBlocked: false,
-    isLoadingEmailSetupStatus: true,
+    isLoadingAccountSetupStatus: true,
+    blockReason: null,
   });
 
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
 
-      const loadEmailSetupStatus = async () => {
+      const loadAccountSetupStatus = async () => {
         setState((current) => ({
           ...current,
-          isLoadingEmailSetupStatus: true,
+          isLoadingAccountSetupStatus: true,
         }));
 
         const result = await getCurrentProfileEmailSetupStatus();
@@ -40,18 +53,53 @@ export function useEmailSetupGate(): EmailSetupGateState {
         if (!result.ok) {
           setState({
             isAccountSetupBlocked: false,
-            isLoadingEmailSetupStatus: false,
+            isLoadingAccountSetupStatus: false,
+            blockReason: null,
+          });
+          return;
+        }
+
+        if (!result.data.isComplete) {
+          setState({
+            isAccountSetupBlocked: true,
+            isLoadingAccountSetupStatus: false,
+            blockReason: "email",
+          });
+          return;
+        }
+
+        const roleResult = await getCurrentUserRole();
+        if (!active) return;
+
+        if (!roleResult.ok || roleResult.data !== Roles.SELLER) {
+          setState({
+            isAccountSetupBlocked: false,
+            isLoadingAccountSetupStatus: false,
+            blockReason: null,
+          });
+          return;
+        }
+
+        const categoryResult = await getCurrentSellerBusinessCategorySetupStatus();
+        if (!active) return;
+
+        if (!categoryResult.ok) {
+          setState({
+            isAccountSetupBlocked: false,
+            isLoadingAccountSetupStatus: false,
+            blockReason: null,
           });
           return;
         }
 
         setState({
-          isAccountSetupBlocked: !result.data.isComplete,
-          isLoadingEmailSetupStatus: false,
+          isAccountSetupBlocked: !categoryResult.data.isComplete,
+          isLoadingAccountSetupStatus: false,
+          blockReason: categoryResult.data.isComplete ? null : "seller_categories",
         });
       };
 
-      void loadEmailSetupStatus();
+      void loadAccountSetupStatus();
 
       return () => {
         active = false;
@@ -60,4 +108,8 @@ export function useEmailSetupGate(): EmailSetupGateState {
   );
 
   return state;
+}
+
+export function useEmailSetupGate(): AccountSetupGateState {
+  return useAccountSetupGate();
 }

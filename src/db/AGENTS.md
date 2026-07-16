@@ -40,16 +40,15 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 - Broadcast only lightweight hints (`conversation_id`, diagnostic `reason`, and `refresh` targets such as `messages`/`view`); never broadcast message text, action metadata, OTPs, ratings, or role-specific content.
 
 ## Delivery, OTP, And Email
-- Delivery timing source of truth is value + unit: shipping uses `max_value/max_unit`; pickup uses `after_value/after_unit`. Legacy `*_days` fields are fallback compatibility only.
+- Delivery source of truth is `purchase_offer_delivery_method` for shipping and `purchase_offer_pickup_method` for pickup. Timing fields are integer days and method rows remain valid when timing is null.
 - Store pickup transaction completion uses a 4-digit OTP stored as a hash in `otp_code` with `otp_type_code='conversation_transaction'`; shipping must not depend on pickup OTP logic.
 - Email verification uses `send_email_verification_otp` and `verify_email_verification_otp`; verification updates `profile.email`, `email_opt_in`, and `email_opt_in_at` atomically.
 - Plaintext OTPs must never be stored.
 
 ## Required RPC Ownership
 - `get_or_create_seller_purchase_request_conversation` owns seller request open/reuse, buyer-profile alignment, first request summary message creation, and visualization insertion.
-- `create_seller_offer_from_conversation` and `update_seller_offer_from_conversation` own offer writes, transition/history updates, and chat summary/image messages.
-- `set_purchase_offer_delivery_timing` preserves exact timing units after create/update.
-- `get_seller_offer_edit_payload_v2` is preferred for exact timing edit preload; legacy/direct-read fallbacks are temporary compatibility paths.
+- `create_seller_offer_fulfillment_from_conversation` and `update_seller_offer_fulfillment_from_conversation` own offer writes, normalized fulfillment, transition/history updates, and chat summary/image messages.
+- `get_seller_offer_edit_payload_v2` owns normalized shipping/pickup edit preload; do not add legacy or direct-table fallbacks.
 - `get_conversation_timeline` owns purchase-request detail timeline order, pending state, icons, and legible date labels.
 
 ## Transition Procedure Pattern

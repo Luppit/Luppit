@@ -25,8 +25,12 @@ import {
 } from "@/src/services/conversation.service";
 import { getPurchaseOfferById } from "@/src/services/purchase.offer.service";
 import { getPurchaseRequestById } from "@/src/services/purchase.request.service";
+import {
+  clearToastBottomInset,
+  setToastBottomInset,
+} from "@/src/services/toast.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, {
   createContext,
@@ -46,6 +50,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const TOAST_INSET_SOURCE = "conversation-composer";
 
 type ConversationLayoutContextValue = {
   conversationId: string;
@@ -254,6 +260,15 @@ export default function ConversationLayout() {
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
   const purchaseOfferId = conversationView?.conversation.purchase_offer_id ?? null;
+  const showComposer = conversationView?.permissions.can_send_messages ?? false;
+
+  useEffect(() => {
+    if (!showComposer) {
+      clearToastBottomInset(TOAST_INSET_SOURCE);
+    }
+
+    return () => clearToastBottomInset(TOAST_INSET_SOURCE);
+  }, [showComposer]);
 
   useEffect(() => {
     if (!purchaseRequestId && !purchaseOfferId) {
@@ -674,7 +689,7 @@ export default function ConversationLayout() {
                     : invalidInput.kind === "rating"
                       ? "Selecciona una calificación en estrellas."
                     : `${invalidInput.label} es obligatorio.`;
-                showError("Dato inválido", message);
+                showWarning("Dato inválido", message);
                 return false;
               }
 
@@ -726,7 +741,8 @@ export default function ConversationLayout() {
     setComposerOverlayHeight((currentHeight) =>
       currentHeight === nextHeight ? currentHeight : nextHeight
     );
-  }, []);
+    setToastBottomInset(TOAST_INSET_SOURCE, nextHeight + t.spacing.sm);
+  }, [t.spacing.sm]);
 
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
@@ -754,7 +770,6 @@ export default function ConversationLayout() {
   const menuActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
-  const showComposer = conversationView.permissions.can_send_messages;
   const showActionButtons = topActions.length > 0;
   const headerBarHeight = 56;
   const headerChromeHeight = insets.top + 72;

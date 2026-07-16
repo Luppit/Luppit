@@ -2,6 +2,7 @@ import Button from "@/src/components/button/Button";
 import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
+import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import { getProfileById } from "@/src/services/profile.service";
 import { getBusinessById } from "@/src/services/business.service";
@@ -741,6 +742,10 @@ export default function ConversationChatScreen() {
             </Text>
           ) : null}
         </View>
+        <MessageUtilities
+          text={message.text}
+          align={isOwnMessage ? "right" : "left"}
+        />
       </View>
     );
   };

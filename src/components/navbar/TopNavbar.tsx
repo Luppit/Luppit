@@ -59,7 +59,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { createTopNavbarStyles } from "./topNavbarStyles";
-import { useEmailSetupGate } from "./useEmailSetupGate";
+import { useAccountSetupGate } from "./useEmailSetupGate";
 
 const segmentSvgModules: Record<string, number> = {
   todas: require("../../../assets/segments/todas.svg"),
@@ -143,8 +143,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   >([]);
   const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
   const isHomeRoute = pathname === "/" || pathname === "/index";
-  const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
-  const shouldBlockHomeControls = isLoadingEmailSetupStatus || isAccountSetupBlocked;
+  const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
+  const shouldBlockHomeControls = isLoadingAccountSetupStatus || isAccountSetupBlocked;
 
   useEffect(() => {
     return subscribeBuyerHomeFilters(setHomeFilters);

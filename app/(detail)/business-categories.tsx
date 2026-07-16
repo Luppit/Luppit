@@ -1,8 +1,11 @@
 import Button from "@/src/components/button/Button";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
-import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   BusinessCategoryOption,
@@ -134,7 +137,10 @@ export default function BusinessCategoriesScreen() {
   );
   const currentCategoryNode = getCategoryNode(categoryTree, categoryBrowserPath);
   const categoryBrowserTitle = getCategoryBrowserTitle(categoryTree, currentCategoryNode);
-  const categoryLabel = getCategoryCountLabel(selectedCategories.length);
+  const selectedSectionTitle = `Seleccionadas (${selectedCategoryRows.length})`;
+  const categoryBrowserSectionTitle = categorySearchValue.trim().length > 0
+    ? "Resultados"
+    : categoryBrowserTitle;
   const hasCategoryChanges = haveCategoryIdsChanged(
     initialCategoryIds,
     selectedCategories.map((preference) => preference.categoryId)
@@ -211,6 +217,10 @@ export default function BusinessCategoriesScreen() {
       return "No hay categorías disponibles.";
     }
 
+    if (categorySearchValue.trim().length > 0) {
+      return "No hay categorías que coincidan con tu búsqueda.";
+    }
+
     return "No hay categorías disponibles aquí.";
   };
 
@@ -243,8 +253,7 @@ export default function BusinessCategoriesScreen() {
       <View style={s.screen}>
         <FlatList
           ref={listRef}
-          data={categoryBrowserItems}
-          keyExtractor={getCategoryBrowserItemKey}
+          data={[] as CategoryBrowserItem[]}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={s.content}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -252,25 +261,7 @@ export default function BusinessCategoriesScreen() {
           automaticallyAdjustKeyboardInsets
           ListHeaderComponent={
             <View style={s.headerContent}>
-              <View style={s.summary}>
-                <View style={s.summaryIcon}>
-                  <Icon name="tag" size={22} color={t.colors.primary} />
-                </View>
-                <View style={s.summaryText}>
-                  <Text variant="subtitle">Categorías activas</Text>
-                  <Text color="stateAnulated">{categoryLabel}</Text>
-                  {hasCategoryChanges ? (
-                    <View style={s.unsavedInline}>
-                      <Icon name="alert-circle" size={14} color={t.colors.secondary} />
-                      <Text variant="small" color="secondary">
-                        Cambios sin guardar
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              <CategorySection title="Seleccionadas">
+              <GroupedListSection title={selectedSectionTitle}>
                 {selectedCategoryRows.length === 0 ? (
                   <View style={s.emptyCategoryRow}>
                     <Text color="stateAnulated">Aún no has elegido categorías.</Text>
@@ -279,22 +270,23 @@ export default function BusinessCategoriesScreen() {
                     </Text>
                   </View>
                 ) : (
-                  selectedCategoryRows.map((category) => (
+                  selectedCategoryRows.map((category, index) => (
                     <SelectedCategoryRow
                       key={category.id}
                       category={category}
+                      showSeparator={index < selectedCategoryRows.length - 1}
                       onRemove={() => removeCategory(category.id)}
                     />
                   ))
                 )}
-              </CategorySection>
+              </GroupedListSection>
 
               <View
                 onLayout={(event) => {
                   searchRowOffsetRef.current = event.nativeEvent.layout.y;
                 }}
               >
-                <CategorySection title="Explorar categorías">
+                <GroupedListSection title="Explorar categorías">
                   <View style={s.searchRow}>
                     <TextField
                       value={categorySearchValue}
@@ -306,43 +298,54 @@ export default function BusinessCategoriesScreen() {
                       inputContainerStyle={s.searchField}
                     />
                   </View>
-                  {categorySearchValue.trim().length === 0 ? (
-                    <CategoryBrowserHeader
-                      title={categoryBrowserTitle}
-                      canGoBack={categoryBrowserPath.length > 0}
-                      onBack={() => setCategoryBrowserPath((current) => current.slice(0, -1))}
-                    />
-                  ) : null}
-                </CategorySection>
+                </GroupedListSection>
               </View>
-            </View>
-          }
-          ListEmptyComponent={
-            <View style={[s.emptyCategoryRow, s.resultRow]}>
-              <Text color="stateAnulated">
-                {getEmptyCategoryBrowserCopy()}
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            if (item.type === "branch") {
-              return (
-                <CategoryBranchRow
-                  item={item}
-                  onPress={() => setCategoryBrowserPath(item.node.pathSegments)}
-                />
-              );
-            }
 
-            return (
-              <CategoryToggleRow
-                category={item.category}
-                breadcrumb={item.breadcrumb}
-                isSelected={selectedCategoryIds.has(item.category.id)}
-                onPress={() => toggleCategory(item.category)}
-              />
-            );
-          }}
+              <GroupedListSection title={categoryBrowserSectionTitle}>
+                {categorySearchValue.trim().length === 0 && categoryBrowserPath.length > 0 ? (
+                  <CategoryBrowserBackRow
+                    showSeparator={categoryBrowserItems.length > 0}
+                    onBack={() => setCategoryBrowserPath((current) => current.slice(0, -1))}
+                  />
+                ) : null}
+
+                {categoryBrowserItems.length === 0 ? (
+                  <View style={s.emptyCategoryRow}>
+                    <Text color="stateAnulated">
+                      {getEmptyCategoryBrowserCopy()}
+                    </Text>
+                  </View>
+                ) : (
+                  categoryBrowserItems.map((item, index) => {
+                    const showSeparator = index < categoryBrowserItems.length - 1;
+
+                    if (item.type === "branch") {
+                      return (
+                        <CategoryBranchRow
+                          key={`branch-${item.node.key}`}
+                          item={item}
+                          showSeparator={showSeparator}
+                          onPress={() => setCategoryBrowserPath(item.node.pathSegments)}
+                        />
+                      );
+                    }
+
+                    return (
+                      <CategoryToggleRow
+                        key={`category-${item.category.id}`}
+                        category={item.category}
+                        breadcrumb={item.breadcrumb}
+                        isSelected={selectedCategoryIds.has(item.category.id)}
+                        showSeparator={showSeparator}
+                        onPress={() => toggleCategory(item.category)}
+                      />
+                    );
+                  })
+                )}
+              </GroupedListSection>
+            </View>
+          }
+          renderItem={() => null}
         />
 
         <View style={s.footer}>
@@ -359,7 +362,7 @@ export default function BusinessCategoriesScreen() {
             ) : null}
             <View style={s.footerButton}>
               <Button
-                title="Guardar cambios"
+                title={hasCategoryChanges ? "Guardar cambios" : "Sin cambios por guardar"}
                 loading={isSaving}
                 disabled={!hasCategoryChanges || isSaving}
                 onPress={() => void saveCategoryPreferences()}
@@ -372,100 +375,67 @@ export default function BusinessCategoriesScreen() {
   );
 }
 
-function CategorySection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessCategoriesStyles(t), [t]);
-
-  return (
-    <View style={s.section}>
-      <Text variant="small" color="textMedium" style={s.sectionTitle}>
-        {title}
-      </Text>
-      <View style={s.rowGroup}>{children}</View>
-    </View>
-  );
-}
-
 function SelectedCategoryRow({
   category,
+  showSeparator,
   onRemove,
 }: {
   category: SelectedCategoryItem;
+  showSeparator: boolean;
   onRemove: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createBusinessCategoriesStyles(t), [t]);
 
   return (
-    <View style={[s.categoryRow, s.groupedRow]}>
-      <View style={s.categoryIcon}>
-        <Icon name="tag" size={18} color={t.colors.secondary} />
-      </View>
-      <View style={s.rowText}>
-        <Text>{category.name}</Text>
-        <Text variant="small" color="stateAnulated" maxLines={2}>
-          {category.breadcrumb || "Categoría completa"}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Quitar ${category.name}`}
-        hitSlop={10}
-        onPress={onRemove}
-        style={s.categoryActionButton}
-      >
-        <Icon name="x" size={18} color={t.colors.error} />
-      </Pressable>
-    </View>
+    <GroupedListRow
+      icon="tag"
+      label={category.name}
+      description={category.breadcrumb || "Categoría completa"}
+      descriptionMaxLines={2}
+      showSeparator={showSeparator}
+      rightAccessory={
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Quitar ${category.name}`}
+          hitSlop={10}
+          onPress={onRemove}
+          style={s.categoryActionButton}
+        >
+          <Icon name="trash-2" size={18} color={t.colors.stateAnulated} />
+        </Pressable>
+      }
+    />
   );
 }
 
-function CategoryBrowserHeader({
-  title,
-  canGoBack,
+function CategoryBrowserBackRow({
+  showSeparator,
   onBack,
 }: {
-  title: string;
-  canGoBack: boolean;
+  showSeparator: boolean;
   onBack: () => void;
 }) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessCategoriesStyles(t), [t]);
-
   return (
-    <View style={[s.browserHeaderRow, s.groupedRow]}>
-      {canGoBack ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Volver al nivel anterior"
-          hitSlop={10}
-          onPress={onBack}
-          style={s.browserBackButton}
-        >
-          <Icon name="arrow-left" size={18} color={t.colors.textDark} />
-        </Pressable>
-      ) : null}
-      <View style={s.rowText}>
-        <Text>{title}</Text>
-        <Text variant="small" color="stateAnulated">
-          {canGoBack ? "Explora subcategorías" : "Todas las categorías"}
-        </Text>
-      </View>
-    </View>
+    <GroupedListRow
+      icon="arrow-left"
+      label="Volver"
+      description="Nivel anterior"
+      showChevron={false}
+      showSeparator={showSeparator}
+      accessibilityLabel="Volver al nivel anterior"
+      onPress={onBack}
+    />
   );
 }
 
 function CategoryBranchRow({
   item,
+  showSeparator,
   onPress,
 }: {
   item: Extract<CategoryBrowserItem, { type: "branch" }>;
+  showSeparator: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
@@ -475,31 +445,23 @@ function CategoryBranchRow({
     : `${item.selectedCount} seleccionadas`;
 
   return (
-    <Pressable
-      accessibilityRole="button"
+    <GroupedListRow
+      icon="folder-closed"
+      label={item.node.name}
+      description={item.preview}
+      descriptionMaxLines={2}
+      showSeparator={showSeparator}
+      showChevron
       accessibilityLabel={`${item.node.name}${item.selectedCount > 0 ? `, ${selectedCopy}` : ""}`}
-      accessibilityHint="Abre subcategorías"
       onPress={onPress}
-      style={[s.categoryRow, s.resultRow]}
-    >
-      <View style={s.categoryIcon}>
-        <Icon name="folder-closed" size={18} color={t.colors.secondary} />
-      </View>
-      <View style={s.rowText}>
-        <Text>{item.node.name}</Text>
-        <Text variant="small" color="stateAnulated">
-          {item.preview}
-        </Text>
-      </View>
-      {item.selectedCount > 0 ? (
+      rightAccessory={item.selectedCount > 0 ? (
         <View style={s.countPill}>
           <Text variant="small" color="primary">
             {item.selectedCount}
           </Text>
         </View>
       ) : null}
-      <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
-    </Pressable>
+    />
   );
 }
 
@@ -507,11 +469,13 @@ function CategoryToggleRow({
   category,
   breadcrumb,
   isSelected,
+  showSeparator,
   onPress,
 }: {
   category: BusinessCategoryOption;
   breadcrumb: string;
   isSelected: boolean;
+  showSeparator: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
@@ -523,14 +487,16 @@ function CategoryToggleRow({
       accessibilityState={{ checked: isSelected }}
       accessibilityLabel={`${category.name}${breadcrumb ? `, ${breadcrumb}` : ""}`}
       onPress={onPress}
-      style={[s.categoryRow, s.resultRow]}
+      style={[s.categoryRow, showSeparator ? s.categoryRowWithSeparator : null]}
     >
       <View style={s.categoryIcon}>
-        <Icon name="tag" size={18} color={t.colors.secondary} />
+        <Icon name="tag" size={20} color={t.colors.stateAnulated} />
       </View>
       <View style={s.rowText}>
-        <Text>{category.name}</Text>
-        <Text variant="small" color="stateAnulated">
+        <Text variant="body" style={s.categoryLabel} maxLines={2}>
+          {category.name}
+        </Text>
+        <Text variant="small" color="stateAnulated" maxLines={2}>
           {breadcrumb || "Categoría completa"}
         </Text>
       </View>
@@ -821,22 +787,11 @@ function normalizeSearchText(value: string) {
     .trim();
 }
 
-function getCategoryCountLabel(count: number) {
-  if (count === 0) return "Sin categorías configuradas";
-  if (count === 1) return "1 categoría seleccionada";
-  return `${count} categorías seleccionadas`;
-}
-
 function haveCategoryIdsChanged(initialIds: string[], currentIds: string[]) {
   if (initialIds.length !== currentIds.length) return true;
 
   const currentSet = new Set(currentIds);
   return initialIds.some((id) => !currentSet.has(id));
-}
-
-function getCategoryBrowserItemKey(item: CategoryBrowserItem) {
-  if (item.type === "branch") return `branch-${item.node.key}`;
-  return `category-${item.category.id}`;
 }
 
 function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentInset = 0) {
@@ -859,75 +814,38 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
       gap: t.spacing.sm,
       paddingTop: topContentInset,
     },
-    summary: {
-      minHeight: 96,
-      ...createRoundedSurfaceStyle(t),
-      padding: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-    },
-    summaryIcon: {
-      width: 46,
-      height: 46,
-      borderRadius: 14,
-      backgroundColor: "rgba(131,163,30,0.14)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    summaryText: {
-      flex: 1,
-      gap: 2,
-    },
-    unsavedInline: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
-      paddingTop: t.spacing.xs,
-    },
-    section: {
-      gap: t.spacing.sm,
-    },
-    sectionTitle: {
-      paddingLeft: t.spacing.md,
-    },
-    rowGroup: {
-      overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
-    },
     rowText: {
       flex: 1,
+      minWidth: 0,
       gap: 2,
     },
     categoryRow: {
-      minHeight: 64,
+      minHeight: 74,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
     },
-    groupedRow: {
+    categoryRowWithSeparator: {
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: "rgba(0,0,0,0.08)",
     },
-    resultRow: {
-      ...createRoundedSurfaceStyle(t),
-    },
     emptyCategoryRow: {
-      minHeight: 56,
+      minHeight: 64,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
       justifyContent: "center",
       gap: 2,
     },
     categoryIcon: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
-      backgroundColor: "rgba(202,115,48,0.14)",
+      width: 32,
+      minHeight: 54,
       alignItems: "center",
       justifyContent: "center",
+    },
+    categoryLabel: {
+      flexShrink: 1,
     },
     categoryActionButton: {
       width: 44,
@@ -940,8 +858,6 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
       minHeight: 64,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: "rgba(0,0,0,0.08)",
       justifyContent: "center",
     },
     searchFieldBase: {
@@ -950,27 +866,12 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     searchField: {
       backgroundColor: t.colors.background,
     },
-    browserHeaderRow: {
-      minHeight: 56,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
-    },
-    browserBackButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-    },
     countPill: {
       minWidth: 28,
       height: 28,
       borderRadius: 999,
       paddingHorizontal: t.spacing.xs,
-      backgroundColor: "rgba(131,163,30,0.14)",
+      backgroundColor: t.colors.primaryLight,
       alignItems: "center",
       justifyContent: "center",
     },

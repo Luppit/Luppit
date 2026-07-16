@@ -17,10 +17,6 @@ export { COL_PROFILE_BUSINESS, TB_PROFILE_BUSINESS } from "./profile_business";
 export { COL_PROFILE_ROLE, TB_PROFILE_ROLE } from "./profile_role";
 export { COL_PURCHASE_OFFER, TB_PURCHASE_OFFER } from "./purchase_offer";
 export {
-  COL_PURCHASE_OFFER_DELIVERY,
-  TB_PURCHASE_OFFER_DELIVERY,
-} from "./purchase_offer_delivery";
-export {
   COL_PURCHASE_OFFER_IMAGE,
   TB_PURCHASE_OFFER_IMAGE,
 } from "./purchase_offer_image";

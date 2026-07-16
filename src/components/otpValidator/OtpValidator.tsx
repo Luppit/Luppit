@@ -7,6 +7,7 @@ import { createOtpValidatorStyles } from "./styles";
 
 type OtpValidatorProps = {
   label: string;
+  accessibilityLabel?: string;
   helperText?: string | null;
   otpLength?: number;
   stretch?: boolean;
@@ -16,6 +17,7 @@ type OtpValidatorProps = {
 
 export default function OtpValidator({
   label,
+  accessibilityLabel,
   helperText,
   otpLength = 4,
   stretch = false,
@@ -35,6 +37,7 @@ export default function OtpValidator({
   );
 
   const focus = () => inputRef.current?.focus();
+  const inputAccessibilityLabel = accessibilityLabel ?? label;
 
   const emit = (nextValue: string) => {
     onChange?.(nextValue);
@@ -59,9 +62,11 @@ export default function OtpValidator({
       <Pressable
         style={[s.inputRow, stretch ? s.inputRowStretch : null]}
         onPress={focus}
+        accessibilityLabel={inputAccessibilityLabel}
       >
         <TextInput
           ref={inputRef}
+          accessibilityLabel={inputAccessibilityLabel}
           value={value}
           onChangeText={handleChange}
           onFocus={(event) => {

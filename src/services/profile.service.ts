@@ -9,6 +9,11 @@ export type ProfileEmailSetupStatus = {
     emailOptInAt: string | null;
     isComplete: boolean;
 };
+export type SellerBusinessCategorySetupStatus = {
+    businessId: string | null;
+    categoryCount: number;
+    isComplete: boolean;
+};
 export type AccountDeletionRequestStatus = {
     status: "pending" | "completed" | "canceled";
     requestedAt: string;
@@ -722,6 +727,55 @@ export async function getCurrentSellerProfileOverview(): Promise<
             profile: profileResult.data,
             business: businessResult.data,
             sellerHomePreset: presetResult.data,
+        },
+    };
+}
+
+export async function getCurrentSellerBusinessCategorySetupStatus(): Promise<
+    { ok: true; data: SellerBusinessCategorySetupStatus } | { ok: false; error: AppError }
+> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const profileBusinessResult = await supabase
+        .from("profile_business")
+        .select("business_id")
+        .eq("profile_id", profileResult.data.id)
+        .maybeSingle();
+
+    if (profileBusinessResult.error) {
+        return { ok: false, error: fromSupabaseError(profileBusinessResult.error) };
+    }
+
+    const businessId = profileBusinessResult.data?.business_id ?? null;
+    if (!businessId) {
+        return {
+            ok: true,
+            data: {
+                businessId: null,
+                categoryCount: 0,
+                isComplete: false,
+            },
+        };
+    }
+
+    const preferenceResult = await supabase
+        .from("business_category_preference")
+        .select("id", { count: "exact", head: true })
+        .eq("business_id", businessId);
+
+    if (preferenceResult.error) {
+        return { ok: false, error: fromSupabaseError(preferenceResult.error) };
+    }
+
+    const categoryCount = preferenceResult.count ?? 0;
+
+    return {
+        ok: true,
+        data: {
+            businessId,
+            categoryCount,
+            isComplete: categoryCount > 0,
         },
     };
 }

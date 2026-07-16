@@ -29,6 +29,113 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_event: {
+        Row: {
+          billable_input_tokens: number | null
+          cached_input_tokens: number | null
+          client_request_id: string | null
+          created_at: string
+          draft_id: string | null
+          duration_ms: number | null
+          estimated_cost_usd: number | null
+          id: string
+          image_count: number
+          input_tokens: number | null
+          metadata: Json
+          model: string | null
+          offer_draft_id: string | null
+          ok: boolean | null
+          output_tokens: number | null
+          pass: string
+          pricing_model: string | null
+          profile_id: string | null
+          request_id: string
+          service: string
+          total_tokens: number | null
+          ui_action: string | null
+          user_id: string | null
+        }
+        Insert: {
+          billable_input_tokens?: number | null
+          cached_input_tokens?: number | null
+          client_request_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          duration_ms?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          image_count?: number
+          input_tokens?: number | null
+          metadata?: Json
+          model?: string | null
+          offer_draft_id?: string | null
+          ok?: boolean | null
+          output_tokens?: number | null
+          pass: string
+          pricing_model?: string | null
+          profile_id?: string | null
+          request_id: string
+          service: string
+          total_tokens?: number | null
+          ui_action?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          billable_input_tokens?: number | null
+          cached_input_tokens?: number | null
+          client_request_id?: string | null
+          created_at?: string
+          draft_id?: string | null
+          duration_ms?: number | null
+          estimated_cost_usd?: number | null
+          id?: string
+          image_count?: number
+          input_tokens?: number | null
+          metadata?: Json
+          model?: string | null
+          offer_draft_id?: string | null
+          ok?: boolean | null
+          output_tokens?: number | null
+          pass?: string
+          pricing_model?: string | null
+          profile_id?: string | null
+          request_id?: string
+          service?: string
+          total_tokens?: number | null
+          ui_action?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_event_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "request_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_event_offer_draft_id_fkey"
+            columns: ["offer_draft_id"]
+            isOneToOne: false
+            referencedRelation: "offer_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_event_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_usage_event_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business: {
         Row: {
           created_at: string
@@ -1312,77 +1419,6 @@ export type Database = {
         }
         Relationships: []
       }
-      legal_document: {
-        Row: {
-          code: string
-          created_at: string
-          effective_date: string | null
-          is_active: boolean
-          title: string
-          updated_at: string
-          version_label: string | null
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          effective_date?: string | null
-          is_active?: boolean
-          title: string
-          updated_at?: string
-          version_label?: string | null
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          effective_date?: string | null
-          is_active?: boolean
-          title?: string
-          updated_at?: string
-          version_label?: string | null
-        }
-        Relationships: []
-      }
-      legal_document_section: {
-        Row: {
-          body: string
-          created_at: string
-          document_code: string
-          heading: string | null
-          id: string
-          is_active: boolean
-          sort_order: number
-          updated_at: string
-        }
-        Insert: {
-          body: string
-          created_at?: string
-          document_code: string
-          heading?: string | null
-          id?: string
-          is_active?: boolean
-          sort_order?: number
-          updated_at?: string
-        }
-        Update: {
-          body?: string
-          created_at?: string
-          document_code?: string
-          heading?: string | null
-          id?: string
-          is_active?: boolean
-          sort_order?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "legal_document_section_document_code_fkey"
-            columns: ["document_code"]
-            isOneToOne: false
-            referencedRelation: "legal_document"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
       home_group: {
         Row: {
           code: string
@@ -1608,6 +1644,77 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      legal_document: {
+        Row: {
+          code: string
+          created_at: string
+          effective_date: string | null
+          is_active: boolean
+          title: string
+          updated_at: string
+          version_label: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          effective_date?: string | null
+          is_active?: boolean
+          title: string
+          updated_at?: string
+          version_label?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          effective_date?: string | null
+          is_active?: boolean
+          title?: string
+          updated_at?: string
+          version_label?: string | null
+        }
+        Relationships: []
+      }
+      legal_document_section: {
+        Row: {
+          body: string
+          created_at: string
+          document_code: string
+          heading: string | null
+          id: string
+          is_active: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          document_code: string
+          heading?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          document_code?: string
+          heading?: string | null
+          id?: string
+          is_active?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_section_document_code_fkey"
+            columns: ["document_code"]
+            isOneToOne: false
+            referencedRelation: "legal_document"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       location: {
         Row: {
@@ -2038,48 +2145,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profile_account_deletion_request: {
-        Row: {
-          admin_note: string | null
-          completed_at: string | null
-          id: string
-          profile_id: string
-          requested_at: string
-          status: string
-        }
-        Insert: {
-          admin_note?: string | null
-          completed_at?: string | null
-          id?: string
-          profile_id: string
-          requested_at?: string
-          status?: string
-        }
-        Update: {
-          admin_note?: string | null
-          completed_at?: string | null
-          id?: string
-          profile_id?: string
-          requested_at?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profile"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profile_with_rating"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       profile_business: {
         Row: {
           business_id: string | null
@@ -2300,7 +2365,6 @@ export type Database = {
           business_id: string | null
           created_at: string
           currency_id: string | null
-          delivery_id: string | null
           description: string | null
           id: string
           price: number | null
@@ -2310,7 +2374,6 @@ export type Database = {
           business_id?: string | null
           created_at?: string
           currency_id?: string | null
-          delivery_id?: string | null
           description?: string | null
           id?: string
           price?: number | null
@@ -2320,7 +2383,6 @@ export type Database = {
           business_id?: string | null
           created_at?: string
           currency_id?: string | null
-          delivery_id?: string | null
           description?: string | null
           id?: string
           price?: number | null
@@ -2349,13 +2411,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "purchase_offer_delivery_id_fkey"
-            columns: ["delivery_id"]
-            isOneToOne: false
-            referencedRelation: "purchase_offer_delivery"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "purchase_offer_purchase_request_id_fkey"
             columns: ["purchase_request_id"]
             isOneToOne: false
@@ -2364,49 +2419,47 @@ export type Database = {
           },
         ]
       }
-      purchase_offer_delivery: {
+      purchase_offer_delivery_method: {
         Row: {
-          after_days: number | null
-          after_unit: string | null
-          after_value: number | null
           created_at: string
-          delivery_cat_id: string | null
+          delivery_catalog_id: string
           id: string
-          max_days: number | null
-          max_unit: string | null
-          max_value: number | null
-          price: number | null
+          purchase_offer_id: string
+          shipping_max_days: number | null
+          shipping_price: number | null
+          updated_at: string
         }
         Insert: {
-          after_days?: number | null
-          after_unit?: string | null
-          after_value?: number | null
           created_at?: string
-          delivery_cat_id?: string | null
+          delivery_catalog_id: string
           id?: string
-          max_days?: number | null
-          max_unit?: string | null
-          max_value?: number | null
-          price?: number | null
+          purchase_offer_id: string
+          shipping_max_days?: number | null
+          shipping_price?: number | null
+          updated_at?: string
         }
         Update: {
-          after_days?: number | null
-          after_unit?: string | null
-          after_value?: number | null
           created_at?: string
-          delivery_cat_id?: string | null
+          delivery_catalog_id?: string
           id?: string
-          max_days?: number | null
-          max_unit?: string | null
-          max_value?: number | null
-          price?: number | null
+          purchase_offer_id?: string
+          shipping_max_days?: number | null
+          shipping_price?: number | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "purchase_offer_delivery_delivery_id_fkey"
-            columns: ["delivery_cat_id"]
+            foreignKeyName: "purchase_offer_delivery_method_delivery_catalog_id_fkey"
+            columns: ["delivery_catalog_id"]
             isOneToOne: false
             referencedRelation: "delivery_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_offer_delivery_method_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
             referencedColumns: ["id"]
           },
         ]
@@ -2433,6 +2486,48 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "purchase_offer_image_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_offer_pickup_method: {
+        Row: {
+          created_at: string
+          id: string
+          pickup_after_days: number | null
+          pickup_catalog_id: string
+          purchase_offer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pickup_after_days?: number | null
+          pickup_catalog_id: string
+          purchase_offer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pickup_after_days?: number | null
+          pickup_catalog_id?: string
+          purchase_offer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_pickup_method_pickup_catalog_id_fkey"
+            columns: ["pickup_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_offer_pickup_method_purchase_offer_id_fkey"
             columns: ["purchase_offer_id"]
             isOneToOne: false
             referencedRelation: "purchase_offer"
@@ -3041,38 +3136,23 @@ export type Database = {
         }[]
       }
       cleanup_empty_request_opened_conversations: { Args: never; Returns: Json }
-      create_seller_offer_from_conversation:
-        | {
-            Args: {
-              p_conversation_id: string
-              p_currency_id: string
-              p_description: string
-              p_image_paths?: string[]
-              p_pickup_after_days?: number
-              p_price: number
-              p_primary_delivery_catalog_id: string
-              p_profile_id: string
-              p_shipping_max_days?: number
-              p_shipping_price?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_conversation_id: string
-              p_conversation_image_paths?: string[]
-              p_currency_id: string
-              p_description: string
-              p_offer_image_paths?: string[]
-              p_pickup_after_days?: number
-              p_price: number
-              p_primary_delivery_catalog_id: string
-              p_profile_id: string
-              p_shipping_max_days?: number
-              p_shipping_price?: number
-            }
-            Returns: Json
-          }
+      create_seller_offer_fulfillment_from_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_profile_id: string
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
       get_buyer_home_purchase_requests: {
         Args: {
           p_end_date?: string
@@ -3152,7 +3232,6 @@ export type Database = {
           business_rating: number
           created_at: string
           currency_id: string
-          delivery_id: string
           description: string
           id: string
           offer_currency_code: string
@@ -3254,7 +3333,6 @@ export type Database = {
           business_id: string
           created_at: string
           currency_id: string
-          delivery_id: string
           description: string
           id: string
           offer_currency_code: string
@@ -3264,6 +3342,16 @@ export type Database = {
           request_category_name: string
           request_profile_name: string
           request_title: string
+        }[]
+      }
+      get_delivery_catalog_options: {
+        Args: never
+        Returns: {
+          created_at: string
+          display_name: string
+          hint: string
+          id: string
+          method_kind: string
         }[]
       }
       get_navbar_items_by_profile: {
@@ -3365,10 +3453,6 @@ export type Database = {
         }
         Returns: Json
       }
-      get_seller_offer_edit_payload: {
-        Args: { p_conversation_id: string; p_profile_id: string }
-        Returns: Json
-      }
       get_seller_offer_edit_payload_v2: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -3393,11 +3477,11 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: Json
       }
-      process_expired_conversation_deadlines: { Args: never; Returns: Json }
-      request_current_profile_account_deletion: {
-        Args: { p_profile_id: string }
-        Returns: Json
+      phone_number_is_registered: {
+        Args: { p_phone: string }
+        Returns: boolean
       }
+      process_expired_conversation_deadlines: { Args: never; Returns: Json }
       publish_purchase_request: {
         Args: {
           p_category_id: string
@@ -3471,14 +3555,6 @@ export type Database = {
         }
         Returns: Json
       }
-      seller_mark_offer_made: {
-        Args: {
-          p_conversation_id: string
-          p_profile_id: string
-          p_purchase_offer_id: string
-        }
-        Returns: Json
-      }
       send_conversation_message:
         | {
             Args: {
@@ -3548,17 +3624,6 @@ export type Database = {
         Args: { p_location_id: string; p_profile_id: string }
         Returns: Json
       }
-      set_purchase_offer_delivery_timing: {
-        Args: {
-          p_conversation_id: string
-          p_pickup_after_unit?: string
-          p_pickup_after_value?: number
-          p_profile_id: string
-          p_shipping_max_unit?: string
-          p_shipping_max_value?: number
-        }
-        Returns: Json
-      }
       submit_conversation_rating: {
         Args: {
           p_action_code: string
@@ -3570,17 +3635,18 @@ export type Database = {
       }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
-      update_seller_offer_from_conversation: {
+      update_seller_offer_fulfillment_from_conversation: {
         Args: {
           p_conversation_id: string
           p_conversation_image_paths?: string[]
           p_currency_id: string
+          p_delivery_catalog_id?: string
           p_description: string
           p_keep_offer_image_ids?: string[]
           p_new_offer_image_paths?: string[]
           p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
           p_price: number
-          p_primary_delivery_catalog_id: string
           p_profile_id: string
           p_shipping_max_days?: number
           p_shipping_price?: number

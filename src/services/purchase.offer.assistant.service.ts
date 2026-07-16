@@ -75,6 +75,7 @@ export type SellerOfferAssistantRequest = {
   uiAction?: SellerOfferAssistantUiAction | null;
   images?: ChatImage[];
   identity?: SellerOfferAssistantRequestIdentity;
+  signal?: AbortSignal;
 };
 
 function normalizeString(value: unknown): string | null {
@@ -351,6 +352,7 @@ export async function callSellerOfferAssistant(
       body: hasImages
         ? buildFormDataBody(input, identity)
         : buildJsonBody(input, identity),
+      signal: input.signal,
     });
 
     const requestId = normalizeString(response.headers.get("x-request-id"));

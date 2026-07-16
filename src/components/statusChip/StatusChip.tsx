@@ -7,6 +7,7 @@ import { createStatusChipStyles } from "./styles";
 type StatusChipProps = {
   label: string;
   styleCode?: string | null;
+  allowWrap?: boolean;
 };
 
 type ThemeColors = Theme["colors"];
@@ -46,7 +47,11 @@ function toTintBackground(color: string) {
   return `rgba(${red}, ${green}, ${blue}, 0.18)`;
 }
 
-export default function StatusChip({ label, styleCode }: StatusChipProps) {
+export default function StatusChip({
+  label,
+  styleCode,
+  allowWrap = false,
+}: StatusChipProps) {
   const t = useTheme();
   const s = useMemo(() => createStatusChipStyles(t), [t]);
   const statusColor = resolveStyleCodeColor(styleCode, t.colors);
@@ -56,6 +61,7 @@ export default function StatusChip({ label, styleCode }: StatusChipProps) {
     <View
       style={[
         s.container,
+        allowWrap ? s.wrappingContainer : null,
         statusColor
           ? {
               backgroundColor: tintBackground ?? t.colors.backgroudWhite,
@@ -64,7 +70,7 @@ export default function StatusChip({ label, styleCode }: StatusChipProps) {
       ]}
     >
       <View style={[s.dot, statusColor ? { backgroundColor: statusColor } : null]} />
-      <Text variant="body" maxLines={1} style={s.label}>
+      <Text variant="body" maxLines={allowWrap ? undefined : 1} style={s.label}>
         {label}
       </Text>
     </View>

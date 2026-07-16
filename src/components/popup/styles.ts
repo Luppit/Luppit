@@ -12,6 +12,9 @@ export type GlobalPopupStyles = {
   backdrop: ViewStyle;
   bottomSheetFrame: ViewStyle;
   bottomSheet: ViewStyle;
+  successSheetFrame: ViewStyle;
+  successSheet: ViewStyle;
+  successSheetContent: ViewStyle;
   sheetContentScroll: ViewStyle;
   sheetContentScrollContent: ViewStyle;
   indicatorTouchArea: ViewStyle;
@@ -116,6 +119,18 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       alignSelf: "center",
       overflow: "hidden",
       ...createRoundedSurfaceStyle(t),
+    },
+    successSheetFrame: {
+      width: "100%",
+      maxWidth: 520,
+      alignSelf: "center",
+    },
+    successSheet: {
+      width: "100%",
+    },
+    successSheetContent: {
+      overflow: "hidden",
+      borderRadius: t.glass.radius.sheet,
     },
     sheetContentScroll: {
       flexGrow: 0,

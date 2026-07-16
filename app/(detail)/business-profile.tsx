@@ -158,16 +158,16 @@ export default function BusinessProfileScreen() {
         <GroupedListRow
           icon="tag"
           label="Categorías de venta"
-          value={categoryLabel}
+          description={
+            selectedCategories.length === 0
+              ? "Elige dónde quieres recibir oportunidades."
+              : categoryLabel
+          }
+          showSeparator={selectedCategories.length > 0}
           onPress={openCategoryEditor}
         />
         {selectedCategories.length === 0 ? (
-          <View style={s.emptyCategoryRow}>
-            <Text color="stateAnulated">Sin categorías configuradas.</Text>
-            <Text variant="small" color="stateAnulated">
-              Toca la fila para elegir dónde quieres recibir oportunidades.
-            </Text>
-          </View>
+          null
         ) : (
           <CategoryPreview preferences={selectedCategories} />
         )}
@@ -188,10 +188,12 @@ function CategoryPreview({
 
   return (
     <View style={s.previewRow}>
+      <Text variant="small" color="stateAnulated" style={s.previewTitle}>
+        Recibes oportunidades en
+      </Text>
       <View style={s.previewChips}>
         {visiblePreferences.map((preference) => (
           <View key={preference.categoryId} style={s.previewChip}>
-            <Icon name="tag" size={14} color={t.colors.secondary} />
             <Text variant="small" maxLines={1} style={s.previewChipLabel}>
               {preference.categoryName}
             </Text>
@@ -284,18 +286,15 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
       flex: 1,
       gap: t.spacing.xs,
     },
-    emptyCategoryRow: {
-      minHeight: 64,
-      paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.md,
-      justifyContent: "center",
-      gap: 2,
-    },
     previewRow: {
-      minHeight: 56,
+      minHeight: 72,
       paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.md,
+      paddingVertical: t.spacing.sm,
       justifyContent: "center",
+      gap: t.spacing.sm,
+    },
+    previewTitle: {
+      paddingLeft: t.spacing.xs,
     },
     previewChips: {
       flexDirection: "row",
@@ -306,10 +305,13 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
       maxWidth: "100%",
       minHeight: 32,
       borderRadius: 999,
-      ...t.glass.chip,
+      backgroundColor: t.colors.background,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: "rgba(0,0,0,0.08)",
       paddingHorizontal: t.spacing.sm,
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "center",
       gap: t.spacing.xs,
     },
     previewChipLabel: {

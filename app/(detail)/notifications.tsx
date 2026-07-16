@@ -1,6 +1,7 @@
 import { Icon } from "@/src/components/Icon";
 import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import {
   createRoundedSurfaceStyle,
   ROUNDED_SURFACE_RADIUS,
@@ -180,15 +181,11 @@ export default function NotificationsScreen() {
   if (notifications.length === 0) {
     return (
       <View style={s.centerState}>
-        <View style={s.emptyIconBadge}>
-          <Icon name="bell" size={28} color={t.colors.textDark} />
-        </View>
-        <Text variant="subtitle" align="center">
-          Sin notificaciones
-        </Text>
-        <Text color="textMedium" align="center" style={s.emptyDescription}>
-          Cuando haya novedades sobre tus solicitudes, ofertas o chats, aparecerán aquí.
-        </Text>
+        <StandaloneListEmptyState
+          icon="bell"
+          title="Sin notificaciones"
+          description="Cuando haya novedades sobre tus solicitudes, ofertas o chats, aparecerán aquí."
+        />
       </View>
     );
   }
@@ -366,9 +363,6 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       ...createRoundedSurfaceStyle(t),
       borderWidth: 1,
       borderColor: t.colors.border,
-    },
-    emptyDescription: {
-      maxWidth: 300,
     },
     retryButton: {
       minHeight: 40,

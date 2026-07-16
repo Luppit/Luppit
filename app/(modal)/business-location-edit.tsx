@@ -1,7 +1,7 @@
 import Button from "@/src/components/button/Button";
+import { GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
-import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   LocationOption,
@@ -19,6 +19,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "../(detail)/detail-top-bar";
 
 type SelectOption = {
   code: string;
@@ -27,7 +29,12 @@ type SelectOption = {
 
 export default function BusinessLocationEditScreen() {
   const t = useTheme();
-  const s = useMemo(() => createBusinessLocationEditStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const s = useMemo(
+    () => createBusinessLocationEditStyles(t, insets.bottom, topContentInset),
+    [insets.bottom, t, topContentInset]
+  );
   const params = useLocalSearchParams<{
     locationId?: string | string[];
     locationLabel?: string | string[];
@@ -136,22 +143,11 @@ export default function BusinessLocationEditScreen() {
   }
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={s.content}
-    >
-      <View style={s.surface}>
-        <View style={s.iconBadge}>
-          <Icon name="map-pin" size={22} color={t.colors.primary} />
-        </View>
-
-        <View style={s.titleBlock}>
-          <Text variant="subtitle">Ubicación del negocio</Text>
-          <Text color="stateAnulated">
-            Selecciona la provincia, cantón y distrito donde opera tu negocio.
-          </Text>
-        </View>
-
+    <View style={s.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.content}
+      >
         {!currentLocationIsSelectable ? (
           <View style={s.warningBox}>
             <Icon name="alert-circle" size={18} color={t.colors.secondary} />
@@ -167,19 +163,22 @@ export default function BusinessLocationEditScreen() {
         ) : null}
 
         {locations.length === 0 ? (
-          <View style={s.emptyState}>
-            <Text color="stateAnulated" align="center">
-              No encontramos ubicaciones disponibles.
-            </Text>
-          </View>
+          <GroupedListSection title="Ubicación">
+            <View style={s.emptyState}>
+              <Text color="stateAnulated" align="center">
+                No encontramos ubicaciones disponibles.
+              </Text>
+            </View>
+          </GroupedListSection>
         ) : (
           <>
-            <LocationSection title="Provincia">
-              {provinceOptions.map((option) => (
+            <GroupedListSection title="Provincia">
+              {provinceOptions.map((option, index) => (
                 <LocationOptionRow
                   key={option.code}
                   label={option.label}
                   selected={option.code === selectedProvinceCode}
+                  showSeparator={index < provinceOptions.length - 1}
                   onPress={() => {
                     setSelectedProvinceCode(option.code);
                     setSelectedCantonCode(null);
@@ -187,15 +186,16 @@ export default function BusinessLocationEditScreen() {
                   }}
                 />
               ))}
-            </LocationSection>
+            </GroupedListSection>
 
-            <LocationSection title="Cantón">
+            <GroupedListSection title="Cantón">
               {selectedProvinceCode ? (
-                cantonOptions.map((option) => (
+                cantonOptions.map((option, index) => (
                   <LocationOptionRow
                     key={option.code}
                     label={option.label}
                     selected={option.code === selectedCantonCode}
+                    showSeparator={index < cantonOptions.length - 1}
                     onPress={() => {
                       setSelectedCantonCode(option.code);
                       setSelectedLocationId(null);
@@ -205,26 +205,29 @@ export default function BusinessLocationEditScreen() {
               ) : (
                 <DisabledOptionLabel label="Primero selecciona una provincia" />
               )}
-            </LocationSection>
+            </GroupedListSection>
 
-            <LocationSection title="Distrito">
+            <GroupedListSection title="Distrito">
               {selectedCantonCode ? (
-                districtOptions.map((option) => (
+                districtOptions.map((option, index) => (
                   <LocationOptionRow
                     key={option.id}
                     label={option.label}
                     description={formatLocationLabel(option.location)}
                     selected={option.id === selectedLocationId}
+                    showSeparator={index < districtOptions.length - 1}
                     onPress={() => setSelectedLocationId(option.id)}
                   />
                 ))
               ) : (
                 <DisabledOptionLabel label="Primero selecciona un cantón" />
               )}
-            </LocationSection>
+            </GroupedListSection>
           </>
         )}
+      </ScrollView>
 
+      <View style={s.footer}>
         <Button
           title="Guardar cambios"
           loading={isSaving}
@@ -232,7 +235,7 @@ export default function BusinessLocationEditScreen() {
           onPress={() => void saveLocation()}
         />
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -265,26 +268,6 @@ function getUniqueOptions<KCode extends keyof LocationOption, KLabel extends key
   return Array.from(options.values());
 }
 
-function LocationSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessLocationEditStyles(t), [t]);
-
-  return (
-    <View style={s.section}>
-      <Text variant="small" color="textMedium" style={s.sectionTitle}>
-        {title}
-      </Text>
-      <View style={s.optionGroup}>{children}</View>
-    </View>
-  );
-}
-
 function DisabledOptionLabel({ label }: { label: string }) {
   const t = useTheme();
   const s = useMemo(() => createBusinessLocationEditStyles(t), [t]);
@@ -300,11 +283,13 @@ function LocationOptionRow({
   label,
   description,
   selected,
+  showSeparator,
   onPress,
 }: {
   label: string;
   description?: string;
   selected: boolean;
+  showSeparator: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
@@ -315,12 +300,14 @@ function LocationOptionRow({
       accessibilityRole="radio"
       accessibilityState={{ checked: selected }}
       onPress={onPress}
-      style={s.optionRow}
+      style={[s.optionRow, description ? s.optionRowWithDescription : null]}
     >
       <View style={s.optionText}>
-        <Text>{label}</Text>
+        <Text variant="body" maxLines={2}>
+          {label}
+        </Text>
         {description ? (
-          <Text variant="small" color="stateAnulated">
+          <Text variant="small" color="stateAnulated" maxLines={2}>
             {description}
           </Text>
         ) : null}
@@ -328,41 +315,37 @@ function LocationOptionRow({
       <View style={[s.checkCircle, selected ? s.checkCircleSelected : null]}>
         {selected ? <Icon name="check" size={16} color={t.colors.backgroudWhite} /> : null}
       </View>
+      {showSeparator ? <View style={s.rowSeparator} /> : null}
     </Pressable>
   );
 }
 
-function createBusinessLocationEditStyles(t: Theme) {
+function createBusinessLocationEditStyles(
+  t: Theme,
+  bottomInset = 0,
+  topContentInset = 0
+) {
   return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
     content: {
       flexGrow: 1,
-      paddingTop: t.spacing.lg,
-      paddingBottom: t.spacing.xl,
+      gap: t.spacing.lg,
+      paddingTop: topContentInset + t.spacing.sm,
+      paddingBottom: 96 + bottomInset,
     },
     loadingBox: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
       gap: t.spacing.sm,
-    },
-    surface: {
-      gap: t.spacing.md,
-    },
-    iconBadge: {
-      width: 42,
-      height: 42,
-      borderRadius: 12,
-      backgroundColor: "rgba(131,163,30,0.14)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    titleBlock: {
-      gap: t.spacing.xs,
+      paddingTop: topContentInset,
     },
     warningBox: {
-      borderRadius: t.borders.sm,
+      borderRadius: t.borders.md,
       backgroundColor: "rgba(202,115,48,0.08)",
-      padding: t.spacing.sm,
+      padding: t.spacing.md,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: t.spacing.sm,
@@ -377,36 +360,26 @@ function createBusinessLocationEditStyles(t: Theme) {
       justifyContent: "center",
       padding: t.spacing.md,
     },
-    section: {
-      gap: t.spacing.sm,
-    },
-    sectionTitle: {
-      paddingLeft: t.spacing.md,
-    },
-    optionGroup: {
-      overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
-    },
     optionRow: {
-      minHeight: 52,
+      minHeight: 58,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: "rgba(0,0,0,0.08)",
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
     },
+    optionRowWithDescription: {
+      minHeight: 74,
+    },
     disabledRow: {
-      minHeight: 52,
+      minHeight: 58,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: "rgba(0,0,0,0.08)",
       justifyContent: "center",
     },
     optionText: {
       flex: 1,
+      minWidth: 0,
       gap: 2,
     },
     checkCircle: {
@@ -421,6 +394,23 @@ function createBusinessLocationEditStyles(t: Theme) {
     checkCircleSelected: {
       backgroundColor: t.colors.primary,
       borderColor: t.colors.primary,
+    },
+    rowSeparator: {
+      position: "absolute",
+      left: t.spacing.md,
+      right: 0,
+      bottom: 0,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: "rgba(0,0,0,0.08)",
+    },
+    footer: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingTop: t.spacing.sm,
+      paddingBottom: Math.max(bottomInset, t.spacing.md) + t.spacing.sm,
+      backgroundColor: t.colors.background,
     },
   });
 }

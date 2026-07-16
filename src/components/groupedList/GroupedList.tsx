@@ -208,13 +208,15 @@ function createGroupedListStyles(t: Theme) {
       gap: t.spacing.sm,
     },
     rowMainLineWithValue: {
-      alignItems: "flex-start",
+      alignItems: "center",
     },
     rowLabel: {
       flex: 1,
+      minWidth: 0,
     },
     rowValue: {
-      maxWidth: 180,
+      minWidth: 112,
+      maxWidth: 176,
       flexShrink: 1,
       textAlign: "right",
     },
