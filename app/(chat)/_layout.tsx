@@ -5,12 +5,24 @@ import {
 } from "./chat-session.context";
 import InputChat from "@/src/components/inputChat/inputChat";
 import { Roles } from "@/src/services/role.service";
+import {
+  clearToastBottomInset,
+  setToastBottomInset,
+} from "@/src/services/toast.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useTheme } from "@/src/themes";
 import { Redirect, Slot, router } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Keyboard, KeyboardAvoidingView, Platform, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  LayoutChangeEvent,
+  Platform,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const TOAST_INSET_SOURCE = "buyer-chat-composer";
 
 function ChatLayoutContent() {
   const t = useTheme();
@@ -18,14 +30,31 @@ function ChatLayoutContent() {
   const {
     title,
     sendMessage,
+    stopAssistant,
     messages,
     showComposer,
     canCompose,
     isSendingMessage,
-    isExecutingControl,
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const isAssistantBusy = isSendingMessage || isExecutingControl;
+
+  const handleComposerLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      setToastBottomInset(
+        TOAST_INSET_SOURCE,
+        event.nativeEvent.layout.height + t.spacing.sm
+      );
+    },
+    [t.spacing.sm]
+  );
+
+  useEffect(() => {
+    if (!showComposer) {
+      clearToastBottomInset(TOAST_INSET_SOURCE);
+    }
+
+    return () => clearToastBottomInset(TOAST_INSET_SOURCE);
+  }, [showComposer]);
 
   useEffect(() => {
     const showEvent =
@@ -57,12 +86,7 @@ function ChatLayoutContent() {
           title={title}
           onClose={() => {
             Keyboard.dismiss();
-            if (router.canGoBack()) {
-              router.back();
-              return;
-            }
-
-            router.replace("/(tabs)");
+            router.dismissTo("/(tabs)");
           }}
           topInset={insets.top}
           isSurfaceVisible={Boolean(title?.trim())}
@@ -77,6 +101,7 @@ function ChatLayoutContent() {
 
         {showComposer ? (
           <View
+            onLayout={handleComposerLayout}
             style={{
               paddingHorizontal: t.spacing.md,
               paddingTop: t.spacing.sm,
@@ -89,7 +114,8 @@ function ChatLayoutContent() {
               clearOnSendStart
               autoFocus={messages.length === 0}
               disabled={!canCompose}
-              busy={isAssistantBusy}
+              busy={isSendingMessage}
+              onStop={stopAssistant}
               maxImages={3}
               onSend={({ text, images }) => {
                 return sendMessage({ text, images });

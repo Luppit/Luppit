@@ -6,10 +6,19 @@ import {
   PurchaseRequestAssistantUiState,
 } from "@/src/services/purchase.request.assistant.service";
 import type { ChatImage } from "@/src/components/inputChat/inputChat";
-import { getPurchaseRequestById, PurchaseRequest } from "@/src/services/purchase.request.service";
-import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
+import { openPopup } from "@/src/services/popup.service";
+import { showError, showWarning } from "@/src/utils/useToast";
 import { router } from "expo-router";
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AccessibilityInfo } from "react-native";
 
 export type ChatMessage = {
   id: string;
@@ -38,6 +47,7 @@ type ChatSessionContextValue = {
   showComposer: boolean;
   canCompose: boolean;
   sendMessage: (payload: { text: string; images: ChatImage[] }) => Promise<void>;
+  stopAssistant: () => void;
   continueClarifying: () => Promise<void>;
   publishDraft: () => Promise<void>;
 };
@@ -62,6 +72,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   showComposer: true,
   canCompose: true,
   sendMessage: async () => {},
+  stopAssistant: () => {},
   continueClarifying: async () => {},
   publishDraft: async () => {},
 });
@@ -101,12 +112,6 @@ function shouldOpenSummaryFromReply(value: string) {
 
 const imageOnlyPrompt = "Adjunto imágenes de referencia para mi solicitud.";
 
-function toDetailRoutePurchaseRequest(
-  purchaseRequest: PurchaseRequest
-): PurchaseRequest {
-  return purchaseRequest;
-}
-
 export function ChatSessionProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -124,6 +129,26 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const [purchaseRequestId, setPurchaseRequestId] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isExecutingControl, setIsExecutingControl] = useState(false);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const shownSuccessRequestIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      const activeRequest = activeRequestRef.current;
+      activeRequestRef.current = null;
+      activeRequest?.abort();
+    };
+  }, []);
+
+  const stopAssistant = useCallback(() => {
+    const activeRequest = activeRequestRef.current;
+    if (!activeRequest) return;
+
+    activeRequestRef.current = null;
+    activeRequest.abort();
+    setIsSendingMessage(false);
+    AccessibilityInfo.announceForAccessibility("Respuesta detenida");
+  }, []);
 
   const syncAssistantState = useCallback(
     async (
@@ -141,7 +166,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         }
 
         if (next.statusCode === 429 && next.retryAfterSeconds) {
-          showInfo(
+          showWarning(
             "Espera un momento",
             `${next.error.message} Reintenta en ${next.retryAfterSeconds} segundos.`
           );
@@ -185,26 +210,22 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       }
 
       if (next.status === "published" && next.purchaseRequestId) {
-        const request = await getPurchaseRequestById(next.purchaseRequestId);
+        if (shownSuccessRequestIdRef.current === next.purchaseRequestId) return;
+        shownSuccessRequestIdRef.current = next.purchaseRequestId;
 
-        if (!request) {
-          showSuccess("Solicitud publicada");
-          return;
-        }
-
-        if (!request.ok) {
-          showSuccess("Solicitud publicada", "No pudimos abrir el detalle todavía.");
-          return;
-        }
-
-        showSuccess("Solicitud publicada");
-        router.push({
-          pathname: "/(detail)/purchase-request",
-          params: {
-            title: request.data.title ?? "Detalle de solicitud",
-            purchaseRequest: JSON.stringify(
-              toDetailRoutePurchaseRequest(request.data)
-            ),
+        const publishedRequestId = next.purchaseRequestId;
+        openPopup({
+          type: "success",
+          title: "¡Solicitud publicada!",
+          description:
+            "Ya está visible para que los negocios puedan enviarte ofertas.",
+          actionLabel: "Ver mi solicitud",
+          actionBackgroundColorKey: "textDark",
+          onAction: () => {
+            router.replace({
+              pathname: "/request/[purchaseRequestId]",
+              params: { purchaseRequestId: publishedRequestId },
+            });
           },
         });
       }
@@ -229,6 +250,8 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         { id: createMessageId("user"), sender: "user", text: trimmed, images },
       ]);
 
+      const requestController = new AbortController();
+      activeRequestRef.current = requestController;
       setIsSendingMessage(true);
       try {
         if (
@@ -242,7 +265,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
             prompt: "",
             draft_id: draftId,
             ui_action: "SHOW_SUMMARY",
+            signal: requestController.signal,
           });
+          if (
+            requestController.signal.aborted ||
+            activeRequestRef.current !== requestController
+          ) {
+            return;
+          }
           await syncAssistantState(summaryResult);
           return;
         }
@@ -252,7 +282,15 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
             prompt: "",
             draft_id: draftId,
             ui_action: "CONTINUE",
+            signal: requestController.signal,
           });
+
+          if (
+            requestController.signal.aborted ||
+            activeRequestRef.current !== requestController
+          ) {
+            return;
+          }
 
           await syncAssistantState(continueResult, { appendAssistantMessage: false });
           if (!continueResult.ok) return;
@@ -262,10 +300,20 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
           prompt: trimmed || imageOnlyPrompt,
           draft_id: draftId,
           images,
+          signal: requestController.signal,
         });
+        if (
+          requestController.signal.aborted ||
+          activeRequestRef.current !== requestController
+        ) {
+          return;
+        }
         await syncAssistantState(result);
       } finally {
-        setIsSendingMessage(false);
+        if (activeRequestRef.current === requestController) {
+          activeRequestRef.current = null;
+          setIsSendingMessage(false);
+        }
       }
     },
     [
@@ -346,6 +394,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         !isExecutingControl &&
         status !== "published",
       sendMessage,
+      stopAssistant,
       continueClarifying,
       publishDraft,
     }),
@@ -363,6 +412,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       purchaseRequestId,
       requiredFields,
       sendMessage,
+      stopAssistant,
       status,
       summary,
       summaryText,

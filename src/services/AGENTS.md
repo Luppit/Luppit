@@ -41,8 +41,8 @@ Applies to service modules and RPC integration behavior.
 - Active business locations come from `location` rows with `country_code='CR'` and `is_active=true`; save only the selected district `location.id`.
 
 ## Offer And Timeline Services
-- Offer create/edit/save flows use conversation-backed RPCs (`create_seller_offer_from_conversation`, `get_seller_offer_edit_payload_v2`/legacy fallback, `update_seller_offer_from_conversation`) rather than scattered direct writes.
-- Preserve delivery timing value + unit (`hours`/`days`); legacy day fields are compatibility fallback only.
+- Offer create/edit/save flows use normalized conversation-backed RPCs (`create_seller_offer_fulfillment_from_conversation`, `get_seller_offer_edit_payload_v2`, and `update_seller_offer_fulfillment_from_conversation`) rather than scattered direct writes.
+- Shipping and pickup are independent methods and may coexist; timing fields are integer days.
 - Offer upload helpers must normalize MIME types before Supabase Storage calls.
 - Buyer offer cards read seller reputation from DB-backed rating views/summaries, not legacy `business.rating` fields.
 - Purchase-request timelines come from `get_conversation_timeline`; do not reconstruct timeline order from direct joins when the RPC exists.

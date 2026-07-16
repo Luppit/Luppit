@@ -5,6 +5,7 @@ import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceR
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Icon } from "@/src/components/Icon";
+import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { openPopup } from "@/src/services/popup.service";
@@ -76,7 +77,7 @@ function getSortLabel(sortId: string) {
 function formatFavoritedAt(rawDate: string) {
   const date = new Date(rawDate);
   if (Number.isNaN(date.getTime())) return "Guardada";
-  return `Guardada ${date.toLocaleDateString("es-CR", {
+  return `Guardada el ${date.toLocaleDateString("es-CR", {
     day: "numeric",
     month: "short",
   })}`;
@@ -355,6 +356,10 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
     });
   }, [selectedSortId]);
 
+  const retryLoad = React.useCallback(() => {
+    void loadFavorites();
+  }, [loadFavorites]);
+
   const content = (() => {
     if (isLoading) {
       return (
@@ -367,11 +372,26 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
     if (favorites.length === 0) {
       return (
         <View style={s.stateContent}>
-          <Text color="stateAnulated">
-            {loadError
-              ? "No se pudieron cargar tus favoritas."
-              : "Cuando guardes solicitudes, aparecerán aquí."}
-          </Text>
+          <StandaloneListEmptyState
+            icon={loadError ? "alert-circle" : hasActiveFilters ? "search" : "heart"}
+            title={
+              loadError
+                ? "No se pudieron cargar tus favoritas"
+                : hasActiveFilters
+                  ? "No encontramos favoritas"
+                  : "Aún no tienes favoritas"
+            }
+            description={
+              loadError
+                ? loadError
+                : hasActiveFilters
+                  ? "Prueba cambiando la búsqueda o limpiando los filtros."
+                  : "Cuando guardes solicitudes, aparecerán aquí."
+            }
+            actionLabel={loadError ? "Reintentar" : hasActiveFilters ? "Limpiar filtros" : null}
+            actionIcon={loadError ? undefined : hasActiveFilters ? "x" : undefined}
+            onAction={loadError ? retryLoad : hasActiveFilters ? () => setFilters(EMPTY_FAVORITE_FILTERS) : undefined}
+          />
         </View>
       );
     }
@@ -407,6 +427,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
           <MarketplaceRequestCard
             key={item.favorite_id}
             item={item}
+            role={role}
             contextLabel={
               role === "buyer"
                 ? item.offers_count > 0
@@ -416,9 +437,11 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
                         : "ofertas para revisar"
                     }`
                   : "Esperando ofertas"
-                : item.status_label?.trim() || "Solicitud guardada"
+                : undefined
             }
             metricLabel={formatFavoritedAt(item.favorited_at)}
+            showSellerActivity={role === "seller"}
+            showSellerStatus={role === "seller"}
             onPress={() => void openFavorite(item)}
             onLongPress={() =>
               openPurchaseRequestCardMenu({
@@ -579,6 +602,8 @@ function createFavoritesScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory 
     stateContent: {
       flex: 1,
       paddingTop: topBarVisibleHeight + t.spacing.md,
+      paddingHorizontal: t.spacing.lg,
+      justifyContent: "center",
     },
     toolbar: {
       flexDirection: "row",

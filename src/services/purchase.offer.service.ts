@@ -20,9 +20,7 @@ export type SellerPurchaseOfferCardData = PurchaseOffer & {
   request_profile_name: string | null;
   offer_currency_code: string | null;
 };
-export type PurchaseOfferDelivery = Row<"purchase_offer_delivery">;
 export type PurchaseOfferImage = Row<"purchase_offer_image">;
-type DeliveryUnit = "horas" | "dias";
 type OfferFile = {
   uri: string;
   name?: string | null;
@@ -32,22 +30,6 @@ type OfferFile = {
   id?: string | null;
   storagePath?: string | null;
   isExisting?: boolean;
-};
-
-export type CreatePurchaseOfferInput = {
-  purchaseRequestId: string;
-  conversationId?: string | null;
-  description: string;
-  price: number;
-  currencyId: string;
-  primaryDeliveryCatalogId: string;
-  files: OfferFile[];
-  deliveryMethods: string[];
-  pickupDelay?: number | null;
-  pickupDelayUnit?: DeliveryUnit;
-  shippingCost?: number | null;
-  shippingMaxTime?: number | null;
-  shippingMaxTimeUnit?: DeliveryUnit;
 };
 
 export type SellerPurchaseOfferFilters = {
@@ -65,10 +47,16 @@ export type BuyerPurchaseOfferFilters = {
   selectedCurrencyIds?: string[];
 };
 
-export type CreatePurchaseOfferResult = {
-  offer: PurchaseOffer;
-  delivery: PurchaseOfferDelivery;
-  images: PurchaseOfferImage[];
+export type PurchaseOfferFulfillment = {
+  delivery: {
+    delivery_catalog_id: string;
+    shipping_max_days: number | null;
+    shipping_price: number | null;
+  } | null;
+  pickup: {
+    pickup_catalog_id: string;
+    pickup_after_days: number | null;
+  } | null;
 };
 
 export type UpdatePurchaseOfferInput = {
@@ -78,17 +66,19 @@ export type UpdatePurchaseOfferInput = {
   description: string;
   price: number;
   currencyId: string;
-  primaryDeliveryCatalogId: string;
+  deliveryCatalogId?: string | null;
+  pickupCatalogId?: string | null;
   files: OfferFile[];
-  deliveryMethods: string[];
-  pickupDelay?: number | null;
-  pickupDelayUnit?: DeliveryUnit;
+  pickupAfterDays?: number | null;
   shippingCost?: number | null;
-  shippingMaxTime?: number | null;
-  shippingMaxTimeUnit?: DeliveryUnit;
+  shippingMaxDays?: number | null;
 };
 
-export type UpdatePurchaseOfferResult = CreatePurchaseOfferResult;
+export type UpdatePurchaseOfferResult = {
+  offer: PurchaseOffer;
+  fulfillment: PurchaseOfferFulfillment;
+  images: PurchaseOfferImage[];
+};
 
 export type EditablePurchaseOfferDraft = {
   purchaseRequestId: string;
@@ -96,14 +86,11 @@ export type EditablePurchaseOfferDraft = {
   description: string;
   price: number;
   currencyId: string;
-  primaryDeliveryCatalogId: string | null;
+  deliveryCatalogId: string | null;
+  pickupCatalogId: string | null;
   pickupAfterDays: number | null;
-  pickupAfterValue: number | null;
-  pickupAfterUnit: DeliveryUnit | null;
   shippingPrice: number | null;
   shippingMaxDays: number | null;
-  shippingMaxValue: number | null;
-  shippingMaxUnit: DeliveryUnit | null;
   files: OfferFile[];
 };
 
@@ -718,40 +705,6 @@ function parseNumberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function parseDeliveryUnit(value: unknown): DeliveryUnit | null {
-  if (value === "horas" || value === "hours") return "horas";
-  if (value === "dias" || value === "days") return "dias";
-  return null;
-}
-
-function toDbDeliveryUnit(unit: DeliveryUnit | null | undefined) {
-  if (unit === "horas") return "hours";
-  if (unit === "dias") return "days";
-  return null;
-}
-
-function getLegacyDays(value: number | null | undefined, unit: DeliveryUnit | null | undefined) {
-  if (!value || value <= 0) return null;
-  if (unit === "horas") return Math.ceil(value / 24);
-  return value;
-}
-
-function resolveDeliveryTiming(value: number | null | undefined, unit: DeliveryUnit | undefined) {
-  if (!value || value <= 0) {
-    return {
-      value: null,
-      unit: null,
-      legacyDays: null,
-    };
-  }
-
-  return {
-    value,
-    unit: unit ?? "dias",
-    legacyDays: getLegacyDays(value, unit ?? "dias"),
-  };
-}
-
 function parseEditablePurchaseOfferDraft(
   raw: unknown
 ): EditablePurchaseOfferDraft | null {
@@ -805,10 +758,14 @@ function parseEditablePurchaseOfferDraft(
     })
     .filter((file): file is OfferFile => file !== null);
 
-  const pickupAfterDays = parseNumberValue(value.pickup_after_days);
-  const shippingMaxDays = parseNumberValue(value.shipping_max_days);
-  const pickupAfterUnit = parseDeliveryUnit(value.pickup_after_unit);
-  const shippingMaxUnit = parseDeliveryUnit(value.shipping_max_unit);
+  const delivery =
+    value.delivery && typeof value.delivery === "object"
+      ? (value.delivery as Record<string, unknown>)
+      : null;
+  const pickup =
+    value.pickup && typeof value.pickup === "object"
+      ? (value.pickup as Record<string, unknown>)
+      : null;
 
   return {
     purchaseRequestId,
@@ -816,17 +773,15 @@ function parseEditablePurchaseOfferDraft(
     description,
     price,
     currencyId,
-    primaryDeliveryCatalogId:
-      typeof value.primary_delivery_catalog_id === "string"
-        ? value.primary_delivery_catalog_id
+    deliveryCatalogId:
+      typeof delivery?.delivery_catalog_id === "string"
+        ? delivery.delivery_catalog_id
         : null,
-    pickupAfterDays,
-    pickupAfterValue: parseNumberValue(value.pickup_after_value) ?? pickupAfterDays,
-    pickupAfterUnit: pickupAfterUnit ?? (pickupAfterDays && pickupAfterDays > 0 ? "dias" : null),
-    shippingPrice: parseNumberValue(value.shipping_price),
-    shippingMaxDays,
-    shippingMaxValue: parseNumberValue(value.shipping_max_value) ?? shippingMaxDays,
-    shippingMaxUnit: shippingMaxUnit ?? (shippingMaxDays && shippingMaxDays > 0 ? "dias" : null),
+    pickupCatalogId:
+      typeof pickup?.pickup_catalog_id === "string" ? pickup.pickup_catalog_id : null,
+    pickupAfterDays: parseNumberValue(pickup?.pickup_after_days),
+    shippingPrice: parseNumberValue(delivery?.shipping_price),
+    shippingMaxDays: parseNumberValue(delivery?.shipping_max_days),
     files,
   };
 }
@@ -879,167 +834,33 @@ export async function getEditablePurchaseOfferDraftByConversationId(
     p_profile_id: profile.data.id,
   });
 
-  if (!v2RpcResult?.error) {
-    const parsed = parseEditablePurchaseOfferDraft(v2RpcResult?.data);
-    if (parsed) {
-      if (parsed.files.length > 0) {
-        return {
-          ok: true,
-          data: {
-            ...parsed,
-            files: await withOfferFilePreviewUrls(parsed.files),
-          },
-        };
-      }
-
-      const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
-      if (!imageFiles.ok) return imageFiles;
-
-      return {
-        ok: true,
-        data: {
-          ...parsed,
-          files: imageFiles.data,
-        },
-      };
-    }
-  } else if (!isMissingRpcError(v2RpcResult.error, "get_seller_offer_edit_payload_v2")) {
+  if (v2RpcResult?.error) {
     return { ok: false, error: fromSupabaseError(v2RpcResult.error) };
   }
 
-  const rpcResult: any = await (supabase as any).rpc("get_seller_offer_edit_payload", {
-    p_conversation_id: conversationId,
-    p_profile_id: profile.data.id,
-  });
+  const parsed = parseEditablePurchaseOfferDraft(v2RpcResult?.data);
+  if (!parsed) return { ok: false, error: fromAppError("unknown") };
 
-  if (!rpcResult?.error) {
-    const parsed = parseEditablePurchaseOfferDraft(rpcResult?.data);
-    if (parsed) {
-      if (parsed.files.length > 0) {
-        return {
-          ok: true,
-          data: {
-            ...parsed,
-            files: await withOfferFilePreviewUrls(parsed.files),
-          },
-        };
-      }
-
-      const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
-      if (!imageFiles.ok) return imageFiles;
-
-      return {
-        ok: true,
-        data: {
-          ...parsed,
-          files: imageFiles.data,
-        },
-      };
-    }
-  } else if (!isMissingRpcError(rpcResult.error, "get_seller_offer_edit_payload")) {
-    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  if (parsed.files.length > 0) {
+    return {
+      ok: true,
+      data: {
+        ...parsed,
+        files: await withOfferFilePreviewUrls(parsed.files),
+      },
+    };
   }
 
-  const conversationResult = await supabase
-    .from("conversation")
-    .select("id, purchase_request_id, purchase_offer_id, seller_profile_id")
-    .eq("id", conversationId)
-    .maybeSingle();
-
-  if (conversationResult.error) {
-    return { ok: false, error: fromSupabaseError(conversationResult.error) };
-  }
-
-  const conversation = conversationResult.data;
-  if (!conversation?.id || conversation.seller_profile_id !== profile.data.id) {
-    return null;
-  }
-
-  const purchaseOfferId =
-    typeof conversation.purchase_offer_id === "string" ? conversation.purchase_offer_id : null;
-  const purchaseRequestId =
-    typeof conversation.purchase_request_id === "string" ? conversation.purchase_request_id : null;
-
-  if (!purchaseOfferId || !purchaseRequestId) return null;
-
-  const offerResult = await supabase
-    .from("purchase_offer")
-    .select("*")
-    .eq("id", purchaseOfferId)
-    .maybeSingle();
-
-  if (offerResult.error) return { ok: false, error: fromSupabaseError(offerResult.error) };
-  if (!offerResult.data) return null;
-
-  const deliveryId =
-    typeof offerResult.data.delivery_id === "string" ? offerResult.data.delivery_id : null;
-
-  const [deliveryResult, imageResult] = await Promise.all([
-    deliveryId
-      ? supabase.from("purchase_offer_delivery").select("*").eq("id", deliveryId).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
-    getPurchaseOfferImagePreviewFiles(purchaseOfferId),
-  ]);
-
-  if (deliveryResult.error) {
-    return { ok: false, error: fromSupabaseError(deliveryResult.error) };
-  }
-  if (!imageResult.ok) {
-    return imageResult;
-  }
+  const imageFiles = await getPurchaseOfferImagePreviewFiles(parsed.purchaseOfferId);
+  if (!imageFiles.ok) return imageFiles;
 
   return {
     ok: true,
     data: {
-      purchaseRequestId,
-      purchaseOfferId,
-      description: offerResult.data.description?.trim() ?? "",
-      price: Number(offerResult.data.price ?? 0),
-      currencyId: offerResult.data.currency_id ?? "",
-      primaryDeliveryCatalogId: deliveryResult.data?.delivery_cat_id ?? null,
-      pickupAfterDays: parseNumberValue(deliveryResult.data?.after_days),
-      pickupAfterValue:
-        parseNumberValue(deliveryResult.data?.after_value) ??
-        parseNumberValue(deliveryResult.data?.after_days),
-      pickupAfterUnit:
-        parseDeliveryUnit(deliveryResult.data?.after_unit) ??
-        (parseNumberValue(deliveryResult.data?.after_days) ? "dias" : null),
-      shippingPrice: parseNumberValue(deliveryResult.data?.price),
-      shippingMaxDays: parseNumberValue(deliveryResult.data?.max_days),
-      shippingMaxValue:
-        parseNumberValue(deliveryResult.data?.max_value) ??
-        parseNumberValue(deliveryResult.data?.max_days),
-      shippingMaxUnit:
-        parseDeliveryUnit(deliveryResult.data?.max_unit) ??
-        (parseNumberValue(deliveryResult.data?.max_days) ? "dias" : null),
-      files: imageResult.data,
+      ...parsed,
+      files: imageFiles.data,
     },
   };
-}
-
-async function syncPurchaseOfferDeliveryTiming(
-  conversationId: string,
-  profileId: string,
-  pickupTiming: ReturnType<typeof resolveDeliveryTiming>,
-  shippingTiming: ReturnType<typeof resolveDeliveryTiming>
-): Promise<{ ok: true } | { ok: false; error: AppError }> {
-  const result: any = await (supabase as any).rpc("set_purchase_offer_delivery_timing", {
-    p_conversation_id: conversationId,
-    p_profile_id: profileId,
-    p_pickup_after_value: pickupTiming.value,
-    p_pickup_after_unit: toDbDeliveryUnit(pickupTiming.unit),
-    p_shipping_max_value: shippingTiming.value,
-    p_shipping_max_unit: toDbDeliveryUnit(shippingTiming.unit),
-  });
-
-  if (result?.error) {
-    if (isMissingRpcError(result.error, "set_purchase_offer_delivery_timing")) {
-      return { ok: true };
-    }
-    return { ok: false, error: fromSupabaseError(result.error) };
-  }
-
-  return { ok: true };
 }
 
 async function uploadImageToBucket(
@@ -1068,130 +889,6 @@ async function uploadImageToBucket(
   return { ok: true, data: filePath };
 }
 
-export async function createPurchaseOffer(
-  input: CreatePurchaseOfferInput
-): Promise<{ ok: true; data: CreatePurchaseOfferResult } | { ok: false; error: AppError }> {
-  if (!input.purchaseRequestId || !input.description.trim()) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-  if (!input.currencyId || !input.primaryDeliveryCatalogId) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-  if (input.price <= 0 || input.files.length === 0 || input.deliveryMethods.length === 0) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-
-  const session = await getSession();
-  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
-
-  const profile = await getProfileByUserId(session.user.id);
-  if (profile?.ok === false) return { ok: false, error: profile.error };
-  if (!profile) return { ok: false, error: fromAppError("not_found") };
-
-  if (!input.conversationId) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-  
-  const hasPickup = (input.pickupDelay ?? 0) > 0;
-  const hasShipping = (input.shippingMaxTime ?? 0) > 0 || (input.shippingCost ?? 0) > 0;
-
-  const pickupTiming = resolveDeliveryTiming(
-    hasPickup ? input.pickupDelay : null,
-    input.pickupDelayUnit
-  );
-  const shippingTiming = resolveDeliveryTiming(
-    hasShipping ? input.shippingMaxTime : null,
-    input.shippingMaxTimeUnit
-  );
-
-  const shippingPrice =
-    hasShipping && (input.shippingCost ?? 0) > 0
-      ? input.shippingCost ?? null
-      : null;
-
-  const offerUploadStoragePrefix = `${input.purchaseRequestId}/${input.conversationId}`;
-  const conversationUploadStoragePrefix = input.conversationId;
-  const uploadedOfferImagePaths: string[] = [];
-  const uploadedConversationImagePaths: string[] = [];
-  for (let i = 0; i < input.files.length; i += 1) {
-    const offerUpload = await uploadImageToBucket(
-      "offers",
-      offerUploadStoragePrefix,
-      input.files[i],
-      i
-    );
-    if (!offerUpload.ok) return offerUpload;
-    uploadedOfferImagePaths.push(offerUpload.data);
-
-    const conversationUpload = await uploadImageToBucket(
-      "conversations",
-      conversationUploadStoragePrefix,
-      input.files[i],
-      i
-    );
-    if (!conversationUpload.ok) return conversationUpload;
-    uploadedConversationImagePaths.push(conversationUpload.data);
-  }
-
-  const rpcResult: any = await (supabase as any).rpc(
-    "create_seller_offer_from_conversation",
-    {
-      p_conversation_id: input.conversationId,
-      p_profile_id: profile.data.id,
-      p_description: input.description.trim(),
-      p_price: input.price,
-      p_currency_id: input.currencyId,
-      p_primary_delivery_catalog_id: input.primaryDeliveryCatalogId,
-      p_pickup_after_days: pickupTiming.legacyDays,
-      p_shipping_max_days: shippingTiming.legacyDays,
-      p_shipping_price: shippingPrice,
-      p_offer_image_paths: uploadedOfferImagePaths,
-      p_conversation_image_paths: uploadedConversationImagePaths,
-    }
-  );
-
-  if (rpcResult?.error) {
-    return { ok: false, error: fromSupabaseError(rpcResult.error) };
-  }
-
-  const timingResult = await syncPurchaseOfferDeliveryTiming(
-    input.conversationId,
-    profile.data.id,
-    pickupTiming,
-    shippingTiming
-  );
-  if (!timingResult.ok) return timingResult;
-
-  const payload =
-    rpcResult?.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
-      ? (rpcResult.data as Record<string, unknown>)
-      : null;
-  if (!payload) return { ok: false, error: fromAppError("unknown") };
-
-  const offerRaw =
-    payload.offer && typeof payload.offer === "object"
-      ? (payload.offer as Record<string, unknown>)
-      : null;
-  const deliveryRaw =
-    payload.delivery && typeof payload.delivery === "object"
-      ? (payload.delivery as Record<string, unknown>)
-      : null;
-  if (!offerRaw || !deliveryRaw) return { ok: false, error: fromAppError("unknown") };
-
-  const images = Array.isArray(payload.images)
-    ? (payload.images as PurchaseOfferImage[])
-    : [];
-
-  return {
-    ok: true,
-    data: {
-      offer: offerRaw as PurchaseOffer,
-      delivery: deliveryRaw as PurchaseOfferDelivery,
-      images,
-    },
-  };
-}
-
 export async function updatePurchaseOffer(
   input: UpdatePurchaseOfferInput
 ): Promise<{ ok: true; data: UpdatePurchaseOfferResult } | { ok: false; error: AppError }> {
@@ -1201,10 +898,10 @@ export async function updatePurchaseOffer(
   if (!input.description.trim()) {
     return { ok: false, error: fromAppError("validation") };
   }
-  if (!input.currencyId || !input.primaryDeliveryCatalogId) {
+  if (!input.currencyId || (!input.deliveryCatalogId && !input.pickupCatalogId)) {
     return { ok: false, error: fromAppError("validation") };
   }
-  if (input.price <= 0 || input.files.length === 0 || input.deliveryMethods.length === 0) {
+  if (input.price <= 0 || input.files.length === 0) {
     return { ok: false, error: fromAppError("validation") };
   }
 
@@ -1215,20 +912,17 @@ export async function updatePurchaseOffer(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const hasPickup = (input.pickupDelay ?? 0) > 0;
-  const hasShipping = (input.shippingMaxTime ?? 0) > 0 || (input.shippingCost ?? 0) > 0;
-
-  const pickupTiming = resolveDeliveryTiming(
-    hasPickup ? input.pickupDelay : null,
-    input.pickupDelayUnit
-  );
-  const shippingTiming = resolveDeliveryTiming(
-    hasShipping ? input.shippingMaxTime : null,
-    input.shippingMaxTimeUnit
-  );
+  const pickupAfterDays =
+    input.pickupCatalogId && typeof input.pickupAfterDays === "number"
+      ? Math.max(0, Math.trunc(input.pickupAfterDays))
+      : null;
+  const shippingMaxDays =
+    input.deliveryCatalogId && typeof input.shippingMaxDays === "number"
+      ? Math.max(0, Math.trunc(input.shippingMaxDays))
+      : null;
   const shippingPrice =
-    hasShipping && (input.shippingCost ?? 0) > 0
-      ? input.shippingCost ?? null
+    input.deliveryCatalogId && typeof input.shippingCost === "number"
+      ? Math.max(0, input.shippingCost)
       : null;
 
   const existingFiles = input.files.filter((file) => file.isExisting === true);
@@ -1266,16 +960,17 @@ export async function updatePurchaseOffer(
   }
 
   const rpcResult: any = await (supabase as any).rpc(
-    "update_seller_offer_from_conversation",
+    "update_seller_offer_fulfillment_from_conversation",
     {
       p_conversation_id: input.conversationId,
       p_profile_id: profile.data.id,
       p_description: input.description.trim(),
       p_price: input.price,
       p_currency_id: input.currencyId,
-      p_primary_delivery_catalog_id: input.primaryDeliveryCatalogId,
-      p_pickup_after_days: pickupTiming.legacyDays,
-      p_shipping_max_days: shippingTiming.legacyDays,
+      p_delivery_catalog_id: input.deliveryCatalogId ?? null,
+      p_pickup_catalog_id: input.pickupCatalogId ?? null,
+      p_pickup_after_days: pickupAfterDays,
+      p_shipping_max_days: shippingMaxDays,
       p_shipping_price: shippingPrice,
       p_keep_offer_image_ids: keepOfferImageIds,
       p_new_offer_image_paths: newOfferImagePaths,
@@ -1287,14 +982,6 @@ export async function updatePurchaseOffer(
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const timingResult = await syncPurchaseOfferDeliveryTiming(
-    input.conversationId,
-    profile.data.id,
-    pickupTiming,
-    shippingTiming
-  );
-  if (!timingResult.ok) return timingResult;
-
   const payload =
     rpcResult?.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
       ? (rpcResult.data as Record<string, unknown>)
@@ -1305,11 +992,13 @@ export async function updatePurchaseOffer(
     payload.offer && typeof payload.offer === "object"
       ? (payload.offer as Record<string, unknown>)
       : null;
-  const deliveryRaw =
-    payload.delivery && typeof payload.delivery === "object"
-      ? (payload.delivery as Record<string, unknown>)
+  const fulfillmentRaw =
+    payload.fulfillment && typeof payload.fulfillment === "object"
+      ? (payload.fulfillment as PurchaseOfferFulfillment)
       : null;
-  if (!offerRaw || !deliveryRaw) return { ok: false, error: fromAppError("unknown") };
+  if (!offerRaw || !fulfillmentRaw) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
 
   const images = Array.isArray(payload.images)
     ? (payload.images as PurchaseOfferImage[])
@@ -1319,7 +1008,7 @@ export async function updatePurchaseOffer(
     ok: true,
     data: {
       offer: offerRaw as PurchaseOffer,
-      delivery: deliveryRaw as PurchaseOfferDelivery,
+      fulfillment: fulfillmentRaw,
       images,
     },
   };

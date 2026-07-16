@@ -3,6 +3,7 @@ import LuppitChip from "@/src/components/chip/LuppitChip";
 import RoleGate from "@/src/components/role/RoleGate";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
+import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
 import { Text } from "@/src/components/Text";
@@ -381,6 +382,14 @@ function SellerOffersContent() {
     });
   }, [selectedSortId]);
 
+  const retryLoad = React.useCallback(() => {
+    void loadOffers();
+  }, [loadOffers]);
+
+  const clearFilters = React.useCallback(() => {
+    setFilters(EMPTY_SELLER_OFFER_FILTERS);
+  }, []);
+
   const content = (() => {
     if (isLoading) {
       return (
@@ -393,11 +402,26 @@ function SellerOffersContent() {
     if (offers.length === 0) {
       return (
         <View style={s.stateContent}>
-          <Text color="stateAnulated">
-            {loadError
-              ? "No se pudieron cargar tus ofertas."
-              : "Cuando envíes ofertas, aparecerán aquí."}
-          </Text>
+          <StandaloneListEmptyState
+            icon={loadError ? "alert-circle" : hasActiveFilters ? "search" : "send"}
+            title={
+              loadError
+                ? "No se pudieron cargar tus ofertas"
+                : hasActiveFilters
+                  ? "No encontramos ofertas"
+                  : "Aún no tienes ofertas"
+            }
+            description={
+              loadError
+                ? loadError
+                : hasActiveFilters
+                  ? "Prueba cambiando la búsqueda o limpiando los filtros."
+                  : "Cuando envíes ofertas, aparecerán aquí."
+            }
+            actionLabel={loadError ? "Reintentar" : hasActiveFilters ? "Limpiar filtros" : null}
+            actionIcon={loadError ? undefined : hasActiveFilters ? "x" : undefined}
+            onAction={loadError ? retryLoad : hasActiveFilters ? clearFilters : undefined}
+          />
         </View>
       );
     }
@@ -405,9 +429,14 @@ function SellerOffersContent() {
     if (visibleOffers.length === 0) {
       return (
         <View style={s.stateContent}>
-          <Text color="stateAnulated">
-            No encontramos ofertas con los filtros aplicados.
-          </Text>
+          <StandaloneListEmptyState
+            icon="search"
+            title="No encontramos ofertas"
+            description="Prueba cambiando la búsqueda o limpiando los filtros."
+            actionLabel="Limpiar filtros"
+            actionIcon="x"
+            onAction={clearFilters}
+          />
         </View>
       );
     }
@@ -611,6 +640,8 @@ function createOffersScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = f
     stateContent: {
       flex: 1,
       paddingTop: topBarVisibleHeight + t.spacing.md,
+      paddingHorizontal: t.spacing.lg,
+      justifyContent: "center",
     },
     toolbar: {
       flexDirection: "row",

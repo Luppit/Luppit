@@ -27,13 +27,10 @@ import {
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Theme, useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
-import { Asset } from "expo-asset";
-import { Image } from "expo-image";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SvgUri } from "react-native-svg";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -102,6 +99,40 @@ function getBuyerOfferSortLabel(sortId: string) {
   return BUYER_OFFER_SORT_OPTIONS.find((option) => option.id === sortId)?.label ?? "Orden";
 }
 
+function getEmptyOffersState({
+  hasActiveFilters,
+  isAcceptedRequest,
+}: {
+  hasActiveFilters: boolean;
+  isAcceptedRequest: boolean;
+}): {
+  icon: LucideIconName;
+  title: string;
+  description: string;
+} {
+  if (isAcceptedRequest) {
+    return {
+      icon: "alert-circle",
+      title: "Oferta no disponible",
+      description: "No se encontró la oferta seleccionada para esta solicitud.",
+    };
+  }
+
+  if (hasActiveFilters) {
+    return {
+      icon: "search",
+      title: "No encontramos ofertas",
+      description: "Prueba cambiando la búsqueda o limpiando los filtros.",
+    };
+  }
+
+  return {
+    icon: "message-circle",
+    title: "Sin ofertas todavía",
+    description: "Cuando recibas una oferta, aparecerá aquí.",
+  };
+}
+
 export default function PurchaseRequestDetailScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -141,9 +172,6 @@ export default function PurchaseRequestDetailScreen() {
   const isCanceledRequest =
     (purchaseRequest?.status ?? "").trim().toLowerCase() === "canceled";
   const offersCount = offers.length;
-  const noOffersAsset = Asset.fromModule(
-    require("../../assets/images/no_offers_request.svg"),
-  );
   const hasActiveFilters = useMemo(() => hasBuyerOfferFilters(filters), [filters]);
   const activeFilterCount = useMemo(
     () => countBuyerOfferFilterGroups(filters),
@@ -171,6 +199,10 @@ export default function PurchaseRequestDetailScreen() {
   }, [isAcceptedRequest, offers, selectedOfferId]);
 
   const displayedOffersCount = displayedOffers.length;
+  const emptyOffersState = getEmptyOffersState({
+    hasActiveFilters,
+    isAcceptedRequest,
+  });
 
   useEffect(() => {
     setRefreshedPurchaseRequest(null);
@@ -601,24 +633,20 @@ export default function PurchaseRequestDetailScreen() {
             />
           ) : displayedOffersCount === 0 ? (
             <View style={s.emptyOffers}>
-              <Text color="stateAnulated" align="center">
-                {isAcceptedRequest
-                  ? "No se encontró la oferta seleccionada para esta solicitud."
-                  : hasActiveFilters
-                    ? "No encontramos ofertas con los filtros aplicados."
-                    : "Cuando recibas una oferta, aparecerá aquí."}
+              <View style={s.emptyOffersIconBadge}>
+                <Icon name={emptyOffersState.icon} size={24} color={t.colors.primary} />
+              </View>
+              <Text variant="body" align="center" style={s.emptyOffersTitle}>
+                {emptyOffersState.title}
               </Text>
-              {!hasActiveFilters || isAcceptedRequest ? (
-                noOffersAsset?.uri ? (
-                  <SvgUri uri={noOffersAsset.uri} width={260} height={340} />
-                ) : (
-                  <Image
-                    source={require("../../assets/images/no_offers_request.svg")}
-                    style={s.noOffersImage}
-                    contentFit="contain"
-                  />
-                )
-              ) : null}
+              <Text
+                variant="small"
+                color="stateAnulated"
+                align="center"
+                style={s.emptyOffersDescription}
+              >
+                {emptyOffersState.description}
+              </Text>
             </View>
           ) : (
             <View style={s.offersList}>
@@ -721,14 +749,28 @@ function createPurchaseRequestDetailStyles(t: Theme, topContentInset = 0) {
       marginTop: t.spacing.sm,
     },
     emptyOffers: {
+      ...createRoundedSurfaceStyle(t),
       alignItems: "center",
       justifyContent: "center",
-      marginTop: t.spacing.md,
-      gap: t.spacing.md,
+      gap: t.spacing.sm,
+      minHeight: 164,
+      paddingHorizontal: t.spacing.lg,
+      paddingVertical: t.spacing.lg,
     },
-    noOffersImage: {
-      width: 260,
-      height: 340,
+    emptyOffersIconBadge: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.primaryLight,
+      marginBottom: t.spacing.xs,
+    },
+    emptyOffersTitle: {
+      color: t.colors.textDark,
+    },
+    emptyOffersDescription: {
+      maxWidth: 280,
     },
     offersList: {
       gap: t.spacing.md,

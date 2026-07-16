@@ -21,7 +21,7 @@ Applies to conversation screens and conversation UI behavior.
 - Header title should be the purchase request title, not counterpart display name.
 - Message bubble labels should use real buyer profile name or seller business name, with generic role labels only as last-resort fallback.
 - Shared composer sizing lives in `src/components/inputChat/AGENTS.md`; do not rebuild autosize behavior here.
-- Offer create/edit mode must preserve delivery timing units (`hours`/`days`) instead of rounding to days.
+- Offer create/edit mode uses the normalized shipping/pickup method payloads; timing fields are integer days.
 
 ## Realtime
 - Conversation realtime uses private Broadcast topic `conversation:<conversation_id>` and event `conversation_changed`.

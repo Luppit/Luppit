@@ -1,6 +1,8 @@
 import { Theme } from "@/src/themes";
 import { StyleSheet } from "react-native";
 
+export const NAVBAR_HEIGHT = 66;
+
 export const createNavbarStyles = (t: Theme) => {
   const COLORS = {
     active: t.colors.primary ?? "#83A31E",
@@ -34,7 +36,7 @@ export const createNavbarStyles = (t: Theme) => {
     pill: {
       flexDirection: "row",
       width: "100%",
-      height: 66,
+      height: NAVBAR_HEIGHT,
       justifyContent: "space-between",
       alignItems: "center",
       columnGap: 0,

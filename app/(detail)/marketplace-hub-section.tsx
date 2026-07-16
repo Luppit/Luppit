@@ -256,6 +256,7 @@ export default function MarketplaceHubSectionScreen() {
       renderItem={({ item }) => (
         <MarketplaceRequestCard
           item={item}
+          role={role}
           onPress={() => (role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item))}
           onLongPress={() =>
             openPurchaseRequestCardMenu({

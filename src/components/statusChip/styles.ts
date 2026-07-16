@@ -3,6 +3,7 @@ import { TextStyle, ViewStyle } from "react-native";
 
 export type StatusChipStyles = {
   container: ViewStyle;
+  wrappingContainer: ViewStyle;
   dot: ViewStyle;
   label: TextStyle;
 };
@@ -20,6 +21,9 @@ export function createStatusChipStyles(t: Theme): StatusChipStyles {
       flexDirection: "row",
       gap: 6,
       alignItems: "center",
+    },
+    wrappingContainer: {
+      flexShrink: 1,
     },
     dot: {
       width: 7,

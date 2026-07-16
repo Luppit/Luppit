@@ -16,8 +16,8 @@ import {
 } from "@/src/services/buyer.home.filters.service";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import {
+  getCurrentSellerBusinessCategorySetupStatus,
   getCurrentProfileEmailSetupStatus,
-  ProfileEmailSetupStatus,
 } from "@/src/services/profile.service";
 import {
   getCurrentBuyerMarketplaceHub,
@@ -49,6 +49,7 @@ import { SvgUri } from "react-native-svg";
 
 const BUYER_DEFAULT_STAGE = "all";
 const SELLER_DEFAULT_STAGE = "for_you";
+type AccountSetupRequirement = "email" | "seller_categories";
 
 export default function HomeScreen() {
   const t = useTheme();
@@ -169,9 +170,25 @@ function openHubListing({
   });
 }
 
+function getRailEmptyMessage({
+  role,
+  selectedStage,
+  hasActiveFilters,
+}: {
+  role: MarketplaceHubRole;
+  selectedStage: MarketplaceHubStage | null;
+  hasActiveFilters: boolean;
+}) {
+  if (hasActiveFilters) return "No hay resultados para esta etapa.";
+  if (selectedStage?.code === "needs_attention") return "Todo está al día por ahora.";
+  return role === "buyer"
+    ? "No hay solicitudes en esta etapa."
+    : "No hay oportunidades en esta etapa.";
+}
+
 function BuyerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
+  const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const [selectedStageCode, setSelectedStageCode] = useState(BUYER_DEFAULT_STAGE);
@@ -183,19 +200,20 @@ function BuyerHomeContent() {
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
     if (!emailSetupResult.ok) {
-      setEmailSetupStatus(null);
+      setSetupRequirement(null);
       setHub(null);
       setIsLoading(false);
       return;
     }
 
-    setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
+      setSetupRequirement("email");
       setHub(null);
       setIsLoading(false);
       return;
     }
 
+    setSetupRequirement(null);
     const result = await getCurrentBuyerMarketplaceHub(
       filters,
       selectedSegmentSvgName,
@@ -219,7 +237,7 @@ function BuyerHomeContent() {
     <MarketplaceHomeContent
       role="buyer"
       isLoading={isLoading}
-      emailSetupStatus={emailSetupStatus}
+      setupRequirement={setupRequirement}
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
@@ -235,7 +253,7 @@ function BuyerHomeContent() {
 
 function SellerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [emailSetupStatus, setEmailSetupStatus] = useState<ProfileEmailSetupStatus | null>(null);
+  const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
   const [selectedStageCode, setSelectedStageCode] = useState(SELLER_DEFAULT_STAGE);
@@ -247,19 +265,35 @@ function SellerHomeContent() {
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
     if (!emailSetupResult.ok) {
-      setEmailSetupStatus(null);
+      setSetupRequirement(null);
       setHub(null);
       setIsLoading(false);
       return;
     }
 
-    setEmailSetupStatus(emailSetupResult.data);
     if (!emailSetupResult.data.isComplete) {
+      setSetupRequirement("email");
       setHub(null);
       setIsLoading(false);
       return;
     }
 
+    const categorySetupResult = await getCurrentSellerBusinessCategorySetupStatus();
+    if (!categorySetupResult.ok) {
+      setSetupRequirement(null);
+      setHub(null);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!categorySetupResult.data.isComplete) {
+      setSetupRequirement("seller_categories");
+      setHub(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setSetupRequirement(null);
     const result = await getCurrentSellerMarketplaceHub(
       filters,
       selectedSegmentSvgName,
@@ -283,7 +317,7 @@ function SellerHomeContent() {
     <MarketplaceHomeContent
       role="seller"
       isLoading={isLoading}
-      emailSetupStatus={emailSetupStatus}
+      setupRequirement={setupRequirement}
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
@@ -300,7 +334,7 @@ function SellerHomeContent() {
 function MarketplaceHomeContent({
   role,
   isLoading,
-  emailSetupStatus,
+  setupRequirement,
   hub,
   filters,
   selectedStageCode,
@@ -311,7 +345,7 @@ function MarketplaceHomeContent({
 }: {
   role: MarketplaceHubRole;
   isLoading: boolean;
-  emailSetupStatus: ProfileEmailSetupStatus | null;
+  setupRequirement: AccountSetupRequirement | null;
   hub: MarketplaceHub | null;
   filters: BuyerHomeFilters | SellerHomeFilters;
   selectedStageCode: string;
@@ -324,7 +358,6 @@ function MarketplaceHomeContent({
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
   const stageScrollRef = useRef<ScrollView | null>(null);
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const topContentInset = useMemo(
     () => getHomeTopContentInset(t, hasFilterChip),
     [hasFilterChip, t]
@@ -361,8 +394,13 @@ function MarketplaceHomeContent({
     return <LoadingState label="Cargando solicitudes..." />;
   }
 
-  if (emailSetupStatus && !emailSetupStatus.isComplete) {
-    return <AccountSetupRequiredState topContentInset={topContentInset} />;
+  if (setupRequirement) {
+    return (
+      <AccountSetupRequiredState
+        requirement={setupRequirement}
+        topContentInset={topContentInset}
+      />
+    );
   }
 
   if (!hub || (hub.stages.length === 0 && items.length === 0)) {
@@ -516,6 +554,7 @@ function MarketplaceHomeContent({
               <MarketplaceRequestCard
                 compact
                 item={item}
+                role={role}
                 onPress={() =>
                   role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item)
                 }
@@ -531,20 +570,41 @@ function MarketplaceHomeContent({
             )}
           />
         ) : (
-          <View style={s.inlineEmptyState}>
-            {emptyBoxAsset?.uri ? (
-              <SvgUri uri={emptyBoxAsset.uri} width={170} height={140} />
-            ) : (
-              <Image
-                source={require("../../assets/images/icon.png")}
-                style={s.inlineEmptyFallbackImage}
-                resizeMode="contain"
-              />
-            )}
-          </View>
+          <HomeRailEmptyState
+            message={getRailEmptyMessage({
+              role,
+              selectedStage,
+              hasActiveFilters,
+            })}
+          />
         )}
       </View>
     </ScrollView>
+  );
+}
+
+function HomeRailEmptyState({ message }: { message: string }) {
+  const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
+  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
+
+  return (
+    <View style={s.inlineEmptyState}>
+      <View style={s.inlineEmptyIllustration}>
+        {emptyBoxAsset?.uri ? (
+          <SvgUri uri={emptyBoxAsset.uri} width={112} height={112} />
+        ) : (
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={s.inlineEmptyFallbackImage}
+            resizeMode="contain"
+          />
+        )}
+      </View>
+      <Text variant="small" color="stateAnulated" align="center" style={s.inlineEmptyText}>
+        {message}
+      </Text>
+    </View>
   );
 }
 
@@ -586,10 +646,17 @@ function HomeShortcut({
   );
 }
 
-function AccountSetupRequiredState({ topContentInset }: { topContentInset: number }) {
+function AccountSetupRequiredState({
+  requirement,
+  topContentInset,
+}: {
+  requirement: AccountSetupRequirement;
+  topContentInset: number;
+}) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
+  const requiresSellerCategories = requirement === "seller_categories";
 
   return (
     <View
@@ -605,18 +672,24 @@ function AccountSetupRequiredState({ topContentInset }: { topContentInset: numbe
         />
       )}
       <Text align="center" variant="body">
-        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir
-        emails de Luppit para continuar.
+        {requiresSellerCategories
+          ? "Necesitas configurar al menos una categoría de venta para que Luppit pueda mostrarte oportunidades relevantes."
+          : "Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar."}
       </Text>
       <View style={s.stateAction}>
         <Button
           variant="dark"
-          title="Completar configuración"
+          title={requiresSellerCategories ? "Configurar categorías" : "Completar configuración"}
           onPress={() =>
-            router.push({
-              pathname: "/(modal)/email-setup",
-              params: { title: "Verificar correo" },
-            })
+            requiresSellerCategories
+              ? router.push({
+                  pathname: "/(detail)/business-categories",
+                  params: { title: "Categorías de venta", hideMenu: "true" },
+                })
+              : router.push({
+                  pathname: "/(modal)/email-setup",
+                  params: { title: "Verificar correo" },
+                })
           }
         />
       </View>
@@ -708,15 +781,27 @@ function createMarketplaceHomeStyles(t: Theme) {
       paddingHorizontal: t.spacing.md,
     },
     inlineEmptyState: {
-      minHeight: 156,
+      minHeight: 176,
       justifyContent: "center",
       alignItems: "center",
+      gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.lg,
+      paddingVertical: t.spacing.md,
       marginHorizontal: t.spacing.md,
       ...createRoundedSurfaceStyle(t),
     },
+    inlineEmptyIllustration: {
+      width: 120,
+      height: 112,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    inlineEmptyText: {
+      maxWidth: 240,
+    },
     inlineEmptyFallbackImage: {
-      width: 72,
-      height: 72,
+      width: 84,
+      height: 84,
     },
     shortcut: {
       marginHorizontal: t.spacing.md,

@@ -86,6 +86,7 @@ type PurchaseRequestAssistantRequest = {
   client_request_id?: string | null;
   idempotency_key?: string | null;
   images?: ChatImage[];
+  signal?: AbortSignal;
 };
 
 function normalizeString(value: unknown): string | null {
@@ -345,6 +346,7 @@ export async function callPurchaseRequestAssistant(
       body: hasImages
         ? buildFormDataBody(input, clientRequestId, idempotencyKey)
         : buildJsonBody(input, clientRequestId, idempotencyKey),
+      signal: input.signal,
     });
 
     const requestId = normalizeString(response.headers.get("x-request-id"));

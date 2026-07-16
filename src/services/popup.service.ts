@@ -159,13 +159,23 @@ export type PopupProfileSwitcherConfig = {
   dismissOnBackdropPress?: boolean;
 };
 
+export type PopupSuccessConfig = {
+  type: "success";
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionBackgroundColorKey?: ThemeColorKey;
+  onAction: () => void | Promise<void>;
+};
+
 export type PopupConfig =
   | PopupMenuConfig
   | PopupHelperConfig
   | PopupSummaryConfig
   | PopupFilterConfig
   | PopupSortConfig
-  | PopupProfileSwitcherConfig;
+  | PopupProfileSwitcherConfig
+  | PopupSuccessConfig;
 
 type PopupState = {
   config: PopupConfig | null;

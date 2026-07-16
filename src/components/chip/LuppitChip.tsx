@@ -16,6 +16,7 @@ type LuppitChipProps = {
   accessibilityLabel?: string;
   removeAccessibilityLabel?: string;
   labelMaxLines?: number;
+  bordered?: boolean;
   style?: ViewStyle;
 };
 
@@ -29,6 +30,7 @@ export default function LuppitChip({
   accessibilityLabel,
   removeAccessibilityLabel,
   labelMaxLines = 1,
+  bordered = false,
   style,
 }: LuppitChipProps) {
   const t = useTheme();
@@ -74,7 +76,9 @@ export default function LuppitChip({
   const chipStyle = [
     s.chip,
     countValue ? s.chipWithCount : null,
+    bordered ? s.chipBordered : null,
     selected ? s.chipSelected : null,
+    bordered && selected ? s.chipBorderedSelected : null,
     onRemove ? s.chipRemovable : null,
     style,
   ];
@@ -112,6 +116,13 @@ function createLuppitChipStyles(t: Theme) {
     },
     chipSelected: {
       backgroundColor: t.colors.textDark,
+    },
+    chipBordered: {
+      borderWidth: 1,
+      borderColor: t.colors.border,
+    },
+    chipBorderedSelected: {
+      borderColor: t.colors.textDark,
     },
     chipWithCount: {
       gap: t.spacing.sm,

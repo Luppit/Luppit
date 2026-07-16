@@ -1,10 +1,9 @@
 import { useTheme } from "@/src/themes";
 import * as ImagePicker from "expo-image-picker";
-import { ArrowUp, Paperclip, X } from "lucide-react-native";
+import { ArrowUp, Paperclip, Square, X } from "lucide-react-native";
 import { useCallback, useRef, useState } from "react";
 import type { TextInputKeyPressEvent } from "react-native";
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -38,6 +37,7 @@ export type InputChatProps = {
     text: string;
     images: ChatImage[];
   }) => void | Promise<void>;
+  onStop?: () => void;
   onPickImages?: () => Promise<ChatImage[] | void> | ChatImage[] | void;
   onImagesChange?: (images: ChatImage[]) => void;
 };
@@ -54,6 +54,7 @@ export default function InputChat({
   clearOnSendStart = false,
   showImagePreview = true,
   onSend,
+  onStop,
   onPickImages,
   onImagesChange,
 }: InputChatProps) {
@@ -64,6 +65,7 @@ export default function InputChat({
   const [images, setImages] = useState<ChatImage[]>([]);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const sendIdRef = useRef(0);
   const isBusy = busy || sending;
   const isBlocked = disabled || isBusy;
 
@@ -145,6 +147,7 @@ export default function InputChat({
     if (isBlocked) return;
     if (!trimmed && images.length === 0) return;
 
+    const sendId = ++sendIdRef.current;
     try {
       setSending(true);
       if (clearOnSend && clearOnSendStart) {
@@ -153,11 +156,13 @@ export default function InputChat({
 
       await Promise.resolve(onSend({ text: trimmed, images }));
 
-      if (clearOnSend && !clearOnSendStart) {
+      if (sendIdRef.current === sendId && clearOnSend && !clearOnSendStart) {
         clearInput();
       }
     } finally {
-      setSending(false);
+      if (sendIdRef.current === sendId) {
+        setSending(false);
+      }
     }
   }, [
     text,
@@ -168,6 +173,14 @@ export default function InputChat({
     clearInput,
     onSend,
   ]);
+
+  const handleStop = useCallback(() => {
+    if (!isBusy || !onStop) return;
+
+    sendIdRef.current += 1;
+    setSending(false);
+    onStop();
+  }, [isBusy, onStop]);
 
   const handleKeyPress = useCallback(
     (e: TextInputKeyPressEvent) => {
@@ -188,6 +201,7 @@ export default function InputChat({
 
   const canSend =
     !isBlocked && (text.trim().length > 0 || images.length > 0);
+  const canStop = isBusy && Boolean(onStop);
   const measureText =
     text.length === 0 ? " " : text.endsWith("\n") ? `${text} ` : text;
 
@@ -271,20 +285,30 @@ export default function InputChat({
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={isBusy ? "Pensando" : "Enviar mensaje"}
-              accessibilityState={{ disabled: !canSend, busy: isBusy }}
-              disabled={!canSend}
-              onPress={handleSend}
+              accessibilityLabel={canStop ? "Detener respuesta" : "Enviar mensaje"}
+              accessibilityHint={
+                canStop ? "Detiene la respuesta actual del asistente" : undefined
+              }
+              accessibilityState={{
+                disabled: canStop ? false : !canSend,
+                busy: isBusy,
+              }}
+              disabled={canStop ? false : !canSend}
+              onPress={canStop ? handleStop : handleSend}
               style={({ pressed }) => [
                 styles.sendButton,
-                !canSend ? styles.sendButtonDisabled : null,
+                !canSend && !canStop ? styles.sendButtonDisabled : null,
                 isBusy ? styles.sendButtonBusy : null,
-                pressed && canSend ? styles.sendButtonPressed : null,
+                pressed && (canSend || canStop) ? styles.sendButtonPressed : null,
               ]}
               hitSlop={8}
             >
               {isBusy ? (
-                <ActivityIndicator size="small" color={t.colors.backgroudWhite} />
+                <Square
+                  size={15}
+                  color={t.colors.backgroudWhite}
+                  fill={t.colors.backgroudWhite}
+                />
               ) : (
                 <ArrowUp
                   size={20}

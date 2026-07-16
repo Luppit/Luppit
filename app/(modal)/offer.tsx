@@ -5,6 +5,7 @@ import FilePicker, {
 } from "@/src/components/filePicker/FilePicker";
 import { Icon } from "@/src/components/Icon";
 import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
+import MessageUtilities from "@/src/components/message/MessageUtilities";
 import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
 import { Currency, getCurrencies } from "@/src/services/currency.service";
 import {
@@ -31,15 +32,17 @@ import {
 } from "@/src/services/purchase.request.service";
 import { Text } from "@/src/components/Text";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { TextField } from "@/src/components/inputField/InputField";
 import TextArea from "@/src/components/textArea/TextArea";
 import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { MODAL_TOP_BAR_HEIGHT } from "./modal-top-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
+  AccessibilityInfo,
   Animated,
   Image,
   Keyboard,
@@ -51,7 +54,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-type DeliveryTimeOption = "horas" | "dias";
 type OfferPurchaseRequest = Pick<PurchaseRequest, "id" | "title">;
 
 function parsePurchaseRequestParam(
@@ -78,6 +80,29 @@ function normalize(value: string | null | undefined) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+}
+
+function shouldOpenSummaryFromReply(value: string) {
+  const normalized = normalize(value)
+    .replace(/[.,!?¿¡]/g, "")
+    .replace(/\s+/g, " ");
+  if (!normalized) return false;
+
+  if (
+    ["si", "si ok", "si por favor", "yes", "ok", "dale", "claro"].includes(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
+  return [
+    "mostrar resumen",
+    "ver resumen",
+    "revisar resumen",
+    "muestrame el resumen",
+    "ensename el resumen",
+  ].some((option) => normalized === option || normalized.includes(option));
 }
 
 function buildFallbackPurchaseRequest(
@@ -211,8 +236,15 @@ function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
 
   if (!isUser) {
     return (
-      <View style={{ maxWidth: "96%", alignSelf: "flex-start", paddingVertical: t.spacing.xs }}>
+      <View
+        style={{
+          maxWidth: "96%",
+          alignSelf: "flex-start",
+          paddingVertical: t.spacing.xs,
+        }}
+      >
         <Text variant="body">{message.text}</Text>
+        <MessageUtilities text={message.text} />
       </View>
     );
   }
@@ -222,33 +254,40 @@ function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
       style={{
         maxWidth: "88%",
         alignSelf: "flex-end",
-        borderRadius: t.borders.md,
-        paddingHorizontal: t.spacing.md,
-        paddingVertical: t.spacing.sm,
-        backgroundColor: t.colors.primaryLight,
         gap: t.spacing.xs,
       }}
     >
-      {message.text.trim().length > 0 ? (
-        <Text variant="body">{message.text}</Text>
-      ) : null}
+      <View
+        style={{
+          borderRadius: t.borders.md,
+          paddingHorizontal: t.spacing.md,
+          paddingVertical: t.spacing.sm,
+          backgroundColor: t.colors.primaryLight,
+          gap: t.spacing.xs,
+        }}
+      >
+        {message.text.trim().length > 0 ? (
+          <Text variant="body">{message.text}</Text>
+        ) : null}
 
-      {message.images && message.images.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
-          {message.images.map((image, index) => (
-            <Image
-              key={`${image.uri}-${index}`}
-              source={{ uri: image.uri }}
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 16,
-                backgroundColor: t.colors.border,
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
+        {message.images && message.images.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
+            {message.images.map((image, index) => (
+              <Image
+                key={`${image.uri}-${index}`}
+                source={{ uri: image.uri }}
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 16,
+                  backgroundColor: t.colors.border,
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+      <MessageUtilities text={message.text} align="right" />
     </View>
   );
 }
@@ -550,8 +589,10 @@ function ReadyToReviewCard({
 
 function OfferAssistantScreen({
   conversationId,
+  purchaseRequestTitle,
 }: {
   conversationId: string | null | undefined;
+  purchaseRequestTitle: string | null | undefined;
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -565,9 +606,31 @@ function OfferAssistantScreen({
   const [successfulOfferPhotoCount, setSuccessfulOfferPhotoCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [pendingRetry, setPendingRetry] = useState<PendingAssistantRetry | null>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const shownSuccessOfferIdRef = useRef<string | null>(null);
 
   const hasOfferPhoto = successfulOfferPhotoCount > 0;
+
+  useEffect(() => {
+    return () => {
+      const activeRequest = activeRequestRef.current;
+      activeRequestRef.current = null;
+      activeRequest?.abort();
+    };
+  }, []);
+
+  const handleStop = useCallback(() => {
+    const activeRequest = activeRequestRef.current;
+    if (!activeRequest) return;
+
+    activeRequestRef.current = null;
+    activeRequest.abort();
+    setIsBusy(false);
+    setIsGeneratingResponse(false);
+    AccessibilityInfo.announceForAccessibility("Respuesta detenida");
+  }, []);
 
   const clearReviewState = useCallback(() => {
     setShowSummary(false);
@@ -629,15 +692,43 @@ function OfferAssistantScreen({
         setSuccessfulOfferPhotoCount((current) => current + successfulImageCount);
       }
 
-      appendAssistantMessage(
-        result.assistantMessage,
-        isSummaryAction ? "summary" : isReadyResult && !isContinueAction ? "ready" : undefined
-      );
+      if (!isSummaryAction) {
+        appendAssistantMessage(
+          result.assistantMessage,
+          isReadyResult && !isContinueAction ? "ready" : undefined
+        );
+      }
 
       if (result.status === "sent") {
         if (result.purchaseOfferId) {
-          showSuccess("Oferta enviada");
-          router.back();
+          if (!conversationId) {
+            showWarning(
+              "Oferta enviada",
+              "No encontramos la conversación para abrir el detalle."
+            );
+            return;
+          }
+          if (shownSuccessOfferIdRef.current === result.purchaseOfferId) return;
+          shownSuccessOfferIdRef.current = result.purchaseOfferId;
+
+          const publishedConversationId = conversationId;
+          openPopup({
+            type: "success",
+            title: "¡Oferta enviada!",
+            description:
+              "El comprador ya puede revisarla. Puedes seguir su estado en la conversación.",
+            actionLabel: "Ver conversación",
+            actionBackgroundColorKey: "textDark",
+            onAction: () => {
+              router.replace({
+                pathname: "/(conversation)/offer",
+                params: {
+                  conversationId: publishedConversationId,
+                  title: purchaseRequestTitle ?? "Conversación",
+                },
+              });
+            },
+          });
           return;
         }
 
@@ -647,15 +738,34 @@ function OfferAssistantScreen({
         );
       }
     },
-    [appendAssistantMessage]
+    [appendAssistantMessage, conversationId, purchaseRequestTitle]
   );
 
   const executeAssistantRequest = useCallback(
     async (input: SellerOfferAssistantRequest, successfulImageCount = 0) => {
+      const requestController = new AbortController();
+      activeRequestRef.current = requestController;
       setIsBusy(true);
-      const result = await callSellerOfferAssistant(input);
-      applyAssistantResult(result, input, successfulImageCount);
-      setIsBusy(false);
+      setIsGeneratingResponse(!input.uiAction);
+      try {
+        const result = await callSellerOfferAssistant({
+          ...input,
+          signal: requestController.signal,
+        });
+        if (
+          requestController.signal.aborted ||
+          activeRequestRef.current !== requestController
+        ) {
+          return;
+        }
+        applyAssistantResult(result, input, successfulImageCount);
+      } finally {
+        if (activeRequestRef.current === requestController) {
+          activeRequestRef.current = null;
+          setIsBusy(false);
+          setIsGeneratingResponse(false);
+        }
+      }
     },
     [applyAssistantResult]
   );
@@ -670,7 +780,15 @@ function OfferAssistantScreen({
       const userText = text.trim();
       if (!userText && images.length === 0) return;
 
-      clearReviewState();
+      const shouldOpenSummary =
+        images.length === 0 &&
+        !!offerDraftId &&
+        isReadyToSend &&
+        shouldOpenSummaryFromReply(userText);
+
+      if (!shouldOpenSummary) {
+        clearReviewState();
+      }
       setMessages((current) => [
         ...current,
         {
@@ -680,6 +798,17 @@ function OfferAssistantScreen({
           images,
         },
       ]);
+
+      if (shouldOpenSummary) {
+        setShowSummary(true);
+        await executeAssistantRequest({
+          prompt: "",
+          offerDraftId,
+          uiAction: "SHOW_SUMMARY",
+          identity: createSellerOfferAssistantRequestIdentity("seller-offer-summary"),
+        });
+        return;
+      }
 
       const input: SellerOfferAssistantRequest = {
         prompt: userText || "Adjunto fotos reales de la oferta.",
@@ -692,12 +821,18 @@ function OfferAssistantScreen({
 
       await executeAssistantRequest(input, images.length);
     },
-    [clearReviewState, conversationId, executeAssistantRequest, offerDraftId]
+    [
+      clearReviewState,
+      conversationId,
+      executeAssistantRequest,
+      isReadyToSend,
+      offerDraftId,
+    ]
   );
 
   const handleShowSummary = useCallback(async () => {
     if (!offerDraftId) {
-      showError("No hay resumen todavía", "Primero cuéntale al asistente los detalles de la oferta.");
+      showWarning("No hay resumen todavía", "Primero cuéntale al asistente los detalles de la oferta.");
       return;
     }
 
@@ -724,12 +859,12 @@ function OfferAssistantScreen({
 
   const handlePublish = useCallback(async () => {
     if (!offerDraftId) {
-      showError("No se pudo enviar", "Primero crea el borrador de la oferta.");
+      showWarning("No se pudo enviar", "Primero crea el borrador de la oferta.");
       return;
     }
 
     if (!hasOfferPhoto) {
-      showError("Falta una foto", "Adjunta al menos una foto real de la oferta antes de enviarla.");
+      showWarning("Falta una foto", "Adjunta al menos una foto real de la oferta antes de enviarla.");
       return;
     }
 
@@ -843,7 +978,8 @@ function OfferAssistantScreen({
           clearOnSendStart
           autoFocus={messages.length === 0}
           disabled={isBusy}
-          busy={isBusy}
+          busy={isGeneratingResponse}
+          onStop={handleStop}
           maxChars={4000}
           maxImages={6}
           placeholder="Describe tu oferta o adjunta fotos reales"
@@ -886,29 +1022,19 @@ export default function OfferScreen() {
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [deliveryMethods, setDeliveryMethods] = useState<string[]>([]);
   const [pickupDelay, setPickupDelay] = useState("");
-  const [pickupDelayUnit, setPickupDelayUnit] =
-    useState<DeliveryTimeOption>("horas");
   const [shippingCost, setShippingCost] = useState("");
-  const [shippingCostCurrencyId, setShippingCostCurrencyId] = useState("");
   const [shippingMaxTime, setShippingMaxTime] = useState("");
-  const [shippingMaxTimeUnit, setShippingMaxTimeUnit] =
-    useState<DeliveryTimeOption>("horas");
   const [editDraft, setEditDraft] = useState<EditablePurchaseOfferDraft | null>(null);
   const [editDraftLoading, setEditDraftLoading] = useState(isEditMode);
   const [didApplyEditDraft, setDidApplyEditDraft] = useState(false);
   const resolvedPurchaseRequestId = purchaseRequestId ?? editDraft?.purchaseRequestId ?? null;
   const pickupCatalog = useMemo(
-    () =>
-      deliveryCatalog.find((item) => {
-        const hint = normalize(item.hint);
-        return hint.length > 0;
-      }) ??
-      null,
+    () => deliveryCatalog.find((item) => item.method_kind === "pickup") ?? null,
     [deliveryCatalog]
   );
   const shippingCatalog = useMemo(
-    () => deliveryCatalog.find((item) => item.id !== pickupCatalog?.id) ?? null,
-    [deliveryCatalog, pickupCatalog]
+    () => deliveryCatalog.find((item) => item.method_kind === "shipping") ?? null,
+    [deliveryCatalog]
   );
   const currencyToggleOptions = useMemo(() => {
     return currencies.slice(0, 2).map((currency) => ({
@@ -1023,24 +1149,13 @@ export default function OfferScreen() {
     if (!isEditMode || !editDraft || didApplyEditDraft) return;
     if (deliveryCatalog.length === 0) return;
 
-    let nextDeliveryMethodId: string | null = null;
-    if (
-      editDraft.primaryDeliveryCatalogId &&
-      deliveryCatalog.some((item) => item.id === editDraft.primaryDeliveryCatalogId)
-    ) {
-      nextDeliveryMethodId = editDraft.primaryDeliveryCatalogId;
-    } else if (
-      pickupCatalog &&
-      ((editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0)
-    ) {
-      nextDeliveryMethodId = pickupCatalog.id;
-    } else if (
-      shippingCatalog &&
-      ((editDraft.shippingMaxValue ?? editDraft.shippingMaxDays ?? 0) > 0 ||
-        (editDraft.shippingPrice ?? 0) > 0)
-    ) {
-      nextDeliveryMethodId = shippingCatalog.id;
-    }
+    const nextDeliveryMethodIds = [
+      editDraft.deliveryCatalogId,
+      editDraft.pickupCatalogId,
+    ].filter(
+      (id): id is string =>
+        typeof id === "string" && deliveryCatalog.some((item) => item.id === id)
+    );
 
     setDescription(editDraft.description);
     setPrice(
@@ -1050,31 +1165,22 @@ export default function OfferScreen() {
     );
     setCurrencyId(editDraft.currencyId);
     setFiles(editDraft.files as SelectedFile[]);
-    setDeliveryMethods(nextDeliveryMethodId ? [nextDeliveryMethodId] : []);
+    setDeliveryMethods(nextDeliveryMethodIds);
     setPickupDelay(
-      (editDraft.pickupAfterValue ?? editDraft.pickupAfterDays ?? 0) > 0
-        ? String(editDraft.pickupAfterValue ?? editDraft.pickupAfterDays)
-        : ""
+      editDraft.pickupAfterDays == null ? "" : String(editDraft.pickupAfterDays)
     );
-    setPickupDelayUnit(editDraft.pickupAfterUnit ?? "dias");
     setShippingCost(
-      (editDraft.shippingPrice ?? 0) > 0 ? String(Math.trunc(editDraft.shippingPrice ?? 0)) : ""
+      editDraft.shippingPrice == null ? "" : String(Math.trunc(editDraft.shippingPrice))
     );
-    setShippingCostCurrencyId(editDraft.currencyId);
     setShippingMaxTime(
-      (editDraft.shippingMaxValue ?? editDraft.shippingMaxDays ?? 0) > 0
-        ? String(editDraft.shippingMaxValue ?? editDraft.shippingMaxDays)
-        : ""
+      editDraft.shippingMaxDays == null ? "" : String(editDraft.shippingMaxDays)
     );
-    setShippingMaxTimeUnit(editDraft.shippingMaxUnit ?? "dias");
     setDidApplyEditDraft(true);
   }, [
     deliveryCatalog,
     didApplyEditDraft,
     editDraft,
     isEditMode,
-    pickupCatalog,
-    shippingCatalog,
   ]);
 
   useEffect(() => {
@@ -1084,29 +1190,18 @@ export default function OfferScreen() {
     if (!currencyId || !currencyToggleOptions.some((option) => option.value === currencyId)) {
       setCurrencyId(firstCurrencyId);
     }
-
-    if (
-      !shippingCostCurrencyId ||
-      !currencyToggleOptions.some((option) => option.value === shippingCostCurrencyId)
-    ) {
-      setShippingCostCurrencyId(firstCurrencyId);
-    }
-  }, [currencyId, shippingCostCurrencyId, currencyToggleOptions]);
+  }, [currencyId, currencyToggleOptions]);
 
   const handlePriceChange = (text: string) => {
     setPrice(text.replace(/\D/g, ""));
   };
 
   const handleDeliveryMethodsChange = useCallback((selectedIds: string[]) => {
-    setDeliveryMethods(selectedIds.slice(-1));
+    setDeliveryMethods(selectedIds);
   }, []);
 
   const selectedCurrency = currencies.find((currency) => currency.id === currencyId) ?? null;
-  const selectedShippingCurrency =
-    currencies.find((currency) => currency.id === shippingCostCurrencyId) ?? null;
   const isColonCurrency = normalize(selectedCurrency?.currency_code) === "col";
-  const isShippingColonCurrency =
-    normalize(selectedShippingCurrency?.currency_code) === "col";
   const priceLabel = isColonCurrency ? `₡${price}` : `$${price}`;
   const deliverySummary = deliveryMethods
     .map((method) => {
@@ -1114,14 +1209,14 @@ export default function OfferScreen() {
       const displayName = catalog?.display_name ?? "Entrega";
       if (pickupCatalog && method === pickupCatalog.id) {
         if (!pickupDelay) return displayName;
-        return `${displayName}: después de ${pickupDelay} ${pickupDelayUnit}.`;
+        return `${displayName}: después de ${pickupDelay} día(s).`;
       }
       if (shippingCatalog && method === shippingCatalog.id) {
         const costText = shippingCost
-          ? `${isShippingColonCurrency ? "₡" : "$"}${shippingCost}`
+          ? `${isColonCurrency ? "₡" : "$"}${shippingCost}`
           : "Sin costo definido";
         const timeText = shippingMaxTime
-          ? `${shippingMaxTime} ${shippingMaxTimeUnit}`
+          ? `${shippingMaxTime} día(s)`
           : "sin tiempo definido";
         return `${displayName}: ${costText}, tiempo máximo ${timeText}.`;
       }
@@ -1130,19 +1225,18 @@ export default function OfferScreen() {
     .join(" ");
 
   const handleConfirmOffer = useCallback(async () => {
-    const primaryDeliveryCatalogId = deliveryMethods[0] ?? "";
-    const selectedDeliveryMethods = primaryDeliveryCatalogId
-      ? [primaryDeliveryCatalogId]
-      : [];
     const isPickupSelected = Boolean(
-      pickupCatalog && primaryDeliveryCatalogId === pickupCatalog.id
+      pickupCatalog && deliveryMethods.includes(pickupCatalog.id)
     );
     const isShippingSelected = Boolean(
-      shippingCatalog && primaryDeliveryCatalogId === shippingCatalog.id
+      shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
     );
-    const pickupDelayValue = isPickupSelected ? Number(pickupDelay || 0) : 0;
-    const shippingCostValue = isShippingSelected ? Number(shippingCost || 0) : 0;
-    const shippingMaxTimeValue = isShippingSelected ? Number(shippingMaxTime || 0) : 0;
+    const pickupAfterDays =
+      isPickupSelected && pickupDelay ? Number(pickupDelay) : null;
+    const shippingCostValue =
+      isShippingSelected && shippingCost ? Number(shippingCost) : null;
+    const shippingMaxDays =
+      isShippingSelected && shippingMaxTime ? Number(shippingMaxTime) : null;
 
     if (isEditMode) {
       if (!conversationId || !editDraft?.purchaseOfferId || !editDraft.purchaseRequestId) {
@@ -1157,14 +1251,12 @@ export default function OfferScreen() {
         description,
         price: Number(price),
         currencyId,
-        primaryDeliveryCatalogId,
+        deliveryCatalogId: isShippingSelected ? shippingCatalog?.id ?? null : null,
+        pickupCatalogId: isPickupSelected ? pickupCatalog?.id ?? null : null,
         files,
-        deliveryMethods: selectedDeliveryMethods,
-        pickupDelay: pickupDelayValue,
-        pickupDelayUnit,
+        pickupAfterDays,
         shippingCost: shippingCostValue,
-        shippingMaxTime: shippingMaxTimeValue,
-        shippingMaxTimeUnit,
+        shippingMaxDays,
       };
 
       const result = await updatePurchaseOffer(payload);
@@ -1184,7 +1276,7 @@ export default function OfferScreen() {
       return;
     }
 
-    showError("No se pudo guardar", "La creación de ofertas ahora se hace con el asistente.");
+    showInfo("Creación desde el asistente", "La creación de ofertas ahora se hace con el asistente.");
   }, [
     conversationId,
     currencyId,
@@ -1195,14 +1287,12 @@ export default function OfferScreen() {
     files,
     isEditMode,
     pickupDelay,
-    pickupDelayUnit,
     pickupCatalog,
     price,
     purchaseRequest,
     shippingCatalog,
     shippingCost,
     shippingMaxTime,
-    shippingMaxTimeUnit,
   ]);
 
   if (requestLoading || editDraftLoading) {
@@ -1236,6 +1326,7 @@ export default function OfferScreen() {
     return (
       <OfferAssistantScreen
         conversationId={conversationId}
+        purchaseRequestTitle={purchaseRequest?.title}
       />
     );
   }
@@ -1307,8 +1398,8 @@ export default function OfferScreen() {
           <OptionsChecklistCard
             icon="truck"
             title="Método de entrega"
-            description="Selecciona la opción que brindarás para esta oferta."
-            allowMultiple={false}
+            description="Selecciona una o ambas opciones para esta oferta."
+            allowMultiple
             value={deliveryMethods}
             onChange={handleDeliveryMethodsChange}
             options={deliveryCatalog.map((delivery) => ({
@@ -1318,20 +1409,15 @@ export default function OfferScreen() {
               content:
                 pickupCatalog && delivery.id === pickupCatalog.id ? (
                   <View style={{ gap: t.spacing.xs }}>
-                    <Text color="stateAnulated">Después de</Text>
-                    <TextFieldWithToggle<DeliveryTimeOption>
+                    <TextField
+                      label="Disponible después de (días)"
                       value={pickupDelay}
                       onChangeText={(text) =>
                         setPickupDelay(text.replace(/\D/g, ""))
                       }
-                      options={[
-                        { label: "Hora(s)", value: "horas" },
-                        { label: "Día(s)", value: "dias" },
-                      ]}
-                      selectedOption={pickupDelayUnit}
-                      onOptionChange={setPickupDelayUnit}
                       keyboardType="number-pad"
                       inputMode="numeric"
+                      baseContainerStyle={{ marginBottom: 0 }}
                     />
                   </View>
                 ) : shippingCatalog && delivery.id === shippingCatalog.id ? (
@@ -1349,30 +1435,23 @@ export default function OfferScreen() {
                             { label: string; value: string },
                           ]
                         }
-                        selectedOption={
-                          shippingCostCurrencyId || currencyToggleOptions[0]?.value || ""
-                        }
-                        onOptionChange={setShippingCostCurrencyId}
+                        selectedOption={currencyId || currencyToggleOptions[0]?.value || ""}
+                        onOptionChange={setCurrencyId}
                         keyboardType="number-pad"
                         inputMode="numeric"
                       />
                     </View>
 
                     <View style={{ gap: t.spacing.xs }}>
-                      <Text color="stateAnulated">Tiempo máximo de entrega</Text>
-                      <TextFieldWithToggle<DeliveryTimeOption>
+                      <TextField
+                        label="Tiempo máximo de entrega (días)"
                         value={shippingMaxTime}
                         onChangeText={(text) =>
                           setShippingMaxTime(text.replace(/\D/g, ""))
                         }
-                        options={[
-                          { label: "Hora(s)", value: "horas" },
-                          { label: "Día(s)", value: "dias" },
-                        ]}
-                        selectedOption={shippingMaxTimeUnit}
-                        onOptionChange={setShippingMaxTimeUnit}
                         keyboardType="number-pad"
                         inputMode="numeric"
+                        baseContainerStyle={{ marginBottom: 0 }}
                       />
                     </View>
                   </View>

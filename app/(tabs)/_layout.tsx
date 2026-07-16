@@ -1,8 +1,8 @@
 import Navbar from "@/src/components/navbar/Navbar";
 import TopNavbar from "@/src/components/navbar/TopNavbar";
 import {
-  isEmailSetupAllowedTabPath,
-  useEmailSetupGate,
+  isAccountSetupAllowedTabPath,
+  useAccountSetupGate,
 } from "@/src/components/navbar/useEmailSetupGate";
 import { RoleProvider } from "@/src/components/role/RoleContext";
 import { colors, spacing } from "@/src/themes";
@@ -23,7 +23,7 @@ export default function TabsLayout() {
     useState<string | null>(null);
   const [hasLoadedPendingSharedRequest, setHasLoadedPendingSharedRequest] =
     useState(false);
-  const { isAccountSetupBlocked, isLoadingEmailSetupStatus } = useEmailSetupGate();
+  const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
   const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
   const isFavoritesTabScreen = pathname === "/favorites";
   const isChatsTabScreen = pathname === "/chats";
@@ -104,9 +104,9 @@ export default function TabsLayout() {
   }
 
   if (
-    !isLoadingEmailSetupStatus &&
+    !isLoadingAccountSetupStatus &&
     isAccountSetupBlocked &&
-    !isEmailSetupAllowedTabPath(pathname)
+    !isAccountSetupAllowedTabPath(pathname)
   ) {
     return <Redirect href="/" />;
   }

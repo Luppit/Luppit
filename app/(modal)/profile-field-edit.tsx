@@ -1,6 +1,6 @@
 import Button from "@/src/components/button/Button";
-import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   ProfileEditableField,
@@ -25,7 +25,6 @@ const FIELD_CONFIG: Record<
     helper: string;
     placeholder: string;
     success: string;
-    icon: "user" | "file-pen-line";
   }
 > = {
   name: {
@@ -33,14 +32,12 @@ const FIELD_CONFIG: Record<
     helper: "Este nombre se usa para identificarte dentro de Luppit.",
     placeholder: "Ingresa tu nombre",
     success: "Nombre actualizado",
-    icon: "user",
   },
   id_document: {
     label: "Documento de identificación",
     helper: "Mantén tu documento actualizado para futuras validaciones de cuenta.",
     placeholder: "Ingresa tu documento",
     success: "Documento actualizado",
-    icon: "file-pen-line",
   },
 };
 
@@ -96,39 +93,40 @@ export default function ProfileFieldEditScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.content}
       >
-        <View style={s.surface}>
-          <View style={s.iconBadge}>
-            <Icon name={config.icon} size={22} color={t.colors.textDark} />
+        <View style={s.section}>
+          <Text variant="small" color="textMedium" style={s.sectionTitle}>
+            {config.label}
+          </Text>
+
+          <View style={s.surface}>
+            <Text variant="body" color="textMedium">
+              {config.helper}
+            </Text>
+
+            <TextField
+              accessibilityLabel={config.label}
+              value={value}
+              onChangeText={(nextValue) => {
+                setValue(nextValue);
+                if (didSubmit) setDidSubmit(false);
+              }}
+              placeholder={config.placeholder}
+              hasError={Boolean(error)}
+              error={error}
+              autoCapitalize={field === "name" ? "words" : "characters"}
+              autoCorrect={field === "name"}
+              returnKeyType="done"
+              onSubmitEditing={() => void save()}
+              baseContainerStyle={s.inputContainer}
+            />
+
+            <Button
+              title="Guardar cambios"
+              loading={isSaving}
+              disabled={!canSave}
+              onPress={() => void save()}
+            />
           </View>
-
-          <View style={s.titleBlock}>
-            <Text variant="subtitle">{config.label}</Text>
-            <Text color="stateAnulated">{config.helper}</Text>
-          </View>
-
-          <TextField
-            label={config.label}
-            value={value}
-            onChangeText={(nextValue) => {
-              setValue(nextValue);
-              if (didSubmit) setDidSubmit(false);
-            }}
-            placeholder={config.placeholder}
-            hasError={Boolean(error)}
-            error={error}
-            autoCapitalize={field === "name" ? "words" : "characters"}
-            autoCorrect={field === "name"}
-            returnKeyType="done"
-            onSubmitEditing={() => void save()}
-            baseContainerStyle={s.inputContainer}
-          />
-
-          <Button
-            title="Guardar cambios"
-            loading={isSaving}
-            disabled={!canSave}
-            onPress={() => void save()}
-          />
         </View>
       </ScrollView>
     </TouchableWithoutFeedback>
@@ -139,24 +137,20 @@ function createProfileFieldEditStyles(t: Theme) {
   return StyleSheet.create({
     content: {
       flexGrow: 1,
-      justifyContent: "center",
       paddingTop: t.spacing.lg,
       paddingBottom: t.spacing.xl,
     },
+    section: {
+      gap: t.spacing.sm,
+    },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
     surface: {
-      backgroundColor: t.colors.backgroudWhite,
-      borderRadius: 28,
-      padding: t.spacing.lg,
+      ...createRoundedSurfaceStyle(t),
+      overflow: "hidden",
+      padding: t.spacing.md,
       gap: t.spacing.md,
-    },
-    iconBadge: {
-      width: 32,
-      height: 32,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    titleBlock: {
-      gap: t.spacing.xs,
     },
     inputContainer: {
       marginBottom: 0,

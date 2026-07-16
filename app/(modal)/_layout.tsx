@@ -1,4 +1,5 @@
 import ModalTopBar from "./modal-top-bar";
+import DetailTopBar, { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "../(detail)/detail-top-bar";
 import { useTheme } from "@/src/themes";
 import { Slot, useGlobalSearchParams, usePathname } from "expo-router";
 import React from "react";
@@ -12,6 +13,11 @@ export default function ModalLayout() {
   const pathname = usePathname();
   const title = Array.isArray(params.title) ? params.title[0] : params.title;
   const isOfferModal = pathname.includes("/offer");
+  const usesDetailTopBar = [
+    "/business-location-edit",
+    "/email-setup",
+    "/profile-field-edit",
+  ].some((route) => pathname.includes(route));
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
@@ -21,7 +27,7 @@ export default function ModalLayout() {
           glass
           topInset={insets.top}
         />
-      ) : (
+      ) : usesDetailTopBar ? null : (
         <View
           style={{
             paddingTop: insets.top,
@@ -40,6 +46,7 @@ export default function ModalLayout() {
         <View
           style={{
             flex: 1,
+            paddingTop: usesDetailTopBar ? insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT : 0,
             paddingHorizontal: t.spacing.md,
             backgroundColor: isOfferModal ? "transparent" : t.colors.background,
           }}
@@ -47,6 +54,13 @@ export default function ModalLayout() {
           <Slot />
         </View>
       </KeyboardAvoidingView>
+      {usesDetailTopBar ? (
+        <DetailTopBar
+          title={title}
+          hideMenu
+          topInset={insets.top}
+        />
+      ) : null}
     </View>
   );
 }

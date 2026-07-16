@@ -1,28 +1,33 @@
-import Toast from "react-native-toast-message";
+import { showToast } from "@/src/services/toast.service";
 
 export function showSuccess(message?: string, description?: string) {
-  Toast.show({
-    type: "success",
-    text1: message || "Éxito",
-    text2: description,
-    position: "bottom",
+  showToast({
+    variant: "success",
+    title: message || "Éxito",
+    description,
   });
 }
 
 export function showError(message?: string, description?: string) {
-  Toast.show({
-    type: "error",
-    text1: message || "Error",
-    text2: description,
-    position: "bottom",
+  showToast({
+    variant: "error",
+    title: message || "Error",
+    description,
   });
 }
 
 export function showInfo(message?: string, description?: string) {
-  Toast.show({
-    type: "info",
-    text1: message || "Información",
-    text2: description,
-    position: "bottom",
+  showToast({
+    variant: "info",
+    title: message || "Información",
+    description,
+  });
+}
+
+export function showWarning(message?: string, description?: string) {
+  showToast({
+    variant: "warning",
+    title: message || "Advertencia",
+    description,
   });
 }

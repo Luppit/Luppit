@@ -1,8 +1,11 @@
 import { Icon } from "@/src/components/Icon";
 import LuppitChip from "@/src/components/chip/LuppitChip";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
+import SuccessPopupContent from "@/src/components/popup/SuccessPopupContent";
+import SuccessScreenConfetti from "@/src/components/popup/SuccessScreenConfetti";
 import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
 import {
@@ -12,16 +15,19 @@ import {
   PopupOption,
   PopupProfileSwitcherConfig,
   PopupSortConfig,
+  PopupSuccessConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
   PopupSummaryInput,
   subscribePopup,
 } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
+import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   Animated,
+  AccessibilityInfo,
   ActivityIndicator,
   Image,
   Keyboard,
@@ -150,6 +156,7 @@ export default function GlobalPopupHost() {
   const [expandedHelperSectionIds, setExpandedHelperSectionIds] = useState<string[]>([]);
   const [profileSwitcherConfig, setProfileSwitcherConfig] =
     useState<PopupProfileSwitcherConfig | null>(null);
+  const [successConfig, setSuccessConfig] = useState<PopupSuccessConfig | null>(null);
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
@@ -166,6 +173,7 @@ export default function GlobalPopupHost() {
   const [pendingSummaryActionId, setPendingSummaryActionId] = useState<string | null>(
     null
   );
+  const [isSuccessActionPending, setSuccessActionPending] = useState(false);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
   const translateY = useRef(new Animated.Value(28)).current;
@@ -250,7 +258,9 @@ export default function GlobalPopupHost() {
             setInlineHelperConfig(null);
             setExpandedHelperSectionIds([]);
             setProfileSwitcherConfig(null);
+            setSuccessConfig(null);
             setPendingSummaryActionId(null);
+            setSuccessActionPending(false);
           }
         });
         return;
@@ -260,6 +270,7 @@ export default function GlobalPopupHost() {
       setExpandedHelperSectionIds([]);
       if (config.type === "summary") {
         setSummaryConfig(config);
+        setSuccessConfig(null);
         setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
@@ -267,6 +278,7 @@ export default function GlobalPopupHost() {
         setOptions([]);
       } else if (config.type === "helper") {
         setSummaryConfig(null);
+        setSuccessConfig(null);
         setHelperConfig(config);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
@@ -274,6 +286,7 @@ export default function GlobalPopupHost() {
         setOptions([]);
       } else if (config.type === "filters") {
         setSummaryConfig(null);
+        setSuccessConfig(null);
         setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(config);
@@ -294,6 +307,7 @@ export default function GlobalPopupHost() {
         setActiveDateField(null);
       } else if (config.type === "sort") {
         setSummaryConfig(null);
+        setSuccessConfig(null);
         setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
@@ -302,21 +316,34 @@ export default function GlobalPopupHost() {
         setSelectedSortOptionId(config.initialSelectedId ?? config.options[0]?.id ?? "");
       } else if (config.type === "profileSwitcher") {
         setSummaryConfig(null);
+        setSuccessConfig(null);
         setHelperConfig(null);
         setProfileSwitcherConfig(config);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions([]);
+      } else if (config.type === "success") {
+        setSummaryConfig(null);
+        setHelperConfig(null);
+        setProfileSwitcherConfig(null);
+        setFilterConfig(null);
+        setSortConfig(null);
+        setOptions([]);
+        setSuccessConfig(config);
       } else {
         setSummaryConfig(null);
+        setSuccessConfig(null);
         setHelperConfig(null);
         setProfileSwitcherConfig(null);
         setFilterConfig(null);
         setSortConfig(null);
         setOptions(config.options);
       }
-      setDismissOnBackdropPress(config.dismissOnBackdropPress ?? true);
+      setDismissOnBackdropPress(
+        config.type === "success" ? false : config.dismissOnBackdropPress ?? true
+      );
       setPendingSummaryActionId(null);
+      setSuccessActionPending(false);
       setMounted(true);
       opacity.setValue(0);
       translateY.setValue(28);
@@ -334,6 +361,17 @@ export default function GlobalPopupHost() {
       ]).start();
     });
   }, [insets.bottom, opacity, translateY]);
+
+  useEffect(() => {
+    if (!successConfig) return;
+
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+      () => undefined
+    );
+    AccessibilityInfo.announceForAccessibility(
+      `${successConfig.title}. ${successConfig.description}`
+    );
+  }, [successConfig]);
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
@@ -381,6 +419,18 @@ export default function GlobalPopupHost() {
       }
     } finally {
       setPendingSummaryActionId(null);
+    }
+  };
+
+  const handleSuccessActionPress = async () => {
+    if (!successConfig || isSuccessActionPending) return;
+
+    setSuccessActionPending(true);
+    try {
+      await successConfig.onAction();
+      closePopup();
+    } finally {
+      setSuccessActionPending(false);
     }
   };
 
@@ -646,9 +696,15 @@ export default function GlobalPopupHost() {
       statusBarTranslucent
       visible={isMounted}
       animationType="none"
-      onRequestClose={canDismissPopup ? closePopup : undefined}
+      onRequestClose={successConfig ? () => undefined : canDismissPopup ? closePopup : undefined}
     >
-      <View style={StyleSheet.absoluteFillObject}>
+      <View
+        style={StyleSheet.absoluteFillObject}
+        accessibilityViewIsModal={Boolean(successConfig)}
+        onAccessibilityEscape={
+          successConfig ? () => void handleSuccessActionPress() : undefined
+        }
+      >
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity }]}>
           <Pressable
             style={[s.backdrop, { opacity: 0.34 }]}
@@ -670,27 +726,51 @@ export default function GlobalPopupHost() {
               },
             ]}
           >
-            <Animated.View
-              style={[
-                s.bottomSheet,
-                {
-                  maxHeight: sheetMaxHeight,
-                  transform: [{ translateY }],
-                },
-              ]}
-            >
-              <View
+            {successConfig ? (
+              <Animated.View
                 style={[
-                  s.bottomSheet,
-                  {
-                    paddingBottom: t.spacing.sm,
-                  },
+                  s.successSheetFrame,
+                  { transform: [{ translateY }] },
                 ]}
-                onTouchStart={Keyboard.dismiss}
                 onLayout={(event) => {
                   sheetHeightRef.current = event.nativeEvent.layout.height;
                 }}
               >
+                <GlassSurface
+                  variant="sheet"
+                  highlight
+                  style={s.successSheet}
+                  contentStyle={s.successSheetContent}
+                >
+                  <SuccessPopupContent
+                    config={successConfig}
+                    pending={isSuccessActionPending}
+                    onAction={() => void handleSuccessActionPress()}
+                  />
+                </GlassSurface>
+              </Animated.View>
+            ) : (
+              <Animated.View
+                style={[
+                  s.bottomSheet,
+                  {
+                    maxHeight: sheetMaxHeight,
+                    transform: [{ translateY }],
+                  },
+                ]}
+              >
+                <View
+                  style={[
+                    s.bottomSheet,
+                    {
+                      paddingBottom: t.spacing.sm,
+                    },
+                  ]}
+                  onTouchStart={Keyboard.dismiss}
+                  onLayout={(event) => {
+                    sheetHeightRef.current = event.nativeEvent.layout.height;
+                  }}
+                >
                 <View
                   style={s.indicatorTouchArea}
                   {...indicatorPanResponder.panHandlers}
@@ -773,7 +853,8 @@ export default function GlobalPopupHost() {
                           </View>
                         ) : null}
 
-                        {filterConfig.chipGroup ? (
+                        {filterConfig.chipGroup &&
+                        filterConfig.chipGroup.options.length > 0 ? (
                           <View style={s.filterSection}>
                             <Text variant="small">
                               {filterConfig.chipGroup.label}
@@ -787,6 +868,7 @@ export default function GlobalPopupHost() {
                                     key={option.id}
                                     label={option.label}
                                     selected={isSelected}
+                                    bordered
                                     onPress={() => handleFilterChipPress(option.id)}
                                   />
                                 );
@@ -797,7 +879,7 @@ export default function GlobalPopupHost() {
 
                         {filterConfig.chipGroups?.map((group) => {
                           const groupId = group.id?.trim();
-                          if (!groupId) return null;
+                          if (!groupId || group.options.length === 0) return null;
 
                           return (
                             <View key={groupId} style={s.filterSection}>
@@ -815,6 +897,7 @@ export default function GlobalPopupHost() {
                                       key={option.id}
                                       label={option.label}
                                       selected={isSelected}
+                                      bordered
                                       onPress={() => handleFilterChipGroupPress(groupId, option.id)}
                                     />
                                   );
@@ -1178,10 +1261,12 @@ export default function GlobalPopupHost() {
                   </View>
                 </ScrollView>
                 )}
-              </View>
-            </Animated.View>
+                </View>
+              </Animated.View>
+            )}
           </View>
         </KeyboardAvoidingView>
+        {successConfig ? <SuccessScreenConfetti /> : null}
       </View>
 
       <Modal

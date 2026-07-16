@@ -4,6 +4,7 @@ import {
 import type { ChatMessage } from "./chat-session.context";
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
+import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
@@ -18,8 +19,15 @@ function AssistantTextBlock({ text }: { text: string }) {
   const t = useTheme();
 
   return (
-    <View style={{ maxWidth: "96%", alignSelf: "flex-start", paddingVertical: t.spacing.xs }}>
+    <View
+      style={{
+        maxWidth: "96%",
+        alignSelf: "flex-start",
+        paddingVertical: t.spacing.xs,
+      }}
+    >
       <Text variant="body">{text}</Text>
+      <MessageUtilities text={text} />
     </View>
   );
 }
@@ -109,33 +117,40 @@ function UserMessageBlock({ message }: { message: ChatMessage }) {
       style={{
         maxWidth: "88%",
         alignSelf: "flex-end",
-        borderRadius: t.borders.md,
-        paddingHorizontal: t.spacing.md,
-        paddingVertical: t.spacing.sm,
-        backgroundColor: t.colors.primaryLight,
         gap: t.spacing.xs,
       }}
     >
-      {message.text.trim().length > 0 ? (
-        <Text variant="body">{message.text}</Text>
-      ) : null}
+      <View
+        style={{
+          borderRadius: t.borders.md,
+          paddingHorizontal: t.spacing.md,
+          paddingVertical: t.spacing.sm,
+          backgroundColor: t.colors.primaryLight,
+          gap: t.spacing.xs,
+        }}
+      >
+        {message.text.trim().length > 0 ? (
+          <Text variant="body">{message.text}</Text>
+        ) : null}
 
-      {message.images && message.images.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
-          {message.images.map((image, index) => (
-            <Image
-              key={`${image.uri}-${index}`}
-              source={{ uri: image.uri }}
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 16,
-                backgroundColor: t.colors.border,
-              }}
-            />
-          ))}
-        </View>
-      ) : null}
+        {message.images && message.images.length > 0 ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.xs }}>
+            {message.images.map((image, index) => (
+              <Image
+                key={`${image.uri}-${index}`}
+                source={{ uri: image.uri }}
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 16,
+                  backgroundColor: t.colors.border,
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
+      </View>
+      <MessageUtilities text={message.text} align="right" />
     </View>
   );
 }

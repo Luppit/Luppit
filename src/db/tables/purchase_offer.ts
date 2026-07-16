@@ -7,7 +7,6 @@ export const COL_PURCHASE_OFFER = {
   created_at: "created_at",
   business_id: "business_id",
   purchase_request_id: "purchase_request_id",
-  delivery_id: "delivery_id",
   currency_id: "currency_id",
   description: "description",
   price: "price",
