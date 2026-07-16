@@ -14,8 +14,8 @@ Applies to navbar UI components and rendering behavior.
 - The large home search control is a visual trigger, not a free-typing search field.
 - Buyer/seller filter popups should drive home RPC params through shared state, not client-only filtering.
 - Applied filters should show a dismissible localized chip such as `Filtros (1)`.
-- Profile name row opens the shared profile-switcher popup. Active profile presses are ignored; non-active presses start sign-out plus the existing OTP login handoff.
-- Saved profile state belongs to `saved.profile.service.ts`; `profile.switch.service.ts` is only the transient sign-out/login handoff.
+- Profile name row opens the shared profile-switcher popup. Active profile presses are ignored; non-active presses switch the root active-profile context without changing the auth session.
+- Switcher rows come from `get_current_user_profiles()` and are identified only by profile ID; never restore the removed saved-profile or OTP handoff state.
 
 ## Visual Rules
 - Top-navbar chrome must use shared glass (`GlassSurface` + `t.glass.chrome/control/chip`) and attach through the safe area with only bottom corners rounded.

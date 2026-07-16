@@ -2,11 +2,12 @@ import { defaultCountryCode } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
-import { signUpWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase/auth";
-import { createBusiness } from "@/src/services/business.service";
+import {
+  InitialProfileSetupError,
+  signUpWithPhoneOtp,
+  verifyPhoneOtp,
+} from "@/src/lib/supabase/auth";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
-import { insertProfileToBusiness } from "@/src/services/profile.business.service";
-import { Profile } from "@/src/services/profile.service";
 import { spacing } from "@/src/themes/spacing";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
@@ -152,44 +153,20 @@ function VerifyStep({
     : buyerValues.idDocument;
 
   const onVerify = async (code: string) => {
-    const userProfile: Profile = {
-      id: "",
+    const initialProfile = {
       name: fullName,
-      id_document: idDocument,
-      created_at: new Date().toISOString(),
-      email: null,
-      email_opt_in: false,
-      email_opt_in_at: null,
-      user_id: "",
-      phone: defaultCountryCode + phoneNumber,
+      idDocument,
+      role: isSeller ? ("seller" as const) : ("buyer" as const),
+      businessName: isSeller ? sellerBusinessValues.businessName : null,
+      businessIdDocument: isSeller
+        ? sellerBusinessValues.businessIdDocument
+        : null,
     };
 
     return await verifyPhoneOtp(
       defaultCountryCode + phoneNumber,
       code,
-      userProfile,
-      isSeller,
-      async (createdProfile) => {
-        if (!isSeller) return;
-
-        const businessResult = await createBusiness({
-          name: sellerBusinessValues.businessName,
-          id_document: sellerBusinessValues.businessIdDocument,
-        });
-
-        if (businessResult.ok === false) {
-          throw new Error(businessResult.error.message);
-        }
-
-        const linkResult = await insertProfileToBusiness(
-          createdProfile.id,
-          businessResult.data.id,
-        );
-
-        if (linkResult.ok === false) {
-          throw new Error(linkResult.error.message);
-        }
-      },
+      initialProfile,
     )
       .then(() => {
         next();
@@ -197,6 +174,9 @@ function VerifyStep({
       })
       .catch((err) => {
         showError(err.message);
+        if (err instanceof InitialProfileSetupError) {
+          router.replace("/");
+        }
         return false;
       });
   };

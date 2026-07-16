@@ -136,6 +136,33 @@ export type Database = {
           },
         ]
       }
+      auth_user_account_deletion_request: {
+        Row: {
+          admin_note: string | null
+          completed_at: string | null
+          id: string
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          completed_at?: string | null
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          completed_at?: string | null
+          id?: string
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       business: {
         Row: {
           created_at: string
@@ -1991,6 +2018,7 @@ export type Database = {
       }
       otp_code: {
         Row: {
+          attempt_count: number
           code_hash: string
           consumed_at: string | null
           consumed_by_profile_id: string | null
@@ -2001,10 +2029,12 @@ export type Database = {
           expires_at: string
           id: string
           invalidated_at: string | null
+          last_attempt_at: string | null
           otp_type_code: string
           target_profile_id: string | null
         }
         Insert: {
+          attempt_count?: number
           code_hash: string
           consumed_at?: string | null
           consumed_by_profile_id?: string | null
@@ -2015,10 +2045,12 @@ export type Database = {
           expires_at: string
           id?: string
           invalidated_at?: string | null
+          last_attempt_at?: string | null
           otp_type_code: string
           target_profile_id?: string | null
         }
         Update: {
+          attempt_count?: number
           code_hash?: string
           consumed_at?: string | null
           consumed_by_profile_id?: string | null
@@ -2029,6 +2061,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invalidated_at?: string | null
+          last_attempt_at?: string | null
           otp_type_code?: string
           target_profile_id?: string | null
         }
@@ -2117,6 +2150,7 @@ export type Database = {
           email_opt_in_at: string | null
           id: string
           id_document: string
+          is_default: boolean
           name: string
           phone: string | null
           user_id: string
@@ -2128,9 +2162,10 @@ export type Database = {
           email_opt_in_at?: string | null
           id?: string
           id_document: string
+          is_default?: boolean
           name: string
           phone?: string | null
-          user_id?: string
+          user_id: string
         }
         Update: {
           created_at?: string
@@ -2139,30 +2174,76 @@ export type Database = {
           email_opt_in_at?: string | null
           id?: string
           id_document?: string
+          is_default?: boolean
           name?: string
           phone?: string | null
           user_id?: string
         }
         Relationships: []
       }
-      profile_business: {
+      profile_account_deletion_request: {
         Row: {
-          business_id: string | null
-          created_at: string
+          admin_note: string | null
+          completed_at: string | null
           id: string
-          profile_id: string | null
+          profile_id: string
+          requested_at: string
+          status: string
         }
         Insert: {
-          business_id?: string | null
-          created_at?: string
+          admin_note?: string | null
+          completed_at?: string | null
           id?: string
-          profile_id?: string | null
+          profile_id: string
+          requested_at?: string
+          status?: string
         }
         Update: {
-          business_id?: string | null
+          admin_note?: string | null
+          completed_at?: string | null
+          id?: string
+          profile_id?: string
+          requested_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_account_deletion_request_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profile_business: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          membership_role: string
+          profile_id: string
+        }
+        Insert: {
+          business_id: string
           created_at?: string
           id?: string
-          profile_id?: string | null
+          membership_role?: string
+          profile_id: string
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          membership_role?: string
+          profile_id?: string
         }
         Relationships: [
           {
@@ -3081,6 +3162,27 @@ export type Database = {
       }
     }
     Functions: {
+      accept_current_user_business_invitation: {
+        Args: { p_id_document: string; p_invitation_id: string; p_name: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       add_buyer_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
@@ -3136,6 +3238,61 @@ export type Database = {
         }[]
       }
       cleanup_empty_request_opened_conversations: { Args: never; Returns: Json }
+      complete_current_user_profile_setup: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_invitation_id?: string
+          p_profile_id: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_current_user_profile: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_id_document: string
+          p_invitation_id?: string
+          p_name: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_seller_offer_fulfillment_from_conversation: {
         Args: {
           p_conversation_id: string
@@ -3152,6 +3309,10 @@ export type Database = {
           p_shipping_price?: number
         }
         Returns: Json
+      }
+      decline_current_user_business_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: boolean
       }
       get_buyer_home_purchase_requests: {
         Args: {
@@ -3264,29 +3425,53 @@ export type Database = {
           version: number
         }[]
       }
-      get_conversation_messages: {
-        Args: { p_conversation_id: string }
-        Returns: {
-          buyer_open_state: string | null
-          buyer_opened_at: string | null
-          conversation_id: string | null
-          created_at: string
-          id: string
-          image_path: string | null
-          message_kind: string | null
-          seller_open_state: string | null
-          seller_opened_at: string | null
-          sender_profile_id: string | null
-          text: string | null
-          visible_to_role_id: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "conversation_message"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
+      get_conversation_messages:
+        | {
+            Args: { p_conversation_id: string }
+            Returns: {
+              buyer_open_state: string | null
+              buyer_opened_at: string | null
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              seller_open_state: string | null
+              seller_opened_at: string | null
+              sender_profile_id: string | null
+              text: string | null
+              visible_to_role_id: string | null
+            }[]
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: false
+              isSetofReturn: true
+            }
+          }
+        | {
+            Args: { p_conversation_id: string; p_profile_id: string }
+            Returns: {
+              buyer_open_state: string | null
+              buyer_opened_at: string | null
+              conversation_id: string | null
+              created_at: string
+              id: string
+              image_path: string | null
+              message_kind: string | null
+              seller_open_state: string | null
+              seller_opened_at: string | null
+              sender_profile_id: string | null
+              text: string | null
+              visible_to_role_id: string | null
+            }[]
+            SetofOptions: {
+              from: "*"
+              to: "conversation_message"
+              isOneToOne: false
+              isSetofReturn: true
+            }
+          }
       get_conversation_timeline: {
         Args: { p_conversation_id: string }
         Returns: {
@@ -3308,6 +3493,16 @@ export type Database = {
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
+      }
+      get_current_business_invitations: {
+        Args: { p_owner_profile_id: string }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          responded_at: string
+          status: string
+        }[]
       }
       get_current_profile_conversations: {
         Args: {
@@ -3342,6 +3537,38 @@ export type Database = {
           request_category_name: string
           request_profile_name: string
           request_title: string
+        }[]
+      }
+      get_current_user_business_invitations: {
+        Args: never
+        Returns: {
+          business_id: string
+          business_name: string
+          created_at: string
+          expires_at: string
+          id: string
+          inviter_profile_name: string
+        }[]
+      }
+      get_current_user_profiles: {
+        Args: never
+        Returns: {
+          business_id: string
+          business_name: string
+          created_at: string
+          email: string
+          email_opt_in: boolean
+          email_opt_in_at: string
+          id: string
+          id_document: string
+          is_default: boolean
+          membership_role: string
+          name: string
+          phone: string
+          role: string
+          setup_status: string
+          unread_count: number
+          user_id: string
         }[]
       }
       get_delivery_catalog_options: {
@@ -3469,6 +3696,10 @@ export type Database = {
         }
         Returns: Json
       }
+      invite_current_user_to_business: {
+        Args: { p_owner_profile_id: string; p_phone: string }
+        Returns: string
+      }
       is_category_leaf: {
         Args: { category_id_input: string }
         Returns: boolean
@@ -3510,6 +3741,19 @@ export type Database = {
       remove_seller_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
+      }
+      request_current_login_deletion: { Args: never; Returns: Json }
+      request_current_profile_account_deletion: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
+      request_current_profile_deletion: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
+      revoke_current_user_business_invitation: {
+        Args: { p_invitation_id: string; p_owner_profile_id: string }
+        Returns: boolean
       }
       search_category: {
         Args: { search_text: string }
@@ -3653,20 +3897,15 @@ export type Database = {
         }
         Returns: Json
       }
-      verify_email_verification_otp:
-        | {
-            Args: { p_code: string; p_email: string; p_profile_id: string }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_code: string
-              p_email: string
-              p_email_opt_in?: boolean
-              p_profile_id: string
-            }
-            Returns: Json
-          }
+      verify_email_verification_otp: {
+        Args: {
+          p_code: string
+          p_email: string
+          p_email_opt_in?: boolean
+          p_profile_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

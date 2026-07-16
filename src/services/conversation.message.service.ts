@@ -1,8 +1,8 @@
-import { InsertRow, Row } from "../db/types";
+import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 
 export type ConversationMessage = Row<"conversation_message"> & {
   image_path?: string | null;
@@ -134,26 +134,21 @@ export async function getConversationMessagesByConversationId(
 ): Promise<{ ok: true; data: ConversationMessage[] } | { ok: false; error: AppError }> {
   if (!conversationId) return { ok: false, error: fromAppError("validation") };
 
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
   const rpcResult: any = await (supabase as any).rpc("get_conversation_messages", {
     p_conversation_id: conversationId,
+    p_profile_id: profile.data.id,
   });
 
-  if (!rpcResult.error && Array.isArray(rpcResult.data)) {
-    const messagesWithUrls = await withSignedImageUrls(
-      rpcResult.data as ConversationMessage[]
-    );
-    return { ok: true, data: messagesWithUrls };
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const { data, error } = await supabase
-    .from("conversation_message")
-    .select("*")
-    .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true });
-
-  if (error) return { ok: false, error: fromSupabaseError(error) };
   const messagesWithUrls = await withSignedImageUrls(
-    (data ?? []) as ConversationMessage[]
+    (Array.isArray(rpcResult.data) ? rpcResult.data : []) as ConversationMessage[]
   );
   return { ok: true, data: messagesWithUrls };
 }
@@ -169,7 +164,7 @@ export async function createConversationTextMessage(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -181,30 +176,15 @@ export async function createConversationTextMessage(
     p_image_path: null,
   });
 
-  if (!rpcResult.error && rpcResult.data) {
-    const rpcData = Array.isArray(rpcResult.data)
-      ? rpcResult.data[0]
-      : rpcResult.data;
-    if (rpcData) {
-      return { ok: true, data: rpcData as ConversationMessage };
-    }
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const payload: InsertRow<"conversation_message"> = {
-    conversation_id: conversationId,
-    sender_profile_id: profile.data.id,
-    text: text.trim(),
-    message_kind: "TEXT",
-  };
-
-  const { data, error } = await supabase
-    .from("conversation_message")
-    .insert(payload)
-    .select("*")
-    .single();
-
-  if (error) return { ok: false, error: fromSupabaseError(error) };
-  return { ok: true, data: data as ConversationMessage };
+  const rpcData = Array.isArray(rpcResult.data)
+    ? rpcResult.data[0]
+    : rpcResult.data;
+  if (!rpcData) return { ok: false, error: fromAppError("unknown") };
+  return { ok: true, data: rpcData as ConversationMessage };
 }
 
 export async function createConversationMessages(
@@ -221,7 +201,7 @@ export async function createConversationMessages(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -245,33 +225,15 @@ export async function createConversationMessages(
       p_image_path: uploaded.data,
     });
 
-    if (!rpcResult.error && rpcResult.data) {
-      const rpcData = Array.isArray(rpcResult.data)
-        ? rpcResult.data[0]
-        : rpcResult.data;
-      if (rpcData) {
-        created.push(rpcData as ConversationMessage);
-        continue;
-      }
+    if (rpcResult.error) {
+      return { ok: false, error: fromSupabaseError(rpcResult.error) };
     }
 
-    const payload: InsertRow<"conversation_message"> & { image_path?: string | null } =
-      {
-        conversation_id: conversationId,
-        sender_profile_id: profile.data.id,
-        text: null,
-        message_kind: "IMAGE",
-        image_path: uploaded.data,
-      };
-
-    const inserted = await supabase
-      .from("conversation_message")
-      .insert(payload as any)
-      .select("*")
-      .single();
-
-    if (inserted.error) return { ok: false, error: fromSupabaseError(inserted.error) };
-    created.push(inserted.data as ConversationMessage);
+    const rpcData = Array.isArray(rpcResult.data)
+      ? rpcResult.data[0]
+      : rpcResult.data;
+    if (!rpcData) return { ok: false, error: fromAppError("unknown") };
+    created.push(rpcData as ConversationMessage);
   }
 
   const createdWithUrls = await withSignedImageUrls(created);

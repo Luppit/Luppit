@@ -2,7 +2,7 @@ import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 
 export type Conversation = Row<"conversation">;
 
@@ -493,7 +493,7 @@ export async function getOrCreateCurrentSellerConversationByPurchaseRequestId(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -641,7 +641,7 @@ export async function getCurrentProfileConversations(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -687,7 +687,7 @@ export async function getCurrentUserConversationView(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 

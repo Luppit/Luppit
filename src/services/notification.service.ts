@@ -1,7 +1,7 @@
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 
 type ProfileNotification = Row<"profile_notification">;
 type NotificationRow = Row<"notification">;
@@ -31,7 +31,7 @@ async function getCurrentProfileId(): Promise<
   const userId = data.session?.user.id;
   if (!userId) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(userId);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 

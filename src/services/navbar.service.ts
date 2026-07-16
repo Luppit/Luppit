@@ -1,7 +1,7 @@
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 
 export type NavbarMenuItem = {
   menuCode: string;
@@ -33,7 +33,7 @@ export async function getCurrentUserNavbarItems(): Promise<
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
@@ -45,11 +45,11 @@ export async function getCurrentUserNavbarItems(): Promise<
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
+  const rows: unknown[] = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
   const data = rows
     .map(mapNavbarMenuItem)
-    .filter((item): item is NavbarMenuItem => item !== null)
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+    .filter((item: NavbarMenuItem | null): item is NavbarMenuItem => item !== null)
+    .sort((a: NavbarMenuItem, b: NavbarMenuItem) => a.sortOrder - b.sortOrder);
 
   return { ok: true, data };
 }

@@ -1,9 +1,16 @@
 import type { ChatImage } from "../components/inputChat/inputChat";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
+import {
+  getCurrentProfile,
+  getCurrentUserProfileCount,
+  registerProfileScopedAbortController,
+} from "./active.profile.service";
 
 const SELLER_OFFER_ASSISTANT_EDGE_FUNCTION = "ai-vendedor-completar";
 const MAX_PROMPT_LENGTH = 4000;
+const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
+const MULTI_PROFILE_AI_UNAVAILABLE = "MULTI_PROFILE_AI_UNAVAILABLE";
 const MAX_IMAGES_PER_REQUEST = 6;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -259,7 +266,8 @@ function validateInput(input: SellerOfferAssistantRequest): AppError | null {
 
 function buildJsonBody(
   input: SellerOfferAssistantRequest,
-  identity: SellerOfferAssistantRequestIdentity
+  identity: SellerOfferAssistantRequestIdentity,
+  activeProfileId: string
 ) {
   return JSON.stringify({
     prompt: input.prompt.trim(),
@@ -268,12 +276,14 @@ function buildJsonBody(
     ui_action: input.uiAction ?? null,
     client_request_id: identity.clientRequestId,
     idempotency_key: identity.idempotencyKey,
+    active_profile_id: activeProfileId,
   });
 }
 
 function buildFormDataBody(
   input: SellerOfferAssistantRequest,
-  identity: SellerOfferAssistantRequestIdentity
+  identity: SellerOfferAssistantRequestIdentity,
+  activeProfileId: string
 ) {
   const formData = new FormData();
   formData.append("prompt", input.prompt.trim());
@@ -282,6 +292,7 @@ function buildFormDataBody(
   if (input.uiAction) formData.append("ui_action", input.uiAction);
   formData.append("client_request_id", identity.clientRequestId);
   formData.append("idempotency_key", identity.idempotencyKey);
+  formData.append("active_profile_id", activeProfileId);
 
   (input.images ?? []).forEach((image, index) => {
     formData.append("offer_images", {
@@ -310,7 +321,8 @@ export async function callSellerOfferAssistant(
   }
 
   const session = await getSession();
-  if (!session?.access_token) {
+  const activeProfile = getCurrentProfile();
+  if (!session?.access_token || !activeProfile) {
     return {
       ok: false,
       error: fromAppError("auth"),
@@ -318,6 +330,23 @@ export async function callSellerOfferAssistant(
       requestId: null,
       retryAfterSeconds: null,
       backendMessage: null,
+    };
+  }
+
+  if (getCurrentUserProfileCount() !== 1) {
+    const error: AppError = {
+      type: "validation",
+      code: MULTI_PROFILE_AI_UNAVAILABLE,
+      message:
+        "El asistente no está disponible temporalmente para cuentas con varios perfiles.",
+    };
+    return {
+      ok: false,
+      error,
+      statusCode: null,
+      requestId: null,
+      retryAfterSeconds: null,
+      backendMessage: error.message,
     };
   }
 
@@ -338,6 +367,12 @@ export async function callSellerOfferAssistant(
     input.identity ??
     createSellerOfferAssistantRequestIdentity(input.uiAction ?? "seller-offer-message");
   const hasImages = (input.images ?? []).length > 0;
+  const requestController = new AbortController();
+  const abortFromCaller = () => requestController.abort();
+  if (input.signal?.aborted) requestController.abort();
+  input.signal?.addEventListener("abort", abortFromCaller);
+  const unregisterAbortController =
+    registerProfileScopedAbortController(requestController);
 
   try {
     const response = await fetch(functionUrl, {
@@ -350,9 +385,9 @@ export async function callSellerOfferAssistant(
         "x-request-id": identity.clientRequestId,
       },
       body: hasImages
-        ? buildFormDataBody(input, identity)
-        : buildJsonBody(input, identity),
-      signal: input.signal,
+        ? buildFormDataBody(input, identity, activeProfile.id)
+        : buildJsonBody(input, identity, activeProfile.id),
+      signal: requestController.signal,
     });
 
     const requestId = normalizeString(response.headers.get("x-request-id"));
@@ -393,6 +428,20 @@ export async function callSellerOfferAssistant(
       requestId ?? normalizeString(record.request_id)
     );
   } catch {
+    if (requestController.signal.aborted) {
+      return {
+        ok: false,
+        error: {
+          type: "unknown",
+          code: PROFILE_SCOPED_REQUEST_ABORTED,
+          message: "Solicitud cancelada.",
+        },
+        statusCode: null,
+        requestId: null,
+        retryAfterSeconds: null,
+        backendMessage: null,
+      };
+    }
     return {
       ok: false,
       error: fromAppError("network"),
@@ -401,5 +450,8 @@ export async function callSellerOfferAssistant(
       retryAfterSeconds: null,
       backendMessage: null,
     };
+  } finally {
+    input.signal?.removeEventListener("abort", abortFromCaller);
+    unregisterAbortController();
   }
 }

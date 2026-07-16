@@ -18,9 +18,9 @@ Applies to tab screens, buyer/seller home behavior, profile tab, and standalone 
 - Profile/settings-style rows and cards should follow the soft grouped-list style in `src/components/AGENTS.md`.
 - Hide the shared top navbar on `/profile`; keep the bottom navbar.
 - Phone is read-only login identity. Editable profile fields are `name` and `id_document`; email changes use the OTP verification modal.
-- Profile switcher uses saved device profile snapshots and the shared popup system. Active profile shows the shared `Activo` status chip.
-- Switching to a non-active saved profile must sign out and reuse the existing phone OTP login flow with prefilled phone and `autoSendOtp=true`.
-- Saved profile notification counts are last-known device snapshots for non-active profiles; refresh only the active authenticated profile from DB.
+- Profile switcher uses the authenticated database profile list and the shared popup system. Active profile shows the shared `Activo` status chip.
+- Switching profiles keeps the same auth session, changes the root active-profile context by profile ID, and remounts profile-scoped tab state.
+- Profile subtitles and unread counts come from `get_current_user_profiles()`; do not cache cross-account profile snapshots.
 - Notifications route to `/(detail)/notifications`; unread badge comes from `notification.service.ts`, refreshes on profile focus, and must not block screen render.
 - Buyer/seller profile stats and ratings are DB-backed through services/summary tables. Seller business category/location editing belongs on `/(detail)/business-profile`, not main profile metric cards.
 - Home preset settings read active DB presets for the current surface, preview metadata non-destructively, and save only on `Guardar cambios`.

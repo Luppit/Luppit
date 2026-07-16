@@ -1,6 +1,10 @@
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import {
+    getCurrentProfileResult,
+    requestActiveProfileRefresh,
+} from "./active.profile.service";
 
 export type Profile = Row<"profile">;
 export type ProfileEmailSetupStatus = {
@@ -161,7 +165,7 @@ async function getCurrentAuthenticatedProfile(): Promise<
         return { ok: false, error: fromAppError("auth") };
     }
 
-    const profileResult = await getProfileByUserId(userId);
+    const profileResult = await getCurrentProfileResult();
     if (profileResult?.ok === false) return { ok: false, error: profileResult.error };
     if (!profileResult || profileResult.ok !== true) {
         return { ok: false, error: fromAppError("not_found") };
@@ -170,44 +174,11 @@ async function getCurrentAuthenticatedProfile(): Promise<
     return { ok: true, data: profileResult.data };
 }
 
-export async function createProfile(profile : Profile): Promise<{ok: true; data: Profile} | {ok: false; error: AppError}> {
-    const { id: _omit, ...insertData } = profile;
-    const { data, error } = await supabase
-        .from("profile")
-        .insert(insertData)
-        .select()
-        .single();
-    if (error) return {ok: false, error: fromSupabaseError(error) };
-    return { ok: true, data: data as Profile };
-}
-
-export async function getProfileByPhone(phone: string): Promise<{ok: true; data: Profile} | {ok: false; error: AppError} | null > {
-    const { data, error } = await supabase
-        .from("profile")
-        .select("*")
-        .eq("phone", phone)
-        .maybeSingle();
-    if (error) return {ok: false, error: fromSupabaseError(error) };
-    if (!data) return null;
-    return { ok: true, data: data as Profile };
-}
-
 export async function getProfileById(id: string): Promise<{ok: true; data: Profile} | {ok: false; error: AppError} | null > {
     const { data, error } = await supabase
         .from("profile")
         .select("*")
         .eq("id", id)
-        .maybeSingle();
-    if (error) return {ok: false, error: fromSupabaseError(error) };
-    if (!data) return null;
-    return { ok: true, data: data as Profile };
-}
-
-export async function getProfileByUserId(userId: string): Promise<{ok: true; data: Profile} | {ok: false; error: AppError} | null > {
-    const { data, error } = await supabase
-        .from("profile")
-        .select("*")
-        .eq("user_id", userId)
         .maybeSingle();
     if (error) return {ok: false, error: fromSupabaseError(error) };
     if (!data) return null;
@@ -800,6 +771,7 @@ export async function updateCurrentProfileField(
         .single();
 
     if (error) return { ok: false, error: fromSupabaseError(error) };
+    void requestActiveProfileRefresh(profileResult.data.id);
     return { ok: true, data: data as Profile };
 }
 
@@ -879,48 +851,12 @@ export async function getCurrentProfileEmailSetupStatus(): Promise<
         };
     }
 
-    const profile = await getProfileByUserId(userId);
+    const profile = await getCurrentProfileResult();
     if (profile?.ok === false) return { ok: false, error: profile.error };
 
     return {
         ok: true,
         data: mapProfileEmailSetupStatus(profile?.ok === true ? profile.data : null),
-    };
-}
-
-type UpdateCurrentProfileEmailSetupInput = {
-    email: string;
-    emailOptIn: boolean;
-};
-
-export async function updateCurrentProfileEmailSetup({
-    email,
-    emailOptIn,
-}: UpdateCurrentProfileEmailSetupInput): Promise<
-    { ok: true; data: ProfileEmailSetupStatus } | { ok: false; error: AppError }
-> {
-    const profileResult = await getCurrentAuthenticatedProfile();
-    if (!profileResult.ok) return profileResult;
-
-    const normalizedEmail = normalizeProfileEmail(email);
-    const payload = {
-        email: normalizedEmail.length > 0 ? normalizedEmail : null,
-        email_opt_in: emailOptIn,
-        email_opt_in_at: emailOptIn ? new Date().toISOString() : null,
-    };
-
-    const { data: updatedProfile, error: updateError } = await supabase
-        .from("profile")
-        .update(payload)
-        .eq("id", profileResult.data.id)
-        .select("*")
-        .single();
-
-    if (updateError) return { ok: false, error: fromSupabaseError(updateError) };
-
-    return {
-        ok: true,
-        data: mapProfileEmailSetupStatus(updatedProfile as Profile),
     };
 }
 
@@ -1010,21 +946,39 @@ export async function verifyCurrentProfileEmailSetup({
         return { ok: false, error: fromSupabaseError(rpcResult.error) };
     }
 
+    if (
+        rpcResult?.data &&
+        typeof rpcResult.data === "object" &&
+        rpcResult.data.ok === false
+    ) {
+        const errorCode =
+            typeof rpcResult.data.error === "string"
+                ? rpcResult.data.error
+                : "invalid_otp_code";
+        const message =
+            errorCode === "otp_attempt_limit_reached"
+                ? "Superaste el número de intentos. Solicita un código nuevo."
+                : errorCode === "otp_expired"
+                  ? "El código venció. Solicita uno nuevo."
+                  : "El código ingresado no es válido.";
+        return {
+            ok: false,
+            error: {
+                type: "validation",
+                code: errorCode,
+                message,
+            },
+        };
+    }
+
+    void requestActiveProfileRefresh(profileResult.data.id);
     return await getCurrentProfileEmailSetupStatus();
 }
 
-export async function requestCurrentProfileAccountDeletion(): Promise<
+export async function requestCurrentLoginDeletion(): Promise<
     { ok: true; data: AccountDeletionRequestStatus } | { ok: false; error: AppError }
 > {
-    const profileResult = await getCurrentAuthenticatedProfile();
-    if (!profileResult.ok) return profileResult;
-
-    const rpcResult: any = await (supabase as any).rpc(
-        "request_current_profile_account_deletion",
-        {
-            p_profile_id: profileResult.data.id,
-        }
-    );
+    const rpcResult: any = await (supabase as any).rpc("request_current_login_deletion");
 
     if (rpcResult?.error) {
         return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -1039,4 +993,26 @@ export async function requestCurrentProfileAccountDeletion(): Promise<
         ok: true,
         data: status,
     };
+}
+
+export async function requestCurrentProfileDeletion(): Promise<
+    { ok: true; data: AccountDeletionRequestStatus } | { ok: false; error: AppError }
+> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const rpcResult: any = await (supabase as any).rpc(
+        "request_current_profile_deletion",
+        {
+            p_profile_id: profileResult.data.id,
+        }
+    );
+
+    if (rpcResult?.error) {
+        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    }
+
+    const status = mapAccountDeletionRequestStatus(rpcResult?.data);
+    if (!status) return { ok: false, error: fromAppError("validation") };
+    return { ok: true, data: status };
 }

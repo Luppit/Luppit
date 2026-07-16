@@ -1,11 +1,10 @@
-import { InsertRow, Row } from "../db/types";
+import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 
 export type Business = Row<"business">;
-export type BusinessInsert = InsertRow<"business">;
 
 export type BuyerBusinessCategory = {
   id: string;
@@ -55,7 +54,7 @@ async function getCurrentAuthenticatedProfileId(): Promise<
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -497,23 +496,6 @@ async function getCurrentBuyerVisibleBusinessOverview(
   if (!parsed) return { ok: false, error: fromAppError("not_found") };
 
   return { ok: true, data: parsed };
-}
-
-export async function createBusiness(
-  business: BusinessInsert
-): Promise<{ ok: true; data: Business } | { ok: false; error: AppError }> {
-  const insertData: BusinessInsert = {
-    ...business,
-    location_id: business.location_id || null,
-  };
-
-  const { data, error } = await supabase
-    .from("business")
-    .insert(insertData)
-    .select()
-    .single();
-  if (error) return { ok: false, error: fromSupabaseError(error) };
-  return { ok: true, data: data as Business };
 }
 
 export async function getBusinessById(

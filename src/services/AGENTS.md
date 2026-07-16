@@ -33,8 +33,8 @@ Applies to service modules and RPC integration behavior.
 
 ## Profile, Account, And Notifications
 - Notification helpers live in `notification.service.ts`; unread state is `profile_notification.read_at`, and marking read goes through the DB RPC.
-- Saved profile snapshots live in `saved.profile.service.ts` and store only non-sensitive display/login payload plus last-known unread counts.
-- Switching to a saved non-active profile reuses the existing phone OTP login flow; do not create a parallel auth flow.
+- Current-profile operations resolve through `active.profile.service.ts`; callers must not select a profile by auth user or phone.
+- Profile switching keeps the current auth session, persists the selected owned profile per device, and never sends OTP or signs out.
 - Profile email setup uses `profile.email`, `email_opt_in`, and `email_opt_in_at`; send/verify through email OTP RPCs and avoid a second client-side profile update after verification.
 - Buyer/seller profile overview data belongs in `profile.service.ts`: ratings from summary tables/views, seller membership from `profile_business`, location from `business.location_id -> location`, and presets from `profile_home_group_preset`.
 - Business category and location edits go through `set_current_business_category_preferences` and `set_current_business_location`; UI should keep unsaved local selection until save.

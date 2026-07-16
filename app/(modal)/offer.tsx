@@ -666,6 +666,7 @@ function OfferAssistantScreen({
       successfulImageCount: number
     ) => {
       if (!result.ok) {
+        if (result.error.code === "PROFILE_SCOPED_REQUEST_ABORTED") return;
         setPendingRetry({ input, successfulImageCount });
         const retryText = result.retryAfterSeconds
           ? ` Puedes intentarlo de nuevo en ${result.retryAfterSeconds} segundo(s).`

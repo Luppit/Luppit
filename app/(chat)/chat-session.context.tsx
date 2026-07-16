@@ -158,6 +158,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       }: { appendAssistantMessage?: boolean } = {}
     ) => {
       if (!next.ok) {
+        if (next.error.code === "PROFILE_SCOPED_REQUEST_ABORTED") return;
         if (next.requestId) {
           console.warn("purchase-request-assistant request failed", {
             requestId: next.requestId,

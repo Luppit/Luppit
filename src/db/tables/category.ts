@@ -6,4 +6,5 @@ export const COL_CATEGORY = {
     id : 'id',
     path : 'path',
     name : 'name',
-} as const satisfies { [K in keyof Row<"category"> & string]: K }; 
+    segment_id: 'segment_id',
+} as const satisfies { [K in keyof Row<"category"> & string]: K };

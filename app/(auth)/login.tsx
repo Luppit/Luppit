@@ -5,31 +5,15 @@ import {
 } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { signInWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase";
-import { getSession } from "@/src/lib/supabase/auth";
-import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
-import { clearPendingProfileSwitch } from "@/src/services/profile.switch.service";
-import { getProfileByUserId } from "@/src/services/profile.service";
-import { saveProfilePayload } from "@/src/services/saved.profile.service";
 import { showError } from "@/src/utils";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { router } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import VerifyCode from "./signup/VerifyCode";
 
 const PHONE_REGEX = /^(?![0-9]{8}$)/;
 
-function normalizeRoutePhone(phone: string | string[] | undefined) {
-  const rawPhone = Array.isArray(phone) ? phone[0] : phone;
-  if (!rawPhone) return "";
-
-  const digits = rawPhone.replace(/\D/g, "");
-  if (digits.startsWith("506") && digits.length > 8) return digits.slice(3);
-  return digits.slice(-8);
-}
-
-export function Step1({ next, values, setValues, autoSendOtp }: any) {
-  const autoSentPhoneRef = useRef("");
-
+export function Step1({ next, values, setValues }: any) {
   const [errors, setErrors] = useState({
     phoneNumber: "",
   });
@@ -56,14 +40,6 @@ export function Step1({ next, values, setValues, autoSendOtp }: any) {
     }
   }, [next, validateFields, values.phoneNumber]);
 
-  useEffect(() => {
-    const phoneNumber = values.phoneNumber.trim();
-    if (!autoSendOtp || !phoneNumber || autoSentPhoneRef.current === phoneNumber) return;
-
-    autoSentPhoneRef.current = phoneNumber;
-    void sendOtp();
-  }, [autoSendOtp, sendOtp, values.phoneNumber]);
-
   return (
     <View>
       <InputPhone
@@ -88,22 +64,6 @@ export function Step2({ next, back, values }: any) {
   const onVerify = async (code: string) => {
     return await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
       .then(async () => {
-        const session = await getSession();
-        const userId = session?.user.id;
-        try {
-          if (userId) {
-            const profileResult = await getProfileByUserId(userId);
-            if (profileResult?.ok === true) {
-              const unreadResult = await getCurrentProfileUnreadNotificationCount();
-              await saveProfilePayload(
-                profileResult.data,
-                unreadResult.ok ? unreadResult.data : undefined
-              );
-            }
-          }
-        } catch {
-          // Local profile snapshots are only used for the switcher.
-        }
         next();
         return true;
       })
@@ -132,29 +92,10 @@ export function Step2({ next, back, values }: any) {
 
 export default function Login() {
   const stepperRef = useRef<StepperRef>(null);
-  const params = useLocalSearchParams<{
-    phone?: string;
-    autoSendOtp?: string;
-  }>();
 
   const [values, setValues] = useState({
-    phoneNumber: normalizeRoutePhone(params.phone),
+    phoneNumber: "",
   });
-  const autoSendOtp = params.autoSendOtp === "true";
-
-  useEffect(() => {
-    const phoneNumber = normalizeRoutePhone(params.phone);
-    if (!phoneNumber) return;
-
-    if (autoSendOtp) {
-      clearPendingProfileSwitch();
-    }
-
-    setValues((current) => {
-      if (current.phoneNumber === phoneNumber) return current;
-      return { ...current, phoneNumber };
-    });
-  }, [autoSendOtp, params.phone]);
 
   const steps: Step[] = React.useMemo(
     () => [
@@ -167,7 +108,6 @@ export default function Login() {
             {...api}
             values={values}
             setValues={setValues}
-            autoSendOtp={autoSendOtp}
           />
         ),
       },
@@ -178,7 +118,7 @@ export default function Login() {
         render: (api) => <Step2 {...api} values={values} />,
       },
     ],
-    [autoSendOtp, values]
+    [values]
   );
 
   return (

@@ -1,9 +1,16 @@
 import type { ChatImage } from "../components/inputChat/inputChat";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
+import {
+  getCurrentProfile,
+  getCurrentUserProfileCount,
+  registerProfileScopedAbortController,
+} from "./active.profile.service";
 
 const PURCHASE_REQUEST_ASSISTANT_EDGE_FUNCTION = "ai-completar";
 const MAX_IMAGES_PER_REQUEST = 3;
+const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
+const MULTI_PROFILE_AI_UNAVAILABLE = "MULTI_PROFILE_AI_UNAVAILABLE";
 
 export type PurchaseRequestAssistantUiAction =
   | "SHOW_SUMMARY"
@@ -254,7 +261,8 @@ function validateInput(input: PurchaseRequestAssistantRequest): AppError | null 
 function buildJsonBody(
   input: PurchaseRequestAssistantRequest,
   clientRequestId: string,
-  idempotencyKey: string
+  idempotencyKey: string,
+  activeProfileId: string
 ) {
   return JSON.stringify({
     prompt: input.prompt.trim(),
@@ -262,13 +270,15 @@ function buildJsonBody(
     ui_action: input.ui_action ?? null,
     client_request_id: clientRequestId,
     idempotency_key: idempotencyKey,
+    active_profile_id: activeProfileId,
   });
 }
 
 function buildFormDataBody(
   input: PurchaseRequestAssistantRequest,
   clientRequestId: string,
-  idempotencyKey: string
+  idempotencyKey: string,
+  activeProfileId: string
 ) {
   const formData = new FormData();
   formData.append("prompt", input.prompt.trim());
@@ -276,6 +286,7 @@ function buildFormDataBody(
   if (input.ui_action) formData.append("ui_action", input.ui_action);
   formData.append("client_request_id", clientRequestId);
   formData.append("idempotency_key", idempotencyKey);
+  formData.append("active_profile_id", activeProfileId);
 
   (input.images ?? []).forEach((image, index) => {
     formData.append("images", {
@@ -304,7 +315,8 @@ export async function callPurchaseRequestAssistant(
   }
 
   const session = await getSession();
-  if (!session?.access_token) {
+  const activeProfile = getCurrentProfile();
+  if (!session?.access_token || !activeProfile) {
     return {
       ok: false,
       error: fromAppError("auth"),
@@ -312,6 +324,23 @@ export async function callPurchaseRequestAssistant(
       requestId: null,
       retryAfterSeconds: null,
       backendMessage: null,
+    };
+  }
+
+  if (getCurrentUserProfileCount() !== 1) {
+    const error: AppError = {
+      type: "validation",
+      code: MULTI_PROFILE_AI_UNAVAILABLE,
+      message:
+        "El asistente no está disponible temporalmente para cuentas con varios perfiles.",
+    };
+    return {
+      ok: false,
+      error,
+      statusCode: null,
+      requestId: null,
+      retryAfterSeconds: null,
+      backendMessage: error.message,
     };
   }
 
@@ -332,6 +361,12 @@ export async function callPurchaseRequestAssistant(
   const clientRequestId = input.client_request_id ?? identity.clientRequestId;
   const idempotencyKey = input.idempotency_key ?? identity.idempotencyKey;
   const hasImages = (input.images ?? []).length > 0;
+  const requestController = new AbortController();
+  const abortFromCaller = () => requestController.abort();
+  if (input.signal?.aborted) requestController.abort();
+  input.signal?.addEventListener("abort", abortFromCaller);
+  const unregisterAbortController =
+    registerProfileScopedAbortController(requestController);
 
   try {
     const response = await fetch(functionUrl, {
@@ -344,9 +379,19 @@ export async function callPurchaseRequestAssistant(
         "x-request-id": clientRequestId,
       },
       body: hasImages
-        ? buildFormDataBody(input, clientRequestId, idempotencyKey)
-        : buildJsonBody(input, clientRequestId, idempotencyKey),
-      signal: input.signal,
+        ? buildFormDataBody(
+            input,
+            clientRequestId,
+            idempotencyKey,
+            activeProfile.id
+          )
+        : buildJsonBody(
+            input,
+            clientRequestId,
+            idempotencyKey,
+            activeProfile.id
+          ),
+      signal: requestController.signal,
     });
 
     const requestId = normalizeString(response.headers.get("x-request-id"));
@@ -388,6 +433,20 @@ export async function callPurchaseRequestAssistant(
       requestId ?? normalizeString(record.request_id)
     );
   } catch {
+    if (requestController.signal.aborted) {
+      return {
+        ok: false,
+        error: {
+          type: "unknown",
+          code: PROFILE_SCOPED_REQUEST_ABORTED,
+          message: "Solicitud cancelada.",
+        },
+        statusCode: null,
+        requestId: null,
+        retryAfterSeconds: null,
+        backendMessage: null,
+      };
+    }
     return {
       ok: false,
       error: fromAppError("network"),
@@ -396,5 +455,8 @@ export async function callPurchaseRequestAssistant(
       retryAfterSeconds: null,
       backendMessage: null,
     };
+  } finally {
+    input.signal?.removeEventListener("abort", abortFromCaller);
+    unregisterAbortController();
   }
 }

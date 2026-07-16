@@ -3,6 +3,7 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { SUPPORT_EMAIL } from "@/src/config/appInfo";
 import { signOut } from "@/src/lib/supabase";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
@@ -14,7 +15,8 @@ import {
   SellerProfileOverview,
   getCurrentBuyerProfileOverview,
   getCurrentSellerProfileOverview,
-  requestCurrentProfileAccountDeletion,
+  requestCurrentLoginDeletion,
+  requestCurrentProfileDeletion,
 } from "@/src/services/profile.service";
 import { Roles } from "@/src/services/role.service";
 import { openSupportEmail } from "@/src/services/support.service";
@@ -179,6 +181,8 @@ function AccountSettingsContent({
   );
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const isSeller = role === Roles.SELLER;
+  const { activeProfile, profiles } = useActiveProfile();
+  const isBusinessOwner = activeProfile?.membershipRole === "owner";
 
   return (
     <ScrollView
@@ -232,7 +236,7 @@ function AccountSettingsContent({
         />
       </GroupedListSection>
 
-      {isSeller ? (
+      {isSeller && isBusinessOwner ? (
         <GroupedListSection title="Preferencias">
           <GroupedListRow
             icon="house"
@@ -261,7 +265,6 @@ function AccountSettingsContent({
           <GroupedListRow
             icon="map-pin"
             label="Ubicación del negocio"
-            showSeparator={false}
             onPress={business
               ? () =>
                 router.push({
@@ -273,6 +276,20 @@ function AccountSettingsContent({
                   },
                 })
               : undefined}
+          />
+          <GroupedListRow
+            icon="circle-plus"
+            label="Invitaciones del negocio"
+            showSeparator={false}
+            onPress={() =>
+              router.push({
+                pathname: "/(detail)/business-invitations",
+                params: {
+                  title: "Invitaciones",
+                  hideMenu: "true",
+                },
+              })
+            }
           />
         </GroupedListSection>
       ) : null}
@@ -344,6 +361,14 @@ function AccountSettingsContent({
           onPress={openSignOutConfirmation}
         />
         <GroupedListRow
+          icon="user"
+          label="Eliminar este perfil"
+          destructive
+          onPress={
+            profiles.length > 1 ? openProfileDeletionConfirmation : undefined
+          }
+        />
+        <GroupedListRow
           icon="trash-2"
           label="Eliminar cuenta"
           destructive
@@ -384,8 +409,52 @@ function openSignOutConfirmation() {
         backgroundColorKey: "backgroudWhite",
         textColorKey: "error",
         iconColorKey: "error",
-        onPress: () => {
-          signOut();
+        onPress: async () => {
+          try {
+            await signOut();
+            return true;
+          } catch (error) {
+            showError(
+              "No se pudo cerrar sesión",
+              error instanceof Error ? error.message : undefined
+            );
+            return false;
+          }
+        },
+      },
+    ],
+  });
+}
+
+function openProfileDeletionConfirmation() {
+  openPopup({
+    type: "summary",
+    title: "Eliminar perfil",
+    icon: "user",
+    description:
+      "Solicitaremos la eliminación de este perfil. Tu inicio de sesión y tus otros perfiles se conservarán.",
+    actions: [
+      {
+        id: "cancel-profile-deletion",
+        label: "Volver",
+        icon: "arrow-left",
+      },
+      {
+        id: "confirm-profile-deletion",
+        label: "Solicitar eliminación",
+        icon: "trash-2",
+        textColorKey: "error",
+        iconColorKey: "error",
+        onPress: async () => {
+          const result = await requestCurrentProfileDeletion();
+          if (!result.ok) {
+            showError("No se pudo solicitar la eliminación", result.error.message);
+            return false;
+          }
+          showSuccess(
+            "Solicitud recibida",
+            "Revisaremos la eliminación de este perfil."
+          );
           return true;
         },
       },
@@ -417,7 +486,7 @@ function openAccountDeletionConfirmation() {
         textColorKey: "error",
         iconColorKey: "error",
         onPress: async () => {
-          const result = await requestCurrentProfileAccountDeletion();
+          const result = await requestCurrentLoginDeletion();
           if (!result.ok) {
             showError("No se pudo solicitar", result.error.message);
             return false;

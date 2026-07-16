@@ -7,7 +7,7 @@ import {
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 import { ALL_SEGMENTS_SVG_NAME } from "./segment.service";
 
 export type PurchaseRequest = Row<"purchase_request">;
@@ -262,7 +262,7 @@ export async function cancelCurrentBuyerPurchaseRequest(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -313,7 +313,7 @@ export async function getCurrentUserPurchaseRequest(): Promise<
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: null };
 
@@ -917,7 +917,7 @@ export async function getCurrentSellerHomePurchaseRequestGroups(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
@@ -977,7 +977,7 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
@@ -1029,7 +1029,7 @@ export async function getCurrentSellerMarketplaceHub(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) {
     return { ok: true, data: extractMarketplaceHub(null, "seller") };
@@ -1070,7 +1070,7 @@ export async function getCurrentBuyerMarketplaceHub(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) {
     return { ok: true, data: extractMarketplaceHub(null, "buyer") };
@@ -1111,7 +1111,7 @@ export async function getCurrentSellerMarketplaceHubItems(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
 
   const normalizedPage = parsePositiveInteger(page, 1);
@@ -1174,7 +1174,7 @@ export async function getCurrentBuyerMarketplaceHubItems(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
 
   const normalizedPage = parsePositiveInteger(page, 1);
@@ -1231,7 +1231,7 @@ export async function addCurrentBuyerPurchaseRequestFavorite(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -1260,7 +1260,7 @@ export async function removeCurrentBuyerPurchaseRequestFavorite(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -1289,7 +1289,7 @@ export async function addCurrentSellerPurchaseRequestFavorite(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -1318,7 +1318,7 @@ export async function removeCurrentSellerPurchaseRequestFavorite(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
@@ -1369,7 +1369,7 @@ async function getCurrentPurchaseRequestFavorites(
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 

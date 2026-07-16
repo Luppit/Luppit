@@ -403,6 +403,12 @@ export default function GlobalPopupHost() {
     void profile.onPress?.();
   };
 
+  const handleProfileSwitcherAction = () => {
+    if (!profileSwitcherConfig?.onAction) return;
+    closePopup();
+    void profileSwitcherConfig.onAction();
+  };
+
   const handleSummaryActionPress = async (action: PopupSummaryAction) => {
     if (pendingSummaryActionId) return;
 
@@ -759,12 +765,12 @@ export default function GlobalPopupHost() {
                   },
                 ]}
               >
-                <View
-                  style={[
-                    s.bottomSheet,
-                    {
-                      paddingBottom: t.spacing.sm,
-                    },
+                <GlassSurface
+                  variant="sheet"
+                  style={s.bottomSheetSurface}
+                  contentStyle={[
+                    s.bottomSheetContent,
+                    { paddingBottom: t.spacing.sm },
                   ]}
                   onTouchStart={Keyboard.dismiss}
                   onLayout={(event) => {
@@ -1040,7 +1046,14 @@ export default function GlobalPopupHost() {
                                     maxLines={1}
                                     style={s.profileSwitcherMetaText}
                                   >
-                                    {formatUnreadNotificationCount(profile.unreadNotificationCount)}
+                                    {[
+                                      profile.subtitle,
+                                      formatUnreadNotificationCount(
+                                        profile.unreadNotificationCount
+                                      ),
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" · ")}
                                   </Text>
                                 </View>
                               </View>
@@ -1048,6 +1061,21 @@ export default function GlobalPopupHost() {
                           </React.Fragment>
                         );
                       })}
+                      {profileSwitcherConfig.actionLabel ? (
+                        <>
+                          <View style={s.profileSwitcherSeparator} />
+                          <Pressable
+                            style={s.profileSwitcherAction}
+                            onPress={handleProfileSwitcherAction}
+                            accessibilityRole="button"
+                          >
+                            <Icon name="plus" size={18} />
+                            <Text variant="subtitle" style={s.profileSwitcherActionText}>
+                              {profileSwitcherConfig.actionLabel}
+                            </Text>
+                          </Pressable>
+                        </>
+                      ) : null}
                     </View>
                   </ScrollView>
                 ) : summaryConfig ? (
@@ -1261,7 +1289,7 @@ export default function GlobalPopupHost() {
                   </View>
                 </ScrollView>
                 )}
-                </View>
+                </GlassSurface>
               </Animated.View>
             )}
           </View>
@@ -1292,14 +1320,16 @@ export default function GlobalPopupHost() {
               }
             }}
           />
-          <View
+          <GlassSurface
+            variant="sheet"
             style={[
               s.bottomSheet,
               s.helperOverlaySheet,
-              {
-                maxHeight: sheetMaxHeight,
-                paddingBottom: t.spacing.sm,
-              },
+              { maxHeight: sheetMaxHeight },
+            ]}
+            contentStyle={[
+              s.bottomSheetContent,
+              { paddingBottom: t.spacing.sm },
             ]}
           >
             <View style={s.indicatorTouchArea}>
@@ -1313,7 +1343,7 @@ export default function GlobalPopupHost() {
                   summaryConfig?.actions
                 )
               : null}
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
 

@@ -147,7 +147,7 @@ export type PopupSortConfig = {
 export type PopupProfileSwitcherItem = {
   id: string;
   title: string;
-  phone: string;
+  subtitle?: string;
   unreadNotificationCount?: number;
   isActive?: boolean;
   onPress?: () => void | Promise<void>;
@@ -156,6 +156,8 @@ export type PopupProfileSwitcherItem = {
 export type PopupProfileSwitcherConfig = {
   type: "profileSwitcher";
   profiles: PopupProfileSwitcherItem[];
+  actionLabel?: string;
+  onAction?: () => void | Promise<void>;
   dismissOnBackdropPress?: boolean;
 };
 

@@ -12,4 +12,5 @@ export const COL_PROFILE = {
   email: "email",
   email_opt_in: "email_opt_in",
   email_opt_in_at: "email_opt_in_at",
+  is_default: "is_default",
 } as const satisfies { [K in keyof Row<"profile"> & string]: K };

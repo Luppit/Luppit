@@ -12,6 +12,8 @@ export type GlobalPopupStyles = {
   backdrop: ViewStyle;
   bottomSheetFrame: ViewStyle;
   bottomSheet: ViewStyle;
+  bottomSheetSurface: ViewStyle;
+  bottomSheetContent: ViewStyle;
   successSheetFrame: ViewStyle;
   successSheet: ViewStyle;
   successSheetContent: ViewStyle;
@@ -99,6 +101,8 @@ export type GlobalPopupStyles = {
   profileSwitcherMetaDot: ViewStyle;
   profileSwitcherMetaText: TextStyle;
   profileSwitcherSeparator: ViewStyle;
+  profileSwitcherAction: ViewStyle;
+  profileSwitcherActionText: TextStyle;
 };
 
 export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
@@ -117,8 +121,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       width: "100%",
       maxWidth: 560,
       alignSelf: "center",
+    },
+    bottomSheetSurface: {
+      width: "100%",
+    },
+    bottomSheetContent: {
       overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
+      borderRadius: t.glass.radius.sheet,
     },
     successSheetFrame: {
       width: "100%",
@@ -463,11 +472,9 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     helperSectionSubtitle: {
       color: t.colors.textMedium,
-      lineHeight: 22,
     },
     helperBody: {
       color: t.colors.textMedium,
-      lineHeight: 22,
     },
     helperRowSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
@@ -550,6 +557,17 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: SOFT_SEPARATOR_COLOR,
       marginLeft: 90,
+    },
+    profileSwitcherAction: {
+      minHeight: 52,
+      paddingHorizontal: t.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: t.spacing.xs,
+    },
+    profileSwitcherActionText: {
+      color: t.colors.primary,
     },
   };
 }

@@ -11,4 +11,9 @@ export const COL_CONVERSATION_MESSAGE = {
   text: "text",
   message_kind: "message_kind",
   image_path: "image_path",
+  visible_to_role_id: "visible_to_role_id",
+  buyer_open_state: "buyer_open_state",
+  seller_open_state: "seller_open_state",
+  buyer_opened_at: "buyer_opened_at",
+  seller_opened_at: "seller_opened_at",
 } as const satisfies { [K in keyof Row<"conversation_message"> & string]: K };

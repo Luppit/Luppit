@@ -2,6 +2,7 @@ import {
   getCurrentProfileEmailSetupStatus,
   getCurrentSellerBusinessCategorySetupStatus,
 } from "@/src/services/profile.service";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Roles } from "@/src/services/role.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useFocusEffect } from "@react-navigation/native";
@@ -31,6 +32,7 @@ export function isEmailSetupAllowedTabPath(path: string) {
 }
 
 export function useAccountSetupGate(): AccountSetupGateState {
+  const { state: profileState, activeProfile } = useActiveProfile();
   const [state, setState] = React.useState<AccountSetupGateState>({
     isAccountSetupBlocked: false,
     isLoadingAccountSetupStatus: true,
@@ -42,6 +44,15 @@ export function useAccountSetupGate(): AccountSetupGateState {
       let active = true;
 
       const loadAccountSetupStatus = async () => {
+        if (profileState !== "ready" || !activeProfile) {
+          setState({
+            isAccountSetupBlocked: false,
+            isLoadingAccountSetupStatus: profileState === "loading",
+            blockReason: null,
+          });
+          return;
+        }
+
         setState((current) => ({
           ...current,
           isLoadingAccountSetupStatus: true,
@@ -104,7 +115,7 @@ export function useAccountSetupGate(): AccountSetupGateState {
       return () => {
         active = false;
       };
-    }, [])
+    }, [activeProfile, profileState])
   );
 
   return state;

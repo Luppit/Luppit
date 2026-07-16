@@ -1,5 +1,6 @@
 import Navbar from "@/src/components/navbar/Navbar";
 import TopNavbar from "@/src/components/navbar/TopNavbar";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import {
   isAccountSetupAllowedTabPath,
   useAccountSetupGate,
@@ -11,14 +12,12 @@ import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getSession, onAuthChange } from "@/src/lib/supabase";
-import { getPendingProfileSwitch } from "@/src/services/profile.switch.service";
 import { consumePendingSharedPurchaseRequest } from "@/src/services/shared.purchase.request.service";
 
 export default function TabsLayout() {
   const pathname = usePathname();
-  const [ready, setReady] = useState(false);
-  const [isAuth, setAuth] = useState(false);
+  const { state, activeProfile, revision } = useActiveProfile();
+  const isReady = state === "ready";
   const [pendingSharedPurchaseRequestId, setPendingSharedPurchaseRequestId] =
     useState<string | null>(null);
   const [hasLoadedPendingSharedRequest, setHasLoadedPendingSharedRequest] =
@@ -31,26 +30,10 @@ export default function TabsLayout() {
     isOffersTabScreen || isFavoritesTabScreen || isChatsTabScreen || pathname === "/profile";
 
   useEffect(() => {
-    let unsub = () => {};
-
-    (async () => {
-      const session = await getSession();
-      setAuth(!!session);
-      setReady(true);
-
-      unsub = onAuthChange((_event, hasSession) => {
-        setAuth(hasSession);
-      });
-    })();
-
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
     let active = true;
 
     const loadPendingSharedRequest = async () => {
-      if (!isAuth) {
+      if (!isReady) {
         setPendingSharedPurchaseRequestId(null);
         setHasLoadedPendingSharedRequest(true);
         return;
@@ -67,27 +50,25 @@ export default function TabsLayout() {
     return () => {
       active = false;
     };
-  }, [isAuth]);
+  }, [isReady]);
 
-  if (!ready) return null;
+  if (state === "loading") return null;
 
-  if (!isAuth) {
-    const pendingProfileSwitch = getPendingProfileSwitch();
-    if (pendingProfileSwitch) {
-      return (
-        <Redirect
-          href={{
-            pathname: "/(auth)/login",
-            params: {
-              phone: pendingProfileSwitch.phone,
-              autoSendOtp: "true",
-            },
-          }}
-        />
-      );
-    }
+  if (state === "signed_out") return <Redirect href="/(auth)/auth" />;
 
-    return <Redirect href="/(auth)/auth" />;
+  if (state === "no_profile" || state === "setup_required") {
+    return (
+      <Redirect
+        href={{
+          pathname: "/(detail)/create-profile",
+          params: {
+            setup: "true",
+            title: state === "setup_required" ? "Completar perfil" : "Crear perfil",
+            hideMenu: "true",
+          },
+        }}
+      />
+    );
   }
 
   if (!hasLoadedPendingSharedRequest) return null;
@@ -112,7 +93,10 @@ export default function TabsLayout() {
   }
 
   return (
-    <View style={layoutStyles.root}>
+    <View
+      key={activeProfile?.profile.id + ":" + revision}
+      style={layoutStyles.root}
+    >
       <RoleProvider>
         <SafeAreaView style={layoutStyles.view}>
           <View style={layoutStyles.container}>

@@ -1,10 +1,9 @@
 import { TextField } from "@/src/components/inputField/InputField";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
-import { getSession } from "@/src/lib/supabase";
-import { supabase } from "@/src/lib/supabase/client";
 import {
   clearBuyerHomeFilters,
   countBuyerHomeFilterGroups,
@@ -24,12 +23,6 @@ import {
 } from "@/src/services/seller.home.filters.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
-  clearPendingProfileSwitch,
-  setPendingProfileSwitch,
-} from "@/src/services/profile.switch.service";
-import { getProfileByUserId, type Profile } from "@/src/services/profile.service";
-import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
-import {
   BuyerHomePurchaseRequestGroup,
   getCurrentBuyerHomePurchaseRequestGroups,
   getCurrentSellerHomeFilterCategoryOptions,
@@ -44,12 +37,6 @@ import {
   setSelectedSegmentSvgName,
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
-import {
-  getSavedProfiles,
-  saveProfilePayload,
-  updateSavedProfileUnreadNotificationCount,
-} from "@/src/services/saved.profile.service";
-import { showError } from "@/src/utils";
 import { router, usePathname } from "expo-router";
 import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
@@ -122,6 +109,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createTopNavbarStyles(t, insets.top), [insets.top, t]);
   const pathname = usePathname();
+  const { activeProfile, profiles, switchProfile } = useActiveProfile();
   const segmentIconUris = useMemo(() => {
     const uris: Record<string, string> = {};
     for (const [svgName, moduleRef] of Object.entries(segmentSvgModules)) {
@@ -134,9 +122,6 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const [searchValue, setSearchValue] = useState("");
   const [homeFilters, setHomeFilters] = useState(getBuyerHomeFilters());
   const [sellerHomeFilters, setSellerHomeFiltersState] = useState(getSellerHomeFilters());
-  const [profileName, setProfileName] = useState("Mi perfil");
-  const [currentProfileId, setCurrentProfileId] = useState("");
-  const [currentProfilePhone, setCurrentProfilePhone] = useState("");
   const [buyerStatusOptions, setBuyerStatusOptions] = useState<PurchaseRequestStatusUiOption[]>([]);
   const [sellerCategoryOptions, setSellerCategoryOptions] = useState<
     SellerHomeFilterCategoryOption[]
@@ -156,43 +141,6 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
 
   useEffect(() => {
     return subscribeSelectedSegment(setSelectedSegmentSvgNameState);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadProfileName = async () => {
-      const session = await getSession();
-      if (!session?.user.id) return;
-
-      const profileResult = await getProfileByUserId(session.user.id);
-      if (!active || !profileResult || profileResult.ok === false) return;
-
-      const name = profileResult.data.name?.trim();
-      if (name) {
-        setProfileName(name);
-      }
-      setCurrentProfileId(profileResult.data.id);
-      setCurrentProfilePhone(profileResult.data.phone?.trim() ?? "");
-
-      try {
-        const unreadResult = await getCurrentProfileUnreadNotificationCount();
-        if (!active) return;
-
-        await saveProfilePayload(
-          profileResult.data,
-          unreadResult.ok ? unreadResult.data : undefined
-        );
-      } catch {
-        // Local profile snapshots are best-effort device state.
-      }
-    };
-
-    void loadProfileName();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -392,117 +340,33 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     shouldBlockHomeControls,
   ]);
 
-  const openProfileSwitcher = useCallback(async () => {
-    let savedProfiles = await getSavedProfiles();
-    let activeProfileId = currentProfileId;
-    let activeProfilePhone = currentProfilePhone;
-    let activeProfileName = profileName;
-    let activeProfileForSave: Profile | null = null;
-    let currentUnreadNotificationCount: number | undefined;
-
-    if (!activeProfileId || !activeProfilePhone) {
-      const session = await getSession();
-      if (session?.user.id) {
-        const profileResult = await getProfileByUserId(session.user.id);
-        if (profileResult?.ok === true) {
-          const profile = profileResult.data;
-          const name = profile.name?.trim();
-
-          activeProfileForSave = profile;
-          activeProfileId = profile.id;
-          activeProfilePhone = profile.phone?.trim() ?? "";
-          activeProfileName = name || activeProfileName;
-          setCurrentProfileId(activeProfileId);
-          setCurrentProfilePhone(activeProfilePhone);
-          if (name) {
-            setProfileName(name);
-          }
-        }
-      }
-    }
-
-    if (!activeProfileId && !activeProfilePhone) {
-      showError("No se pudo cargar el perfil activo.");
-      return;
-    }
-
-    if (activeProfileId) {
-      try {
-        const unreadResult = await getCurrentProfileUnreadNotificationCount();
-        if (unreadResult.ok) {
-          currentUnreadNotificationCount = unreadResult.data;
-          savedProfiles = await updateSavedProfileUnreadNotificationCount(
-            activeProfileId,
-            unreadResult.data
-          );
-          if (activeProfileForSave) {
-            await saveProfilePayload(activeProfileForSave, unreadResult.data);
-            savedProfiles = await getSavedProfiles();
-          }
-        }
-      } catch {
-        // Keep the last saved count if the current refresh fails.
-      }
-    }
-
-    const visibleProfiles = [...savedProfiles];
-    const hasCurrentProfile =
-      Boolean(activeProfileId) &&
-      visibleProfiles.some(
-        (profile) =>
-          profile.profileId === activeProfileId ||
-          Boolean(activeProfilePhone && profile.phone === activeProfilePhone)
-      );
-
-    if (activeProfileId && activeProfilePhone && !hasCurrentProfile) {
-      visibleProfiles.unshift({
-        profileId: activeProfileId,
-        userId: "",
-        name: activeProfileName,
-        phone: activeProfilePhone,
-        savedAt: new Date().toISOString(),
-        unreadNotificationCount: currentUnreadNotificationCount,
-      });
-    }
-
+  const openProfileSwitcher = useCallback(() => {
     openPopup({
       type: "profileSwitcher",
-      profiles: visibleProfiles.map((profile) => {
-        const isActive =
-          profile.profileId === activeProfileId ||
-          Boolean(profile.phone && profile.phone === activeProfilePhone);
-
-        return {
-          id: profile.profileId,
-          title: profile.name,
-          phone: profile.phone,
-          unreadNotificationCount: profile.unreadNotificationCount,
-          isActive,
-          onPress: async () => {
-            const phone = profile.phone.trim();
-            if (!phone) return;
-
-            setPendingProfileSwitch(phone);
-
-            const { error } = await supabase.auth.signOut();
-            if (error) {
-              clearPendingProfileSwitch();
-              showError(error.message);
-              return;
-            }
-
-            router.replace({
-              pathname: "/(auth)/login",
-              params: {
-                phone,
-                autoSendOtp: "true",
-              },
-            });
+      profiles: profiles.map((profile) => ({
+        id: profile.profile.id,
+        title: profile.profile.name,
+        subtitle:
+          profile.role === "seller"
+            ? profile.businessName || "Vendedor"
+            : "Comprador",
+        unreadNotificationCount: profile.unreadCount,
+        isActive: profile.profile.id === activeProfile?.profile.id,
+        onPress: async () => {
+          await switchProfile(profile.profile.id);
+        },
+      })),
+      actionLabel: "Crear perfil",
+      onAction: () =>
+        router.push({
+          pathname: "/(detail)/create-profile",
+          params: {
+            title: "Crear perfil",
+            hideMenu: "true",
           },
-        };
-      }),
+        }),
     });
-  }, [currentProfileId, currentProfilePhone, profileName]);
+  }, [activeProfile?.profile.id, profiles, switchProfile]);
   const showBuyerFilterChip =
     !shouldBlockHomeControls && role === "buyer" && hasBuyerHomeFilters(homeFilters);
   const showSellerFilterChip =
@@ -522,7 +386,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     >
       <Pressable onPress={() => void openProfileSwitcher()}>
         <View style={s.profileRow}>
-          <Text variant="subtitle">{profileName}</Text>
+          <Text variant="subtitle">{activeProfile?.profile.name ?? "Mi perfil"}</Text>
           <Icon name="chevron-down" size={18} />
           <View style={s.onlineDot} />
         </View>

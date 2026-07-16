@@ -16,7 +16,7 @@ Entrypoint for repository guidance. Keep this file compact; put only durable, hi
 - Buyer/seller home discovery, grouping, filters, status labels/styles, segment selection, favorites, visualization counts, and lifecycle visibility belong to their DB RPCs/configuration.
 - Conversation actions, menu items, confirmations, passive status/deadline cards, rating visibility, deadlines, transitions, and message open-state belong to DB metadata/RPCs.
 - Navigation/menu/segment labels and icons come from DB configuration; do not hardcode buyer/seller menus or segment arrays.
-- Profile/account data stays profile-driven: phone is read-only login identity, email changes use OTP verification, ratings come from summary tables/views, and saved profile snapshots are device-only non-sensitive display data.
+- Profile/account data stays profile-driven: one auth user may own multiple profiles, the active profile is resolved through the root provider, phone is read-only login identity, email changes use OTP verification, and ratings come from summary tables/views.
 
 ## Shared Glass UI
 - Render glass through `src/components/glass/GlassSurface.tsx` and tune material roles in `src/themes/glass.ts`; avoid one-off blur/rgba/shadow recipes.

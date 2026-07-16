@@ -1,6 +1,6 @@
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
-import { getProfileByUserId } from "./profile.service";
+import { getCurrentProfileResult } from "./active.profile.service";
 import { getProfileRoleByProfileId } from "./profile.role.service";
 import { getRoleById, Roles } from "./role.service";
 
@@ -10,7 +10,7 @@ export async function getCurrentUserRole(): Promise<
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  const profile = await getProfileByUserId(session.user.id);
+  const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: null };
 
