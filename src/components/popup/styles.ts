@@ -495,21 +495,20 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       marginHorizontal: t.spacing.md,
       marginBottom: t.spacing.sm,
       overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
     },
     profileSwitcherRow: {
-      minHeight: 92,
+      minHeight: 80,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
-      paddingVertical: t.spacing.md,
+      paddingVertical: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },
     profileSwitcherRowActive: {},
     profileSwitcherAvatar: {
-      width: 62,
-      height: 62,
-      borderRadius: 31,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       borderWidth: 1,
       borderColor: SOFT_BORDER_COLOR,
       backgroundColor: t.colors.backgroudWhite,
@@ -523,7 +522,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     profileSwitcherContent: {
       flex: 1,
       minWidth: 0,
-      gap: 4,
+      gap: t.spacing.xs,
     },
     profileSwitcherTitleRow: {
       minHeight: 32,
@@ -538,8 +537,8 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     profileSwitcherMetaRow: {
       flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
+      alignItems: "flex-start",
+      gap: t.spacing.xs,
     },
     profileSwitcherMetaDot: {
       width: 8,
@@ -547,6 +546,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderRadius: 999,
       backgroundColor: t.colors.error,
       flexShrink: 0,
+      marginTop: 5,
     },
     profileSwitcherMetaText: {
       color: t.colors.stateAnulated,
@@ -556,10 +556,10 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     profileSwitcherSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: SOFT_SEPARATOR_COLOR,
-      marginLeft: 90,
+      marginLeft: 72,
     },
     profileSwitcherAction: {
-      minHeight: 52,
+      minHeight: 56,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
       alignItems: "center",

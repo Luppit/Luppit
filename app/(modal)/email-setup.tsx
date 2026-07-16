@@ -55,6 +55,7 @@ export default function EmailSetupScreen() {
   const [emailOptIn, setEmailOptIn] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState("");
+  const [emailServerError, setEmailServerError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -101,13 +102,15 @@ export default function EmailSetupScreen() {
   const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
   const isEmailValid =
     normalizedEmail.length > 0 && EMAIL_REGEX.test(normalizedEmail);
-  const emailError = didTryEmailSubmit
-    ? normalizedEmail.length === 0
-      ? "Ingresa el correo donde quieres recibir notificaciones."
-      : !isEmailValid
-        ? "Ingresa un correo válido."
-        : ""
-    : "";
+  const emailError =
+    emailServerError ||
+    (didTryEmailSubmit
+      ? normalizedEmail.length === 0
+        ? "Ingresa un correo."
+        : !isEmailValid
+          ? "Ingresa un correo válido."
+          : ""
+      : "");
   const consentError =
     didTryEmailSubmit && !emailOptIn
       ? "Debes aceptar recibir correos para continuar."
@@ -125,6 +128,7 @@ export default function EmailSetupScreen() {
 
   const handleSendCode = async () => {
     setDidTryEmailSubmit(true);
+    setEmailServerError("");
     if (!isEmailValid || !emailOptIn) return;
 
     setIsSendingCode(true);
@@ -134,6 +138,10 @@ export default function EmailSetupScreen() {
     setIsSendingCode(false);
 
     if (!result.ok) {
+      if (result.error.code === "email_already_in_use") {
+        setEmailServerError(result.error.message);
+        return;
+      }
       showError("No se pudo enviar el código", result.error.message);
       return;
     }
@@ -155,6 +163,13 @@ export default function EmailSetupScreen() {
     setIsSendingCode(false);
 
     if (!result.ok) {
+      if (result.error.code === "email_already_in_use") {
+        setStep("email");
+        setOtpCode("");
+        setOtpError("");
+        setEmailServerError(result.error.message);
+        return;
+      }
       showError("No se pudo reenviar el código", result.error.message);
       return;
     }
@@ -176,7 +191,14 @@ export default function EmailSetupScreen() {
     setIsVerifying(false);
 
     if (!result.ok) {
-      setOtpError("No pudimos validar el código. Intenta nuevamente.");
+      if (result.error.code === "email_already_in_use") {
+        setStep("email");
+        setOtpCode("");
+        setOtpError("");
+        setEmailServerError(result.error.message);
+        return;
+      }
+      setOtpError(result.error.message);
       return;
     }
 
@@ -188,6 +210,7 @@ export default function EmailSetupScreen() {
     setStep("email");
     setOtpCode("");
     setOtpError("");
+    setEmailServerError("");
   };
 
   const resendLabel =
@@ -230,6 +253,7 @@ export default function EmailSetupScreen() {
                     value={email}
                     onChangeText={(value) => {
                       setEmail(value);
+                      if (emailServerError) setEmailServerError("");
                       if (otpError) setOtpError("");
                     }}
                     autoCapitalize="none"

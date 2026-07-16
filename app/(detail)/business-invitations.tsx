@@ -5,6 +5,7 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import { TextField } from "@/src/components/inputField/InputField";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   CurrentBusinessInvitation,
@@ -15,7 +16,7 @@ import {
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -71,35 +72,59 @@ export default function BusinessInvitationsScreen() {
 
   if (!isOwner) {
     return (
-      <ScrollView contentContainerStyle={s.content}>
-        <Text variant="body">
-          Solo la persona propietaria puede administrar invitaciones.
-        </Text>
+      <ScrollView
+        contentContainerStyle={s.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <GroupedListSection title="Invitaciones">
+          <GroupedListRow
+            icon="info"
+            label="Acceso de propietario"
+            description="Solo la persona propietaria puede administrar invitaciones."
+            showSeparator={false}
+          />
+        </GroupedListSection>
       </ScrollView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <TextField
-        label="Teléfono de Luppit"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        placeholder="+506 8888 8888"
-      />
-      <Button
-        title="Invitar"
-        loading={isSaving}
-        disabled={!phone.trim()}
-        onPress={() => void invite()}
-      />
+    <ScrollView
+      contentContainerStyle={s.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={s.formSection}>
+        <Text variant="small" color="textMedium" style={s.sectionTitle}>
+          Nueva invitación
+        </Text>
+        <View style={s.formSurface}>
+          <Text variant="small" color="stateAnulated">
+            Usa el número asociado al inicio de sesión de Luppit.
+          </Text>
+          <TextField
+            label="Teléfono de Luppit"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            placeholder="+506 8888 8888"
+            baseContainerStyle={s.inputContainer}
+          />
+          <Button
+            title="Invitar"
+            loading={isSaving}
+            disabled={!phone.trim()}
+            onPress={() => void invite()}
+          />
+        </View>
+      </View>
 
       <GroupedListSection title="Invitaciones">
         {invitations.length === 0 ? (
           <GroupedListRow
             icon="info"
             label="No hay invitaciones"
+            description="Las invitaciones que envíes aparecerán aquí."
             showSeparator={false}
           />
         ) : (
@@ -143,7 +168,21 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
     content: {
       paddingTop: topInset + t.spacing.md,
       paddingBottom: bottomInset + t.spacing.xl,
+      gap: t.spacing.lg,
+    },
+    formSection: {
+      gap: t.spacing.sm,
+    },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
+    formSurface: {
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
       gap: t.spacing.md,
+    },
+    inputContainer: {
+      marginBottom: 0,
     },
   });
 }

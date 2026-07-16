@@ -1,6 +1,12 @@
 import Button from "@/src/components/button/Button";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
+import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   completeCurrentUserProfileSetup,
@@ -16,7 +22,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   View,
@@ -177,102 +182,128 @@ export default function CreateProfileScreen() {
       <ScrollView
         contentContainerStyle={s.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text variant="title">
-          {isRepair ? "Completar perfil" : "Crear perfil"}
-        </Text>
-        <Text variant="body" color="stateAnulated">
-          Todos tus perfiles usan el mismo número y la misma sesión.
-        </Text>
-
         {!isRepair ? (
-          <>
+          <FormSection
+            title="Datos del perfil"
+            helper="Usará el mismo número y la misma sesión."
+            styles={s}
+          >
             <TextField
               label="Nombre"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
+              baseContainerStyle={s.inputContainer}
             />
             <TextField
               label="Identificación"
               value={idDocument}
               onChangeText={setIdDocument}
+              baseContainerStyle={s.inputContainer}
             />
-          </>
+          </FormSection>
         ) : null}
 
         {!requiresBusinessRepair && (!isRepair || activeProfile?.role == null) ? (
-          <View style={s.roleRow}>
-            <View style={s.roleButton}>
-              <Button
-                title="Comprador"
-                variant={role === "buyer" ? "dark" : "white"}
-                onPress={() => {
-                  setRole("buyer");
-                  setInvitationId(null);
-                }}
-              />
-            </View>
-            <View style={s.roleButton}>
-              <Button
-                title="Vendedor"
-                variant={role === "seller" ? "dark" : "white"}
-                onPress={() => setRole("seller")}
-              />
-            </View>
-          </View>
+          <GroupedListSection title="Tipo de perfil">
+            <GroupedListRow
+              icon="user"
+              label="Comprador"
+              description="Para solicitar productos y comparar ofertas."
+              showChevron={false}
+              rightAccessory={
+                <SelectionIndicator selected={role === "buyer"} styles={s} />
+              }
+              onPress={() => {
+                setRole("buyer");
+                setInvitationId(null);
+              }}
+            />
+            <GroupedListRow
+              icon="handshake"
+              label="Vendedor"
+              description="Para vender desde un negocio."
+              showChevron={false}
+              showSeparator={false}
+              rightAccessory={
+                <SelectionIndicator selected={role === "seller"} styles={s} />
+              }
+              onPress={() => setRole("seller")}
+            />
+          </GroupedListSection>
         ) : null}
 
         {role === "seller" && invitations.length > 0 ? (
-          <View style={s.section}>
-            <Text variant="subtitle">Invitaciones disponibles</Text>
-            {invitations.map((invitation) => {
+          <GroupedListSection title="Invitación de negocio">
+            {invitations.map((invitation, index) => {
               const selected = invitation.id === invitationId;
               return (
-                <Pressable
+                <GroupedListRow
                   key={invitation.id}
-                  style={[s.invitation, selected && s.invitationSelected]}
-                  onPress={() => setInvitationId(invitation.id)}
-                >
-                  <Text variant="subtitle">{invitation.businessName}</Text>
-                  <Text variant="small" color="stateAnulated">
-                    {invitation.inviterProfileName
+                  icon="handshake"
+                  label={invitation.businessName}
+                  description={
+                    invitation.inviterProfileName
                       ? "Invitado por " + invitation.inviterProfileName
-                      : "Invitación de negocio"}
-                  </Text>
-                </Pressable>
+                      : "Invitación de negocio"
+                  }
+                  showChevron={false}
+                  showSeparator={
+                    index < invitations.length - 1 || Boolean(invitationId)
+                  }
+                  rightAccessory={
+                    <SelectionIndicator selected={selected} styles={s} />
+                  }
+                  onPress={() => setInvitationId(invitation.id)}
+                />
               );
             })}
             {invitationId ? (
-              <Button
-                title="Rechazar invitación"
-                variant="white"
+              <GroupedListRow
+                icon="x-circle"
+                label="Rechazar invitación"
+                destructive
+                showChevron={false}
+                showSeparator={false}
                 onPress={() => void declineInvitation()}
               />
             ) : null}
-          </View>
+          </GroupedListSection>
+        ) : null}
+
+        {sellerNeedsInvitation && invitations.length === 0 ? (
+          <GroupedListSection title="Invitación de negocio">
+            <GroupedListRow
+              icon="info"
+              label="Sin invitaciones pendientes"
+              description="La persona propietaria del negocio debe invitar tu número de Luppit."
+              descriptionMaxLines={3}
+              showSeparator={false}
+            />
+          </GroupedListSection>
         ) : null}
 
         {sellerCreatesBusiness ? (
-          <>
+          <FormSection
+            title="Datos del negocio"
+            helper="Este perfil será propietario del negocio."
+            styles={s}
+          >
             <TextField
               label="Nombre del negocio"
               value={businessName}
               onChangeText={setBusinessName}
+              baseContainerStyle={s.inputContainer}
             />
             <TextField
               label="Identificación del negocio"
               value={businessIdDocument}
               onChangeText={setBusinessIdDocument}
+              baseContainerStyle={s.inputContainer}
             />
-          </>
-        ) : null}
-
-        {sellerNeedsInvitation && invitations.length === 0 ? (
-          <Text variant="body" color="stateAnulated">
-            No tienes invitaciones pendientes. La persona propietaria del negocio
-            debe invitar tu número de Luppit.
-          </Text>
+          </FormSection>
         ) : null}
 
         <Button
@@ -292,6 +323,57 @@ export default function CreateProfileScreen() {
   );
 }
 
+type ScreenStyles = ReturnType<typeof createStyles>;
+
+function FormSection({
+  title,
+  helper,
+  styles,
+  children,
+}: {
+  title: string;
+  helper: string;
+  styles: ScreenStyles;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.formSection}>
+      <Text variant="small" color="textMedium" style={styles.sectionTitle}>
+        {title}
+      </Text>
+      <View style={styles.formSurface}>
+        <Text variant="small" color="stateAnulated">
+          {helper}
+        </Text>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+function SelectionIndicator({
+  selected,
+  styles,
+}: {
+  selected: boolean;
+  styles: ScreenStyles;
+}) {
+  const t = useTheme();
+
+  return (
+    <View
+      style={[
+        styles.selectionIndicator,
+        selected ? styles.selectionIndicatorSelected : null,
+      ]}
+    >
+      {selected ? (
+        <Icon name="check" size={14} color={t.colors.backgroudWhite} />
+      ) : null}
+    </View>
+  );
+}
+
 function createStyles(t: Theme, topInset: number, bottomInset: number) {
   return StyleSheet.create({
     root: {
@@ -300,28 +382,36 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
     content: {
       paddingTop: topInset + t.spacing.md,
       paddingBottom: bottomInset + t.spacing.xl,
+      gap: t.spacing.lg,
+    },
+    formSection: {
+      gap: t.spacing.sm,
+    },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
+    formSurface: {
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
       gap: t.spacing.md,
     },
-    roleRow: {
-      flexDirection: "row",
-      gap: t.spacing.sm,
+    inputContainer: {
+      marginBottom: 0,
     },
-    roleButton: {
-      flex: 1,
-    },
-    section: {
-      gap: t.spacing.sm,
-    },
-    invitation: {
-      padding: t.spacing.md,
-      gap: t.spacing.xs,
+    selectionIndicator: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: t.colors.border,
-      borderRadius: t.borders.md,
       backgroundColor: t.colors.backgroudWhite,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
     },
-    invitationSelected: {
+    selectionIndicatorSelected: {
       borderColor: t.colors.primary,
+      backgroundColor: t.colors.primary,
     },
   });
 }

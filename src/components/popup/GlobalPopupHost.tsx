@@ -1025,14 +1025,14 @@ export default function GlobalPopupHost() {
                               accessibilityRole="button"
                             >
                               <View style={s.profileSwitcherAvatar}>
-                                <Text variant="subtitle" maxLines={1} style={s.profileSwitcherInitials}>
+                                <Text variant="body" maxLines={1} style={s.profileSwitcherInitials}>
                                   {getInitials(profile.title)}
                                 </Text>
                               </View>
 
                               <View style={s.profileSwitcherContent}>
                                 <View style={s.profileSwitcherTitleRow}>
-                                  <Text variant="subtitle" maxLines={1} style={s.profileSwitcherTitle}>
+                                  <Text variant="body" maxLines={1} style={s.profileSwitcherTitle}>
                                     {profile.title}
                                   </Text>
                                   {profile.isActive ? <StatusChip label="Activo" /> : null}
@@ -1042,8 +1042,8 @@ export default function GlobalPopupHost() {
                                     <View style={s.profileSwitcherMetaDot} />
                                   ) : null}
                                   <Text
-                                    variant="body"
-                                    maxLines={1}
+                                    variant="small"
+                                    maxLines={2}
                                     style={s.profileSwitcherMetaText}
                                   >
                                     {[
@@ -1069,8 +1069,8 @@ export default function GlobalPopupHost() {
                             onPress={handleProfileSwitcherAction}
                             accessibilityRole="button"
                           >
-                            <Icon name="plus" size={18} />
-                            <Text variant="subtitle" style={s.profileSwitcherActionText}>
+                            <Icon name="plus" size={18} color={t.colors.primary} />
+                            <Text variant="body" style={s.profileSwitcherActionText}>
                               {profileSwitcherConfig.actionLabel}
                             </Text>
                           </Pressable>

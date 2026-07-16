@@ -177,7 +177,6 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
       setCurrentProfileSummary(selectedProfile);
       setState(getStateForProfile(selectedProfile));
       setRevision((value) => value + 1);
-      router.dismissAll();
       router.replace("/");
       return true;
     },

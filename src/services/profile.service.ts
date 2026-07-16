@@ -93,6 +93,20 @@ function normalizeProfileEmail(email: string) {
     return email.trim().toLowerCase();
 }
 
+function mapProfileEmailVerificationError(error: any): AppError {
+    const rawMessage = typeof error?.message === "string" ? error.message : "";
+
+    if (rawMessage.includes("email_already_in_use")) {
+        return {
+            type: "validation",
+            code: "email_already_in_use",
+            message: "Este correo ya está en uso.",
+        };
+    }
+
+    return fromSupabaseError(error);
+}
+
 function mapProfileEmailSetupStatus(profile: Profile | null): ProfileEmailSetupStatus {
     const email = typeof profile?.email === "string" ? profile.email.trim() : "";
     const emailOptIn = profile?.email_opt_in === true;
@@ -881,7 +895,7 @@ async function sendCurrentProfileEmailSetupVerificationOtp(email: string): Promi
     });
 
     if (rpcResult?.error) {
-        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+        return { ok: false, error: mapProfileEmailVerificationError(rpcResult.error) };
     }
 
     return {
@@ -943,7 +957,7 @@ export async function verifyCurrentProfileEmailSetup({
     });
 
     if (rpcResult?.error) {
-        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+        return { ok: false, error: mapProfileEmailVerificationError(rpcResult.error) };
     }
 
     if (
