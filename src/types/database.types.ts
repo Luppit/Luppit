@@ -357,6 +357,7 @@ export type Database = {
           id: string
           purchase_offer_id: string | null
           purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
           seller_profile_id: string | null
           status_code: string | null
         }
@@ -366,6 +367,7 @@ export type Database = {
           id?: string
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
+          selected_fulfillment_catalog_id?: string | null
           seller_profile_id?: string | null
           status_code?: string | null
         }
@@ -375,6 +377,7 @@ export type Database = {
           id?: string
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
+          selected_fulfillment_catalog_id?: string | null
           seller_profile_id?: string | null
           status_code?: string | null
         }
@@ -405,6 +408,13 @@ export type Database = {
             columns: ["purchase_request_id"]
             isOneToOne: false
             referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_selected_fulfillment_catalog_id_fkey"
+            columns: ["selected_fulfillment_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_catalog"
             referencedColumns: ["id"]
           },
           {
@@ -992,6 +1002,9 @@ export type Database = {
           description: string | null
           icon: string | null
           is_terminal: boolean | null
+          sort_order: number | null
+          style_code: string | null
+          ui_text: string | null
         }
         Insert: {
           code: string
@@ -999,6 +1012,9 @@ export type Database = {
           description?: string | null
           icon?: string | null
           is_terminal?: boolean | null
+          sort_order?: number | null
+          style_code?: string | null
+          ui_text?: string | null
         }
         Update: {
           code?: string
@@ -1006,6 +1022,9 @@ export type Database = {
           description?: string | null
           icon?: string | null
           is_terminal?: boolean | null
+          sort_order?: number | null
+          style_code?: string | null
+          ui_text?: string | null
         }
         Relationships: []
       }
@@ -1401,18 +1420,21 @@ export type Database = {
           display_name: string | null
           hint: string | null
           id: string
+          method_kind: string
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           hint?: string | null
           id?: string
+          method_kind: string
         }
         Update: {
           created_at?: string
           display_name?: string | null
           hint?: string | null
           id?: string
+          method_kind?: string
         }
         Relationships: []
       }
@@ -1823,24 +1845,56 @@ export type Database = {
       }
       notification: {
         Row: {
+          conversation_id: string | null
+          conversation_status_history_id: string | null
           created_at: string
+          dedupe_key: string | null
+          event_code: string | null
           id: string
           message: string
+          payload: Json
+          title: string | null
           type_code: string
         }
         Insert: {
+          conversation_id?: string | null
+          conversation_status_history_id?: string | null
           created_at?: string
+          dedupe_key?: string | null
+          event_code?: string | null
           id?: string
           message: string
+          payload?: Json
+          title?: string | null
           type_code: string
         }
         Update: {
+          conversation_id?: string | null
+          conversation_status_history_id?: string | null
           created_at?: string
+          dedupe_key?: string | null
+          event_code?: string | null
           id?: string
           message?: string
+          payload?: Json
+          title?: string | null
           type_code?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notification_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_conversation_status_history_id_fkey"
+            columns: ["conversation_status_history_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_status_history"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notification_type_code_fkey"
             columns: ["type_code"]
@@ -3206,9 +3260,27 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_cancel_purchase: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       buyer_confirm_received: {
         Args: {
           p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_report_not_received: {
+        Args: {
+          p_action_code: string
           p_conversation_id: string
           p_payload?: Json
           p_profile_id: string
@@ -3517,6 +3589,7 @@ export type Database = {
       get_current_seller_purchase_offers: {
         Args: {
           p_category_ids?: string[]
+          p_conversation_status_codes?: string[]
           p_currency_ids?: string[]
           p_end_date?: string
           p_profile_id: string
@@ -3526,6 +3599,12 @@ export type Database = {
         }
         Returns: {
           business_id: string
+          conversation_id: string
+          conversation_is_terminal: boolean
+          conversation_status_code: string
+          conversation_status_label: string
+          conversation_status_sort_order: number
+          conversation_status_style_code: string
           created_at: string
           currency_id: string
           description: string

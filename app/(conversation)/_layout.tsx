@@ -11,7 +11,12 @@ import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 import { getSession } from "@/src/lib/supabase";
 import { supabase } from "@/src/lib/supabase/client";
-import { openPopup, PopupOption } from "@/src/services/popup.service";
+import {
+  closePopup,
+  openPopup,
+  PopupOption,
+  PopupSummaryActionOutcome,
+} from "@/src/services/popup.service";
 import {
   ConversationMessage,
   createConversationMessages,
@@ -24,7 +29,11 @@ import {
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
 import { getPurchaseOfferById } from "@/src/services/purchase.offer.service";
-import { getPurchaseRequestById } from "@/src/services/purchase.request.service";
+import {
+  addCurrentBuyerPurchaseRequestFavorite,
+  addCurrentSellerPurchaseRequestFavorite,
+  getPurchaseRequestById,
+} from "@/src/services/purchase.request.service";
 import {
   clearToastBottomInset,
   setToastBottomInset,
@@ -52,6 +61,37 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const TOAST_INSET_SOURCE = "conversation-composer";
+
+type ConversationActionFailure = {
+  message: string;
+  code?: string;
+};
+
+function didReissueTransactionCode(code: string | undefined) {
+  return (
+    code === "transaction_code_expired_new_code_sent" ||
+    code === "transaction_code_not_found_new_code_sent"
+  );
+}
+
+function isTransactionCodeInputError(code: string | undefined) {
+  return (
+    code === "invalid_transaction_code" ||
+    code === "invalid_transaction_code_format" ||
+    code === "otp_required"
+  );
+}
+
+function openConfirmationClientTarget(target: string) {
+  if (target !== "modal.email_setup") return false;
+
+  closePopup();
+  router.push({
+    pathname: "/(modal)/email-setup",
+    params: { title: "Configurar correo" },
+  });
+  return true;
+}
 
 type ConversationLayoutContextValue = {
   conversationId: string;
@@ -239,6 +279,7 @@ export default function ConversationLayout() {
   );
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
@@ -252,6 +293,7 @@ export default function ConversationLayout() {
   const realtimeRefreshTargetsRef = useRef<Set<ConversationRealtimeRefreshTarget>>(
     new Set()
   );
+  const isExecutingActionRef = useRef(false);
 
   const conversationId = useMemo(
     () => parseStringParam(params.conversationId),
@@ -378,12 +420,12 @@ export default function ConversationLayout() {
 
     const result = await getCurrentUserConversationView(conversationId);
     if (!result.ok) {
-      setConversationView(null);
-      setProfileId(null);
+      setLoadError(result.error.message);
       setIsLoading(false);
       return;
     }
 
+    setLoadError(null);
     setConversationView(result.data);
     setProfileId(result.profileId);
     setIsLoading(false);
@@ -475,122 +517,165 @@ export default function ConversationLayout() {
   const runAction = useCallback(
     async (
       action: ConversationViewAction,
-      payload?: Record<string, unknown> | null
+      payload?: Record<string, unknown> | null,
+      onFailure?: (error: ConversationActionFailure) => void
     ) => {
-      if (!conversationId || !profileId) return;
+      if (!conversationId || !profileId) return false;
       if (!action.code) {
         showError("Acción no disponible", "Esta acción no tiene código de ejecución.");
-        return;
+        return false;
       }
-      if (isExecutingAction) return;
+      if (isExecutingActionRef.current) return false;
 
+      isExecutingActionRef.current = true;
       setIsExecutingAction(true);
 
-      let result:
-        | { ok: true; data: unknown }
-        | { ok: false; error: { message: string } };
+      try {
+        let result:
+          | { ok: true; data: unknown }
+          | { ok: false; error: ConversationActionFailure };
 
-      if (action.executor?.execution_type === "server_rpc") {
-        result = await executeConversationActionByExecutor({
-          conversationId,
-          profileId,
-          actionCode: action.code,
-          payload: payload ?? null,
-          executor: action.executor,
-        });
-      } else if (action.executor?.execution_type === "client_command") {
-        if (action.executor.target === "modal.offer") {
-          if (!purchaseRequestId) {
-            showError(
-              "No se pudo abrir la oferta",
-              "La conversación no tiene una solicitud asociada."
-            );
-            setIsExecutingAction(false);
-            return;
+        if (action.executor?.execution_type === "server_rpc") {
+          result = await executeConversationActionByExecutor({
+            conversationId,
+            profileId,
+            actionCode: action.code,
+            payload: payload ?? null,
+            executor: action.executor,
+          });
+        } else if (action.executor?.execution_type === "client_command") {
+          if (action.executor.target === "modal.offer") {
+            if (!purchaseRequestId) {
+              showError(
+                "No se pudo abrir la oferta",
+                "La conversación no tiene una solicitud asociada."
+              );
+              return false;
+            }
+
+            router.push({
+              pathname: "/(modal)/offer",
+              params: {
+                title: "Crear oferta",
+                purchaseRequestId,
+                conversationId,
+              },
+            });
+          } else if (action.executor.target === "modal.offer.edit") {
+            router.push({
+              pathname: "/(modal)/offer",
+              params: {
+                title: "Modificar oferta",
+                conversationId,
+                mode: "edit",
+                ...(purchaseRequestId ? { purchaseRequestId } : null),
+              },
+            });
+          } else if (action.executor.target === "detail.faq") {
+            router.push({
+              pathname: "/(detail)/faq",
+              params: { title: "Ayuda", hideMenu: "true" },
+            });
+          } else if (action.executor.target === "detail.seller_business") {
+            router.push({
+              pathname: "/(detail)/seller-business",
+              params: {
+                title: "Negocio",
+                hideMenu: "true",
+                conversationId,
+              },
+            });
+          } else if (action.executor.target === "favorite.toggle") {
+            if (!purchaseRequestId) {
+              showError(
+                "No se pudo agregar a favoritos",
+                "La conversación no tiene una solicitud asociada."
+              );
+              return false;
+            }
+
+            const favoriteResult =
+              conversationView?.role_code === "BUYER"
+                ? await addCurrentBuyerPurchaseRequestFavorite(purchaseRequestId)
+                : conversationView?.role_code === "SELLER"
+                  ? await addCurrentSellerPurchaseRequestFavorite(purchaseRequestId)
+                  : null;
+
+            if (!favoriteResult) {
+              showError(
+                "No se pudo agregar a favoritos",
+                "No pudimos determinar tu rol en esta conversación."
+              );
+              return false;
+            }
+
+            if (!favoriteResult.ok) {
+              showError("No se pudo agregar a favoritos", favoriteResult.error.message);
+              return false;
+            }
+
+            if (favoriteResult.data.alreadyExists) {
+              showInfo("Ya estaba en favoritos");
+            } else {
+              showSuccess("Favorito agregado");
+            }
+          } else if (action.executor.target !== "popup.close") {
+            showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
           }
-
-          router.push({
-            pathname: "/(modal)/offer",
-            params: {
-              title: "Crear oferta",
-              purchaseRequestId,
-              conversationId,
-            },
+          result = { ok: true, data: null };
+        } else {
+          result = await executeConversationAction({
+            conversationId,
+            profileId,
+            actionCode: action.code,
+            payload: payload ?? null,
           });
-        } else if (action.executor.target === "modal.offer.edit") {
-          if (!conversationId) {
-            showError(
-              "No se pudo abrir la edición",
-              "La conversación no está disponible."
-            );
-            setIsExecutingAction(false);
-            return;
-          }
-
-          router.push({
-            pathname: "/(modal)/offer",
-            params: {
-              title: "Modificar oferta",
-              conversationId,
-              mode: "edit",
-              ...(purchaseRequestId ? { purchaseRequestId } : null),
-            },
-          });
-        } else if (action.executor.target === "detail.faq") {
-          router.push({
-            pathname: "/(detail)/faq",
-            params: { title: "Ayuda", hideMenu: "true" },
-          });
-        } else if (action.executor.target === "detail.seller_business") {
-          router.push({
-            pathname: "/(detail)/seller-business",
-            params: {
-              title: "Negocio",
-              hideMenu: "true",
-              conversationId,
-            },
-          });
-        } else if (action.executor.target !== "popup.close") {
-          showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
         }
-        result = { ok: true, data: null };
-      } else {
-        result = await executeConversationAction({
-          conversationId,
-          profileId,
-          actionCode: action.code,
-          payload: payload ?? null,
-        });
-      }
 
-      setIsExecutingAction(false);
+        if (!result.ok) {
+          if (onFailure) {
+            onFailure(result.error);
+          } else {
+            showError("No se pudo ejecutar la acción", result.error.message);
+          }
+          return false;
+        }
 
-      if (!result.ok) {
-        showError("No se pudo ejecutar la acción", result.error.message);
-        return;
-      }
+        const shouldRefresh = action.executor?.requires_refresh ?? true;
+        const conversationWasPurged = didPurgeConversationResult(result.data, conversationId);
+        if (conversationWasPurged) {
+          showSuccess("Acción completada");
+          router.replace("/(tabs)/chats");
+          return true;
+        }
 
-      const shouldRefresh = action.executor?.requires_refresh ?? true;
-      const conversationWasPurged = didPurgeConversationResult(result.data, conversationId);
-      if (conversationWasPurged) {
-        showSuccess("Acción completada");
-        router.replace("/(tabs)/chats");
-        return;
-      }
+        if (shouldRefresh) {
+          await refreshConversation();
+          setMessageRefreshTick((prev) => prev + 1);
+        }
 
-      if (shouldRefresh) {
-        await refreshConversation();
-        setMessageRefreshTick((prev) => prev + 1);
-      }
+        if (action.executor?.execution_type !== "client_command") {
+          showSuccess("Acción completada");
+        }
 
-      if (action.executor?.execution_type !== "client_command") {
-        showSuccess("Acción completada");
+        return true;
+      } catch {
+        const error = { message: "Ocurrió un error, intenta de nuevo." };
+        if (onFailure) {
+          onFailure(error);
+        } else {
+          showError("No se pudo ejecutar la acción", error.message);
+        }
+        return false;
+      } finally {
+        isExecutingActionRef.current = false;
+        setIsExecutingAction(false);
       }
     },
     [
       conversationId,
       profileId,
-      isExecutingAction,
+      conversationView?.role_code,
       purchaseRequestId,
       refreshConversation,
     ]
@@ -604,7 +689,9 @@ export default function ConversationLayout() {
         return;
       }
 
-      const inputValues: Record<string, unknown> = {};
+      const inputValues: Record<string, unknown> = {
+        ...confirmation.payload_defaults,
+      };
       const description = interpolateTemplate(
         confirmation.description_template,
         conversationView?.context ?? {}
@@ -621,6 +708,23 @@ export default function ConversationLayout() {
         helper_text: input.helper_text,
         otp_length: input.otp_length,
         component_config: input.component_config,
+        options: input.options.map((option) => ({
+          value: option.value,
+          methodKind: option.method_kind,
+          label: option.label,
+          feeLabel: option.fee_label,
+          totalLabel: option.total_label,
+          timingLabel: option.timing_label,
+          availabilityLabel: option.availability_label,
+          disabled: option.disabled,
+          disabledReason: option.disabled_reason,
+          setupActionLabel: option.setup_action?.label,
+          onSetupPress:
+            option.setup_action &&
+            option.setup_action.target === "modal.email_setup"
+              ? () => openConfirmationClientTarget(option.setup_action!.target)
+              : undefined,
+        })),
         is_required: input.is_required,
         onValueChange: (value: unknown) => {
           inputValues[input.payload_key] = value;
@@ -636,6 +740,19 @@ export default function ConversationLayout() {
         description,
         rows,
         inputs,
+        blocker: confirmation.blocker
+          ? {
+              message: confirmation.blocker.message,
+              actionLabel: confirmation.blocker.action_label,
+              onActionPress:
+                confirmation.blocker.action_target === "modal.email_setup"
+                  ? () =>
+                      openConfirmationClientTarget(
+                        confirmation.blocker!.action_target!
+                      )
+                  : undefined,
+            }
+          : null,
         actions: [
           {
             id: `${action.id}-cancel`,
@@ -660,6 +777,7 @@ export default function ConversationLayout() {
               : confirmStyle.isDanger
                 ? "error"
                 : "textDark",
+            disabled: confirmation.blocker != null,
             onPress: () => {
               const invalidInput = confirmation.inputs.find((input) => {
                 const raw = inputValues[input.payload_key];
@@ -677,6 +795,16 @@ export default function ConversationLayout() {
                   return raw.stars < 1;
                 }
 
+                if (input.kind === "choice") {
+                  const value = typeof raw === "string" ? raw.trim() : "";
+                  if (input.options.length === 0) return true;
+                  if (input.is_required && !value) return true;
+                  if (!value) return false;
+                  return !input.options.some(
+                    (option) => option.value === value && !option.disabled
+                  );
+                }
+
                 const value = typeof raw === "string" ? raw.trim() : "";
                 if (input.is_required && !value) return true;
                 return false;
@@ -688,38 +816,122 @@ export default function ConversationLayout() {
                     ? `Ingresa un código de ${invalidInput.otp_length} dígitos.`
                     : invalidInput.kind === "rating"
                       ? "Selecciona una calificación en estrellas."
-                    : `${invalidInput.label} es obligatorio.`;
-                showWarning("Dato inválido", message);
-                return false;
+                    : invalidInput.kind === "choice"
+                      ? invalidInput.options.length === 0
+                        ? "Los métodos disponibles no se pudieron cargar. Actualiza la conversación."
+                        : "Selecciona un método de entrega."
+                      : `${invalidInput.label} es obligatorio.`;
+                if (
+                  invalidInput.kind === "otp" ||
+                  invalidInput.kind === "rating" ||
+                  invalidInput.kind === "choice"
+                ) {
+                  return {
+                    shouldClose: false,
+                    inputErrors: { [invalidInput.id]: message },
+                  } satisfies PopupSummaryActionOutcome;
+                }
+
+                return {
+                  shouldClose: false,
+                  feedback: {
+                    tone: "warning",
+                    title: "Dato incompleto",
+                    message,
+                  },
+                } satisfies PopupSummaryActionOutcome;
               }
 
-              const payload =
-                confirmation.inputs.length > 0
-                  ? confirmation.inputs.reduce<Record<string, unknown>>((acc, input) => {
-                      const raw = inputValues[input.payload_key];
+              const payload = confirmation.inputs.reduce<Record<string, unknown>>(
+                (acc, input) => {
+                  const raw = inputValues[input.payload_key];
 
-                      if (input.kind === "rating") {
-                        if (isRatingPayload(raw) && raw.stars >= 1) {
-                          acc[input.payload_key] = raw;
-                        }
-                        return acc;
-                      }
+                  if (input.kind === "rating") {
+                    if (isRatingPayload(raw) && raw.stars >= 1) {
+                      acc[input.payload_key] = raw;
+                    }
+                    return acc;
+                  }
 
-                      const value = typeof raw === "string" ? raw.trim() : "";
-                      if (value) {
-                        acc[input.payload_key] = value;
-                      }
+                  if (input.kind === "choice") {
+                    const value = typeof raw === "string" ? raw.trim() : "";
+                    const selectedOption = input.options.find(
+                      (option) => option.value === value && !option.disabled
+                    );
+                    if (selectedOption) {
+                      acc[input.payload_key] = selectedOption.value;
+                    }
+                    return acc;
+                  }
+
+                  const value = typeof raw === "string" ? raw.trim() : "";
+                  if (value) {
+                    acc[input.payload_key] = value;
+                  }
+                  return acc;
+                },
+                { ...confirmation.payload_defaults }
+              );
+              const actionPayload = Object.keys(payload).length > 0 ? payload : null;
+
+              return (async (): Promise<boolean | PopupSummaryActionOutcome> => {
+                let failure: ConversationActionFailure | null = null;
+                const succeeded = await runAction(action, actionPayload, (error) => {
+                  failure = error;
+                });
+
+                if (succeeded) return true;
+
+                const error = failure as ConversationActionFailure | null;
+                if (error?.code === "offer_changed") {
+                  closePopup();
+                  await refreshConversation();
+                  showWarning(
+                    "La oferta cambió",
+                    error.message ||
+                      "Revísala nuevamente antes de concretar la compra."
+                  );
+                  return false;
+                }
+                const codeWasReissued = didReissueTransactionCode(error?.code);
+                const otpInputIds = confirmation.inputs
+                  .filter((input) => input.kind === "otp")
+                  .map((input) => input.id);
+                const isOtpInputError =
+                  isTransactionCodeInputError(error?.code) && otpInputIds.length > 0;
+                const inputErrors = isOtpInputError
+                  ? otpInputIds.reduce<Record<string, string>>((acc, inputId) => {
+                      acc[inputId] =
+                        error?.message ?? "El código no es válido. Inténtalo de nuevo.";
                       return acc;
                     }, {})
-                  : null;
+                  : undefined;
 
-              void runAction(action, payload);
+                return {
+                  shouldClose: false,
+                  feedback: isOtpInputError
+                    ? undefined
+                    : {
+                        tone: codeWasReissued ? "success" : "error",
+                        title: codeWasReissued
+                          ? "Nuevo código enviado"
+                          : "No se pudo completar la acción",
+                        message: codeWasReissued
+                          ? "El comprador recibió un código nuevo. Solicítalo para finalizar."
+                          : error?.message ?? "Ocurrió un error, intenta de nuevo.",
+                      },
+                  inputErrors,
+                  resetInputIds: codeWasReissued
+                    ? otpInputIds
+                    : undefined,
+                };
+              })();
             },
           },
         ],
       });
     },
-    [conversationView?.context, runAction]
+    [conversationView?.context, refreshConversation, runAction]
   );
 
   const openConversationMenu = useCallback(
@@ -746,8 +958,34 @@ export default function ConversationLayout() {
 
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
-  if (isLoading || !conversationView || !profileId) {
+  if (isLoading) {
     return <LoadingState label="Cargando conversación..." />;
+  }
+
+  if (!conversationView || !profileId) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          padding: t.spacing.xl,
+          gap: t.spacing.md,
+          backgroundColor: t.colors.background,
+        }}
+      >
+        <Text variant="body" align="center">
+          {loadError ?? "No se pudo cargar la conversación."}
+        </Text>
+        <Button
+          title="Reintentar"
+          onPress={() => {
+            setIsLoading(true);
+            void refreshConversation();
+          }}
+        />
+      </View>
+    );
   }
 
   const topActions = conversationView.actions

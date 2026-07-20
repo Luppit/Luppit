@@ -14,6 +14,7 @@ type ProfileNotificationRecord = ProfileNotification & {
 export type ProfileNotificationListItem = {
   notificationId: string;
   profileId: string;
+  title: string | null;
   message: string;
   typeCode: string;
   typeLabel: string | null;
@@ -52,7 +53,7 @@ export async function getCurrentProfileNotifications(): Promise<
         "profile_id",
         "read_at",
         "created_at",
-        "notification:notification_id(id,message,type_code,created_at)",
+        "notification:notification_id(id,title,message,type_code,created_at)",
       ].join(",")
     )
     .eq("profile_id", profileResult.data);
@@ -92,6 +93,7 @@ export async function getCurrentProfileNotifications(): Promise<
       return {
         notificationId: notification.id,
         profileId: row.profile_id,
+        title: notification.title,
         message: notification.message,
         typeCode: notification.type_code,
         typeLabel: type?.label ?? null,

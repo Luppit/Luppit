@@ -19,6 +19,12 @@ export type SellerPurchaseOfferCardData = PurchaseOffer & {
   request_category_name: string | null;
   request_profile_name: string | null;
   offer_currency_code: string | null;
+  conversation_id: string | null;
+  conversation_status_code: string | null;
+  conversation_status_label: string | null;
+  conversation_status_style_code: string | null;
+  conversation_status_sort_order: number | null;
+  conversation_is_terminal: boolean | null;
 };
 export type PurchaseOfferImage = Row<"purchase_offer_image">;
 type OfferFile = {
@@ -38,6 +44,7 @@ export type SellerPurchaseOfferFilters = {
   endDate?: string;
   selectedCategoryIds?: string[];
   selectedCurrencyIds?: string[];
+  selectedConversationStatusCodes?: string[];
 };
 
 export type BuyerPurchaseOfferFilters = {
@@ -383,6 +390,11 @@ export async function getCurrentSellerPurchaseOffers(
         ? filters.selectedCurrencyIds
         : null,
     p_sort_code: sortCode || "newly_listed",
+    p_conversation_status_codes:
+      filters?.selectedConversationStatusCodes &&
+      filters.selectedConversationStatusCodes.length > 0
+        ? filters.selectedConversationStatusCodes
+        : null,
   });
 
   if (!rpcResult?.error) {
@@ -405,6 +417,28 @@ export async function getCurrentSellerPurchaseOffers(
             : null,
       offer_currency_code:
         typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+      conversation_id:
+        typeof row.conversation_id === "string" ? row.conversation_id : null,
+      conversation_status_code:
+        typeof row.conversation_status_code === "string"
+          ? row.conversation_status_code
+          : null,
+      conversation_status_label:
+        typeof row.conversation_status_label === "string"
+          ? row.conversation_status_label
+          : null,
+      conversation_status_style_code:
+        typeof row.conversation_status_style_code === "string"
+          ? row.conversation_status_style_code
+          : null,
+      conversation_status_sort_order:
+        typeof row.conversation_status_sort_order === "number"
+          ? row.conversation_status_sort_order
+          : null,
+      conversation_is_terminal:
+        typeof row.conversation_is_terminal === "boolean"
+          ? row.conversation_is_terminal
+          : null,
     })) as SellerPurchaseOfferCardData[];
 
     return {
@@ -523,6 +557,12 @@ export async function getCurrentSellerPurchaseOffers(
       request_category_name: requestInfo?.categoryName ?? null,
       request_profile_name: requestProfileName,
       offer_currency_code: currency?.currency_code ?? null,
+      conversation_id: null,
+      conversation_status_code: null,
+      conversation_status_label: null,
+      conversation_status_style_code: null,
+      conversation_status_sort_order: null,
+      conversation_is_terminal: null,
     } as SellerPurchaseOfferCardData;
   });
 

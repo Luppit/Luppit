@@ -23,11 +23,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showError, showInfo } from "@/src/utils/useToast";
 
 const SELLER_OFFER_SORT_OPTIONS = [
-  { id: "newly_listed", label: "Más recientes" },
-  { id: "offer_created_newest", label: "Fecha de oferta: más reciente" },
+  { id: "newly_listed", label: "Oferta más reciente" },
   { id: "offer_created_oldest", label: "Fecha de oferta: más antigua" },
-  { id: "price_col_low_to_high", label: "COL: menor precio primero" },
-  { id: "price_col_high_to_low", label: "COL: mayor precio primero" },
+  { id: "price_col_low_to_high", label: "CRC: menor precio primero" },
+  { id: "price_col_high_to_low", label: "CRC: mayor precio primero" },
   { id: "price_usd_low_to_high", label: "USD: menor precio primero" },
   { id: "price_usd_high_to_low", label: "USD: mayor precio primero" },
 ];
@@ -39,6 +38,7 @@ type SellerOfferFilters = {
   endDate: string;
   selectedCategoryIds: string[];
   selectedCurrencyIds: string[];
+  selectedConversationStatusCodes: string[];
 };
 
 const EMPTY_SELLER_OFFER_FILTERS: SellerOfferFilters = {
@@ -47,28 +47,8 @@ const EMPTY_SELLER_OFFER_FILTERS: SellerOfferFilters = {
   endDate: "",
   selectedCategoryIds: [],
   selectedCurrencyIds: [],
+  selectedConversationStatusCodes: [],
 };
-
-function normalizeSearchValue(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function parseDateTime(value: string | null | undefined) {
-  if (!value) return 0;
-  const parsed = new Date(value).getTime();
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-function getDateOnlyTime(value: string | null | undefined) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()).getTime();
-}
 
 function normalizeFilterList(values: string[]) {
   return Array.from(
@@ -76,19 +56,28 @@ function normalizeFilterList(values: string[]) {
   );
 }
 
-function getOfferCategoryFilterId(offer: SellerPurchaseOfferCardData) {
-  return offer.request_category_id?.trim() || normalizeSearchValue(offer.request_category_name);
-}
-
-function getOfferCurrencyFilterId(offer: SellerPurchaseOfferCardData) {
-  return offer.currency_id?.trim() || normalizeSearchValue(offer.offer_currency_code);
-}
-
-function getOfferCurrencyCode(offer: SellerPurchaseOfferCardData) {
-  return normalizeSearchValue(offer.offer_currency_code);
-}
-
 function hasSellerOfferFilters(filters: SellerOfferFilters) {
+  return Boolean(
+    filters.searchValue ||
+      filters.startDate ||
+      filters.endDate ||
+      filters.selectedCategoryIds.length > 0 ||
+      filters.selectedCurrencyIds.length > 0 ||
+      filters.selectedConversationStatusCodes.length > 0
+  );
+}
+
+function countSellerOfferFilterGroups(filters: SellerOfferFilters) {
+  return [
+    filters.searchValue,
+    filters.startDate || filters.endDate,
+    filters.selectedCategoryIds.length > 0,
+    filters.selectedCurrencyIds.length > 0,
+    filters.selectedConversationStatusCodes.length > 0,
+  ].filter(Boolean).length;
+}
+
+function hasAdvancedSellerOfferFilters(filters: SellerOfferFilters) {
   return Boolean(
     filters.searchValue ||
       filters.startDate ||
@@ -98,7 +87,7 @@ function hasSellerOfferFilters(filters: SellerOfferFilters) {
   );
 }
 
-function countSellerOfferFilterGroups(filters: SellerOfferFilters) {
+function countAdvancedSellerOfferFilterGroups(filters: SellerOfferFilters) {
   return [
     filters.searchValue,
     filters.startDate || filters.endDate,
@@ -111,27 +100,6 @@ function getSortLabel(sortId: string) {
   return SELLER_OFFER_SORT_OPTIONS.find((option) => option.id === sortId)?.label ?? "Orden";
 }
 
-function compareOfferPriceByCurrency(
-  a: SellerPurchaseOfferCardData,
-  b: SellerPurchaseOfferCardData,
-  currencyCode: "col" | "usd",
-  direction: "asc" | "desc"
-) {
-  const aMatchesCurrency = getOfferCurrencyCode(a) === currencyCode;
-  const bMatchesCurrency = getOfferCurrencyCode(b) === currencyCode;
-
-  if (aMatchesCurrency !== bMatchesCurrency) {
-    return aMatchesCurrency ? -1 : 1;
-  }
-
-  if (aMatchesCurrency && bMatchesCurrency) {
-    const priceDiff = Number(a.price ?? 0) - Number(b.price ?? 0);
-    return direction === "asc" ? priceDiff : -priceDiff;
-  }
-
-  return parseDateTime(b.created_at) - parseDateTime(a.created_at);
-}
-
 export default function OffersScreen() {
   const t = useTheme();
   const s = React.useMemo(() => createOffersScreenStyles(t), [t]);
@@ -141,13 +109,13 @@ export default function OffersScreen() {
       <RoleGate
         loading={
           <>
-            <OffersTopBar title="Todas mis ofertas" />
+            <OffersTopBar title="Mis ofertas" />
             <LoadingState label="Cargando contenido..." />
           </>
         }
         buyer={
           <>
-            <OffersTopBar title="Todas mis ofertas" />
+            <OffersTopBar title="Mis ofertas" />
             <Text variant="title">Offers Buyer</Text>
           </>
         }
@@ -164,6 +132,9 @@ function SellerOffersContent() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [offers, setOffers] = React.useState<SellerPurchaseOfferCardData[]>([]);
+  const [filterOptionsSource, setFilterOptionsSource] = React.useState<
+    SellerPurchaseOfferCardData[]
+  >([]);
   const [filters, setFilters] = React.useState<SellerOfferFilters>(
     EMPTY_SELLER_OFFER_FILTERS
   );
@@ -177,6 +148,17 @@ function SellerOffersContent() {
   }, []);
   const openOfferConversation = React.useCallback(
     async (offer: SellerPurchaseOfferCardData) => {
+      if (offer.conversation_id) {
+        router.push({
+          pathname: "/(conversation)/offer",
+          params: {
+            conversationId: offer.conversation_id,
+            title: offer.request_title ?? "Conversación",
+          },
+        });
+        return;
+      }
+
       const conversation = await getConversationByPurchaseOfferId(offer.id);
       if (!conversation) {
         showInfo("Sin conversación", "Esta oferta todavía no tiene conversación.");
@@ -198,6 +180,15 @@ function SellerOffersContent() {
     []
   );
 
+  const loadFilterOptions = React.useCallback(async () => {
+    const result = await getCurrentSellerPurchaseOffers(
+      EMPTY_SELLER_OFFER_FILTERS,
+      DEFAULT_SELLER_OFFER_SORT_ID
+    );
+    if (!isMountedRef.current || !result.ok) return;
+    setFilterOptionsSource(result.data);
+  }, []);
+
   const loadOffers = React.useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -217,113 +208,90 @@ function SellerOffersContent() {
 
   useFocusEffect(
     React.useCallback(() => {
+      void loadFilterOptions();
+      return () => {};
+    }, [loadFilterOptions])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
       void loadOffers();
       return () => {};
     }, [loadOffers])
   );
 
-  React.useEffect(() => {
-    void loadOffers();
-  }, [loadOffers]);
-
   const categoryOptions = React.useMemo(() => {
     const optionsById = new Map<string, { id: string; label: string }>();
 
-    offers.forEach((offer) => {
+    filterOptionsSource.forEach((offer) => {
       const label = offer.request_category_name?.trim();
-      const id = getOfferCategoryFilterId(offer);
+      const id = offer.request_category_id?.trim();
       if (!id || !label || optionsById.has(id)) return;
       optionsById.set(id, { id, label });
     });
 
     return Array.from(optionsById.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [offers]);
+  }, [filterOptionsSource]);
 
   const currencyOptions = React.useMemo(() => {
     const optionsById = new Map<string, { id: string; label: string }>();
 
-    offers.forEach((offer) => {
+    filterOptionsSource.forEach((offer) => {
       const label = offer.offer_currency_code?.trim();
-      const id = getOfferCurrencyFilterId(offer);
+      const id = offer.currency_id?.trim();
       if (!id || !label || optionsById.has(id)) return;
       optionsById.set(id, { id, label });
     });
 
     return Array.from(optionsById.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [offers]);
+  }, [filterOptionsSource]);
 
-  const visibleOffers = React.useMemo(() => {
-    const searchNeedle = normalizeSearchValue(filters.searchValue);
-    const startTime = getDateOnlyTime(filters.startDate);
-    const endTime = getDateOnlyTime(filters.endDate);
-    const selectedCategoryIds = new Set(filters.selectedCategoryIds);
-    const selectedCurrencyIds = new Set(filters.selectedCurrencyIds);
+  const statusOptions = React.useMemo(() => {
+    const optionsById = new Map<
+      string,
+      { id: string; label: string; sortOrder: number | null }
+    >();
 
-    const filteredOffers = offers.filter((offer) => {
-      if (searchNeedle) {
-        const searchableText = normalizeSearchValue(
-          [
-            offer.request_title,
-            offer.description,
-            offer.request_profile_name,
-            offer.request_category_name,
-            offer.offer_currency_code,
-          ].join(" ")
-        );
-        if (!searchableText.includes(searchNeedle)) return false;
-      }
-
-      const offerDate = getDateOnlyTime(offer.created_at);
-      if (startTime != null && (offerDate == null || offerDate < startTime)) return false;
-      if (endTime != null && (offerDate == null || offerDate > endTime)) return false;
-
-      if (
-        selectedCategoryIds.size > 0 &&
-        !selectedCategoryIds.has(getOfferCategoryFilterId(offer))
-      ) {
-        return false;
-      }
-
-      if (
-        selectedCurrencyIds.size > 0 &&
-        !selectedCurrencyIds.has(getOfferCurrencyFilterId(offer))
-      ) {
-        return false;
-      }
-
-      return true;
+    filterOptionsSource.forEach((offer) => {
+      const id = offer.conversation_status_code?.trim();
+      const label = offer.conversation_status_label?.trim();
+      if (!id || !label || optionsById.has(id)) return;
+      optionsById.set(id, {
+        id,
+        label,
+        sortOrder: offer.conversation_status_sort_order,
+      });
     });
 
-    return [...filteredOffers].sort((a, b) => {
-      if (selectedSortId === "offer_created_oldest") {
-        return parseDateTime(a.created_at) - parseDateTime(b.created_at);
-      }
-
-      if (selectedSortId === "price_col_low_to_high") {
-        return compareOfferPriceByCurrency(a, b, "col", "asc");
-      }
-
-      if (selectedSortId === "price_col_high_to_low") {
-        return compareOfferPriceByCurrency(a, b, "col", "desc");
-      }
-
-      if (selectedSortId === "price_usd_low_to_high") {
-        return compareOfferPriceByCurrency(a, b, "usd", "asc");
-      }
-
-      if (selectedSortId === "price_usd_high_to_low") {
-        return compareOfferPriceByCurrency(a, b, "usd", "desc");
-      }
-
-      return parseDateTime(b.created_at) - parseDateTime(a.created_at);
+    return Array.from(optionsById.values()).sort((a, b) => {
+      const orderA = a.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB || a.label.localeCompare(b.label, "es");
     });
-  }, [filters, offers, selectedSortId]);
+  }, [filterOptionsSource]);
+
+  const visibleOffers = offers;
 
   const hasActiveFilters = React.useMemo(() => hasSellerOfferFilters(filters), [filters]);
   const activeFilterCount = React.useMemo(
     () => countSellerOfferFilterGroups(filters),
     [filters]
   );
+  const hasAdvancedFilters = React.useMemo(
+    () => hasAdvancedSellerOfferFilters(filters),
+    [filters]
+  );
+  const advancedFilterCount = React.useMemo(
+    () => countAdvancedSellerOfferFilterGroups(filters),
+    [filters]
+  );
+  const selectedStatusOptions = React.useMemo(() => {
+    const labelById = new Map(statusOptions.map((option) => [option.id, option.label]));
+    return filters.selectedConversationStatusCodes.map((id) => ({
+      id,
+      label: labelById.get(id) ?? "Estado",
+    }));
+  }, [filters.selectedConversationStatusCodes, statusOptions]);
   const hasCustomSort = selectedSortId !== DEFAULT_SELLER_OFFER_SORT_ID;
 
   const openSearchPopup = React.useCallback(() => {
@@ -331,18 +299,24 @@ function SellerOffersContent() {
       type: "filters",
       title: "Filtros",
       searchField: {
-        label: "Oferta, solicitud o comprador",
-        placeholder: "Buscar",
+        label: "Solicitud, comprador, estado o descripción",
+        placeholder: "Buscar ofertas",
         initialValue: filters.searchValue,
       },
       dateRangeField: {
-        label: "Fecha de la oferta",
+        label: "Fecha de envío",
         startPlaceholder: "Desde",
         endPlaceholder: "Hasta",
         initialStartValue: filters.startDate,
         initialEndValue: filters.endDate,
       },
       chipGroups: [
+        {
+          id: "statuses",
+          label: "Estado de la conversación",
+          options: statusOptions,
+          initialSelectedIds: filters.selectedConversationStatusCodes,
+        },
         {
           id: "categories",
           label: "Categoría",
@@ -367,10 +341,13 @@ function SellerOffersContent() {
           endDate: values.endDate.trim(),
           selectedCategoryIds: normalizeFilterList(selectedGroups.categories ?? []),
           selectedCurrencyIds: normalizeFilterList(selectedGroups.currencies ?? []),
+          selectedConversationStatusCodes: normalizeFilterList(
+            selectedGroups.statuses ?? []
+          ),
         });
       },
     });
-  }, [categoryOptions, currencyOptions, filters]);
+  }, [categoryOptions, currencyOptions, filters, statusOptions]);
 
   const openSortPopup = React.useCallback(() => {
     openPopup({
@@ -388,6 +365,22 @@ function SellerOffersContent() {
 
   const clearFilters = React.useCallback(() => {
     setFilters(EMPTY_SELLER_OFFER_FILTERS);
+  }, []);
+
+  const clearAdvancedFilters = React.useCallback(() => {
+    setFilters((current) => ({
+      ...EMPTY_SELLER_OFFER_FILTERS,
+      selectedConversationStatusCodes: current.selectedConversationStatusCodes,
+    }));
+  }, []);
+
+  const removeStatusFilter = React.useCallback((statusCode: string) => {
+    setFilters((current) => ({
+      ...current,
+      selectedConversationStatusCodes: current.selectedConversationStatusCodes.filter(
+        (code) => code !== statusCode
+      ),
+    }));
   }, []);
 
   const content = (() => {
@@ -408,34 +401,19 @@ function SellerOffersContent() {
               loadError
                 ? "No se pudieron cargar tus ofertas"
                 : hasActiveFilters
-                  ? "No encontramos ofertas"
-                  : "Aún no tienes ofertas"
+                  ? "No hay ofertas con estos filtros"
+                  : "Aún no has enviado ofertas"
             }
             description={
               loadError
                 ? loadError
                 : hasActiveFilters
-                  ? "Prueba cambiando la búsqueda o limpiando los filtros."
-                  : "Cuando envíes ofertas, aparecerán aquí."
+                  ? "Prueba otro estado, cambia la búsqueda o limpia los filtros."
+                  : "Tus ofertas aparecerán aquí cuando respondas una solicitud."
             }
             actionLabel={loadError ? "Reintentar" : hasActiveFilters ? "Limpiar filtros" : null}
             actionIcon={loadError ? undefined : hasActiveFilters ? "x" : undefined}
             onAction={loadError ? retryLoad : hasActiveFilters ? clearFilters : undefined}
-          />
-        </View>
-      );
-    }
-
-    if (visibleOffers.length === 0) {
-      return (
-        <View style={s.stateContent}>
-          <StandaloneListEmptyState
-            icon="search"
-            title="No encontramos ofertas"
-            description="Prueba cambiando la búsqueda o limpiando los filtros."
-            actionLabel="Limpiar filtros"
-            actionIcon="x"
-            onAction={clearFilters}
           />
         </View>
       );
@@ -448,12 +426,22 @@ function SellerOffersContent() {
       >
         {hasActiveFilters || hasCustomSort ? (
           <View style={s.activeChipsRow}>
-            {hasActiveFilters ? (
+            {selectedStatusOptions.map((option) => (
+              <LuppitChip
+                key={option.id}
+                label={option.label}
+                selected
+                onRemove={() => removeStatusFilter(option.id)}
+                removeAccessibilityLabel={`Quitar estado ${option.label}`}
+              />
+            ))}
+
+            {hasAdvancedFilters ? (
               <LuppitChip
                 icon="sliders-horizontal"
-                label={`Filtros (${activeFilterCount})`}
-                onRemove={() => setFilters(EMPTY_SELLER_OFFER_FILTERS)}
-                removeAccessibilityLabel="Limpiar filtros"
+                label={`Otros filtros (${advancedFilterCount})`}
+                onRemove={clearAdvancedFilters}
+                removeAccessibilityLabel="Limpiar otros filtros"
               />
             ) : null}
 
@@ -501,10 +489,17 @@ function SellerOffersContent() {
         style={s.searchTrigger}
         onPress={openSearchPopup}
         accessibilityRole="button"
+        accessibilityLabel={
+          hasActiveFilters
+            ? `Buscar y filtrar ofertas. ${activeFilterCount} filtros activos`
+            : "Buscar y filtrar ofertas"
+        }
       >
-        <Icon name="search" size={20} color={t.colors.stateAnulated} />
+        <Icon name="sliders-horizontal" size={20} color={t.colors.stateAnulated} />
         <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
-          {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
+          {hasActiveFilters
+            ? `Filtros activos (${activeFilterCount})`
+            : "Buscar y filtrar"}
         </Text>
       </Pressable>
 
@@ -524,7 +519,7 @@ function SellerOffersContent() {
       <View style={s.content}>
         {content}
       </View>
-      <OffersTopBar title="Todas mis ofertas" accessory={toolbar} />
+      <OffersTopBar title="Mis ofertas" accessory={toolbar} />
     </>
   );
 }

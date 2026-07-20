@@ -9,6 +9,7 @@ type OtpValidatorProps = {
   label: string;
   accessibilityLabel?: string;
   helperText?: string | null;
+  errorText?: string | null;
   otpLength?: number;
   stretch?: boolean;
   onChange?: (value: string) => void;
@@ -19,6 +20,7 @@ export default function OtpValidator({
   label,
   accessibilityLabel,
   helperText,
+  errorText,
   otpLength = 4,
   stretch = false,
   onChange,
@@ -63,6 +65,7 @@ export default function OtpValidator({
         style={[s.inputRow, stretch ? s.inputRowStretch : null]}
         onPress={focus}
         accessibilityLabel={inputAccessibilityLabel}
+        accessibilityHint={errorText ?? undefined}
       >
         <TextInput
           ref={inputRef}
@@ -90,12 +93,18 @@ export default function OtpValidator({
               s.inputBox,
               stretch ? s.inputBoxStretch : null,
               focusedIndex === index ? s.inputBoxFocused : null,
+              errorText ? s.inputBoxError : null,
             ]}
           >
             <Text style={s.inputText}>{values[index]}</Text>
           </View>
         ))}
       </Pressable>
+      {errorText ? (
+        <Text variant="small" style={s.errorText} accessibilityRole="alert">
+          {errorText}
+        </Text>
+      ) : null}
       {helperText && onHelperPress ? (
         <Pressable
           onPress={onHelperPress}

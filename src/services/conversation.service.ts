@@ -25,6 +25,23 @@ export type ConversationActionConfirmationField = {
   sort_order: number;
 };
 
+export type ConversationChoiceOption = {
+  value: string;
+  method_kind: "shipping" | "pickup";
+  label: string;
+  fee_label: string | null;
+  total_label: string | null;
+  timing_label: string | null;
+  availability_label: string | null;
+  disabled: boolean;
+  disabled_reason: string | null;
+  setup_action: {
+    label: string;
+    target: string;
+  } | null;
+  sort_order: number;
+};
+
 export type ConversationActionConfirmationInput = {
   id: string;
   kind: string;
@@ -35,6 +52,14 @@ export type ConversationActionConfirmationInput = {
   is_required: boolean;
   sort_order: number;
   component_config: Record<string, unknown> | null;
+  options: ConversationChoiceOption[];
+};
+
+export type ConversationConfirmationBlocker = {
+  code: string;
+  message: string;
+  action_label: string | null;
+  action_target: string | null;
 };
 
 export type ConversationActionConfirmation = {
@@ -49,6 +74,8 @@ export type ConversationActionConfirmation = {
   confirm_style_code: string | null;
   fields: ConversationActionConfirmationField[];
   inputs: ConversationActionConfirmationInput[];
+  payload_defaults: Record<string, unknown>;
+  blocker: ConversationConfirmationBlocker | null;
 };
 
 export type ConversationViewAction = {
@@ -88,6 +115,7 @@ export type ConversationView = {
     status_code: string | null;
     purchase_request_id: string | null;
     purchase_offer_id: string | null;
+    selected_fulfillment_catalog_id: string | null;
     buyer_profile_id: string | null;
     seller_profile_id: string | null;
   };
@@ -201,6 +229,75 @@ function parseConversationActionConfirmationInput(
   const label = typeof value.label === "string" ? value.label : "";
   if (!id || !kind || !payloadKey || !label) return null;
 
+  const rawOptions = Array.isArray(value.options) ? value.options : [];
+  const options = rawOptions
+    .map((option, index): ConversationChoiceOption | null => {
+      if (!option || typeof option !== "object" || Array.isArray(option)) return null;
+      const optionValue = option as Record<string, unknown>;
+      const catalogId =
+        typeof optionValue.value === "string"
+          ? optionValue.value.trim()
+          : typeof optionValue.catalog_id === "string"
+            ? optionValue.catalog_id.trim()
+            : "";
+      const methodKind = optionValue.method_kind;
+      const optionLabel =
+        typeof optionValue.label === "string" ? optionValue.label.trim() : "";
+
+      if (
+        !catalogId ||
+        (methodKind !== "shipping" && methodKind !== "pickup") ||
+        !optionLabel
+      ) {
+        return null;
+      }
+
+      const rawSetupAction =
+        optionValue.setup_action &&
+        typeof optionValue.setup_action === "object" &&
+        !Array.isArray(optionValue.setup_action)
+          ? (optionValue.setup_action as Record<string, unknown>)
+          : null;
+      const setupActionLabel =
+        typeof rawSetupAction?.label === "string" ? rawSetupAction.label.trim() : "";
+      const setupActionTarget =
+        typeof rawSetupAction?.target === "string" ? rawSetupAction.target.trim() : "";
+
+      const optionalText = (...candidates: unknown[]) => {
+        const match = candidates.find(
+          (candidate) => typeof candidate === "string" && candidate.trim()
+        );
+        return typeof match === "string" ? match.trim() : null;
+      };
+
+      return {
+        value: catalogId,
+        method_kind: methodKind,
+        label: optionLabel,
+        fee_label: optionalText(
+          optionValue.fee_label,
+          optionValue.shipping_fee_label,
+          optionValue.formatted_fee
+        ),
+        total_label: optionalText(optionValue.total_label, optionValue.formatted_total),
+        timing_label: optionalText(optionValue.timing_label, optionValue.formatted_timing),
+        availability_label: optionalText(
+          optionValue.availability_label,
+          optionValue.availability
+        ),
+        disabled: optionValue.disabled === true || optionValue.available === false,
+        disabled_reason: optionalText(optionValue.disabled_reason),
+        setup_action:
+          setupActionLabel && setupActionTarget
+            ? { label: setupActionLabel, target: setupActionTarget }
+            : null,
+        sort_order:
+          typeof optionValue.sort_order === "number" ? optionValue.sort_order : index,
+      };
+    })
+    .filter((option): option is ConversationChoiceOption => Boolean(option))
+    .sort((a, b) => a.sort_order - b.sort_order);
+
   return {
     id,
     kind,
@@ -213,6 +310,30 @@ function parseConversationActionConfirmationInput(
     component_config:
       value.component_config && typeof value.component_config === "object"
         ? (value.component_config as Record<string, unknown>)
+        : null,
+    options,
+  };
+}
+
+function parseConversationConfirmationBlocker(
+  raw: unknown
+): ConversationConfirmationBlocker | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  const code = typeof value.code === "string" ? value.code.trim() : "";
+  const message = typeof value.message === "string" ? value.message.trim() : "";
+  if (!code || !message) return null;
+
+  return {
+    code,
+    message,
+    action_label:
+      typeof value.action_label === "string" && value.action_label.trim()
+        ? value.action_label.trim()
+        : null,
+    action_target:
+      typeof value.action_target === "string" && value.action_target.trim()
+        ? value.action_target.trim()
         : null,
   };
 }
@@ -251,6 +372,13 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
       typeof value.confirm_style_code === "string" ? value.confirm_style_code : null,
     fields,
     inputs,
+    payload_defaults:
+      value.payload_defaults &&
+      typeof value.payload_defaults === "object" &&
+      !Array.isArray(value.payload_defaults)
+        ? (value.payload_defaults as Record<string, unknown>)
+        : {},
+    blocker: parseConversationConfirmationBlocker(value.blocker),
   };
 }
 
@@ -363,6 +491,10 @@ function parseConversationView(raw: unknown): ConversationView | null {
         typeof conversationValue.purchase_offer_id === "string"
           ? conversationValue.purchase_offer_id
           : null,
+      selected_fulfillment_catalog_id:
+        typeof conversationValue.selected_fulfillment_catalog_id === "string"
+          ? conversationValue.selected_fulfillment_catalog_id
+          : null,
       buyer_profile_id:
         typeof conversationValue.buyer_profile_id === "string"
           ? conversationValue.buyer_profile_id
@@ -469,6 +601,24 @@ function parseConversationListItem(raw: unknown): ConversationListItem | null {
           ? value.unopened_count > 0
           : false,
   };
+}
+
+function getConversationActionResultError(data: unknown): AppError | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+
+  const value = data as Record<string, unknown>;
+  if (value.ok !== false && value.success !== false) return null;
+
+  const errorCode =
+    typeof value.error_code === "string"
+      ? value.error_code
+      : typeof value.code === "string"
+        ? value.code
+        : typeof value.error === "string"
+          ? value.error
+          : "conversation_action_failed";
+
+  return fromSupabaseError({ code: errorCode, message: errorCode });
 }
 
 export async function getConversationByPurchaseOfferId(
@@ -714,6 +864,9 @@ export async function executeConversationAction(
 
   if (rpcResult.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
 
+  const actionError = getConversationActionResultError(rpcResult.data);
+  if (actionError) return { ok: false, error: actionError };
+
   return { ok: true, data: rpcResult.data ?? null };
 }
 
@@ -733,42 +886,19 @@ export async function executeConversationActionByExecutor(
     return executeConversationAction(input);
   }
 
-  const payload = input.payload ?? null;
-  const variants = [
-    {
-      p_conversation_id: input.conversationId,
-      p_profile_id: input.profileId,
-      p_action_code: input.actionCode,
-      p_payload: payload,
-    },
-    {
-      p_conversation_id: input.conversationId,
-      p_profile_id: input.profileId,
-      p_action_code: input.actionCode,
-    },
-    {
-      p_conversation_id: input.conversationId,
-      p_profile_id: input.profileId,
-    },
-    {
-      conversation_id: input.conversationId,
-      profile_id: input.profileId,
-    },
-  ];
+  const rpcResult: any = await (supabase as any).rpc(rpcName, {
+    p_conversation_id: input.conversationId,
+    p_profile_id: input.profileId,
+    p_action_code: input.actionCode,
+    p_payload: input.payload ?? null,
+  });
 
-  let lastError: any = null;
-  for (const args of variants) {
-    const rpcResult: any = await (supabase as any).rpc(rpcName, args);
-    if (!rpcResult.error) {
-      return { ok: true, data: rpcResult.data ?? null };
-    }
-    lastError = rpcResult.error;
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  const fallback = await executeConversationAction(input);
-  if (fallback.ok) return fallback;
+  const actionError = getConversationActionResultError(rpcResult.data);
+  if (actionError) return { ok: false, error: actionError };
 
-  return lastError
-    ? { ok: false, error: fromSupabaseError(lastError) }
-    : fallback;
+  return { ok: true, data: rpcResult.data ?? null };
 }

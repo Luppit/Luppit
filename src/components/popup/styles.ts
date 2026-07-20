@@ -2,7 +2,7 @@ import {
   ROUNDED_SURFACE_RADIUS,
   createRoundedSurfaceStyle,
 } from "@/src/components/surface/styles";
-import { Theme } from "@/src/themes";
+import { fontFamilies, Theme } from "@/src/themes";
 import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from "react-native";
 
 const SOFT_BORDER_COLOR = "rgba(0,0,0,0.08)";
@@ -56,6 +56,30 @@ export type GlobalPopupStyles = {
   summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
   summaryInputsList: ViewStyle;
+  choiceInput: ViewStyle;
+  choiceInputLabel: TextStyle;
+  choiceHelperText: TextStyle;
+  choiceOptionsList: ViewStyle;
+  choiceOption: ViewStyle;
+  choiceOptionSelected: ViewStyle;
+  choiceOptionDisabled: ViewStyle;
+  choiceOptionContent: ViewStyle;
+  choiceOptionHeader: ViewStyle;
+  choiceOptionLabel: TextStyle;
+  choiceOptionMeta: TextStyle;
+  choiceOptionDisabledReason: TextStyle;
+  choiceSetupAction: ViewStyle;
+  choiceSetupActionLabel: TextStyle;
+  choiceInputError: TextStyle;
+  summaryBlocker: ViewStyle;
+  summaryBlockerMessage: TextStyle;
+  summaryBlockerAction: ViewStyle;
+  summaryBlockerActionLabel: TextStyle;
+  summaryFeedback: ViewStyle;
+  summaryFeedbackIcon: ViewStyle;
+  summaryFeedbackContent: ViewStyle;
+  summaryFeedbackTitle: TextStyle;
+  summaryFeedbackMessage: TextStyle;
   summaryRowBlock: ViewStyle;
   summaryImageBlock: ViewStyle;
   summaryRowLabel: TextStyle;
@@ -333,6 +357,117 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryInputsList: {
       gap: t.spacing.md,
+    },
+    choiceInput: {
+      gap: t.spacing.xs,
+    },
+    choiceInputLabel: {
+      color: t.colors.textDark,
+    },
+    choiceHelperText: {
+      color: t.colors.textMedium,
+    },
+    choiceOptionsList: {
+      gap: t.spacing.sm,
+      marginTop: t.spacing.xs,
+    },
+    choiceOption: {
+      minHeight: 72,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.md,
+      padding: t.spacing.md,
+      borderWidth: 1,
+      borderColor: SOFT_BORDER_COLOR,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
+      backgroundColor: t.colors.backgroudWhite,
+    },
+    choiceOptionSelected: {
+      borderColor: t.colors.primary,
+      backgroundColor: t.colors.primaryLight,
+    },
+    choiceOptionDisabled: {
+      opacity: 0.66,
+    },
+    choiceOptionContent: {
+      flex: 1,
+      gap: t.spacing.xs,
+    },
+    choiceOptionHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: t.spacing.sm,
+    },
+    choiceOptionLabel: {
+      flex: 1,
+      color: t.colors.textDark,
+    },
+    choiceOptionMeta: {
+      color: t.colors.textMedium,
+    },
+    choiceOptionDisabledReason: {
+      color: t.colors.error,
+    },
+    choiceSetupAction: {
+      minHeight: 44,
+      alignSelf: "flex-start",
+      justifyContent: "center",
+      paddingHorizontal: t.spacing.sm,
+      marginLeft: -t.spacing.sm,
+    },
+    choiceSetupActionLabel: {
+      color: t.colors.primary,
+      fontFamily: fontFamilies.medium,
+    },
+    choiceInputError: {
+      color: t.colors.error,
+    },
+    summaryBlocker: {
+      gap: t.spacing.xs,
+      padding: t.spacing.md,
+      borderRadius: ROUNDED_SURFACE_RADIUS,
+      backgroundColor: t.colors.background,
+    },
+    summaryBlockerMessage: {
+      color: t.colors.error,
+    },
+    summaryBlockerAction: {
+      minHeight: 44,
+      alignSelf: "flex-start",
+      justifyContent: "center",
+    },
+    summaryBlockerActionLabel: {
+      color: t.colors.primary,
+      fontFamily: fontFamilies.medium,
+    },
+    summaryFeedback: {
+      marginHorizontal: t.spacing.md,
+      minHeight: 60,
+      padding: 12,
+      borderRadius: t.glass.radius.surface,
+      backgroundColor: t.colors.background,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    summaryFeedbackIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    summaryFeedbackContent: {
+      flex: 1,
+      gap: t.spacing.xs,
+    },
+    summaryFeedbackTitle: {
+      fontFamily: fontFamilies.medium,
+    },
+    summaryFeedbackMessage: {
+      color: t.colors.textMedium,
     },
     summaryRowBlock: {
       gap: t.spacing.xs,

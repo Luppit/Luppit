@@ -555,6 +555,7 @@ function MarketplaceHomeContent({
                 compact
                 item={item}
                 role={role}
+                showSellerStatus={role === "seller"}
                 onPress={() =>
                   role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item)
                 }

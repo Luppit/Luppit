@@ -1,7 +1,8 @@
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
-import type { ToastMessage, ToastVariant } from "@/src/services/toast.service";
+import { getToastVariantPresentation } from "@/src/components/toast/presentation";
+import type { ToastMessage } from "@/src/services/toast.service";
 import { fontFamilies, useTheme } from "@/src/themes";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -12,44 +13,6 @@ type ToastCardProps = {
   actionPending: boolean;
   onActionPress: () => void;
 };
-
-type VariantPresentation = {
-  icon: "check" | "alert-circle" | "info";
-  iconColor: string;
-  badgeColor: string;
-};
-
-function getVariantPresentation(
-  variant: ToastVariant,
-  colors: ReturnType<typeof useTheme>["colors"]
-): VariantPresentation {
-  switch (variant) {
-    case "success":
-      return {
-        icon: "check",
-        iconColor: colors.success,
-        badgeColor: "rgba(131,163,30,0.14)",
-      };
-    case "error":
-      return {
-        icon: "alert-circle",
-        iconColor: colors.error,
-        badgeColor: "rgba(165,33,0,0.12)",
-      };
-    case "warning":
-      return {
-        icon: "alert-circle",
-        iconColor: colors.secondary,
-        badgeColor: "rgba(255,200,97,0.22)",
-      };
-    case "info":
-      return {
-        icon: "info",
-        iconColor: colors.textMedium,
-        badgeColor: "rgba(119,190,240,0.18)",
-      };
-  }
-}
 
 function getVisibleCopy(toast: ToastMessage) {
   const title = toast.title?.trim();
@@ -68,7 +31,7 @@ export default function ToastCard({
   onActionPress,
 }: ToastCardProps) {
   const t = useTheme();
-  const presentation = getVariantPresentation(toast.variant, t.colors);
+  const presentation = getToastVariantPresentation(toast.variant, t.colors);
   const copy = getVisibleCopy(toast);
 
   return (

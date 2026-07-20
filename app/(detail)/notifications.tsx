@@ -219,7 +219,7 @@ function NotificationRow({
   const s = React.useMemo(() => createNotificationsStyles(t), [t]);
   const tone = getNotificationTone(t, notification.typeCode);
   const isUnread = notification.readAt == null;
-  const title = notification.typeLabel || "Notificación";
+  const title = notification.title || notification.typeLabel || "Notificación";
   const openNotificationDetail = () => {
     openPopup({
       type: "summary",

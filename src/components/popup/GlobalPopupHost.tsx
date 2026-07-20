@@ -8,6 +8,7 @@ import SuccessPopupContent from "@/src/components/popup/SuccessPopupContent";
 import SuccessScreenConfetti from "@/src/components/popup/SuccessScreenConfetti";
 import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
+import { getToastVariantPresentation } from "@/src/components/toast/presentation";
 import {
   closePopup,
   PopupFilterConfig,
@@ -18,6 +19,7 @@ import {
   PopupSuccessConfig,
   PopupSummaryAction,
   PopupSummaryConfig,
+  PopupSummaryFeedback,
   PopupSummaryInput,
   subscribePopup,
 } from "@/src/services/popup.service";
@@ -173,6 +175,17 @@ export default function GlobalPopupHost() {
   const [pendingSummaryActionId, setPendingSummaryActionId] = useState<string | null>(
     null
   );
+  const [summaryFeedback, setSummaryFeedback] =
+    useState<PopupSummaryFeedback | null>(null);
+  const [summaryInputErrors, setSummaryInputErrors] = useState<
+    Record<string, string>
+  >({});
+  const [summaryInputResetKeys, setSummaryInputResetKeys] = useState<
+    Record<string, number>
+  >({});
+  const [summaryChoiceValues, setSummaryChoiceValues] = useState<
+    Record<string, string>
+  >({});
   const [isSuccessActionPending, setSuccessActionPending] = useState(false);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -260,6 +273,10 @@ export default function GlobalPopupHost() {
             setProfileSwitcherConfig(null);
             setSuccessConfig(null);
             setPendingSummaryActionId(null);
+            setSummaryFeedback(null);
+            setSummaryInputErrors({});
+            setSummaryInputResetKeys({});
+            setSummaryChoiceValues({});
             setSuccessActionPending(false);
           }
         });
@@ -343,6 +360,10 @@ export default function GlobalPopupHost() {
         config.type === "success" ? false : config.dismissOnBackdropPress ?? true
       );
       setPendingSummaryActionId(null);
+      setSummaryFeedback(null);
+      setSummaryInputErrors({});
+      setSummaryInputResetKeys({});
+      setSummaryChoiceValues({});
       setSuccessActionPending(false);
       setMounted(true);
       opacity.setValue(0);
@@ -413,13 +434,59 @@ export default function GlobalPopupHost() {
     if (pendingSummaryActionId) return;
 
     setPendingSummaryActionId(action.id);
+    setSummaryFeedback(null);
+    setSummaryInputErrors({});
     try {
-      const result = action.onPress?.();
+      const result = await action.onPress?.();
       let shouldClose = result !== false;
-      if (result && typeof (result as Promise<void | boolean>).then === "function") {
-        const resolvedResult = await result;
-        shouldClose = resolvedResult !== false;
+
+      if (result && typeof result === "object") {
+        shouldClose = result.shouldClose;
+
+        if (result.feedback) {
+          setSummaryFeedback(result.feedback);
+          AccessibilityInfo.announceForAccessibility(
+            `${result.feedback.title}. ${result.feedback.message}`
+          );
+
+          const feedbackType =
+            result.feedback.tone === "success"
+              ? Haptics.NotificationFeedbackType.Success
+              : result.feedback.tone === "error"
+                ? Haptics.NotificationFeedbackType.Error
+                : Haptics.NotificationFeedbackType.Warning;
+          void Haptics.notificationAsync(feedbackType).catch(() => undefined);
+        }
+
+        const inputErrors = result.inputErrors ?? {};
+        setSummaryInputErrors(inputErrors);
+        const firstInputError = Object.values(inputErrors).find((message) =>
+          message.trim()
+        );
+        if (firstInputError) {
+          AccessibilityInfo.announceForAccessibility(firstInputError);
+          void Haptics.notificationAsync(
+            Haptics.NotificationFeedbackType.Warning
+          ).catch(() => undefined);
+        }
+
+        const resetInputIds = Array.from(new Set(result.resetInputIds ?? []));
+        if (resetInputIds.length > 0) {
+          summaryConfig?.inputs?.forEach((input) => {
+            if (resetInputIds.includes(input.id)) {
+              input.onValueChange?.("");
+            }
+          });
+          setSummaryInputResetKeys((current) => {
+            const next = { ...current };
+            resetInputIds.forEach((inputId) => {
+              next[inputId] = (current[inputId] ?? 0) + 1;
+            });
+            return next;
+          });
+        }
       }
+
       if (shouldClose) {
         closePopup();
       }
@@ -696,6 +763,10 @@ export default function GlobalPopupHost() {
 
   if (!isMounted) return null;
 
+  const summaryFeedbackPresentation = summaryFeedback
+    ? getToastVariantPresentation(summaryFeedback.tone, t.colors)
+    : null;
+
   return (
     <Modal
       transparent
@@ -706,7 +777,7 @@ export default function GlobalPopupHost() {
     >
       <View
         style={StyleSheet.absoluteFillObject}
-        accessibilityViewIsModal={Boolean(successConfig)}
+        accessibilityViewIsModal
         onAccessibilityEscape={
           successConfig ? () => void handleSuccessActionPress() : undefined
         }
@@ -958,7 +1029,10 @@ export default function GlobalPopupHost() {
                     <View style={s.section}>
                       <View style={s.summaryHeaderBlock}>
                         <View style={s.summaryHeader}>
-                          <Text variant="subtitle" style={s.summaryTitle}>
+                          <Text
+                            variant="subtitle"
+                            style={s.summaryTitle}
+                          >
                             {sortConfig.title}
                           </Text>
                         </View>
@@ -1088,11 +1162,18 @@ export default function GlobalPopupHost() {
                     contentContainerStyle={s.sheetContentScrollContent}
                     showsVerticalScrollIndicator={false}
                     nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+                    automaticallyAdjustKeyboardInsets
                   >
                     <View style={s.section}>
                       <View style={s.summaryHeaderBlock}>
                         <View style={s.summaryHeader}>
-                          <Text variant="subtitle" style={s.summaryTitle}>
+                          <Text
+                            variant="subtitle"
+                            style={s.summaryTitle}
+                            accessibilityRole="header"
+                          >
                             {summaryConfig.title}
                           </Text>
                           {summaryConfig.icon ? (
@@ -1133,9 +1214,10 @@ export default function GlobalPopupHost() {
 
                               return (
                                 <OtpValidator
-                                  key={input.id}
+                                  key={`${input.id}-${summaryInputResetKeys[input.id] ?? 0}`}
                                   label={input.label}
                                   helperText={input.helper_text}
+                                  errorText={summaryInputErrors[input.id]}
                                   otpLength={input.otp_length ?? 4}
                                   onHelperPress={
                                     helper
@@ -1146,7 +1228,15 @@ export default function GlobalPopupHost() {
                                         }
                                       : undefined
                                   }
-                                  onChange={(value) => input.onValueChange?.(value)}
+                                  onChange={(value) => {
+                                    setSummaryInputErrors((current) => {
+                                      if (!current[input.id]) return current;
+                                      const next = { ...current };
+                                      delete next[input.id];
+                                      return next;
+                                    });
+                                    input.onValueChange?.(value);
+                                  }}
                                 />
                               );
                             }
@@ -1156,15 +1246,206 @@ export default function GlobalPopupHost() {
                                 <RatingInput
                                   key={input.id}
                                   label={input.label}
+                                  hideLabel={
+                                    summaryConfig.title.trim() === input.label.trim()
+                                  }
                                   helperText={input.helper_text}
+                                  errorText={summaryInputErrors[input.id]}
                                   componentConfig={input.component_config}
-                                  onChange={(value) => input.onValueChange?.(value)}
+                                  onChange={(value) => {
+                                    if (value.stars >= 1) {
+                                      setSummaryInputErrors((current) => {
+                                        if (!current[input.id]) return current;
+                                        const next = { ...current };
+                                        delete next[input.id];
+                                        return next;
+                                      });
+                                    }
+                                    input.onValueChange?.(value);
+                                  }}
                                 />
+                              );
+                            }
+
+                            if (input.kind === "choice") {
+                              const choiceOptions = input.options ?? [];
+                              const selectedValue = summaryChoiceValues[input.id];
+
+                              return (
+                                <View
+                                  key={input.id}
+                                  accessibilityRole="radiogroup"
+                                  style={s.choiceInput}
+                                >
+                                  <Text variant="body" style={s.choiceInputLabel}>
+                                    {input.label}
+                                  </Text>
+                                  {input.helper_text ? (
+                                    <Text variant="small" style={s.choiceHelperText}>
+                                      {input.helper_text}
+                                    </Text>
+                                  ) : null}
+
+                                  {choiceOptions.length > 0 ? (
+                                    <View style={s.choiceOptionsList}>
+                                      {choiceOptions.map((option) => {
+                                        const isSelected = selectedValue === option.value;
+                                        const isDisabled =
+                                          option.disabled === true ||
+                                          pendingSummaryActionId != null;
+                                        const accessibilityLabel = [
+                                          option.label,
+                                          option.availabilityLabel,
+                                          option.feeLabel,
+                                          option.totalLabel,
+                                          option.timingLabel,
+                                          option.disabledReason,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(". ");
+
+                                        return (
+                                          <Pressable
+                                            key={option.value}
+                                            accessibilityRole="radio"
+                                            accessibilityLabel={accessibilityLabel}
+                                            accessibilityState={{
+                                              checked: isSelected,
+                                              disabled: isDisabled,
+                                            }}
+                                            style={[
+                                              s.choiceOption,
+                                              isSelected ? s.choiceOptionSelected : null,
+                                              option.disabled ? s.choiceOptionDisabled : null,
+                                            ]}
+                                            onPress={() => {
+                                              if (isDisabled) return;
+                                              setSummaryChoiceValues((current) => ({
+                                                ...current,
+                                                [input.id]: option.value,
+                                              }));
+                                              setSummaryInputErrors((current) => {
+                                                if (!current[input.id]) return current;
+                                                const next = { ...current };
+                                                delete next[input.id];
+                                                return next;
+                                              });
+                                              input.onValueChange?.(option.value);
+                                            }}
+                                          >
+                                            <View
+                                              style={[
+                                                s.sortRadioOuter,
+                                                isSelected ? s.sortRadioOuterSelected : null,
+                                              ]}
+                                            >
+                                              {isSelected ? (
+                                                <View style={s.sortRadioInner} />
+                                              ) : null}
+                                            </View>
+                                            <View style={s.choiceOptionContent}>
+                                              <View style={s.choiceOptionHeader}>
+                                                <Text
+                                                  variant="body"
+                                                  style={s.choiceOptionLabel}
+                                                >
+                                                  {option.label}
+                                                </Text>
+                                                {option.availabilityLabel ? (
+                                                  <Text
+                                                    variant="small"
+                                                    style={s.choiceOptionMeta}
+                                                  >
+                                                    {option.availabilityLabel}
+                                                  </Text>
+                                                ) : null}
+                                              </View>
+                                              {[option.feeLabel, option.totalLabel, option.timingLabel]
+                                                .filter(Boolean)
+                                                .map((detail) => (
+                                                  <Text
+                                                    key={detail}
+                                                    variant="small"
+                                                    style={s.choiceOptionMeta}
+                                                  >
+                                                    {detail}
+                                                  </Text>
+                                                ))}
+                                              {option.disabledReason ? (
+                                                <Text
+                                                  variant="small"
+                                                  style={s.choiceOptionDisabledReason}
+                                                >
+                                                  {option.disabledReason}
+                                                </Text>
+                                              ) : null}
+                                              {option.disabled &&
+                                              option.setupActionLabel &&
+                                              option.onSetupPress ? (
+                                                <Pressable
+                                                  accessibilityRole="button"
+                                                  hitSlop={8}
+                                                  style={s.choiceSetupAction}
+                                                  onPress={(event) => {
+                                                    event.stopPropagation();
+                                                    option.onSetupPress?.();
+                                                  }}
+                                                >
+                                                  <Text
+                                                    variant="small"
+                                                    style={s.choiceSetupActionLabel}
+                                                  >
+                                                    {option.setupActionLabel}
+                                                  </Text>
+                                                </Pressable>
+                                              ) : null}
+                                            </View>
+                                          </Pressable>
+                                        );
+                                      })}
+                                    </View>
+                                  ) : (
+                                    <Text variant="small" style={s.choiceInputError}>
+                                      No hay opciones disponibles. Actualiza la conversación.
+                                    </Text>
+                                  )}
+
+                                  {summaryInputErrors[input.id] ? (
+                                    <Text
+                                      accessibilityRole="alert"
+                                      variant="small"
+                                      style={s.choiceInputError}
+                                    >
+                                      {summaryInputErrors[input.id]}
+                                    </Text>
+                                  ) : null}
+                                </View>
                               );
                             }
 
                             return null;
                           })}
+                        </View>
+                      ) : null}
+
+                      {summaryConfig.blocker ? (
+                        <View accessibilityRole="alert" style={s.summaryBlocker}>
+                          <Text variant="small" style={s.summaryBlockerMessage}>
+                            {summaryConfig.blocker.message}
+                          </Text>
+                          {summaryConfig.blocker.actionLabel &&
+                          summaryConfig.blocker.onActionPress ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              hitSlop={8}
+                              style={s.summaryBlockerAction}
+                              onPress={summaryConfig.blocker.onActionPress}
+                            >
+                              <Text variant="small" style={s.summaryBlockerActionLabel}>
+                                {summaryConfig.blocker.actionLabel}
+                              </Text>
+                            </Pressable>
+                          ) : null}
                         </View>
                       ) : null}
 
@@ -1195,6 +1476,44 @@ export default function GlobalPopupHost() {
                     </View>
                   </ScrollView>
 
+                  {summaryFeedback && summaryFeedbackPresentation ? (
+                    <View
+                      accessibilityRole={summaryFeedback.tone === "error" ? "alert" : undefined}
+                      style={s.summaryFeedback}
+                    >
+                      <View
+                        pointerEvents="none"
+                        style={[
+                          s.summaryFeedbackIcon,
+                          { backgroundColor: summaryFeedbackPresentation.badgeColor },
+                        ]}
+                      >
+                        <Icon
+                          name={summaryFeedbackPresentation.icon}
+                          size={19}
+                          strokeWidth={2.25}
+                          color={summaryFeedbackPresentation.iconColor}
+                        />
+                      </View>
+                      <View style={s.summaryFeedbackContent}>
+                        <Text
+                          variant="body"
+                          maxLines={2}
+                          style={s.summaryFeedbackTitle}
+                        >
+                          {summaryFeedback.title}
+                        </Text>
+                        <Text
+                          variant="small"
+                          maxLines={3}
+                          style={s.summaryFeedbackMessage}
+                        >
+                          {summaryFeedback.message}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
                   {summaryConfig.actions && summaryConfig.actions.length > 0 ? (
                     <View style={s.summaryActionsRow}>
                       {summaryConfig.actions.slice(0, 2).map((action) => {
@@ -1212,11 +1531,17 @@ export default function GlobalPopupHost() {
                             : t.colors.backgroudWhite;
                         const isSingle = summaryConfig.actions?.length === 1;
                         const isPending = pendingSummaryActionId === action.id;
-                        const isDisabled = pendingSummaryActionId != null;
+                        const isDisabled =
+                          action.disabled === true || pendingSummaryActionId != null;
 
                         return (
                           <Pressable
                             key={action.id}
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              disabled: isDisabled,
+                              busy: isPending,
+                            }}
                             disabled={isDisabled}
                             style={[
                               s.summaryActionButton,

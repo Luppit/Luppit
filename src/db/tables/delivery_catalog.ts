@@ -7,4 +7,5 @@ export const COL_DELIVERY_CATALOG = {
   created_at: "created_at",
   display_name: "display_name",
   hint: "hint",
+  method_kind: "method_kind",
 } as const satisfies { [K in keyof Row<"delivery_catalog"> & string]: K };

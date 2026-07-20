@@ -1,8 +1,10 @@
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import { Text } from "@/src/components/Text";
+import TextArea from "@/src/components/textArea/TextArea";
 import { lucideIcons } from "@/src/icons/lucide";
 import { useTheme } from "@/src/themes";
 import React, { useMemo, useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
 import { createRatingInputStyles } from "./ratingInputStyles";
 
 type RatingValue = {
@@ -13,7 +15,9 @@ type RatingValue = {
 
 type RatingInputProps = {
   label: string;
+  hideLabel?: boolean;
   helperText?: string | null;
+  errorText?: string | null;
   componentConfig?: Record<string, unknown> | null;
   onChange?: (value: RatingValue) => void;
 };
@@ -33,7 +37,9 @@ function toStringArray(value: unknown): string[] {
 
 export default function RatingInput({
   label,
+  hideLabel = false,
   helperText,
+  errorText,
   componentConfig,
   onChange,
 }: RatingInputProps) {
@@ -108,12 +114,14 @@ export default function RatingInput({
 
   return (
     <View style={s.container}>
-      <Text variant="body" style={s.label}>
-        {label}
-      </Text>
+      {!hideLabel && label.trim() ? (
+        <Text variant="body" style={s.label}>
+          {label}
+        </Text>
+      ) : null}
 
       {targetName ? (
-        <Text variant="body">
+        <Text variant="body" style={s.targetName}>
           {targetName}
         </Text>
       ) : null}
@@ -123,25 +131,43 @@ export default function RatingInput({
         </Text>
       ) : null}
 
-      <View style={s.starsRow}>
-        {Array.from({ length: starsMax }).map((_, index) => {
-          const value = index + 1;
-          const isSelected = value <= stars;
-          return (
-            <Pressable
-              key={value}
-              onPress={() => handleStarsPress(value)}
-              style={s.starButton}
-              hitSlop={8}
-            >
-              <StarIcon
-                size={30}
-                color={isSelected ? t.colors.accentYellow : t.colors.border}
-                fill={isSelected ? t.colors.accentYellow : "transparent"}
-              />
-            </Pressable>
-          );
-        })}
+      <View style={s.starsBlock}>
+        <View style={s.starsRow}>
+          {Array.from({ length: starsMax }).map((_, index) => {
+            const value = index + 1;
+            const isFilled = value <= stars;
+            return (
+              <Pressable
+                key={value}
+                accessibilityRole="radio"
+                accessibilityLabel={`${value} de ${starsMax} estrellas`}
+                accessibilityState={{ checked: stars === value }}
+                onPress={() => handleStarsPress(value)}
+                style={s.starButton}
+              >
+                <StarIcon
+                  size={30}
+                  color={isFilled ? t.colors.accentYellow : t.colors.border}
+                  fill={isFilled ? t.colors.accentYellow : "transparent"}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+        {stars > 0 ? (
+          <Text variant="small" style={s.ratingStatus}>
+            {stars} de {starsMax} estrellas
+          </Text>
+        ) : null}
+        {errorText ? (
+          <Text
+            variant="small"
+            style={s.fieldError}
+            accessibilityRole="alert"
+          >
+            {errorText}
+          </Text>
+        ) : null}
       </View>
 
       {chips.length > 0 ? (
@@ -149,38 +175,30 @@ export default function RatingInput({
           {chips.map((chip) => {
             const isSelected = selectedTags.includes(chip);
             return (
-              <Pressable
+              <LuppitChip
                 key={chip}
-                style={[s.chipButton, isSelected ? s.chipButtonActive : null]}
+                label={chip}
+                bordered
+                selected={isSelected}
                 onPress={() => handleTagPress(chip)}
-              >
-                <Text
-                  variant="body"
-                  style={isSelected ? s.chipLabelActive : s.chipLabel}
-                >
-                  {chip}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
       ) : null}
 
       <View style={s.commentBlock}>
-        <Text variant="small" color="stateAnulated">
+        <Text variant="small" color="textMedium">
           Comentarios
         </Text>
-        <View style={s.commentInputWrap}>
-          <TextInput
-            value={comment}
-            onChangeText={handleCommentChange}
-            placeholder={commentPlaceholder}
-            placeholderTextColor={t.colors.border}
-            multiline
-            textAlignVertical="top"
-            style={s.commentInput}
-          />
-        </View>
+        <TextArea
+          value={comment}
+          onChangeText={handleCommentChange}
+          placeholder={commentPlaceholder}
+          placeholderTextColor={t.colors.textMedium}
+          accessibilityLabel="Comentarios, opcional"
+          baseContainerStyle={s.commentTextArea}
+        />
       </View>
     </View>
   );

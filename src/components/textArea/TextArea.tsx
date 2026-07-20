@@ -32,6 +32,7 @@ export default function TextArea({
   multiline = true,
   onFocus,
   onBlur,
+  placeholderTextColor,
   ...props
 }: TextAreaProps) {
   const t = useTheme();
@@ -64,7 +65,7 @@ export default function TextArea({
             setFocused(false);
             onBlur?.(event);
           }}
-          placeholderTextColor={t.colors.border}
+          placeholderTextColor={placeholderTextColor ?? t.colors.border}
         />
       </View>
 

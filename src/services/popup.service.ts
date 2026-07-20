@@ -1,4 +1,5 @@
 import { LucideIconName } from "@/src/icons/lucide";
+import type { ToastVariant } from "@/src/services/toast.service";
 import { Theme } from "@/src/themes";
 
 type ThemeColorKey = keyof Theme["colors"];
@@ -28,6 +29,24 @@ export type PopupSummaryImage = {
   uri: string;
 };
 
+export type PopupSummaryFeedback = {
+  tone: ToastVariant;
+  title: string;
+  message: string;
+};
+
+export type PopupSummaryActionOutcome = {
+  shouldClose: boolean;
+  feedback?: PopupSummaryFeedback;
+  inputErrors?: Record<string, string>;
+  resetInputIds?: string[];
+};
+
+export type PopupSummaryActionResult =
+  | void
+  | boolean
+  | PopupSummaryActionOutcome;
+
 export type PopupSummaryAction = {
   id: string;
   label: string;
@@ -35,7 +54,22 @@ export type PopupSummaryAction = {
   backgroundColorKey?: ThemeColorKey;
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;
-  onPress?: () => void | boolean | Promise<void | boolean>;
+  disabled?: boolean;
+  onPress?: () => PopupSummaryActionResult | Promise<PopupSummaryActionResult>;
+};
+
+export type PopupSummaryChoiceOption = {
+  value: string;
+  methodKind: "shipping" | "pickup";
+  label: string;
+  feeLabel?: string | null;
+  totalLabel?: string | null;
+  timingLabel?: string | null;
+  availabilityLabel?: string | null;
+  disabled?: boolean;
+  disabledReason?: string | null;
+  setupActionLabel?: string | null;
+  onSetupPress?: () => void;
 };
 
 export type PopupSummaryInput = {
@@ -47,7 +81,14 @@ export type PopupSummaryInput = {
   otp_length?: number;
   is_required?: boolean;
   component_config?: Record<string, unknown> | null;
+  options?: PopupSummaryChoiceOption[];
   onValueChange?: (value: unknown) => void;
+};
+
+export type PopupSummaryBlocker = {
+  message: string;
+  actionLabel?: string | null;
+  onActionPress?: () => void;
 };
 
 export type PopupHelperSection = {
@@ -77,6 +118,7 @@ export type PopupSummaryConfig = {
   rows?: PopupSummaryRow[];
   inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];
+  blocker?: PopupSummaryBlocker | null;
   actions?: PopupSummaryAction[];
   dismissOnBackdropPress?: boolean;
 };
