@@ -26,13 +26,12 @@ import {
   ConversationViewAction,
   executeConversationAction,
   executeConversationActionByExecutor,
+  getCurrentProfileConversationById,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
-import { getPurchaseOfferById } from "@/src/services/purchase.offer.service";
 import {
   addCurrentBuyerPurchaseRequestFavorite,
   addCurrentSellerPurchaseRequestFavorite,
-  getPurchaseRequestById,
 } from "@/src/services/purchase.request.service";
 import {
   clearToastBottomInset,
@@ -301,7 +300,6 @@ export default function ConversationLayout() {
   );
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
-  const purchaseOfferId = conversationView?.conversation.purchase_offer_id ?? null;
   const showComposer = conversationView?.permissions.can_send_messages ?? false;
 
   useEffect(() => {
@@ -313,7 +311,7 @@ export default function ConversationLayout() {
   }, [showComposer]);
 
   useEffect(() => {
-    if (!purchaseRequestId && !purchaseOfferId) {
+    if (!conversationId) {
       setPurchaseRequestTitle(null);
       return;
     }
@@ -321,29 +319,15 @@ export default function ConversationLayout() {
     let active = true;
 
     const loadPurchaseRequestTitle = async () => {
-      let resolvedPurchaseRequestId = purchaseRequestId;
-
-      if (!resolvedPurchaseRequestId && purchaseOfferId) {
-        const offerResult = await getPurchaseOfferById(purchaseOfferId);
-        if (offerResult?.ok) {
-          resolvedPurchaseRequestId = offerResult.data.purchase_request_id;
-        }
-      }
-
-      if (!resolvedPurchaseRequestId) {
-        if (active) setPurchaseRequestTitle(null);
-        return;
-      }
-
-      const result = await getPurchaseRequestById(resolvedPurchaseRequestId);
+      const result = await getCurrentProfileConversationById(conversationId);
       if (!active) return;
 
-      if (!result || result.ok === false) {
+      if (!result.ok) {
         setPurchaseRequestTitle(null);
         return;
       }
 
-      setPurchaseRequestTitle(result.data.title?.trim() || null);
+      setPurchaseRequestTitle(result.data.request_title?.trim() || null);
     };
 
     void loadPurchaseRequestTitle();
@@ -351,7 +335,7 @@ export default function ConversationLayout() {
     return () => {
       active = false;
     };
-  }, [purchaseOfferId, purchaseRequestId]);
+  }, [conversationId]);
 
   useEffect(() => {
     setOptimisticMessages([]);

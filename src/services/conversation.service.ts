@@ -826,6 +826,28 @@ export async function getCurrentProfileConversations(
   return { ok: true, data: items };
 }
 
+export async function getCurrentProfileConversationById(
+  conversationId: string
+): Promise<
+  { ok: true; data: ConversationListItem } | { ok: false; error: AppError }
+> {
+  if (!conversationId) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const conversations = await getCurrentProfileConversations();
+  if (!conversations.ok) return conversations;
+
+  const conversation = conversations.data.find(
+    (item) => item.conversation_id === conversationId
+  );
+  if (!conversation) {
+    return { ok: false, error: fromAppError("not_found") };
+  }
+
+  return { ok: true, data: conversation };
+}
+
 export async function getCurrentUserConversationView(
   conversationId: string
 ): Promise<

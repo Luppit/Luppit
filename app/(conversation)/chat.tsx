@@ -4,16 +4,11 @@ import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
-import { getProfileById } from "@/src/services/profile.service";
-import { getBusinessById } from "@/src/services/business.service";
-import { getBusinessIdByProfileId } from "@/src/services/profile.business.service";
-import { getPurchaseOfferById } from "@/src/services/purchase.offer.service";
-import { getPurchaseRequestById } from "@/src/services/purchase.request.service";
 import {
   ConversationMessage,
   getConversationMessagesByConversationId,
 } from "@/src/services/conversation.message.service";
-import { getCurrentProfileConversations } from "@/src/services/conversation.service";
+import { getCurrentProfileConversationById } from "@/src/services/conversation.service";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "@/src/themes";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -35,12 +30,6 @@ type ConversationRenderItem =
     };
 
 const imageGroupWindowMs = 2 * 60 * 1000;
-const emptyConversationFilters = {
-  searchValue: "",
-  startDate: "",
-  endDate: "",
-  selectedCategoryIds: [],
-};
 
 const getMessageImageUri = (message: ConversationMessage) =>
   (message.image_url as string | null | undefined) ??
@@ -61,66 +50,10 @@ function normalizeDisplayName(value: string | null | undefined) {
   return name;
 }
 
-async function getBuyerDisplayName(profileId: string) {
-  const profileResult = await getProfileById(profileId);
-  if (!profileResult || profileResult.ok === false) return null;
-
-  return normalizeDisplayName(profileResult.data.name);
-}
-
-async function getBuyerDisplayNameByPurchaseRequestId(purchaseRequestId: string | null) {
-  if (!purchaseRequestId) return null;
-
-  const requestResult = await getPurchaseRequestById(purchaseRequestId);
-  if (!requestResult || requestResult.ok === false) return null;
-
-  return getBuyerDisplayName(requestResult.data.profile_id);
-}
-
-async function getBuyerDisplayNameByPurchaseSource(
-  purchaseRequestId: string | null,
-  purchaseOfferId: string | null
-) {
-  if (purchaseRequestId) {
-    const name = await getBuyerDisplayNameByPurchaseRequestId(purchaseRequestId);
-    if (name) return name;
-  }
-
-  if (!purchaseOfferId) return null;
-
-  const offerResult = await getPurchaseOfferById(purchaseOfferId);
-  if (!offerResult?.ok || !offerResult.data.purchase_request_id) return null;
-
-  return getBuyerDisplayNameByPurchaseRequestId(offerResult.data.purchase_request_id);
-}
-
 async function getCounterpartDisplayNameByConversationId(conversationId: string) {
-  const conversationsResult = await getCurrentProfileConversations(
-    emptyConversationFilters
-  );
-  if (!conversationsResult.ok) return null;
-
-  const conversation = conversationsResult.data.find(
-    (item) => item.conversation_id === conversationId
-  );
-
-  return normalizeDisplayName(conversation?.display_name);
-}
-
-async function getSellerDisplayName(profileId: string) {
-  const businessRef = await getBusinessIdByProfileId(profileId);
-  if (businessRef?.ok) {
-    const businessResult = await getBusinessById(businessRef.data);
-    if (businessResult?.ok) {
-      const businessName = normalizeDisplayName(businessResult.data.name);
-      if (businessName) return businessName;
-    }
-  }
-
-  const profileResult = await getProfileById(profileId);
-  if (!profileResult || profileResult.ok === false) return null;
-
-  return normalizeDisplayName(profileResult.data.name);
+  const result = await getCurrentProfileConversationById(conversationId);
+  if (!result.ok) return null;
+  return normalizeDisplayName(result.data.display_name);
 }
 
 const shouldGroupImageMessages = (
@@ -278,48 +211,11 @@ export default function ConversationChatScreen() {
   }, [messageRefreshTick, loadMessages]);
 
   useEffect(() => {
-    const buyerProfileId = conversationView.conversation.buyer_profile_id;
-    const sellerProfileId = conversationView.conversation.seller_profile_id;
-    const purchaseOfferId = conversationView.conversation.purchase_offer_id;
-    const purchaseRequestId = conversationView.conversation.purchase_request_id;
-    const roleCode = conversationView.role_code.toLowerCase();
-    const isSellerViewer =
-      profileId === sellerProfileId || roleCode.includes("seller");
-    const isBuyerViewer =
-      (profileId === buyerProfileId || roleCode.includes("buyer")) && !isSellerViewer;
-    const counterpartProfileId = isBuyerViewer
-      ? sellerProfileId
-      : isSellerViewer
-        ? buyerProfileId
-        : null;
-
-    if (
-      !counterpartProfileId &&
-      (isBuyerViewer || (!purchaseRequestId && !purchaseOfferId))
-    ) {
-      setCounterpartDisplayName(null);
-      return;
-    }
-
     let active = true;
 
     const loadCounterpartDisplayName = async () => {
-      const listDisplayName =
-        await getCounterpartDisplayNameByConversationId(conversationId);
       const name =
-        listDisplayName ??
-        (isBuyerViewer
-          ? counterpartProfileId
-            ? await getSellerDisplayName(counterpartProfileId)
-            : null
-          : (await getBuyerDisplayNameByPurchaseSource(
-              purchaseRequestId,
-              purchaseOfferId
-            )) ??
-            (counterpartProfileId
-              ? await getBuyerDisplayName(counterpartProfileId)
-              : null));
-
+        await getCounterpartDisplayNameByConversationId(conversationId);
       if (active) setCounterpartDisplayName(name);
     };
 
@@ -328,20 +224,9 @@ export default function ConversationChatScreen() {
     return () => {
       active = false;
     };
-  }, [
-    conversationView.conversation.buyer_profile_id,
-    conversationView.conversation.purchase_offer_id,
-    conversationView.conversation.purchase_request_id,
-    conversationView.conversation.seller_profile_id,
-    conversationView.role_code,
-    conversationId,
-    profileId,
-  ]);
+  }, [conversationId]);
 
   useEffect(() => {
-    const purchaseOfferId = conversationView.conversation.purchase_offer_id;
-    const purchaseRequestId = conversationView.conversation.purchase_request_id;
-    const sellerProfileId = conversationView.conversation.seller_profile_id;
     const senderIds = Array.from(
       new Set(
         visibleMessages
@@ -358,50 +243,18 @@ export default function ConversationChatScreen() {
       return;
     }
 
-    let active = true;
+    if (!counterpartDisplayName) {
+      setSenderNameById({});
+      return;
+    }
 
-    const loadSenderNames = async () => {
-      const listDisplayName =
-        await getCounterpartDisplayNameByConversationId(conversationId);
-      const entries = await Promise.all(
-        senderIds.map(async (senderId) => {
-          const name = senderId === sellerProfileId
-            ? (await getSellerDisplayName(senderId)) ?? listDisplayName
-            : (await getBuyerDisplayName(senderId)) ??
-              (await getBuyerDisplayNameByPurchaseSource(
-                purchaseRequestId,
-                purchaseOfferId
-              )) ??
-              listDisplayName;
-          if (!name) return null;
-          return [senderId, name] as const;
-        })
-      );
-
-      if (!active) return;
-
-      setSenderNameById(
-        entries.reduce<Record<string, string>>((acc, entry) => {
-          if (!entry) return acc;
-          acc[entry[0]] = entry[1];
-          return acc;
-        }, {})
-      );
-    };
-
-    void loadSenderNames();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    conversationView.conversation.purchase_offer_id,
-    conversationView.conversation.purchase_request_id,
-    conversationView.conversation.seller_profile_id,
-    conversationId,
-    visibleMessages,
-    profileId,
-  ]);
+    setSenderNameById(
+      senderIds.reduce<Record<string, string>>((acc, senderId) => {
+        acc[senderId] = counterpartDisplayName;
+        return acc;
+      }, {})
+    );
+  }, [counterpartDisplayName, visibleMessages, profileId]);
 
   const formatTime = (date: string) =>
     new Date(date).toLocaleTimeString("en-US", {

@@ -46,16 +46,26 @@ export async function getPurchaseRequestVisualizationCount(
 ): Promise<{ ok: true; data: number } | { ok: false; error: AppError }> {
   if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
 
-  const { data, error } = await supabase
-    .from("purchase_request_visualization")
-    .select("profile_id")
-    .eq("purchase_request_id", purchaseRequestId);
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const { data, error } = await supabase.rpc(
+    "get_purchase_request_visualization_count",
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
-  const uniqueProfiles = new Set(
-    (data ?? [])
-      .map((row) => row.profile_id)
-      .filter((profileId): profileId is string => Boolean(profileId))
-  );
-  return { ok: true, data: uniqueProfiles.size };
+
+  const count = Number(data ?? 0);
+  return {
+    ok: true,
+    data: Number.isFinite(count) ? Math.max(0, count) : 0,
+  };
 }

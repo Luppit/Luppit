@@ -3702,6 +3702,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_purchase_request_status_ui_options: {
+        Args: { p_profile_id: string }
+        Returns: {
+          status_code: string
+          style_code: string
+          ui_text: string
+        }[]
+      }
+      get_purchase_request_visualization_count: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: number
+      }
       get_seller_home_filter_options: {
         Args: { p_profile_id: string }
         Returns: Json

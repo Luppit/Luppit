@@ -1442,23 +1442,21 @@ export async function getCurrentSellerHomeFilterCategoryOptions(
 export async function getPurchaseRequestStatusUiOptions(): Promise<
   { ok: true; data: PurchaseRequestStatusUiOption[] } | { ok: false; error: AppError }
 > {
-  let { data, error } = await (supabase as any)
-    .from("purchase_request_status_ui")
-    .select("status_code, ui_text, style_code");
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
 
-  if (error) {
-    const legacyResult = await (supabase as any)
-      .from("purchase_request_status_ui")
-      .select("status_code, ui_text");
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-    if (legacyResult.error) return { ok: false, error: fromSupabaseError(error) };
-    data = legacyResult.data;
-    error = legacyResult.error;
-  }
+  const { data, error } = await supabase.rpc(
+    "get_purchase_request_status_ui_options",
+    { p_profile_id: profile.data.id }
+  );
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
-  const rows = Array.isArray(data) ? data : [];
+  const rows: unknown[] = Array.isArray(data) ? data : [];
   const mapped = rows
     .map(mapPurchaseRequestStatusUiOption)
     .filter((item): item is PurchaseRequestStatusUiOption => item !== null);
