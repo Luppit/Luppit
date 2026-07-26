@@ -75,10 +75,22 @@ export const createNavbarStyles = (t: Theme) => {
       opacity: 0.48,
     },
     iconSlot: {
+      position: "relative",
       width: 24,
       height: 24,
       alignItems: "center",
       justifyContent: "center",
+    },
+    notificationDot: {
+      position: "absolute",
+      top: -2,
+      right: -3,
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      borderWidth: 2,
+      borderColor: t.colors.backgroudWhite,
+      backgroundColor: COLORS.active,
     },
     label: {
       width: "100%",

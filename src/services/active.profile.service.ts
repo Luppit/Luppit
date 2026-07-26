@@ -1,7 +1,14 @@
+import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { Row } from "@/src/db/types";
 import { supabase } from "@/src/lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "@/src/lib/supabase/errors";
 import { createKVStorage } from "@/src/store/factory";
+import {
+  COSTA_RICA_LEGAL_ID_ERROR,
+  COSTA_RICA_PERSONAL_ID_ERROR,
+  isValidCostaRicaLegalId,
+  isValidCostaRicaPersonalId,
+} from "@/src/utils/costaRicaIdDocument";
 
 export type ActiveProfileSetupStatus =
   | "missing_role"
@@ -40,12 +47,31 @@ export type CurrentUserBusinessInvitation = {
   expiresAt: string;
 };
 
-export type CurrentBusinessInvitation = {
+export type CurrentBusinessMember = {
+  membershipId: string;
+  profileId: string;
+  name: string;
+  membershipRole: "owner" | "member";
+  joinedAt: string;
+  canRemove: boolean;
+  removeBlockReason:
+    | "business_owner_cannot_be_removed"
+    | "business_member_has_conversation_history"
+    | null;
+};
+
+export type CurrentBusinessPendingInvitation = {
   id: string;
-  status: "pending" | "accepted" | "declined" | "revoked" | "expired";
+  recipientLabel: string;
   createdAt: string;
   expiresAt: string;
-  respondedAt: string | null;
+};
+
+export type CurrentBusinessTeam = {
+  businessId: string;
+  businessName: string;
+  members: CurrentBusinessMember[];
+  pendingInvitations: CurrentBusinessPendingInvitation[];
 };
 
 type ActiveProfileListener = () => void;
@@ -187,7 +213,7 @@ export async function getCurrentProfileResult(): Promise<
 export async function listCurrentUserProfiles(): Promise<
   { ok: true; data: ActiveProfileSummary[] } | { ok: false; error: AppError }
 > {
-  const result: any = await (supabase as any).rpc("get_current_user_profiles");
+  const result = await supabase.rpc(RPC_FUNCTIONS.GET_CURRENT_USER_PROFILES);
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
 
   const profiles = (Array.isArray(result.data) ? result.data : [])
@@ -226,14 +252,34 @@ export function abortProfileScopedRequests() {
 export async function createCurrentUserProfile(
   input: CreateCurrentUserProfileInput
 ): Promise<{ ok: true; data: ActiveProfile } | { ok: false; error: AppError }> {
-  const result: any = await (supabase as any).rpc("create_current_user_profile", {
-    p_name: input.name.trim(),
-    p_id_document: input.idDocument.trim(),
-    p_role: input.role,
-    p_business_name: input.businessName?.trim() || null,
-    p_business_id_document: input.businessIdDocument?.trim() || null,
-    p_invitation_id: input.invitationId ?? null,
-  });
+  if (!isValidCostaRicaPersonalId(input.idDocument)) {
+    return {
+      ok: false,
+      error: { type: "validation", message: COSTA_RICA_PERSONAL_ID_ERROR },
+    };
+  }
+  if (
+    input.role === "seller" &&
+    !input.invitationId &&
+    !isValidCostaRicaLegalId(input.businessIdDocument ?? "")
+  ) {
+    return {
+      ok: false,
+      error: { type: "validation", message: COSTA_RICA_LEGAL_ID_ERROR },
+    };
+  }
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.CREATE_CURRENT_USER_PROFILE,
+    {
+      p_name: input.name.trim(),
+      p_id_document: input.idDocument.trim(),
+      p_role: input.role,
+      p_business_name: input.businessName?.trim() || null,
+      p_business_id_document: input.businessIdDocument?.trim() || null,
+      p_invitation_id: input.invitationId ?? null,
+    } as never
+  );
 
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
   if (!result.data || typeof result.data.id !== "string") {
@@ -247,15 +293,26 @@ export async function completeCurrentUserProfileSetup(
   profileId: string,
   input: Omit<CreateCurrentUserProfileInput, "name" | "idDocument">
 ): Promise<{ ok: true; data: ActiveProfile } | { ok: false; error: AppError }> {
-  const result: any = await (supabase as any).rpc(
-    "complete_current_user_profile_setup",
+  if (
+    input.role === "seller" &&
+    !input.invitationId &&
+    !isValidCostaRicaLegalId(input.businessIdDocument ?? "")
+  ) {
+    return {
+      ok: false,
+      error: { type: "validation", message: COSTA_RICA_LEGAL_ID_ERROR },
+    };
+  }
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.COMPLETE_CURRENT_USER_PROFILE_SETUP,
     {
       p_profile_id: profileId,
       p_role: input.role,
       p_business_name: input.businessName?.trim() || null,
       p_business_id_document: input.businessIdDocument?.trim() || null,
       p_invitation_id: input.invitationId ?? null,
-    }
+    } as never
   );
 
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
@@ -270,8 +327,8 @@ export async function getCurrentUserBusinessInvitations(): Promise<
   | { ok: true; data: CurrentUserBusinessInvitation[] }
   | { ok: false; error: AppError }
 > {
-  const result: any = await (supabase as any).rpc(
-    "get_current_user_business_invitations"
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_USER_BUSINESS_INVITATIONS
   );
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
 
@@ -311,22 +368,29 @@ export async function getCurrentUserBusinessInvitations(): Promise<
 }
 
 export async function declineCurrentUserBusinessInvitation(invitationId: string) {
-  const result: any = await (supabase as any).rpc(
-    "decline_current_user_business_invitation",
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.DECLINE_CURRENT_USER_BUSINESS_INVITATION,
     { p_invitation_id: invitationId }
   );
   if (result.error) return { ok: false as const, error: fromSupabaseError(result.error) };
   return { ok: true as const };
 }
 
-export async function inviteCurrentUserToBusiness(
-  ownerProfileId: string,
-  phone: string
-) {
-  const result: any = await (supabase as any).rpc(
-    "invite_current_user_to_business",
+async function getCurrentProfileId() {
+  const profile = await getCurrentProfileResult();
+  if (!profile) return { ok: false as const, error: fromAppError("auth") };
+  if (!profile.ok) return profile;
+  return { ok: true as const, data: profile.data.id };
+}
+
+export async function inviteCurrentUserToBusiness(phone: string) {
+  const profile = await getCurrentProfileId();
+  if (!profile.ok) return profile;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.INVITE_CURRENT_USER_TO_BUSINESS,
     {
-      p_owner_profile_id: ownerProfileId,
+      p_owner_profile_id: profile.data,
       p_phone: phone.trim(),
     }
   );
@@ -334,27 +398,73 @@ export async function inviteCurrentUserToBusiness(
   return { ok: true as const, data: result.data as string };
 }
 
-export async function getCurrentBusinessInvitations(ownerProfileId: string): Promise<
-  { ok: true; data: CurrentBusinessInvitation[] } | { ok: false; error: AppError }
+export async function getCurrentBusinessTeam(): Promise<
+  { ok: true; data: CurrentBusinessTeam } | { ok: false; error: AppError }
 > {
-  const result: any = await (supabase as any).rpc(
-    "get_current_business_invitations",
-    { p_owner_profile_id: ownerProfileId }
+  const profile = await getCurrentProfileId();
+  if (!profile.ok) return profile;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_BUSINESS_TEAM,
+    { p_owner_profile_id: profile.data }
   );
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
 
-  const invitations = (Array.isArray(result.data) ? result.data : [])
+  if (!result.data || typeof result.data !== "object") {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const payload = result.data as Record<string, unknown>;
+  if (
+    typeof payload.business_id !== "string" ||
+    typeof payload.business_name !== "string"
+  ) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const members = (Array.isArray(payload.members) ? payload.members : [])
     .map((value: unknown) => {
       if (!value || typeof value !== "object") return null;
       const row = value as Record<string, unknown>;
-      const status = row.status;
+      if (
+        typeof row.membership_id !== "string" ||
+        typeof row.profile_id !== "string" ||
+        typeof row.name !== "string" ||
+        (row.membership_role !== "owner" && row.membership_role !== "member") ||
+        typeof row.joined_at !== "string" ||
+        typeof row.can_remove !== "boolean"
+      ) {
+        return null;
+      }
+
+      return {
+        membershipId: row.membership_id,
+        profileId: row.profile_id,
+        name: row.name,
+        membershipRole: row.membership_role,
+        joinedAt: row.joined_at,
+        canRemove: row.can_remove,
+        removeBlockReason:
+          row.remove_block_reason === "business_owner_cannot_be_removed" ||
+          row.remove_block_reason === "business_member_has_conversation_history"
+            ? row.remove_block_reason
+            : null,
+      } satisfies CurrentBusinessMember;
+    })
+    .filter(
+      (member: CurrentBusinessMember | null): member is CurrentBusinessMember =>
+        member !== null
+    );
+
+  const pendingInvitations = (
+    Array.isArray(payload.pending_invitations) ? payload.pending_invitations : []
+  )
+    .map((value: unknown) => {
+      if (!value || typeof value !== "object") return null;
+      const row = value as Record<string, unknown>;
       if (
         typeof row.id !== "string" ||
-        (status !== "pending" &&
-          status !== "accepted" &&
-          status !== "declined" &&
-          status !== "revoked" &&
-          status !== "expired") ||
+        typeof row.recipient_label !== "string" ||
         typeof row.created_at !== "string" ||
         typeof row.expires_at !== "string"
       ) {
@@ -363,32 +473,54 @@ export async function getCurrentBusinessInvitations(ownerProfileId: string): Pro
 
       return {
         id: row.id,
-        status,
+        recipientLabel: row.recipient_label,
         createdAt: row.created_at,
         expiresAt: row.expires_at,
-        respondedAt: typeof row.responded_at === "string" ? row.responded_at : null,
-      } satisfies CurrentBusinessInvitation;
+      } satisfies CurrentBusinessPendingInvitation;
     })
     .filter(
       (
-        invitation: CurrentBusinessInvitation | null
-      ): invitation is CurrentBusinessInvitation => invitation !== null
+        invitation: CurrentBusinessPendingInvitation | null
+      ): invitation is CurrentBusinessPendingInvitation => invitation !== null
     );
 
-  return { ok: true, data: invitations };
+  return {
+    ok: true,
+    data: {
+      businessId: payload.business_id,
+      businessName: payload.business_name,
+      members,
+      pendingInvitations,
+    },
+  };
 }
 
-export async function revokeCurrentBusinessInvitation(
-  ownerProfileId: string,
-  invitationId: string
-) {
-  const result: any = await (supabase as any).rpc(
-    "revoke_current_user_business_invitation",
+export async function revokeCurrentBusinessInvitation(invitationId: string) {
+  const profile = await getCurrentProfileId();
+  if (!profile.ok) return profile;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.REVOKE_CURRENT_USER_BUSINESS_INVITATION,
     {
-      p_owner_profile_id: ownerProfileId,
+      p_owner_profile_id: profile.data,
       p_invitation_id: invitationId,
     }
   );
   if (result.error) return { ok: false as const, error: fromSupabaseError(result.error) };
   return { ok: true as const };
+}
+
+export async function removeCurrentBusinessMember(membershipId: string) {
+  const profile = await getCurrentProfileId();
+  if (!profile.ok) return profile;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.REMOVE_CURRENT_BUSINESS_MEMBER,
+    {
+      p_owner_profile_id: profile.data,
+      p_membership_id: membershipId,
+    }
+  );
+  if (result.error) return { ok: false as const, error: fromSupabaseError(result.error) };
+  return { ok: true as const, data: result.data as Record<string, unknown> };
 }

@@ -32,7 +32,7 @@ Applies to service modules and RPC integration behavior.
 - Seller request open flow uses `get_or_create_seller_purchase_request_conversation`; this RPC owns conversation creation/reuse and visualization side effects.
 
 ## Profile, Account, And Notifications
-- Notification helpers live in `notification.service.ts`; unread state is `profile_notification.read_at`, and marking read goes through the DB RPC.
+- Notification helpers live in `notification.service.ts`; unread state is `profile_notification.read_at`, opening a detail marks only that owned notification through `mark_profile_notification_read`, and shared counts update only from authoritative query/RPC results.
 - Current-profile operations resolve through `active.profile.service.ts`; callers must not select a profile by auth user or phone.
 - Profile switching keeps the current auth session, persists the selected owned profile per device, and never sends OTP or signs out.
 - Profile email setup uses `profile.email`, `email_opt_in`, and `email_opt_in_at`; send/verify through email OTP RPCs and avoid a second client-side profile update after verification.
@@ -48,6 +48,7 @@ Applies to service modules and RPC integration behavior.
 - Purchase-request timelines come from `get_conversation_timeline`; do not reconstruct timeline order from direct joins when the RPC exists.
 
 ## Other Service Contracts
+- Runtime application variables come from `app_config` through `app.config.service.ts`; support UI resolves `support_email` through `support.service.ts` and must not hardcode or import a build-time support address.
 - Navbar items come from `get_navbar_items_by_profile`; render DB `label`, `route`, `icon`, and `sort_order`.
 - Top-navbar segments come from `segment`; `svg_name` maps to `assets/segments/{svg_name}.svg`, and `todas` means all segments.
 - Buyer request assistant calls `POST /functions/v1/ai-completar`, preserves `draft_id`, and sends explicit control actions (`SHOW_SUMMARY`, `CONTINUE`, `PUBLISH`). This surface is text-only unless product re-enables images.

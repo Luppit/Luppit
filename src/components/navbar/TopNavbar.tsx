@@ -2,6 +2,7 @@ import { TextField } from "@/src/components/inputField/InputField";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { getCurrentUserBusinessInvitations } from "@/src/services/active.profile.service";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
 import {
@@ -109,7 +110,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const insets = useSafeAreaInsets();
   const s = useMemo(() => createTopNavbarStyles(t, insets.top), [insets.top, t]);
   const pathname = usePathname();
-  const { activeProfile, profiles, switchProfile } = useActiveProfile();
+  const { activeProfile, profiles, refreshProfiles, switchProfile } =
+    useActiveProfile();
   const segmentIconUris = useMemo(() => {
     const uris: Record<string, string> = {};
     for (const [svgName, moduleRef] of Object.entries(segmentSvgModules)) {
@@ -127,6 +129,10 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     SellerHomeFilterCategoryOption[]
   >([]);
   const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
+  const [pendingInvitationCount, setPendingInvitationCount] = useState(0);
+  const [profileSwitcherOpenRequestId, setProfileSwitcherOpenRequestId] =
+    useState(0);
+  const handledProfileSwitcherOpenRequestIdRef = React.useRef(0);
   const isHomeRoute = pathname === "/" || pathname === "/index";
   const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
   const shouldBlockHomeControls = isLoadingAccountSetupStatus || isAccountSetupBlocked;
@@ -142,6 +148,16 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   useEffect(() => {
     return subscribeSelectedSegment(setSelectedSegmentSvgNameState);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void getCurrentUserBusinessInvitations().then((result) => {
+      if (active && result.ok) setPendingInvitationCount(result.data.length);
+    });
+    return () => {
+      active = false;
+    };
+  }, [activeProfile?.profile.id, profiles.length]);
 
   useEffect(() => {
     let active = true;
@@ -340,7 +356,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     shouldBlockHomeControls,
   ]);
 
-  const openProfileSwitcher = useCallback(() => {
+  const showProfileSwitcher = useCallback(() => {
     openPopup({
       type: "profileSwitcher",
       profiles: profiles.map((profile) => ({
@@ -356,7 +372,10 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           await switchProfile(profile.profile.id);
         },
       })),
-      actionLabel: "Crear perfil",
+      actionLabel:
+        pendingInvitationCount > 0
+          ? `Crear perfil · ${pendingInvitationCount} ${pendingInvitationCount === 1 ? "invitación" : "invitaciones"}`
+          : "Crear perfil",
       onAction: () =>
         router.push({
           pathname: "/(detail)/create-profile",
@@ -366,7 +385,26 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           },
         }),
     });
-  }, [activeProfile?.profile.id, profiles, switchProfile]);
+  }, [activeProfile?.profile.id, pendingInvitationCount, profiles, switchProfile]);
+
+  const openProfileSwitcher = useCallback(async () => {
+    await refreshProfiles(activeProfile?.profile.id);
+    setProfileSwitcherOpenRequestId((value) => value + 1);
+  }, [activeProfile?.profile.id, refreshProfiles]);
+
+  useEffect(() => {
+    if (
+      profileSwitcherOpenRequestId === 0 ||
+      handledProfileSwitcherOpenRequestIdRef.current ===
+        profileSwitcherOpenRequestId
+    ) {
+      return;
+    }
+
+    handledProfileSwitcherOpenRequestIdRef.current =
+      profileSwitcherOpenRequestId;
+    showProfileSwitcher();
+  }, [profileSwitcherOpenRequestId, showProfileSwitcher]);
   const showBuyerFilterChip =
     !shouldBlockHomeControls && role === "buyer" && hasBuyerHomeFilters(homeFilters);
   const showSellerFilterChip =
@@ -388,7 +426,6 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
         <View style={s.profileRow}>
           <Text variant="subtitle">{activeProfile?.profile.name ?? "Mi perfil"}</Text>
           <Icon name="chevron-down" size={18} />
-          <View style={s.onlineDot} />
         </View>
       </Pressable>
 

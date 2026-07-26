@@ -21,6 +21,12 @@ Applies to shared React Native UI components and app screens that consume shared
 - Accordion rows should feel like revealed detail inside the same group, not separate cards. Keep the question as `body`, use a small muted chevron, and put separators after expanded content.
 - Use app spacing tokens (`t.spacing.*`) rather than raw spacing values unless matching an existing local pattern.
 
+## Keyboard Handling
+- Give each screen or shared shell one keyboard-layout owner. Do not combine `KeyboardAvoidingView` with `automaticallyAdjustKeyboardInsets` in the same layout hierarchy.
+- Scroll-only forms may let their scroll container adjust keyboard insets. Screens with a fixed footer, composer, or popup action row should let the containing `KeyboardAvoidingView` resize the available area instead.
+- On Android, rely on the app window resize behavior unless a screen has a verified need for an additional keyboard adjustment.
+- Popup and fixed-footer bodies must be allowed to shrink and scroll while their actions remain outside the scrollable region.
+
 ## What To Avoid
 - Do not add explanatory intro cards above settings/help groups unless they are truly needed; they often make these screens feel crowded.
 - Do not put UI cards inside other cards.

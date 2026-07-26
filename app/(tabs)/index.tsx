@@ -5,6 +5,7 @@ import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
@@ -20,6 +21,7 @@ import {
   getCurrentProfileEmailSetupStatus,
 } from "@/src/services/profile.service";
 import {
+  DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
   getCurrentBuyerMarketplaceHub,
   getCurrentSellerMarketplaceHub,
   MarketplaceHub,
@@ -27,6 +29,7 @@ import {
   MarketplaceHubRole,
   MarketplaceHubStage,
 } from "@/src/services/purchase.request.service";
+import { openPopup } from "@/src/services/popup.service";
 import {
   getSellerHomeFilters,
   hasSellerHomeFilters,
@@ -146,12 +149,14 @@ function openHubListing({
   stage,
   segmentSvgName,
   filters,
+  sortCode,
   fallbackTitle,
 }: {
   role: MarketplaceHubRole;
   stage: MarketplaceHubStage | null;
   segmentSvgName: string;
   filters: BuyerHomeFilters | SellerHomeFilters;
+  sortCode?: string;
   fallbackTitle?: string;
 }) {
   const stageCode = stage?.code ?? (role === "buyer" ? BUYER_DEFAULT_STAGE : SELLER_DEFAULT_STAGE);
@@ -165,6 +170,7 @@ function openHubListing({
       stageCode,
       segmentSvgName,
       filters: JSON.stringify(filters),
+      ...(sortCode ? { sortCode } : {}),
       ...(stage?.description ? { description: stage.description } : {}),
     },
   });
@@ -192,6 +198,9 @@ function BuyerHomeContent() {
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const [selectedStageCode, setSelectedStageCode] = useState(BUYER_DEFAULT_STAGE);
+  const [selectedSortCode, setSelectedSortCode] = useState(
+    DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE
+  );
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
     getSelectedSegmentSvgName()
   );
@@ -217,13 +226,27 @@ function BuyerHomeContent() {
     const result = await getCurrentBuyerMarketplaceHub(
       filters,
       selectedSegmentSvgName,
-      selectedStageCode
+      selectedStageCode,
+      selectedSortCode
     );
     setHub(result.ok ? result.data : null);
     setIsLoading(false);
-  }, [filters, selectedSegmentSvgName, selectedStageCode]);
+  }, [filters, selectedSegmentSvgName, selectedSortCode, selectedStageCode]);
 
-  useEffect(() => subscribeBuyerHomeFilters(setFilters), []);
+  useEffect(
+    () =>
+      subscribeBuyerHomeFilters((nextFilters) => {
+        setFilters(nextFilters);
+        if (
+          nextFilters.selectedChipIds.some(
+            (statusCode) => statusCode.trim().toLowerCase() === "canceled"
+          )
+        ) {
+          setSelectedStageCode(BUYER_DEFAULT_STAGE);
+        }
+      }),
+    []
+  );
   useEffect(() => subscribeSelectedSegment(setSelectedSegmentSvgName), []);
 
   useFocusEffect(
@@ -241,12 +264,14 @@ function BuyerHomeContent() {
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
+      selectedSortCode={selectedSortCode}
       selectedSegmentSvgName={selectedSegmentSvgName}
       hasFilterChip={hasBuyerHomeFilters(filters)}
       hasActiveFilters={
         hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
       }
       onSelectStage={setSelectedStageCode}
+      onSelectSort={setSelectedSortCode}
     />
   );
 }
@@ -321,12 +346,14 @@ function SellerHomeContent() {
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
+      selectedSortCode={null}
       selectedSegmentSvgName={selectedSegmentSvgName}
       hasFilterChip={hasSellerHomeFilters(filters)}
       hasActiveFilters={
         hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
       }
       onSelectStage={setSelectedStageCode}
+      onSelectSort={undefined}
     />
   );
 }
@@ -338,10 +365,12 @@ function MarketplaceHomeContent({
   hub,
   filters,
   selectedStageCode,
+  selectedSortCode,
   selectedSegmentSvgName,
   hasFilterChip,
   hasActiveFilters,
   onSelectStage,
+  onSelectSort,
 }: {
   role: MarketplaceHubRole;
   isLoading: boolean;
@@ -349,10 +378,12 @@ function MarketplaceHomeContent({
   hub: MarketplaceHub | null;
   filters: BuyerHomeFilters | SellerHomeFilters;
   selectedStageCode: string;
+  selectedSortCode: string | null;
   selectedSegmentSvgName: string;
   hasFilterChip: boolean;
   hasActiveFilters: boolean;
   onSelectStage: (stageCode: string) => void;
+  onSelectSort?: (sortCode: string) => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -369,6 +400,15 @@ function MarketplaceHomeContent({
   const unreadConversationCount = hub?.overview.unread_conversation_count ?? 0;
   const unreadMessageCount = hub?.overview.unread_message_count ?? 0;
   const activeRequestCount = hub?.overview.active_request_count ?? 0;
+  const sortConfig = role === "buyer" ? hub?.sort ?? null : null;
+  const resolvedSortCode =
+    selectedSortCode ??
+    DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE;
+  const defaultSortCode =
+    sortConfig?.default_code ?? DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE;
+  const selectedSortLabel =
+    sortConfig?.options.find((option) => option.code === resolvedSortCode)?.label ??
+    "Orden";
   const orderedStages = useMemo(() => {
     const stages = hub?.stages ?? [];
     const selected = stages.find((stage) => stage.code === selectedStageCode);
@@ -389,6 +429,21 @@ function MarketplaceHomeContent({
 
     return () => clearTimeout(timer);
   }, [selectedStageCode]);
+
+  const openSortPopup = useCallback(() => {
+    if (role !== "buyer" || !sortConfig || !onSelectSort) return;
+
+    openPopup({
+      type: "sort",
+      title: "Ordenar solicitudes",
+      options: sortConfig.options.map((option) => ({
+        id: option.code,
+        label: option.label,
+      })),
+      initialSelectedId: resolvedSortCode,
+      onSelect: onSelectSort,
+    });
+  }, [onSelectSort, resolvedSortCode, role, sortConfig]);
 
   if (isLoading) {
     return <LoadingState label="Cargando solicitudes..." />;
@@ -469,6 +524,7 @@ function MarketplaceHomeContent({
               stage: attentionStage,
               segmentSvgName: selectedSegmentSvgName,
               filters,
+              sortCode: role === "buyer" ? resolvedSortCode : undefined,
               fallbackTitle: "Necesitan tu atención",
             })
           }
@@ -515,31 +571,55 @@ function MarketplaceHomeContent({
             <Text variant="body" style={s.railTitle}>
               {hub.rail.title}
             </Text>
-            {hub.rail.total > 0 ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() =>
-                  openHubListing({
-                    role,
-                    stage: selectedStage,
-                    segmentSvgName: selectedSegmentSvgName,
-                    filters,
-                    fallbackTitle: hub.rail.title,
-                  })
-              }
-              style={s.viewAllLink}
-            >
-                <Text variant="small" style={s.viewAllText}>
-                  Ver todas
-                </Text>
-                <Icon name="chevron-right" size={16} color={t.colors.textDark} />
-              </Pressable>
-            ) : null}
+            <View style={s.railHeaderActions}>
+              {role === "buyer" && (sortConfig?.options.length ?? 0) > 1 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ordenar tus solicitudes. Orden actual: ${selectedSortLabel}`}
+                  onPress={openSortPopup}
+                  style={s.sortButton}
+                >
+                  <Icon name="arrow-up-down" size={22} color={t.colors.textDark} />
+                </Pressable>
+              ) : null}
+              {hub.rail.total > 0 ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    openHubListing({
+                      role,
+                      stage: selectedStage,
+                      segmentSvgName: selectedSegmentSvgName,
+                      filters,
+                      sortCode: role === "buyer" ? resolvedSortCode : undefined,
+                      fallbackTitle: hub.rail.title,
+                    })
+                  }
+                  style={s.viewAllLink}
+                >
+                  <Text variant="small" style={s.viewAllText}>
+                    Ver todas
+                  </Text>
+                  <Icon name="chevron-right" size={16} color={t.colors.textDark} />
+                </Pressable>
+              ) : null}
+            </View>
           </View>
           {selectedStage?.description ? (
             <Text variant="small" color="textMedium" style={s.railDescription}>
               {selectedStage.description}
             </Text>
+          ) : null}
+          {role === "buyer" && resolvedSortCode !== defaultSortCode ? (
+            <LuppitChip
+              icon="arrow-up-down"
+              label={selectedSortLabel}
+              onRemove={() => onSelectSort?.(defaultSortCode)}
+              accessibilityLabel={`Cambiar orden. Orden actual: ${selectedSortLabel}`}
+              removeAccessibilityLabel="Restablecer orden"
+              bordered
+              style={s.activeSortChip}
+            />
           ) : null}
         </View>
 
@@ -656,8 +736,11 @@ function AccountSetupRequiredState({
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
+  const { activeProfile } = useActiveProfile();
   const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const requiresSellerCategories = requirement === "seller_categories";
+  const isMemberWaitingForCategories =
+    requiresSellerCategories && activeProfile?.membershipRole === "member";
 
   return (
     <View
@@ -673,14 +756,23 @@ function AccountSetupRequiredState({
         />
       )}
       <Text align="center" variant="body">
-        {requiresSellerCategories
+        {isMemberWaitingForCategories
+          ? "El negocio necesita al menos una categoría de venta. Pídele a la persona propietaria que la configure para recibir oportunidades."
+          : requiresSellerCategories
           ? "Necesitas configurar al menos una categoría de venta para que Luppit pueda mostrarte oportunidades relevantes."
           : "Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar."}
       </Text>
       <View style={s.stateAction}>
         <Button
           variant="dark"
-          title={requiresSellerCategories ? "Configurar categorías" : "Completar configuración"}
+          title={
+            isMemberWaitingForCategories
+              ? "Pendiente del propietario"
+              : requiresSellerCategories
+                ? "Configurar categorías"
+                : "Completar configuración"
+          }
+          disabled={isMemberWaitingForCategories}
           onPress={() =>
             requiresSellerCategories
               ? router.push({
@@ -763,6 +855,23 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     railTitle: {
       flex: 1,
+    },
+    railHeaderActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+      flexShrink: 0,
+    },
+    sortButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    activeSortChip: {
+      alignSelf: "flex-start",
+      marginTop: t.spacing.xs,
     },
     railDescription: {
       paddingRight: t.spacing.xl,

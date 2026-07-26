@@ -24,6 +24,7 @@ type GroupedListRowProps = {
   showSeparator?: boolean;
   showChevron?: boolean;
   descriptionMaxLines?: number;
+  descriptionColor?: keyof Theme["colors"];
   rightAccessory?: ReactNode;
   accessibilityLabel?: string;
   onPress?: () => void;
@@ -63,6 +64,7 @@ export function GroupedListRow({
   showSeparator = true,
   showChevron,
   descriptionMaxLines = 2,
+  descriptionColor = "stateAnulated",
   rightAccessory,
   accessibilityLabel,
   onPress,
@@ -102,7 +104,7 @@ export function GroupedListRow({
           ) : null}
         </View>
         {description ? (
-          <Text variant="small" color="stateAnulated" maxLines={descriptionMaxLines}>
+          <Text variant="small" color={descriptionColor} maxLines={descriptionMaxLines}>
             {description}
           </Text>
         ) : null}

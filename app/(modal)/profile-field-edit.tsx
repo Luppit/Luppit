@@ -7,6 +7,11 @@ import {
   updateCurrentProfileField,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
+import {
+  COSTA_RICA_PERSONAL_ID_ERROR,
+  COSTA_RICA_PERSONAL_ID_LENGTH,
+  isValidCostaRicaPersonalId,
+} from "@/src/utils/costaRicaIdDocument";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -35,8 +40,8 @@ const FIELD_CONFIG: Record<
   },
   id_document: {
     label: "Documento de identificación",
-    helper: "Mantén tu documento actualizado para futuras validaciones de cuenta.",
-    placeholder: "Ingresa tu documento",
+    helper: "Ingresa los 9 dígitos de tu cédula personal, sin espacios ni guiones.",
+    placeholder: "Ej. 123456789",
     success: "Documento actualizado",
   },
 };
@@ -61,17 +66,25 @@ export default function ProfileFieldEditScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const normalizedValue = value.trim();
-  const error =
-    didSubmit && !normalizedValue
-      ? field === "name"
-        ? "Ingresa tu nombre."
-        : "Ingresa tu documento de identificación."
-      : "";
+  const error = didSubmit
+    ? field === "name"
+      ? normalizedValue
+        ? ""
+        : "Ingresa tu nombre."
+      : isValidCostaRicaPersonalId(value)
+        ? ""
+        : COSTA_RICA_PERSONAL_ID_ERROR
+    : "";
   const canSave = normalizedValue.length > 0 && !isSaving;
 
   const save = async () => {
     setDidSubmit(true);
-    if (!canSave) return;
+    if (
+      !canSave ||
+      (field === "id_document" && !isValidCostaRicaPersonalId(value))
+    ) {
+      return;
+    }
 
     setIsSaving(true);
     const result = await updateCurrentProfileField(field, normalizedValue);
@@ -108,13 +121,19 @@ export default function ProfileFieldEditScreen() {
               value={value}
               onChangeText={(nextValue) => {
                 setValue(nextValue);
-                if (didSubmit) setDidSubmit(false);
               }}
               placeholder={config.placeholder}
               hasError={Boolean(error)}
               error={error}
               autoCapitalize={field === "name" ? "words" : "characters"}
               autoCorrect={field === "name"}
+              keyboardType={field === "id_document" ? "number-pad" : "default"}
+              inputMode={field === "id_document" ? "numeric" : "text"}
+              maxLength={
+                field === "id_document"
+                  ? COSTA_RICA_PERSONAL_ID_LENGTH
+                  : undefined
+              }
               returnKeyType="done"
               onSubmitEditing={() => void save()}
               baseContainerStyle={s.inputContainer}

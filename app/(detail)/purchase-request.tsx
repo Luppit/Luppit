@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import Button from "@/src/components/button/Button";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import {
   GroupedListRow,
@@ -10,7 +11,6 @@ import OfferCard, {
 } from "@/src/components/offerCard/OfferCard";
 import { Text } from "@/src/components/Text";
 import {
-  getAcceptedConversationByPurchaseRequestId,
   getConversationByPurchaseOfferId,
   getConversationTimeline,
 } from "@/src/services/conversation.service";
@@ -21,6 +21,7 @@ import {
 import { openPopup } from "@/src/services/popup.service";
 import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import {
+  deleteCurrentBuyerPurchaseRequest,
   getPurchaseRequestById,
   PurchaseRequest,
 } from "@/src/services/purchase.request.service";
@@ -32,6 +33,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
+import { showError, showSuccess } from "@/src/utils/useToast";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 const BUYER_OFFER_SORT_OPTIONS = [
@@ -102,14 +104,24 @@ function getBuyerOfferSortLabel(sortId: string) {
 function getEmptyOffersState({
   hasActiveFilters,
   isAcceptedRequest,
+  isCanceledRequest,
 }: {
   hasActiveFilters: boolean;
   isAcceptedRequest: boolean;
+  isCanceledRequest: boolean;
 }): {
   icon: LucideIconName;
   title: string;
   description: string;
 } {
+  if (isCanceledRequest) {
+    return {
+      icon: "x-circle",
+      title: "Compra cerrada",
+      description: "Esta solicitud se canceló antes de seleccionar una oferta.",
+    };
+  }
+
   if (isAcceptedRequest) {
     return {
       icon: "alert-circle",
@@ -154,7 +166,12 @@ export default function PurchaseRequestDetailScreen() {
     []
   );
   const [selectedOfferLoading, setSelectedOfferLoading] = useState(false);
+  const [selectedOfferTimelineError, setSelectedOfferTimelineError] = useState<
+    string | null
+  >(null);
+  const [timelineReloadKey, setTimelineReloadKey] = useState(0);
   const [viewsCount, setViewsCount] = useState(0);
+  const [isDeletingRequest, setIsDeletingRequest] = useState(false);
   const params = useGlobalSearchParams<{
     purchaseRequest?: string | string[];
   }>();
@@ -171,6 +188,7 @@ export default function PurchaseRequestDetailScreen() {
     (purchaseRequest?.status ?? "").trim().toLowerCase() === "offer_accepted";
   const isCanceledRequest =
     (purchaseRequest?.status ?? "").trim().toLowerCase() === "canceled";
+  const isTrackedRequest = isAcceptedRequest || isCanceledRequest;
   const offersCount = offers.length;
   const hasActiveFilters = useMemo(() => hasBuyerOfferFilters(filters), [filters]);
   const activeFilterCount = useMemo(
@@ -193,15 +211,16 @@ export default function PurchaseRequestDetailScreen() {
     );
   }, [filterOptionsSource]);
   const displayedOffers = useMemo(() => {
-    if (!isAcceptedRequest) return offers;
-    if (!selectedOfferId) return [];
+    if (!isTrackedRequest) return offers;
+    if (!selectedOfferId) return offers.length === 1 ? offers : [];
     return offers.filter((offer) => offer.id === selectedOfferId);
-  }, [isAcceptedRequest, offers, selectedOfferId]);
+  }, [isTrackedRequest, offers, selectedOfferId]);
 
   const displayedOffersCount = displayedOffers.length;
   const emptyOffersState = getEmptyOffersState({
     hasActiveFilters,
     isAcceptedRequest,
+    isCanceledRequest,
   });
 
   useEffect(() => {
@@ -249,17 +268,11 @@ export default function PurchaseRequestDetailScreen() {
         return;
       }
 
-      if (isCanceledRequest) {
-        setOffers([]);
-        setOffersLoading(false);
-        return;
-      }
-
       setOffersLoading(true);
       const result = await getCurrentBuyerPurchaseRequestOffers(
         purchaseRequestId,
-        isAcceptedRequest ? EMPTY_BUYER_OFFER_FILTERS : filters,
-        isAcceptedRequest ? DEFAULT_BUYER_OFFER_SORT_ID : selectedSortId
+        isTrackedRequest ? EMPTY_BUYER_OFFER_FILTERS : filters,
+        isTrackedRequest ? DEFAULT_BUYER_OFFER_SORT_ID : selectedSortId
       );
       if (!active) return;
 
@@ -274,7 +287,7 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [filters, isAcceptedRequest, isCanceledRequest, purchaseRequestId, selectedSortId]);
+  }, [filters, isTrackedRequest, purchaseRequestId, selectedSortId]);
 
   useEffect(() => {
     let active = true;
@@ -309,35 +322,48 @@ export default function PurchaseRequestDetailScreen() {
     let active = true;
 
     const resolveSelectedOffer = async () => {
-      if (!isAcceptedRequest || isCanceledRequest) {
+      if (!isTrackedRequest) {
         setSelectedOfferId(null);
         setSelectedOfferTimeline([]);
+        setSelectedOfferTimelineError(null);
+        setSelectedOfferLoading(false);
+        return;
+      }
+
+      if (offersLoading) {
+        setSelectedOfferLoading(true);
+        setSelectedOfferTimelineError(null);
+        return;
+      }
+
+      const acceptedOffer = offers.find(
+        (offer) =>
+          offer.purchase_request_id === purchaseRequestId &&
+          Boolean(offer.conversation_id)
+      );
+
+      if (!acceptedOffer?.conversation_id) {
+        setSelectedOfferId(null);
+        setSelectedOfferTimeline([]);
+        setSelectedOfferTimelineError(
+          offers.length > 0
+            ? "No pudimos cargar el seguimiento de esta compra."
+            : null
+        );
         setSelectedOfferLoading(false);
         return;
       }
 
       setSelectedOfferLoading(true);
-      const acceptedConversation = await getAcceptedConversationByPurchaseRequestId(
-        purchaseRequestId
-      );
+      setSelectedOfferTimelineError(null);
+      setSelectedOfferId(acceptedOffer.id);
 
-      if (!active) return;
-
-      if (!acceptedConversation || acceptedConversation.ok === false) {
-        setSelectedOfferId(null);
-        setSelectedOfferTimeline([]);
-        setSelectedOfferLoading(false);
-        return;
-      }
-
-      const acceptedOfferId = acceptedConversation.data.purchase_offer_id ?? null;
-      setSelectedOfferId(acceptedOfferId);
-
-      const timelineResult = await getConversationTimeline(acceptedConversation.data.id);
+      const timelineResult = await getConversationTimeline(acceptedOffer.conversation_id);
       if (!active) return;
 
       if (!timelineResult.ok) {
         setSelectedOfferTimeline([]);
+        setSelectedOfferTimelineError("No pudimos cargar el seguimiento de esta compra.");
         setSelectedOfferLoading(false);
         return;
       }
@@ -353,12 +379,18 @@ export default function PurchaseRequestDetailScreen() {
           reached_at: step.reached_at,
           reached_at_label: step.reached_at_label,
           pre_label: step.pre_label,
+          detail: step.detail,
+          style_code: step.style_code,
+          method_kind: step.method_kind,
+          method_label: step.method_label,
+          accessibility_label: step.accessibility_label,
           is_completed: step.is_completed,
           is_next: step.is_next,
         } satisfies OfferCardTimelineItem;
       });
 
       setSelectedOfferTimeline(timeline);
+      setSelectedOfferTimelineError(null);
       setSelectedOfferLoading(false);
     };
 
@@ -366,7 +398,7 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [isAcceptedRequest, isCanceledRequest, purchaseRequestId]);
+  }, [isTrackedRequest, offers, offersLoading, purchaseRequestId, timelineReloadKey]);
 
   const openOfferConversation = async (purchaseOfferId: string) => {
     if (!purchaseRequest) return;
@@ -472,6 +504,51 @@ export default function PurchaseRequestDetailScreen() {
     });
   };
 
+  const openPermanentDeleteConfirmation = useCallback(() => {
+    if (!purchaseRequestId || isDeletingRequest) return;
+
+    openPopup({
+      type: "summary",
+      title: "Eliminar permanentemente",
+      icon: "trash-2",
+      description:
+        "Esta acción es irreversible. Se eliminarán la solicitud, sus ofertas, conversaciones, mensajes y archivos. No podrás recuperarlos.",
+      dismissOnBackdropPress: false,
+      actions: [
+        {
+          id: "keep-canceled-request",
+          label: "Volver",
+          icon: "arrow-left",
+        },
+        {
+          id: "confirm-permanent-delete",
+          label: "Eliminar permanentemente",
+          icon: "trash-2",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: async () => {
+            setIsDeletingRequest(true);
+            try {
+              const result = await deleteCurrentBuyerPurchaseRequest(
+                purchaseRequestId
+              );
+              if (!result.ok) {
+                showError("No se pudo eliminar", result.error.message);
+                return false;
+              }
+
+              showSuccess("Solicitud eliminada permanentemente");
+              router.replace("/(tabs)");
+              return true;
+            } finally {
+              setIsDeletingRequest(false);
+            }
+          },
+        },
+      ],
+    });
+  }, [isDeletingRequest, purchaseRequestId]);
+
   useEffect(() => {
     let active = true;
 
@@ -528,10 +605,18 @@ export default function PurchaseRequestDetailScreen() {
                 Solicitud cancelada
               </Text>
             </View>
-            <Text color="stateAnulated">
-              Puedes revisar la información de esta solicitud, pero ya no está
-              disponible para recibir ofertas o continuar conversaciones.
+            <Text color="textMedium">
+              La solicitud está cerrada. Si aceptaste una oferta antes de cancelarla,
+              puedes revisar su seguimiento y abrir el chat.
             </Text>
+            <Button
+              title="Eliminar permanentemente"
+              icon="trash-2"
+              variant="white"
+              loading={isDeletingRequest}
+              onPress={openPermanentDeleteConfirmation}
+              labelStyle={s.permanentDeleteLabel}
+            />
           </View>
         ) : null}
 
@@ -554,7 +639,7 @@ export default function PurchaseRequestDetailScreen() {
           >
             <Text color="textMedium" variant="small" style={s.offerHeaderTitle}>
               {isCanceledRequest
-                ? "Ofertas cerradas"
+                ? "Compra cerrada"
                 : isAcceptedRequest
                   ? "Oferta seleccionada"
                   : `Ofertas (${offersCount}):`}
@@ -613,21 +698,9 @@ export default function PurchaseRequestDetailScreen() {
             </View>
           ) : null}
 
-          {isCanceledRequest ? (
-            <View style={s.closedOffersMessage}>
-              <Text color="stateAnulated">
-                Las ofertas relacionadas quedaron cerradas al cancelar la solicitud.
-              </Text>
-            </View>
-          ) : offersLoading ? (
+          {offersLoading ? (
             <LoadingState
               label="Cargando ofertas..."
-              variant="inline"
-              style={s.inlineLoading}
-            />
-          ) : isAcceptedRequest && selectedOfferLoading ? (
-            <LoadingState
-              label="Cargando oferta seleccionada..."
               variant="inline"
               style={s.inlineLoading}
             />
@@ -654,11 +727,22 @@ export default function PurchaseRequestDetailScreen() {
                 <OfferCard
                   key={offer.id}
                   offer={offer}
-                  connectLabel={isAcceptedRequest ? "Ver chat" : "Ver conversación"}
+                  connectLabel={isTrackedRequest ? "Ver chat" : "Ver conversación"}
                   timeline={
-                    isAcceptedRequest && offer.id === selectedOfferId
+                    isTrackedRequest &&
+                    (offer.id === selectedOfferId || (!selectedOfferId && offers.length === 1))
                       ? selectedOfferTimeline
                       : undefined
+                  }
+                  timelineLoading={isTrackedRequest && selectedOfferLoading}
+                  timelineError={
+                    isTrackedRequest &&
+                    (offer.id === selectedOfferId || (!selectedOfferId && offers.length === 1))
+                      ? selectedOfferTimelineError
+                      : null
+                  }
+                  onTimelineRetry={
+                    isTrackedRequest ? () => setTimelineReloadKey((value) => value + 1) : undefined
                   }
                   onMenuPress={() => openOfferMenu(offer)}
                   onConnect={() => void openOfferConversation(offer.id)}
@@ -712,6 +796,9 @@ function createPurchaseRequestDetailStyles(t: Theme, topContentInset = 0) {
     },
     canceledTitle: {
       color: t.colors.stateCanceled,
+    },
+    permanentDeleteLabel: {
+      color: t.colors.error,
     },
     offersSection: {
       gap: t.spacing.md,

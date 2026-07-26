@@ -7,6 +7,8 @@ import { SupabaseStorage } from "./supabaseStorage";
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
+export const supabasePublicUrl = url;
+
 const baseStorage = createKVStorage();
 
 const env = process.env.EXPO_PUBLIC_ENV ?? "dev";
@@ -14,7 +16,7 @@ const storage = new SupabaseStorage(baseStorage, `sb_${env}`);
 
 export const supabase : SupabaseClient<Database> = createClient<Database>(url, anon, {
   auth: {
-    storage: storage as any,
+    storage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

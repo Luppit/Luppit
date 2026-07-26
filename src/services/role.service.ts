@@ -1,3 +1,4 @@
+import { COL_ROLE, TB_ROLE } from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -11,9 +12,9 @@ export enum Roles {
 
 export async function getRoleByName(name: Roles): Promise<{ ok: true; data: Role } | { ok: false; error: AppError }> {
   const { data, error } = await supabase
-    .from("role")
+    .from(TB_ROLE)
     .select()
-    .eq("name", name)
+    .eq(COL_ROLE.name, name)
     .single();
   if (error) {
     return { ok: false, error: fromSupabaseError(error) };
@@ -23,9 +24,9 @@ export async function getRoleByName(name: Roles): Promise<{ ok: true; data: Role
 
 export async function getRoleById(id: string): Promise<{ ok: true; data: Role } | { ok: false; error: AppError } | null> {
   const { data, error } = await supabase
-    .from("role")
+    .from(TB_ROLE)
     .select()
-    .eq("id", id)
+    .eq(COL_ROLE.id, id)
     .maybeSingle();
   if (error) {
     return { ok: false, error: fromSupabaseError(error) };

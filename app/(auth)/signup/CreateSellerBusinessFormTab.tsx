@@ -1,5 +1,10 @@
 import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
+import {
+  COSTA_RICA_LEGAL_ID_ERROR,
+  COSTA_RICA_LEGAL_ID_LENGTH,
+  isValidCostaRicaLegalId,
+} from "@/src/utils/costaRicaIdDocument";
 import React, { useState } from "react";
 import { View } from "react-native";
 
@@ -16,8 +21,6 @@ export type CreateSellerBusinessFormTabProps = {
 };
 
 const BUSINESS_NAME_ERROR = "El nombre del negocio es obligatorio.";
-const BUSINESS_ID_DOCUMENT_ERROR =
-  "El documento de identificacion del negocio es obligatorio.";
 
 export default function CreateSellerBusinessFormTab({
   values,
@@ -32,8 +35,8 @@ export default function CreateSellerBusinessFormTab({
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
     if (!values.businessName.trim()) newErrors.businessName = BUSINESS_NAME_ERROR;
-    if (!values.businessIdDocument.trim()) {
-      newErrors.businessIdDocument = BUSINESS_ID_DOCUMENT_ERROR;
+    if (!isValidCostaRicaLegalId(values.businessIdDocument)) {
+      newErrors.businessIdDocument = COSTA_RICA_LEGAL_ID_ERROR;
     }
 
     setErrors(newErrors as any);
@@ -66,12 +69,15 @@ export default function CreateSellerBusinessFormTab({
         value={values.businessIdDocument}
         onChangeText={(text) => {
           setValues({ ...values, businessIdDocument: text });
-          if (errors.businessIdDocument && text.trim()) {
+          if (errors.businessIdDocument && isValidCostaRicaLegalId(text)) {
             setErrors({ ...errors, businessIdDocument: "" });
           }
         }}
         hasError={!!errors.businessIdDocument}
         error={errors.businessIdDocument}
+        keyboardType="number-pad"
+        inputMode="numeric"
+        maxLength={COSTA_RICA_LEGAL_ID_LENGTH}
       />
       <Button variant="dark" onPress={createSellerBusiness} title="Siguiente" />
     </View>

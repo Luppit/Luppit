@@ -1,4 +1,5 @@
 import GlassSurface from "@/src/components/glass/GlassSurface";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import {
   clearToastBottomInset,
   setToastBottomInset,
@@ -25,6 +26,7 @@ export default function Navbar() {
   const t = useTheme();
   const s = React.useMemo(() => createNavbarStyles(t), [t]);
   const items = useNavItems();
+  const { unreadNotificationCount } = useActiveProfile();
   const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
   const shouldRestrictTabs = isLoadingAccountSetupStatus || isAccountSetupBlocked;
   const bottomOffset = Math.max(insets.bottom, Platform.OS === "android" ? 10 : 12);
@@ -63,6 +65,9 @@ export default function Navbar() {
             item={it}
             active={isActive(String(it.href), pathname)}
             disabled={shouldRestrictTabs && !isAccountSetupAllowedTabPath(String(it.href))}
+            unreadNotificationCount={
+              it.name === "SHARED_PROFILE" ? unreadNotificationCount : 0
+            }
           />
         ))}
       </GlassSurface>

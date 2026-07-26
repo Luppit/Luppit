@@ -104,7 +104,7 @@ function createLuppitChipStyles(t: Theme) {
   return StyleSheet.create({
     chip: {
       maxWidth: "100%",
-      minHeight: 40,
+      minHeight: 44,
       borderRadius: 999,
       ...createRoundedSurfaceStyle(t),
       paddingLeft: t.spacing.md,
@@ -157,9 +157,9 @@ function createLuppitChipStyles(t: Theme) {
       color: t.colors.backgroudWhite,
     },
     removeButton: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
     },

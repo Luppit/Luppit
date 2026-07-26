@@ -6,6 +6,7 @@ import {
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
 import {
   BusinessCategoryOption,
@@ -59,6 +60,8 @@ type SelectedCategoryItem = {
 export default function BusinessCategoriesScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const { state: activeProfileState, activeProfile } = useActiveProfile();
+  const isBusinessOwner = activeProfile?.membershipRole === "owner";
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = useMemo(
     () => createBusinessCategoriesStyles(t, insets.bottom, topContentInset),
@@ -77,6 +80,11 @@ export default function BusinessCategoriesScreen() {
   const searchRowOffsetRef = useRef(0);
 
   const loadCategories = useCallback(async () => {
+    if (!isBusinessOwner) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     const [profileResult, categoryResult] = await Promise.all([
       getCurrentSellerProfileOverview(),
@@ -108,7 +116,7 @@ export default function BusinessCategoriesScreen() {
     setCategoryBrowserPath([]);
     setCategorySearchValue("");
     setIsLoading(false);
-  }, []);
+  }, [isBusinessOwner]);
 
   useFocusEffect(
     useCallback(() => {
@@ -179,6 +187,14 @@ export default function BusinessCategoriesScreen() {
   };
 
   const saveCategoryPreferences = async () => {
+    if (!isBusinessOwner) {
+      showError(
+        "Acceso restringido",
+        "Solo la persona propietaria puede cambiar las categorías del negocio."
+      );
+      return;
+    }
+
     if (!hasCategoryChanges || isSaving) return;
 
     const nextCategoryIds = selectedCategories.map((preference) => preference.categoryId);
@@ -240,7 +256,25 @@ export default function BusinessCategoriesScreen() {
     scrollToCategorySearch();
   }, [scrollToCategorySearch]);
 
-  if (isLoading) {
+  if (activeProfileState !== "loading" && !isBusinessOwner) {
+    return (
+      <View style={s.screen}>
+        <View style={s.restrictedContent}>
+          <GroupedListSection title="Categorías de venta">
+            <GroupedListRow
+              icon="lock"
+              label="Solo para propietarios"
+              description="Tu perfil puede consultar las categorías, pero solo la persona propietaria puede cambiarlas."
+              descriptionMaxLines={3}
+              showSeparator={false}
+            />
+          </GroupedListSection>
+        </View>
+      </View>
+    );
+  }
+
+  if (activeProfileState === "loading" || isLoading) {
     return <LoadingState label="Cargando categorías..." style={s.loadingBox} />;
   }
 
@@ -258,7 +292,6 @@ export default function BusinessCategoriesScreen() {
           contentContainerStyle={s.content}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
           ListHeaderComponent={
             <View style={s.headerContent}>
               <GroupedListSection title={selectedSectionTitle}>
@@ -350,24 +383,20 @@ export default function BusinessCategoriesScreen() {
 
         <View style={s.footer}>
           <View style={s.footerActions}>
+            <Button
+              title="Guardar"
+              loading={isSaving}
+              disabled={!hasCategoryChanges || isSaving}
+              onPress={() => void saveCategoryPreferences()}
+            />
             {hasCategoryChanges ? (
-              <View style={s.footerButton}>
-                <Button
-                  title="Descartar"
-                  variant="white"
-                  disabled={isSaving}
-                  onPress={discardCategoryChanges}
-                />
-              </View>
-            ) : null}
-            <View style={s.footerButton}>
               <Button
-                title={hasCategoryChanges ? "Guardar cambios" : "Sin cambios por guardar"}
-                loading={isSaving}
-                disabled={!hasCategoryChanges || isSaving}
-                onPress={() => void saveCategoryPreferences()}
+                title="Descartar"
+                variant="white"
+                disabled={isSaving}
+                onPress={discardCategoryChanges}
               />
-            </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -802,7 +831,12 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
     content: {
       gap: t.spacing.md,
       paddingTop: topContentInset + t.spacing.sm,
-      paddingBottom: 120 + bottomInset,
+      paddingBottom: 136 + bottomInset,
+    },
+    restrictedContent: {
+      gap: t.spacing.lg,
+      paddingTop: topContentInset + t.spacing.sm,
+      paddingBottom: bottomInset + t.spacing.xl,
     },
     headerContent: {
       gap: t.spacing.lg,
@@ -899,11 +933,7 @@ function createBusinessCategoriesStyles(t: Theme, bottomInset = 0, topContentIns
       backgroundColor: t.colors.background,
     },
     footerActions: {
-      flexDirection: "row",
       gap: t.spacing.sm,
-    },
-    footerButton: {
-      flex: 1,
     },
   });
 }

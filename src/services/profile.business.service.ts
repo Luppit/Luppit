@@ -1,3 +1,4 @@
+import { COL_PROFILE_BUSINESS, TB_PROFILE_BUSINESS } from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -8,9 +9,9 @@ export async function getBusinessIdByProfileId(
   profileId: string
 ): Promise<{ ok: true; data: string } | { ok: false; error: AppError } | null> {
   const { data, error } = await supabase
-    .from("profile_business")
+    .from(TB_PROFILE_BUSINESS)
     .select("business_id")
-    .eq("profile_id", profileId)
+    .eq(COL_PROFILE_BUSINESS.profile_id, profileId)
     .maybeSingle();
 
   if (error) return { ok: false, error: fromSupabaseError(error) };

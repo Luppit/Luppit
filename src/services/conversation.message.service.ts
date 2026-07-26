@@ -1,7 +1,14 @@
+import { RPC_FUNCTIONS } from "../db/functions";
 import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import {
+  getSignedStorageUrl,
+  parseStorageImagePath,
+  STORAGE_BUCKETS,
+  toAbsoluteStorageUrl,
+} from "../lib/supabase/storage";
 import { getCurrentProfileResult } from "./active.profile.service";
 
 export type ConversationMessage = Row<"conversation_message"> & {
@@ -21,25 +28,6 @@ type SendConversationMessageInput = {
   text?: string;
   images?: ConversationMessageImage[];
 };
-
-const storageUriPrefix = "storage://";
-
-function parseStorageImagePath(imagePath: string, fallbackBucket: string) {
-  if (!imagePath.startsWith(storageUriPrefix)) {
-    return { bucket: fallbackBucket, path: imagePath };
-  }
-
-  const withoutScheme = imagePath.slice(storageUriPrefix.length);
-  const slashIndex = withoutScheme.indexOf("/");
-  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
-    return { bucket: fallbackBucket, path: imagePath };
-  }
-
-  return {
-    bucket: withoutScheme.slice(0, slashIndex),
-    path: withoutScheme.slice(slashIndex + 1),
-  };
-}
 
 function getFileExtension(file: ConversationMessageImage, fallback = "jpg") {
   const fromName = file.name?.split(".").pop()?.toLowerCase();
@@ -66,7 +54,7 @@ async function uploadConversationImage(
   const body = await response.arrayBuffer();
 
   const { error } = await supabase.storage
-    .from("conversations")
+    .from(STORAGE_BUCKETS.conversations)
     .upload(filePath, body, {
       contentType: file.mime ?? undefined,
       upsert: false,
@@ -80,22 +68,6 @@ async function withSignedImageUrls(
   messages: ConversationMessage[]
 ): Promise<ConversationMessage[]> {
   const result: ConversationMessage[] = [];
-  const supabaseBaseUrl =
-    process.env.EXPO_PUBLIC_SUPABASE_URL ?? (supabase as any).supabaseUrl ?? "";
-
-  const toAbsoluteStorageUrl = (rawUrl: string | null | undefined) => {
-    if (!rawUrl) return null;
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
-    if (!supabaseBaseUrl) return rawUrl;
-    const normalizedBase = supabaseBaseUrl.replace(/\/$/, "");
-    const normalizedRaw = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-
-    if (normalizedRaw.startsWith("/storage/v1/")) {
-      return `${normalizedBase}${normalizedRaw}`;
-    }
-
-    return `${normalizedBase}/storage/v1${normalizedRaw}`;
-  };
 
   for (const message of messages) {
     const imagePath = message.image_path ?? null;
@@ -104,7 +76,10 @@ async function withSignedImageUrls(
       continue;
     }
 
-    const storageImage = parseStorageImagePath(imagePath, "conversations");
+    const storageImage = parseStorageImagePath(
+      imagePath,
+      STORAGE_BUCKETS.conversations
+    );
 
     const signed = await supabase.storage
       .from(storageImage.bucket)
@@ -114,10 +89,7 @@ async function withSignedImageUrls(
       .from(storageImage.bucket)
       .getPublicUrl(storageImage.path);
 
-    const signedData: any = signed.data;
-    const rawSignedUrl = signed.error
-      ? null
-      : signedData?.signedUrl ?? signedData?.signedURL ?? null;
+    const rawSignedUrl = signed.error ? null : getSignedStorageUrl(signed.data);
     const signedUrl = toAbsoluteStorageUrl(rawSignedUrl);
 
     result.push({
@@ -138,10 +110,13 @@ export async function getConversationMessagesByConversationId(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc("get_conversation_messages", {
-    p_conversation_id: conversationId,
-    p_profile_id: profile.data.id,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CONVERSATION_MESSAGES,
+    {
+      p_conversation_id: conversationId,
+      p_profile_id: profile.data.id,
+    }
+  );
 
   if (rpcResult.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -168,13 +143,32 @@ export async function createConversationTextMessage(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc("send_conversation_message", {
-    p_conversation_id: conversationId,
-    p_profile_id: profile.data.id,
-    p_text: text.trim(),
-    p_message_kind: "TEXT",
-    p_image_path: null,
+  return sendConversationMessage(conversationId, profile.data.id, {
+    text: text.trim(),
+    kind: "TEXT",
+    imagePath: null,
   });
+}
+
+async function sendConversationMessage(
+  conversationId: string,
+  profileId: string,
+  message: {
+    text: string | null;
+    kind: "TEXT" | "IMAGE";
+    imagePath: string | null;
+  }
+): Promise<{ ok: true; data: ConversationMessage } | { ok: false; error: AppError }> {
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.SEND_CONVERSATION_MESSAGE,
+    {
+      p_conversation_id: conversationId,
+      p_profile_id: profileId,
+      p_text: message.text,
+      p_message_kind: message.kind,
+      p_image_path: message.imagePath,
+    } as never
+  );
 
   if (rpcResult.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -208,7 +202,11 @@ export async function createConversationMessages(
   const created: ConversationMessage[] = [];
 
   if (text) {
-    const textMessage = await createConversationTextMessage(conversationId, text);
+    const textMessage = await sendConversationMessage(
+      conversationId,
+      profile.data.id,
+      { text, kind: "TEXT", imagePath: null }
+    );
     if (!textMessage.ok) return textMessage;
     created.push(textMessage.data);
   }
@@ -217,23 +215,13 @@ export async function createConversationMessages(
     const uploaded = await uploadConversationImage(conversationId, images[i], i);
     if (!uploaded.ok) return uploaded;
 
-    const rpcResult: any = await (supabase as any).rpc("send_conversation_message", {
-      p_conversation_id: conversationId,
-      p_profile_id: profile.data.id,
-      p_text: null,
-      p_message_kind: "IMAGE",
-      p_image_path: uploaded.data,
-    });
-
-    if (rpcResult.error) {
-      return { ok: false, error: fromSupabaseError(rpcResult.error) };
-    }
-
-    const rpcData = Array.isArray(rpcResult.data)
-      ? rpcResult.data[0]
-      : rpcResult.data;
-    if (!rpcData) return { ok: false, error: fromAppError("unknown") };
-    created.push(rpcData as ConversationMessage);
+    const imageMessage = await sendConversationMessage(
+      conversationId,
+      profile.data.id,
+      { text: null, kind: "IMAGE", imagePath: uploaded.data }
+    );
+    if (!imageMessage.ok) return imageMessage;
+    created.push(imageMessage.data);
   }
 
   const createdWithUrls = await withSignedImageUrls(created);

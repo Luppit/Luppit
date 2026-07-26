@@ -5,6 +5,7 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
+import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
@@ -15,10 +16,19 @@ import {
   declineCurrentUserBusinessInvitation,
   getCurrentUserBusinessInvitations,
 } from "@/src/services/active.profile.service";
+import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
+import {
+  COSTA_RICA_LEGAL_ID_ERROR,
+  COSTA_RICA_LEGAL_ID_LENGTH,
+  COSTA_RICA_PERSONAL_ID_ERROR,
+  COSTA_RICA_PERSONAL_ID_LENGTH,
+  isValidCostaRicaLegalId,
+  isValidCostaRicaPersonalId,
+} from "@/src/utils/costaRicaIdDocument";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -30,6 +40,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 type ProfileRole = "buyer" | "seller";
+
+function formatInvitationDate(value: string) {
+  return new Date(value).toLocaleDateString("es-CR", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export default function CreateProfileScreen() {
   const t = useTheme();
@@ -64,18 +82,28 @@ export default function CreateProfileScreen() {
   const [invitations, setInvitations] = useState<CurrentUserBusinessInvitation[]>(
     []
   );
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(true);
+  const [hasInvitationLoadError, setHasInvitationLoadError] = useState(false);
   const [createdProfileId, setCreatedProfileId] = useState<string | null>(null);
+  const [didSubmit, setDidSubmit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    void getCurrentUserBusinessInvitations().then((result) => {
-      if (active && result.ok) setInvitations(result.data);
-    });
-    return () => {
-      active = false;
-    };
+  const loadInvitations = useCallback(async () => {
+    setIsLoadingInvitations(true);
+    setHasInvitationLoadError(false);
+    const result = await getCurrentUserBusinessInvitations();
+    if (!result.ok) {
+      setHasInvitationLoadError(true);
+      setIsLoadingInvitations(false);
+      return;
+    }
+    setInvitations(result.data);
+    setIsLoadingInvitations(false);
   }, []);
+
+  useEffect(() => {
+    void loadInvitations();
+  }, [loadInvitations]);
 
   useEffect(() => {
     if (params.setup === "true" && state === "ready") {
@@ -86,6 +114,29 @@ export default function CreateProfileScreen() {
   const sellerNeedsInvitation = role === "seller" && hasProfiles && !isRepair;
   const sellerCreatesBusiness =
     role === "seller" && !invitationId && !sellerNeedsInvitation;
+  const selectedInvitation =
+    invitations.find((invitation) => invitation.id === invitationId) ?? null;
+  const idDocumentError =
+    didSubmit && !isRepair && !isValidCostaRicaPersonalId(idDocument)
+      ? COSTA_RICA_PERSONAL_ID_ERROR
+      : "";
+  const businessIdDocumentError =
+    didSubmit &&
+    sellerCreatesBusiness &&
+    !isValidCostaRicaLegalId(businessIdDocument)
+      ? COSTA_RICA_LEGAL_ID_ERROR
+      : "";
+
+  const showProfileReady = () => {
+    if (selectedInvitation) {
+      showSuccess(
+        `Te uniste a ${selectedInvitation.businessName}`,
+        "Tu perfil vendedor ya está vinculado al negocio."
+      );
+      return;
+    }
+    showSuccess("Perfil listo", "Este perfil ahora está activo.");
+  };
 
   const save = async () => {
     if (createdProfileId) {
@@ -99,13 +150,17 @@ export default function CreateProfileScreen() {
         );
         return;
       }
-      showSuccess("Perfil listo", "Este perfil ahora está activo.");
+      showProfileReady();
       router.replace("/");
       return;
     }
 
-    if (!isRepair && (!name.trim() || !idDocument.trim())) {
-      showError("Faltan datos", "Completa el nombre y la identificación.");
+    setDidSubmit(true);
+    if (!isRepair && !name.trim()) {
+      showError("Faltan datos", "Completa el nombre.");
+      return;
+    }
+    if (!isRepair && !isValidCostaRicaPersonalId(idDocument)) {
       return;
     }
     if (sellerNeedsInvitation && !invitationId) {
@@ -117,9 +172,15 @@ export default function CreateProfileScreen() {
     }
     if (
       sellerCreatesBusiness &&
-      (!businessName.trim() || !businessIdDocument.trim())
+      !businessName.trim()
     ) {
-      showError("Faltan datos", "Completa la información del negocio.");
+      showError("Faltan datos", "Completa el nombre del negocio.");
+      return;
+    }
+    if (
+      sellerCreatesBusiness &&
+      !isValidCostaRicaLegalId(businessIdDocument)
+    ) {
       return;
     }
 
@@ -157,21 +218,46 @@ export default function CreateProfileScreen() {
       return;
     }
     setCreatedProfileId(null);
-    showSuccess("Perfil listo", "Este perfil ahora está activo.");
+    showProfileReady();
     router.replace("/");
   };
 
-  const declineInvitation = async () => {
-    if (!invitationId) return;
-    const result = await declineCurrentUserBusinessInvitation(invitationId);
+  const declineInvitation = async (invitation: CurrentUserBusinessInvitation) => {
+    const result = await declineCurrentUserBusinessInvitation(invitation.id);
     if (!result.ok) {
       showError("No se pudo rechazar la invitación", result.error.message);
-      return;
+      return false;
     }
     setInvitations((current) =>
-      current.filter((invitation) => invitation.id !== invitationId)
+      current.filter((currentInvitation) => currentInvitation.id !== invitation.id)
     );
-    setInvitationId(null);
+    if (invitationId === invitation.id) setInvitationId(null);
+    showSuccess("Invitación rechazada");
+    return true;
+  };
+
+  const openDeclineInvitation = (invitation: CurrentUserBusinessInvitation) => {
+    openPopup({
+      type: "summary",
+      title: "Rechazar invitación",
+      icon: "x-circle",
+      description: `Esta invitación dejará de estar disponible y no te unirás a ${invitation.businessName}. La persona propietaria podrá invitarte de nuevo después.`,
+      actions: [
+        {
+          id: "keep-invitation",
+          label: "Conservar",
+          icon: "arrow-left",
+        },
+        {
+          id: "decline-invitation",
+          label: "Rechazar",
+          icon: "x-circle",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: () => declineInvitation(invitation),
+        },
+      ],
+    });
   };
 
   return (
@@ -201,9 +287,75 @@ export default function CreateProfileScreen() {
               label="Identificación"
               value={idDocument}
               onChangeText={setIdDocument}
+              hasError={Boolean(idDocumentError)}
+              error={idDocumentError}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              maxLength={COSTA_RICA_PERSONAL_ID_LENGTH}
               baseContainerStyle={s.inputContainer}
             />
           </FormSection>
+        ) : null}
+
+        {isLoadingInvitations ? (
+          <GroupedListSection title="Invitaciones pendientes">
+            <LoadingState
+              label="Revisando invitaciones..."
+              variant="inline"
+              style={s.invitationLoading}
+            />
+          </GroupedListSection>
+        ) : hasInvitationLoadError ? (
+          <GroupedListSection title="Invitaciones pendientes">
+            <GroupedListRow
+              icon="alert-circle"
+              label="No pudimos revisar tus invitaciones"
+              description="Toca para intentarlo nuevamente."
+              showSeparator={false}
+              onPress={() => void loadInvitations()}
+            />
+          </GroupedListSection>
+        ) : invitations.length > 0 ? (
+          <GroupedListSection title="Invitaciones pendientes">
+            {invitations.map((invitation, index) => {
+              const selected = invitation.id === invitationId;
+              const inviter = invitation.inviterProfileName.trim();
+              return (
+                <GroupedListRow
+                  key={invitation.id}
+                  icon="handshake"
+                  label={
+                    inviter
+                      ? `${inviter} te invitó a ${invitation.businessName}`
+                      : `Te invitaron a ${invitation.businessName}`
+                  }
+                  description={`Crea un perfil vendedor como miembro · Vence el ${formatInvitationDate(invitation.expiresAt)}.`}
+                  descriptionMaxLines={3}
+                  showChevron={false}
+                  showSeparator={
+                    index < invitations.length - 1 || Boolean(selectedInvitation)
+                  }
+                  rightAccessory={
+                    <SelectionIndicator selected={selected} styles={s} />
+                  }
+                  onPress={() => {
+                    setRole("seller");
+                    setInvitationId(invitation.id);
+                  }}
+                />
+              );
+            })}
+            {selectedInvitation ? (
+              <GroupedListRow
+                icon="x-circle"
+                label="Rechazar esta invitación"
+                destructive
+                showChevron={false}
+                showSeparator={false}
+                onPress={() => openDeclineInvitation(selectedInvitation)}
+              />
+            ) : null}
+          </GroupedListSection>
         ) : null}
 
         {!requiresBusinessRepair && (!isRepair || activeProfile?.role == null) ? (
@@ -224,7 +376,12 @@ export default function CreateProfileScreen() {
             <GroupedListRow
               icon="handshake"
               label="Vendedor"
-              description="Para vender desde un negocio."
+              description={
+                sellerNeedsInvitation
+                  ? "Necesitas una invitación vigente para crear otro perfil vendedor."
+                  : "Para vender desde un negocio."
+              }
+              descriptionMaxLines={3}
               showChevron={false}
               showSeparator={false}
               rightAccessory={
@@ -235,50 +392,15 @@ export default function CreateProfileScreen() {
           </GroupedListSection>
         ) : null}
 
-        {role === "seller" && invitations.length > 0 ? (
-          <GroupedListSection title="Invitación de negocio">
-            {invitations.map((invitation, index) => {
-              const selected = invitation.id === invitationId;
-              return (
-                <GroupedListRow
-                  key={invitation.id}
-                  icon="handshake"
-                  label={invitation.businessName}
-                  description={
-                    invitation.inviterProfileName
-                      ? "Invitado por " + invitation.inviterProfileName
-                      : "Invitación de negocio"
-                  }
-                  showChevron={false}
-                  showSeparator={
-                    index < invitations.length - 1 || Boolean(invitationId)
-                  }
-                  rightAccessory={
-                    <SelectionIndicator selected={selected} styles={s} />
-                  }
-                  onPress={() => setInvitationId(invitation.id)}
-                />
-              );
-            })}
-            {invitationId ? (
-              <GroupedListRow
-                icon="x-circle"
-                label="Rechazar invitación"
-                destructive
-                showChevron={false}
-                showSeparator={false}
-                onPress={() => void declineInvitation()}
-              />
-            ) : null}
-          </GroupedListSection>
-        ) : null}
-
-        {sellerNeedsInvitation && invitations.length === 0 ? (
+        {sellerNeedsInvitation &&
+        !isLoadingInvitations &&
+        !hasInvitationLoadError &&
+        invitations.length === 0 ? (
           <GroupedListSection title="Invitación de negocio">
             <GroupedListRow
               icon="info"
-              label="Sin invitaciones pendientes"
-              description="La persona propietaria del negocio debe invitar tu número de Luppit."
+              label="Necesitas una invitación"
+              description="La persona propietaria del negocio debe invitar el número con el que inicias sesión en Luppit."
               descriptionMaxLines={3}
               showSeparator={false}
             />
@@ -301,6 +423,11 @@ export default function CreateProfileScreen() {
               label="Identificación del negocio"
               value={businessIdDocument}
               onChangeText={setBusinessIdDocument}
+              hasError={Boolean(businessIdDocumentError)}
+              error={businessIdDocumentError}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              maxLength={COSTA_RICA_LEGAL_ID_LENGTH}
               baseContainerStyle={s.inputContainer}
             />
           </FormSection>
@@ -310,6 +437,10 @@ export default function CreateProfileScreen() {
           title={
             createdProfileId
               ? "Reintentar activación"
+              : selectedInvitation && isRepair
+                ? "Aceptar y completar perfil"
+                : selectedInvitation
+                  ? "Aceptar y crear perfil"
               : isRepair
                 ? "Completar perfil"
                 : "Crear y activar"
@@ -397,6 +528,9 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
     },
     inputContainer: {
       marginBottom: 0,
+    },
+    invitationLoading: {
+      minHeight: 74,
     },
     selectionIndicator: {
       width: 24,

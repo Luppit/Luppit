@@ -9,6 +9,7 @@ Applies to shared popup rendering in this folder.
 - Filter chips are plain bordered chips; selected chips may use primary color, but status-color dots are reserved for status chips on cards/profile active chips.
 - Profile switcher is a `GlobalPopupHost` variant, not a custom overlay. Keep shared bottom-sheet shell, drag indicator, backdrop, spacing, separators, and the shared `Activo` status chip.
 - Saved-profile notification rows show a red dot only when unread count is greater than zero; otherwise show `Sin notificaciones pendientes`.
+- When the keyboard is visible, keep popup actions fixed and give the popup body a bounded, scrollable height. Do not dismiss the keyboard from a sheet-level `onTouchStart`; use the scroll view dismissal mode so scrolling and focused inputs continue to work.
 
 ## Helper Variant
 - Helper content is a `GlobalPopupHost` `helper` variant, not a separate modal style.

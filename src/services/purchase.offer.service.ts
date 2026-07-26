@@ -1,7 +1,26 @@
+import { RPC_FUNCTIONS } from "../db/functions";
+import {
+  COL_PROFILE,
+  COL_PURCHASE_OFFER,
+  COL_PURCHASE_OFFER_IMAGE,
+  COL_PURCHASE_REQUEST,
+  TB_PROFILE,
+  TB_PURCHASE_OFFER,
+  TB_PURCHASE_OFFER_IMAGE,
+  TB_PURCHASE_REQUEST,
+} from "../db/tables";
 import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import {
+  getSignedStorageUrl,
+  parseStorageImagePath,
+  STORAGE_BUCKETS,
+  STORAGE_URI_PREFIX,
+  StorageBucket,
+  toAbsoluteStorageUrl,
+} from "../lib/supabase/storage";
 import { getBusinessIdByProfileId } from "./profile.business.service";
 import { getCurrentProfileResult } from "./active.profile.service";
 
@@ -12,6 +31,7 @@ export type PurchaseOfferCardData = PurchaseOffer & {
   business_rating: number | null;
   business_num_ratings: number | null;
   offer_currency_code: string | null;
+  conversation_id?: string | null;
 };
 export type SellerPurchaseOfferCardData = PurchaseOffer & {
   request_category_id: string | null;
@@ -102,24 +122,6 @@ export type EditablePurchaseOfferDraft = {
 };
 
 const purchaseOffersByRequestCache = new Map<string, PurchaseOfferCardData[]>();
-const storageUriPrefix = "storage://";
-
-function parseStorageImagePath(imagePath: string, fallbackBucket: string) {
-  if (!imagePath.startsWith(storageUriPrefix)) {
-    return { bucket: fallbackBucket, path: imagePath };
-  }
-
-  const withoutScheme = imagePath.slice(storageUriPrefix.length);
-  const slashIndex = withoutScheme.indexOf("/");
-  if (slashIndex <= 0 || slashIndex === withoutScheme.length - 1) {
-    return { bucket: fallbackBucket, path: imagePath };
-  }
-
-  return {
-    bucket: withoutScheme.slice(0, slashIndex),
-    path: withoutScheme.slice(slashIndex + 1),
-  };
-}
 
 function normalizeSellerOfferRequestTitle(value: unknown) {
   if (typeof value !== "string") return null;
@@ -160,13 +162,16 @@ async function fillSellerOfferContextFromConversations(
 
   if (offerIdsNeedingContext.size === 0) return offers;
 
-  const rpcResult: any = await (supabase as any).rpc("get_current_profile_conversations", {
-    p_profile_id: profileId,
-    p_search_text: null,
-    p_start_date: null,
-    p_end_date: null,
-    p_category_ids: null,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_PROFILE_CONVERSATIONS,
+    {
+      p_profile_id: profileId,
+      p_search_text: null,
+      p_start_date: null,
+      p_end_date: null,
+      p_category_ids: null,
+    } as never
+  );
 
   if (rpcResult?.error) return offers;
 
@@ -227,7 +232,7 @@ export async function getPurchaseOffersByPurchaseRequestId(
   }
 
   const { data, error } = await supabase
-    .from("purchase_offer")
+    .from(TB_PURCHASE_OFFER)
     .select(
       `
       *,
@@ -244,8 +249,8 @@ export async function getPurchaseOffersByPurchaseRequestId(
       )
     `
     )
-    .eq("purchase_request_id", purchaseRequestId)
-    .order("created_at", { ascending: false });
+    .eq(COL_PURCHASE_OFFER.purchase_request_id, purchaseRequestId)
+    .order(COL_PURCHASE_OFFER.created_at, { ascending: false });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -297,9 +302,9 @@ export async function getPurchaseOffersCountByPurchaseRequestIds(
   if (ids.length === 0) return { ok: true, data: {} };
 
   const { data, error } = await supabase
-    .from("purchase_offer")
+    .from(TB_PURCHASE_OFFER)
     .select("purchase_request_id")
-    .in("purchase_request_id", ids);
+    .in(COL_PURCHASE_OFFER.purchase_request_id, ids);
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -330,25 +335,28 @@ export async function getCurrentBuyerPurchaseRequestOffers(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc("get_buyer_purchase_request_offers", {
-    p_profile_id: profile.data.id,
-    p_purchase_request_id: purchaseRequestId,
-    p_search_text: filters?.searchValue?.trim() || null,
-    p_start_date: filters?.startDate?.trim() || null,
-    p_end_date: filters?.endDate?.trim() || null,
-    p_currency_ids:
-      filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
-        ? filters.selectedCurrencyIds
-        : null,
-    p_sort_code: sortCode || "offer_created_newest",
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_BUYER_PURCHASE_REQUEST_OFFERS,
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+      p_search_text: filters?.searchValue?.trim() || null,
+      p_start_date: filters?.startDate?.trim() || null,
+      p_end_date: filters?.endDate?.trim() || null,
+      p_currency_ids:
+        filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
+          ? filters.selectedCurrencyIds
+          : null,
+      p_sort_code: sortCode || "offer_created_newest",
+    } as never
+  );
 
   if (rpcResult?.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
 
   const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
   return {
     ok: true,
-    data: rows.map((row: any) => ({
+    data: rows.map((row) => ({
       ...row,
       business_name: typeof row.business_name === "string" ? row.business_name : null,
       business_province:
@@ -359,6 +367,8 @@ export async function getCurrentBuyerPurchaseRequestOffers(
         typeof row.business_num_ratings === "number" ? row.business_num_ratings : null,
       offer_currency_code:
         typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+      conversation_id:
+        typeof row.conversation_id === "string" ? row.conversation_id : null,
     })) as PurchaseOfferCardData[],
   };
 }
@@ -376,70 +386,76 @@ export async function getCurrentSellerPurchaseOffers(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc("get_current_seller_purchase_offers", {
-    p_profile_id: profile.data.id,
-    p_search_text: filters?.searchValue?.trim() || null,
-    p_start_date: filters?.startDate?.trim() || null,
-    p_end_date: filters?.endDate?.trim() || null,
-    p_category_ids:
-      filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
-        ? filters.selectedCategoryIds
-        : null,
-    p_currency_ids:
-      filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
-        ? filters.selectedCurrencyIds
-        : null,
-    p_sort_code: sortCode || "newly_listed",
-    p_conversation_status_codes:
-      filters?.selectedConversationStatusCodes &&
-      filters.selectedConversationStatusCodes.length > 0
-        ? filters.selectedConversationStatusCodes
-        : null,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_SELLER_PURCHASE_OFFERS,
+    {
+      p_profile_id: profile.data.id,
+      p_search_text: filters?.searchValue?.trim() || null,
+      p_start_date: filters?.startDate?.trim() || null,
+      p_end_date: filters?.endDate?.trim() || null,
+      p_category_ids:
+        filters?.selectedCategoryIds && filters.selectedCategoryIds.length > 0
+          ? filters.selectedCategoryIds
+          : null,
+      p_currency_ids:
+        filters?.selectedCurrencyIds && filters.selectedCurrencyIds.length > 0
+          ? filters.selectedCurrencyIds
+          : null,
+      p_sort_code: sortCode || "newly_listed",
+      p_conversation_status_codes:
+        filters?.selectedConversationStatusCodes &&
+        filters.selectedConversationStatusCodes.length > 0
+          ? filters.selectedConversationStatusCodes
+          : null,
+    } as never
+  );
 
   if (!rpcResult?.error) {
     const rows = Array.isArray(rpcResult?.data) ? rpcResult.data : [];
-    const parsedRows = rows.map((row: any) => ({
-      ...row,
-      request_category_id:
-        typeof row.request_category_id === "string" ? row.request_category_id : null,
-      request_title:
-        normalizeSellerOfferRequestTitle(row.request_title) ??
-        normalizeSellerOfferRequestTitle(row.purchase_request_title) ??
-        normalizeSellerOfferRequestTitle(row.title),
-      request_category_name:
-        typeof row.request_category_name === "string" ? row.request_category_name : null,
-      request_profile_name:
-        typeof row.request_profile_name === "string"
-          ? row.request_profile_name
-          : typeof row.buyer_profile_name === "string"
-            ? row.buyer_profile_name
+    const parsedRows = rows.map((row) => {
+      const compatibilityRow = row as Record<string, unknown>;
+      return {
+        ...row,
+        request_category_id:
+          typeof row.request_category_id === "string" ? row.request_category_id : null,
+        request_title:
+          normalizeSellerOfferRequestTitle(row.request_title) ??
+          normalizeSellerOfferRequestTitle(compatibilityRow.purchase_request_title) ??
+          normalizeSellerOfferRequestTitle(compatibilityRow.title),
+        request_category_name:
+          typeof row.request_category_name === "string" ? row.request_category_name : null,
+        request_profile_name:
+          typeof row.request_profile_name === "string"
+            ? row.request_profile_name
+            : typeof compatibilityRow.buyer_profile_name === "string"
+              ? compatibilityRow.buyer_profile_name
+              : null,
+        offer_currency_code:
+          typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
+        conversation_id:
+          typeof row.conversation_id === "string" ? row.conversation_id : null,
+        conversation_status_code:
+          typeof row.conversation_status_code === "string"
+            ? row.conversation_status_code
             : null,
-      offer_currency_code:
-        typeof row.offer_currency_code === "string" ? row.offer_currency_code : null,
-      conversation_id:
-        typeof row.conversation_id === "string" ? row.conversation_id : null,
-      conversation_status_code:
-        typeof row.conversation_status_code === "string"
-          ? row.conversation_status_code
-          : null,
-      conversation_status_label:
-        typeof row.conversation_status_label === "string"
-          ? row.conversation_status_label
-          : null,
-      conversation_status_style_code:
-        typeof row.conversation_status_style_code === "string"
-          ? row.conversation_status_style_code
-          : null,
-      conversation_status_sort_order:
-        typeof row.conversation_status_sort_order === "number"
-          ? row.conversation_status_sort_order
-          : null,
-      conversation_is_terminal:
-        typeof row.conversation_is_terminal === "boolean"
-          ? row.conversation_is_terminal
-          : null,
-    })) as SellerPurchaseOfferCardData[];
+        conversation_status_label:
+          typeof row.conversation_status_label === "string"
+            ? row.conversation_status_label
+            : null,
+        conversation_status_style_code:
+          typeof row.conversation_status_style_code === "string"
+            ? row.conversation_status_style_code
+            : null,
+        conversation_status_sort_order:
+          typeof row.conversation_status_sort_order === "number"
+            ? row.conversation_status_sort_order
+            : null,
+        conversation_is_terminal:
+          typeof row.conversation_is_terminal === "boolean"
+            ? row.conversation_is_terminal
+            : null,
+      };
+    }) as SellerPurchaseOfferCardData[];
 
     return {
       ok: true,
@@ -456,7 +472,7 @@ export async function getCurrentSellerPurchaseOffers(
   if (!businessRef) return { ok: false, error: fromAppError("not_found") };
 
   const { data, error } = await supabase
-    .from("purchase_offer")
+    .from(TB_PURCHASE_OFFER)
     .select(
       `
       *,
@@ -465,8 +481,8 @@ export async function getCurrentSellerPurchaseOffers(
       )
     `
     )
-    .eq("business_id", businessRef.data)
-    .order("created_at", { ascending: false });
+    .eq(COL_PURCHASE_OFFER.business_id, businessRef.data)
+    .order(COL_PURCHASE_OFFER.created_at, { ascending: false });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -497,9 +513,9 @@ export async function getCurrentSellerPurchaseOffers(
 
   if (purchaseRequestIds.length > 0) {
     const requestResult = await supabase
-      .from("purchase_request")
+      .from(TB_PURCHASE_REQUEST)
       .select("id, title, category_id, category_name, profile_id")
-      .in("id", purchaseRequestIds);
+      .in(COL_PURCHASE_REQUEST.id, purchaseRequestIds);
 
     if (!requestResult.error) {
       for (const row of requestResult.data ?? []) {
@@ -527,9 +543,9 @@ export async function getCurrentSellerPurchaseOffers(
   const profileNameById = new Map<string, string>();
   if (profileIds.length > 0) {
     const profileResult = await supabase
-      .from("profile")
+      .from(TB_PROFILE)
       .select("id, name")
-      .in("id", profileIds);
+      .in(COL_PROFILE.id, profileIds);
 
     if (!profileResult.error) {
       for (const row of profileResult.data ?? []) {
@@ -576,9 +592,9 @@ export async function getPurchaseOfferById(
   purchaseOfferId: string
 ): Promise<{ ok: true; data: PurchaseOffer } | { ok: false; error: AppError } | null> {
   const { data, error } = await supabase
-    .from("purchase_offer")
+    .from(TB_PURCHASE_OFFER)
     .select("*")
-    .eq("id", purchaseOfferId)
+    .eq(COL_PURCHASE_OFFER.id, purchaseOfferId)
     .maybeSingle();
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
@@ -644,30 +660,12 @@ function resolveUploadContentType(
 
 function getFileNameFromPath(path: string | null | undefined) {
   if (!path) return null;
-  const parsedPath = path.startsWith(storageUriPrefix)
-    ? parseStorageImagePath(path, "offers").path
+  const parsedPath = path.startsWith(STORAGE_URI_PREFIX)
+    ? parseStorageImagePath(path, STORAGE_BUCKETS.offers).path
     : path;
   const normalized = parsedPath.split("?")[0] ?? parsedPath;
   const parts = normalized.split("/");
   return parts[parts.length - 1] ?? null;
-}
-
-function toAbsoluteStorageUrl(rawUrl: string | null | undefined) {
-  if (!rawUrl) return null;
-  if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
-
-  const supabaseBaseUrl =
-    process.env.EXPO_PUBLIC_SUPABASE_URL ?? (supabase as any).supabaseUrl ?? "";
-  if (!supabaseBaseUrl) return rawUrl;
-
-  const normalizedBase = supabaseBaseUrl.replace(/\/$/, "");
-  const normalizedRaw = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-
-  if (normalizedRaw.startsWith("/storage/v1/")) {
-    return `${normalizedBase}${normalizedRaw}`;
-  }
-
-  return `${normalizedBase}/storage/v1${normalizedRaw}`;
 }
 
 async function getOfferImagePreviewFiles(
@@ -677,14 +675,14 @@ async function getOfferImagePreviewFiles(
 
   for (const image of images) {
     const imagePath = image.path;
-    const storageImage = parseStorageImagePath(imagePath, "offers");
+    const storageImage = parseStorageImagePath(
+      imagePath,
+      STORAGE_BUCKETS.offers
+    );
     const signed = await supabase.storage
       .from(storageImage.bucket)
       .createSignedUrl(storageImage.path, 60 * 60);
-    const signedData: any = signed.data;
-    const rawSignedUrl = signed.error
-      ? null
-      : signedData?.signedUrl ?? signedData?.signedURL ?? null;
+    const rawSignedUrl = signed.error ? null : getSignedStorageUrl(signed.data);
     const fallbackPublic = supabase.storage
       .from(storageImage.bucket)
       .getPublicUrl(storageImage.path);
@@ -710,10 +708,10 @@ async function getPurchaseOfferImagePreviewFiles(
   purchaseOfferId: string
 ): Promise<{ ok: true; data: OfferFile[] } | { ok: false; error: AppError }> {
   const imageResult = await supabase
-    .from("purchase_offer_image")
+    .from(TB_PURCHASE_OFFER_IMAGE)
     .select("id, path")
-    .eq("purchase_offer_id", purchaseOfferId)
-    .order("created_at", { ascending: true });
+    .eq(COL_PURCHASE_OFFER_IMAGE.purchase_offer_id, purchaseOfferId)
+    .order(COL_PURCHASE_OFFER_IMAGE.created_at, { ascending: true });
 
   if (imageResult.error) {
     return { ok: false, error: fromSupabaseError(imageResult.error) };
@@ -735,9 +733,12 @@ async function getPurchaseOfferImagePreviewFiles(
   return { ok: true, data: files };
 }
 
-function isMissingRpcError(error: any, functionName: string) {
-  if (!error || error.code !== "PGRST202") return false;
-  const message = typeof error.message === "string" ? error.message : "";
+function isMissingRpcError(error: unknown, functionName: string) {
+  if (!error || typeof error !== "object") return false;
+
+  const value = error as Record<string, unknown>;
+  if (value.code !== "PGRST202") return false;
+  const message = typeof value.message === "string" ? value.message : "";
   return message.includes(functionName);
 }
 
@@ -782,7 +783,7 @@ function parseEditablePurchaseOfferDraft(
             ? parsed.storage_path
             : typeof parsed.path === "string"
               ? parsed.path
-              : uri.startsWith(storageUriPrefix)
+              : uri.startsWith(STORAGE_URI_PREFIX)
                 ? uri
                 : null;
       return {
@@ -830,19 +831,19 @@ async function withOfferFilePreviewUrls(files: OfferFile[]) {
   const result: OfferFile[] = [];
 
   for (const file of files) {
-    if (!file.uri.startsWith(storageUriPrefix)) {
+    if (!file.uri.startsWith(STORAGE_URI_PREFIX)) {
       result.push(file);
       continue;
     }
 
-    const storageImage = parseStorageImagePath(file.uri, "offers");
+    const storageImage = parseStorageImagePath(
+      file.uri,
+      STORAGE_BUCKETS.offers
+    );
     const signed = await supabase.storage
       .from(storageImage.bucket)
       .createSignedUrl(storageImage.path, 60 * 60);
-    const signedData: any = signed.data;
-    const rawSignedUrl = signed.error
-      ? null
-      : signedData?.signedUrl ?? signedData?.signedURL ?? null;
+    const rawSignedUrl = signed.error ? null : getSignedStorageUrl(signed.data);
     const fallbackPublic = supabase.storage
       .from(storageImage.bucket)
       .getPublicUrl(storageImage.path);
@@ -869,10 +870,13 @@ export async function getEditablePurchaseOfferDraftByConversationId(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const v2RpcResult: any = await (supabase as any).rpc("get_seller_offer_edit_payload_v2", {
-    p_conversation_id: conversationId,
-    p_profile_id: profile.data.id,
-  });
+  const v2RpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_SELLER_OFFER_EDIT_PAYLOAD_V2,
+    {
+      p_conversation_id: conversationId,
+      p_profile_id: profile.data.id,
+    }
+  );
 
   if (v2RpcResult?.error) {
     return { ok: false, error: fromSupabaseError(v2RpcResult.error) };
@@ -904,7 +908,7 @@ export async function getEditablePurchaseOfferDraftByConversationId(
 }
 
 async function uploadImageToBucket(
-  bucket: "offers" | "conversations",
+  bucket: StorageBucket,
   storagePrefix: string,
   file: OfferFile,
   index: number
@@ -980,7 +984,7 @@ export async function updatePurchaseOffer(
 
     if (file.isExisting !== true) {
       const offerUpload = await uploadImageToBucket(
-        "offers",
+        STORAGE_BUCKETS.offers,
         offerUploadStoragePrefix,
         file,
         i
@@ -990,7 +994,7 @@ export async function updatePurchaseOffer(
     }
 
     const conversationUpload = await uploadImageToBucket(
-      "conversations",
+      STORAGE_BUCKETS.conversations,
       conversationUploadStoragePrefix,
       file,
       i
@@ -999,8 +1003,8 @@ export async function updatePurchaseOffer(
     conversationImagePaths.push(conversationUpload.data);
   }
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "update_seller_offer_fulfillment_from_conversation",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.UPDATE_SELLER_OFFER_FULFILLMENT_FROM_CONVERSATION,
     {
       p_conversation_id: input.conversationId,
       p_profile_id: profile.data.id,
@@ -1015,7 +1019,7 @@ export async function updatePurchaseOffer(
       p_keep_offer_image_ids: keepOfferImageIds,
       p_new_offer_image_paths: newOfferImagePaths,
       p_conversation_image_paths: conversationImagePaths,
-    }
+    } as never
   );
 
   if (rpcResult?.error) {

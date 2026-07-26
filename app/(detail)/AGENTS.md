@@ -17,7 +17,7 @@ Applies to purchase-request detail screens, selected-offer timeline behavior, an
 - Detail help/settings/profile-adjacent surfaces should follow the soft grouped-list style in `src/components/AGENTS.md`.
 - Account-setting detail routes are not purchase-request details; hide the purchase-request ellipsis/menu.
 - `/(detail)/account-settings` loads profile/account fields through `profile.service.ts` and resolves role itself because tab role context may be unavailable.
-- `/(detail)/notifications` uses the shared detail top bar with `hideMenu=true`, loads through `notification.service.ts`, marks loaded unread notifications read through the service RPC on open, and shows full message text through the shared popup.
+- `/(detail)/notifications` uses the shared detail top bar with `hideMenu=true`, loads through `notification.service.ts`, marks only the notification whose detail was opened through the owner-checked RPC, and shows full message text plus any allowlisted payload navigation through the shared popup.
 - `/(detail)/home-preset` loads active preset metadata for the current surface, previews DB group names/order/max-items locally, and saves through `profile_home_group_preset` only on `Guardar cambios`.
 - `/(detail)/business-profile` resolves seller business data through `profile_business`, reads location from `business.location_id -> location`, shows rating from `business_rating_summary`, and edits category preferences through `set_current_business_category_preferences`.
 - Business location editing belongs in `/(modal)/business-location-edit`, uses active `location` rows, and saves only a valid district `location.id` through `set_current_business_location`.

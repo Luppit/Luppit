@@ -1,7 +1,7 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React, { useMemo, useRef, useState } from "react";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, TextInput, TextInputProps, View } from "react-native";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createOtpValidatorStyles } from "./styles";
 
@@ -13,6 +13,7 @@ type OtpValidatorProps = {
   otpLength?: number;
   stretch?: boolean;
   onChange?: (value: string) => void;
+  onFocus?: TextInputProps["onFocus"];
   onHelperPress?: () => void;
 };
 
@@ -24,6 +25,7 @@ export default function OtpValidator({
   otpLength = 4,
   stretch = false,
   onChange,
+  onFocus,
   onHelperPress,
 }: OtpValidatorProps) {
   const t = useTheme();
@@ -74,6 +76,7 @@ export default function OtpValidator({
           onChangeText={handleChange}
           onFocus={(event) => {
             stepperKeyboard?.scrollToFocusedInput(event.target);
+            onFocus?.(event);
             setFocusedIndex(Math.min(value.length, otpLength - 1));
           }}
           onBlur={() => setFocusedIndex(null)}
@@ -96,7 +99,11 @@ export default function OtpValidator({
               errorText ? s.inputBoxError : null,
             ]}
           >
-            <Text style={s.inputText}>{values[index]}</Text>
+            {values[index] ? (
+              <Text style={s.inputText}>{values[index]}</Text>
+            ) : focusedIndex === index ? (
+              <View style={s.inputCaret} />
+            ) : null}
           </View>
         ))}
       </Pressable>

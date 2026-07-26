@@ -4,11 +4,11 @@ import {
   GroupedListRow,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { signOut } from "@/src/lib/supabase";
-import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
 import {
   BuyerProfileOverview,
   SellerProfileOverview,
@@ -41,13 +41,14 @@ export default function ProfileScreen() {
 function BuyerProfileContent() {
   const t = useTheme();
   const s = useMemo(() => createProfileStyles(t), [t]);
+  const { unreadNotificationCount, refreshUnreadNotificationCount } =
+    useActiveProfile();
   const [overview, setOverview] = useState<BuyerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
-    void refreshUnreadNotificationsCount(setUnreadNotificationsCount);
+    void refreshUnreadNotificationCount();
     const result = await getCurrentBuyerProfileOverview();
     if (!result.ok) {
       setOverview(null);
@@ -58,7 +59,7 @@ function BuyerProfileContent() {
 
     setOverview(result.data);
     setIsLoading(false);
-  }, []);
+  }, [refreshUnreadNotificationCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,8 +145,8 @@ function BuyerProfileContent() {
             <GroupedListRow
               icon="bell"
               label="Notificaciones"
-              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
-              rightAccessory={<NotificationCountPill count={unreadNotificationsCount} />}
+              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationCount)}
+              rightAccessory={<NotificationCountPill count={unreadNotificationCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -181,13 +182,14 @@ function BuyerProfileContent() {
 function SellerProfileContent() {
   const t = useTheme();
   const s = useMemo(() => createProfileStyles(t), [t]);
+  const { unreadNotificationCount, refreshUnreadNotificationCount } =
+    useActiveProfile();
   const [overview, setOverview] = useState<SellerProfileOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
-    void refreshUnreadNotificationsCount(setUnreadNotificationsCount);
+    void refreshUnreadNotificationCount();
     const result = await getCurrentSellerProfileOverview();
     if (!result.ok) {
       setOverview(null);
@@ -198,7 +200,7 @@ function SellerProfileContent() {
 
     setOverview(result.data);
     setIsLoading(false);
-  }, []);
+  }, [refreshUnreadNotificationCount]);
 
   useFocusEffect(
     useCallback(() => {
@@ -279,8 +281,8 @@ function SellerProfileContent() {
             <GroupedListRow
               icon="bell"
               label="Notificaciones"
-              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationsCount)}
-              rightAccessory={<NotificationCountPill count={unreadNotificationsCount} />}
+              accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationCount)}
+              rightAccessory={<NotificationCountPill count={unreadNotificationCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -419,19 +421,6 @@ function getMetricTone(t: Theme, tone: "primary" | "secondary" | "warning") {
 function getNotificationRowAccessibilityLabel(unreadCount: number) {
   if (unreadCount <= 0) return "Notificaciones";
   return `Notificaciones, ${unreadCount > 99 ? "99 o más" : unreadCount} sin leer`;
-}
-
-async function refreshUnreadNotificationsCount(
-  setUnreadNotificationsCount: (count: number) => void
-) {
-  try {
-    const result = await getCurrentProfileUnreadNotificationCount();
-    if (result.ok) {
-      setUnreadNotificationsCount(result.data);
-    }
-  } catch {
-    return;
-  }
 }
 
 function NotificationCountPill({ count }: { count: number }) {

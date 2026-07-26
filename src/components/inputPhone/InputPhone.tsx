@@ -1,6 +1,12 @@
 import { useTheme } from "@/src/themes";
 import { useMemo, useState } from "react";
-import { TextInput, TextInputProps, View } from "react-native";
+import {
+  StyleProp,
+  TextInput,
+  TextInputProps,
+  View,
+  ViewStyle,
+} from "react-native";
 import { Text } from "../Text";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createInputPhoneStyles } from "./styles";
@@ -10,6 +16,7 @@ type InputPhoneProps = TextInputProps & {
   countryCode?: string;
   error?: string;
   hasError?: boolean;
+  baseContainerStyle?: StyleProp<ViewStyle>;
 };
 
 export const defaultCountryCode = "+506";
@@ -19,6 +26,7 @@ export const InputPhone = ({
   countryCode = defaultCountryCode,
   error,
   hasError,
+  baseContainerStyle,
   ...props
 }: InputPhoneProps) => {
   const t = useTheme();
@@ -31,7 +39,7 @@ export const InputPhone = ({
   };
 
   return (
-    <View style={s.phoneInputContainer}>
+    <View style={[s.phoneInputContainer, baseContainerStyle]}>
       <Text color="stateAnulated" style={s.label}>
         {label}:
       </Text>
@@ -66,7 +74,12 @@ export const InputPhone = ({
         </View>
       </View>
       {Boolean(error) && (
-        <Text color="error" style={s.error.errorLabel}>
+        <Text
+          color="error"
+          style={s.error.errorLabel}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
           {error}
         </Text>
       )}

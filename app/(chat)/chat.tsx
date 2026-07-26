@@ -284,13 +284,10 @@ function PublishRequestCard({
           <Icon name="sparkles" size={22} color={t.colors.primary} />
         </View>
 
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="small" color="textDark">
-            Solicitud lista
-          </Text>
-          <Text variant="body">Revisa el resumen antes de publicarla</Text>
-          <Text variant="small" color="stateAnulated">
-            Confirma producto, categoría y detalles.
+        <View style={{ flex: 1, gap: t.spacing.xs }}>
+          <Text variant="subtitle">Solicitud lista</Text>
+          <Text variant="small" color="textMedium">
+            Revisa el producto, la categoría y los detalles antes de publicar.
           </Text>
         </View>
       </View>

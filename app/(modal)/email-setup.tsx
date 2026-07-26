@@ -1,10 +1,9 @@
 import Button from "@/src/components/button/Button";
-import HintModal from "@/src/components/hintModal/HintModal";
+import { GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
-import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   getCurrentProfileEmailSetupStatus,
@@ -60,7 +59,6 @@ export default function EmailSetupScreen() {
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [didTryEmailSubmit, setDidTryEmailSubmit] = useState(false);
-  const [isHintVisible, setIsHintVisible] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
 
   useEffect(() => {
@@ -115,8 +113,7 @@ export default function EmailSetupScreen() {
     didTryEmailSubmit && !emailOptIn
       ? "Debes aceptar recibir correos para continuar."
       : "";
-  const canSendCode =
-    isEmailValid && emailOptIn && !isLoading && !isSendingCode && !isVerifying;
+  const canAttemptSendCode = !isLoading && !isSendingCode && !isVerifying;
   const canVerifyCode =
     otpCode.length === OTP_LENGTH &&
     !isLoading &&
@@ -213,209 +210,195 @@ export default function EmailSetupScreen() {
     setEmailServerError("");
   };
 
-  const resendLabel =
-    resendCountdown > 0
-      ? `Reenviar en 0:${String(resendCountdown).padStart(2, "0")}`
-      : "Reenviar código";
+  const resendCountdownLabel = `Puedes reenviar en 0:${String(
+    resendCountdown
+  ).padStart(2, "0")}`;
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.layout}>
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text
-                variant="small"
-                color="textMedium"
-                style={styles.sectionTitle}
-                accessibilityRole="header"
-                accessibilityLabel={
-                  step === "email" ? "Paso 1 de 2, Correo" : "Paso 2 de 2, Código"
-                }
-              >
-                {step === "email" ? "Correo" : "Código"}
+        {isLoading ? (
+          <LoadingState
+            label="Cargando configuración..."
+            variant="inline"
+            style={styles.loadingState}
+          />
+        ) : step === "email" ? (
+          <View style={styles.stepContent}>
+            <View style={styles.intro}>
+              <Text variant="subtitle" accessibilityRole="header">
+                Configura tu correo
+              </Text>
+              <Text variant="body" color="textMedium">
+                Aquí recibirás códigos, confirmaciones y avisos importantes.
               </Text>
             </View>
 
-            <View style={styles.surface}>
-              {step === "email" ? (
-                <View style={styles.sectionContent}>
-                  <Text variant="small" color="textMedium">
-                    Para códigos y notificaciones.
-                  </Text>
+            <GroupedListSection title="Datos de contacto">
+              <View style={styles.formContent}>
+                <Text variant="body">Correo electrónico</Text>
+                <TextField
+                  accessibilityLabel="Correo electrónico"
+                  accessibilityHint={
+                    emailError || "Ingresa la dirección que quieres verificar"
+                  }
+                  value={email}
+                  onChangeText={(value) => {
+                    setEmail(value);
+                    if (emailServerError) setEmailServerError("");
+                    if (otpError) setOtpError("");
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  textContentType="emailAddress"
+                  autoComplete="email"
+                  returnKeyType="send"
+                  onSubmitEditing={() => {
+                    void handleSendCode();
+                  }}
+                  placeholder="nombre@correo.com"
+                  hasError={Boolean(emailError)}
+                  error={emailError}
+                  baseContainerStyle={styles.inputContainer}
+                />
+              </View>
+            </GroupedListSection>
 
-                  <TextField
-                    accessibilityLabel="Correo"
-                    value={email}
-                    onChangeText={(value) => {
-                      setEmail(value);
-                      if (emailServerError) setEmailServerError("");
-                      if (otpError) setOtpError("");
-                    }}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                    textContentType="emailAddress"
-                    autoComplete="email"
-                    placeholder="nombre@correo.com"
-                    hasError={Boolean(emailError)}
-                    error={emailError}
-                    baseContainerStyle={styles.inputContainer}
-                  />
-
-                  <Button
-                    variant="dark"
-                    title="Enviar código"
-                    loading={isSendingCode}
-                    disabled={!canSendCode}
-                    onPress={() => {
-                      void handleSendCode();
-                    }}
-                  />
-
-                  <View style={styles.consentBlock}>
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: emailOptIn }}
-                      onPress={() => setEmailOptIn((current) => !current)}
-                      style={styles.consentRow}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          emailOptIn ? styles.checkboxSelected : null,
-                        ]}
-                      >
-                        {emailOptIn ? (
-                          <Icon
-                            name="check"
-                            size={14}
-                            color={t.colors.backgroudWhite}
-                          />
-                        ) : null}
-                      </View>
-                      <Text variant="body" style={styles.consentLabel}>
-                        Recibir correos
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setIsHintVisible(true)}
-                      hitSlop={8}
-                      style={styles.infoButton}
-                      accessibilityRole="button"
-                      accessibilityLabel="Información sobre recibir correos"
-                    >
-                      <Icon
-                        name="info"
-                        size={16}
-                        color={t.colors.stateAnulated}
-                      />
-                    </Pressable>
-                  </View>
-                  {consentError ? (
-                    <Text variant="small" color="error">
-                      {consentError}
-                    </Text>
+            <GroupedListSection title="Preferencias de correo">
+              <Pressable
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: emailOptIn }}
+                accessibilityHint="Necesario para recibir códigos, confirmaciones y avisos de entrega"
+                onPress={() => setEmailOptIn((current) => !current)}
+                style={styles.consentRow}
+              >
+                <View
+                  style={[
+                    styles.checkbox,
+                    emailOptIn ? styles.checkboxSelected : null,
+                  ]}
+                >
+                  {emailOptIn ? (
+                    <Icon
+                      name="check"
+                      size={14}
+                      color={t.colors.backgroudWhite}
+                    />
                   ) : null}
                 </View>
-              ) : (
-                <View style={styles.sectionContent}>
-                  <View style={styles.emailHeader}>
-                    <View style={styles.emailLine}>
-                      <Text
-                        variant="body"
-                        color="textMedium"
-                        style={styles.emailText}
-                        maxLines={1}
-                      >
-                        Enviado a {maskedEmail}
-                      </Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        onPress={handleEditEmail}
-                        hitSlop={8}
-                        style={[styles.linkButton, styles.emailChangeButton]}
-                      >
-                        <Text variant="small" color="textDark">
-                          Cambiar
-                        </Text>
-                      </Pressable>
-                    </View>
-                    <View style={styles.emailHeaderSeparator} />
-                  </View>
-
-                  <View style={styles.otpBlock}>
-                    <OtpValidator
-                      label=""
-                      accessibilityLabel="Código"
-                      otpLength={OTP_LENGTH}
-                      onChange={(value) => {
-                        setOtpCode(value);
-                        if (otpError) setOtpError("");
-                      }}
-                    />
-                    {otpError ? (
-                      <Text
-                        variant="small"
-                        color="error"
-                        style={styles.otpError}
-                      >
-                        {otpError}
-                      </Text>
-                    ) : null}
-                  </View>
-
-                  <Button
-                    variant="dark"
-                    title="Verificar"
-                    loading={isVerifying}
-                    disabled={!canVerifyCode}
-                    onPress={() => {
-                      void handleVerifyCode();
-                    }}
-                  />
-
-                  <View style={styles.inlineActions}>
-                    <Pressable
-                      onPress={() => {
-                        void handleResendCode();
-                      }}
-                      disabled={resendCountdown > 0 || isSendingCode || isVerifying}
-                      style={styles.linkButton}
-                    >
-                      <Text
-                        variant="small"
-                        color={
-                          resendCountdown > 0 ? "stateAnulated" : "textDark"
-                        }
-                      >
-                        {resendLabel}
-                      </Text>
-                    </Pressable>
-                  </View>
+                <View style={styles.consentCopy}>
+                  <Text variant="body">Acepto recibir correos de Luppit</Text>
+                  <Text variant="small" color="textMedium">
+                    Incluye códigos, confirmaciones y avisos de entrega.
+                  </Text>
                 </View>
-              )}
-
-              {isLoading ? (
-                <LoadingState
-                  label="Cargando configuración..."
-                  variant="inline"
-                  style={styles.loadingRow}
-                />
+              </Pressable>
+              {consentError ? (
+                <Text
+                  variant="small"
+                  color="error"
+                  style={styles.consentError}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                >
+                  {consentError}
+                </Text>
               ) : null}
+            </GroupedListSection>
+
+            <Button
+              variant="dark"
+              title="Enviar código"
+              loading={isSendingCode}
+              disabled={!canAttemptSendCode}
+              onPress={() => {
+                void handleSendCode();
+              }}
+            />
+          </View>
+        ) : (
+          <View style={styles.stepContent}>
+            <View style={styles.intro}>
+              <Text variant="subtitle" accessibilityRole="header">
+                Ingresa el código
+              </Text>
+              <Text variant="body" color="textMedium">
+                Enviamos un código de 4 dígitos a:
+              </Text>
+              <View style={styles.emailDestination}>
+                <Text variant="body" maxLines={2}>
+                  {maskedEmail}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleEditEmail}
+                  style={styles.secondaryAction}
+                >
+                  <Text variant="body" color="primary">
+                    Cambiar correo
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <GroupedListSection title="Código de verificación">
+              <View style={styles.otpContent}>
+                <OtpValidator
+                  label="Código de 4 dígitos"
+                  accessibilityLabel={`Código de 4 dígitos enviado a ${maskedEmail}`}
+                  errorText={otpError}
+                  otpLength={OTP_LENGTH}
+                  stretch
+                  onChange={(value) => {
+                    setOtpCode(value);
+                    if (otpError) setOtpError("");
+                  }}
+                />
+              </View>
+            </GroupedListSection>
+
+            <View style={styles.actionStack}>
+              <Button
+                variant="dark"
+                title="Verificar correo"
+                loading={isVerifying}
+                disabled={!canVerifyCode}
+                onPress={() => {
+                  void handleVerifyCode();
+                }}
+              />
+
+              {resendCountdown > 0 || isSendingCode ? (
+                <View style={styles.resendStatus}>
+                  <Text variant="small" color="textMedium" align="center">
+                    {isSendingCode
+                      ? "Reenviando código..."
+                      : resendCountdownLabel}
+                  </Text>
+                </View>
+              ) : (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void handleResendCode();
+                  }}
+                  disabled={isVerifying}
+                  style={styles.resendButton}
+                >
+                  <Text variant="body" color="primary" align="center">
+                    Reenviar código
+                  </Text>
+                </Pressable>
+              )}
             </View>
           </View>
-        </View>
-
-        <HintModal
-          visible={isHintVisible}
-          text="Luppit te enviará correos transaccionales a esta dirección, como códigos OTP, confirmaciones y avisos de entrega."
-          onClose={() => setIsHintVisible(false)}
-        />
+        )}
       </ScrollView>
     </TouchableWithoutFeedback>
   );
@@ -428,53 +411,38 @@ function createEmailSetupStyles(t: Theme) {
       paddingTop: t.spacing.lg,
       paddingBottom: t.spacing.xl,
     },
-    layout: {
-      flex: 1,
-      gap: t.spacing.sm,
+    stepContent: {
+      gap: t.spacing.lg,
     },
-    section: {
-      gap: t.spacing.sm,
+    intro: {
+      gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.md,
     },
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
-    },
-    sectionTitle: {
-      flex: 1,
-      paddingLeft: t.spacing.md,
-    },
-    surface: {
-      ...createRoundedSurfaceStyle(t),
-      overflow: "hidden",
+    formContent: {
       padding: t.spacing.md,
-      gap: t.spacing.md,
-    },
-    sectionContent: {
-      gap: t.spacing.md,
+      gap: t.spacing.sm,
     },
     inputContainer: {
       marginBottom: 0,
     },
-    consentBlock: {
-      minHeight: 54,
+    consentRow: {
+      minHeight: 74,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
     },
-    consentRow: {
+    consentCopy: {
       flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm,
+      gap: t.spacing.xs,
     },
     checkbox: {
       width: 22,
       height: 22,
       borderRadius: t.borders.sm,
       borderWidth: 1,
-      borderColor: t.colors.border,
+      borderColor: t.colors.textMedium,
       backgroundColor: t.colors.backgroudWhite,
       alignItems: "center",
       justifyContent: "center",
@@ -483,52 +451,38 @@ function createEmailSetupStyles(t: Theme) {
       borderColor: t.colors.primary,
       backgroundColor: t.colors.primary,
     },
-    consentLabel: {
-      flex: 1,
-      color: t.colors.textDark,
+    consentError: {
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.md,
     },
-    infoButton: {
-      width: 32,
-      height: 32,
+    emailDestination: {
+      gap: t.spacing.xs,
+    },
+    secondaryAction: {
+      minHeight: 44,
+      alignSelf: "flex-start",
+      justifyContent: "center",
+    },
+    otpContent: {
+      padding: t.spacing.md,
+    },
+    actionStack: {
+      gap: t.spacing.sm,
+    },
+    resendStatus: {
+      minHeight: 44,
       alignItems: "center",
       justifyContent: "center",
     },
-    emailLine: {
-      minHeight: 54,
-      flexDirection: "row",
+    resendButton: {
+      minHeight: 44,
       alignItems: "center",
-      gap: t.spacing.sm,
+      justifyContent: "center",
     },
-    emailHeader: {
-      gap: t.spacing.xs,
-    },
-    emailText: {
+    loadingState: {
       flex: 1,
-      minWidth: 0,
-    },
-    emailChangeButton: {
-      flexShrink: 0,
-    },
-    emailHeaderSeparator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: "rgba(0,0,0,0.08)",
-    },
-    otpBlock: {
-      gap: t.spacing.sm,
-    },
-    otpError: {
-      paddingLeft: t.spacing.sm,
-    },
-    inlineActions: {
-      flexDirection: "row",
       alignItems: "center",
-    },
-    linkButton: {
-      paddingVertical: t.spacing.xs,
-    },
-    loadingRow: {
-      alignItems: "center",
-      paddingVertical: t.spacing.sm,
+      justifyContent: "center",
     },
   });
 }

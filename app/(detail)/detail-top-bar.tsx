@@ -5,6 +5,7 @@ import { openPopup } from "@/src/services/popup.service";
 import {
   addCurrentBuyerPurchaseRequestFavorite,
   cancelCurrentBuyerPurchaseRequest,
+  getCurrentBuyerPurchaseRequestCancellationEligibility,
   getCurrentBuyerPurchaseRequestFavoriteStatus,
   removeCurrentBuyerPurchaseRequestFavorite,
 } from "@/src/services/purchase.request.service";
@@ -34,8 +35,18 @@ export default function DetailTopBar({
   const t = useTheme();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isSavingFavorite, setIsSavingFavorite] = useState(false);
+  const [canCancelRequest, setCanCancelRequest] = useState(false);
   const isCanceledRequest =
     (purchaseRequestStatus ?? "").trim().toLowerCase() === "canceled";
+
+  const handleBackPress = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/(tabs)");
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +68,32 @@ export default function DetailTopBar({
       active = false;
     };
   }, [purchaseRequestId]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCancellationEligibility = async () => {
+      if (!purchaseRequestId || isCanceledRequest) {
+        setCanCancelRequest(false);
+        return;
+      }
+
+      const result =
+        await getCurrentBuyerPurchaseRequestCancellationEligibility(
+          purchaseRequestId
+        );
+      if (!active) return;
+
+      setCanCancelRequest(result.ok ? result.data.canCancel : false);
+    };
+
+    setCanCancelRequest(false);
+    void loadCancellationEligibility();
+
+    return () => {
+      active = false;
+    };
+  }, [isCanceledRequest, purchaseRequestId]);
 
   const handleFavoritePress = useCallback(async () => {
     if (isSavingFavorite) return;
@@ -172,6 +209,9 @@ export default function DetailTopBar({
           onPress: async () => {
             const result = await cancelCurrentBuyerPurchaseRequest(purchaseRequestId);
             if (!result.ok) {
+              if (result.error.code === "purchase_request_cancellation_locked") {
+                setCanCancelRequest(false);
+              }
               showError("No se pudo cancelar", result.error.message);
               return false;
             }
@@ -225,9 +265,16 @@ export default function DetailTopBar({
         }}
       >
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBackPress}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
           hitSlop={12}
-          style={{ width: 40, alignItems: "flex-start", justifyContent: "center" }}
+          style={{
+            width: 44,
+            height: 44,
+            alignItems: "flex-start",
+            justifyContent: "center",
+          }}
         >
           <Icon name="arrow-left" size={28} />
         </Pressable>
@@ -267,7 +314,7 @@ export default function DetailTopBar({
                     iconColorKey: "textDark",
                     onPress: () => void sharePurchaseRequest(),
                   },
-                  ...(!isCanceledRequest
+                  ...(canCancelRequest
                     ? [
                         {
                           id: "cancel-request",

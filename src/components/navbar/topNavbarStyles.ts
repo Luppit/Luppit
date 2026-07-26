@@ -33,13 +33,6 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       alignItems: "center",
       gap: t.spacing.xs,
     },
-    onlineDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 999,
-      backgroundColor: t.colors.error,
-      marginLeft: 2,
-    },
     searchInputContainer: {
       borderRadius: 999,
       height: 48,

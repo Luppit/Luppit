@@ -24,7 +24,6 @@ import {
 import {
   ConversationView,
   ConversationViewAction,
-  executeConversationAction,
   executeConversationActionByExecutor,
   getCurrentProfileConversationById,
   getCurrentUserConversationView,
@@ -264,6 +263,17 @@ function didPurgeConversationResult(value: unknown, conversationId: string) {
         : null;
 
   return result.conversation_deleted === true || purgedConversationId === conversationId;
+}
+
+function getActionSuccessMessage(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "Acción completada";
+  }
+
+  const message = (value as Record<string, unknown>).success_message;
+  return typeof message === "string" && message.trim()
+    ? message.trim()
+    : "Acción completada";
 }
 
 export default function ConversationLayout() {
@@ -509,6 +519,18 @@ export default function ConversationLayout() {
         showError("Acción no disponible", "Esta acción no tiene código de ejecución.");
         return false;
       }
+      if (
+        !action.executor ||
+        !action.executor.target.trim() ||
+        (action.executor.execution_type !== "server_rpc" &&
+          action.executor.execution_type !== "client_command")
+      ) {
+        showError(
+          "Acción no disponible",
+          "Esta acción tiene una configuración incompleta."
+        );
+        return false;
+      }
       if (isExecutingActionRef.current) return false;
 
       isExecutingActionRef.current = true;
@@ -604,16 +626,19 @@ export default function ConversationLayout() {
               showSuccess("Favorito agregado");
             }
           } else if (action.executor.target !== "popup.close") {
-            showInfo("Acción local", `Comando cliente: ${action.executor.target}`);
+            showError(
+              "Acción no disponible",
+              "Esta acción tiene una configuración no reconocida."
+            );
+            return false;
           }
           result = { ok: true, data: null };
         } else {
-          result = await executeConversationAction({
-            conversationId,
-            profileId,
-            actionCode: action.code,
-            payload: payload ?? null,
-          });
+          showError(
+            "Acción no disponible",
+            "Esta acción tiene una configuración incompleta."
+          );
+          return false;
         }
 
         if (!result.ok) {
@@ -628,7 +653,7 @@ export default function ConversationLayout() {
         const shouldRefresh = action.executor?.requires_refresh ?? true;
         const conversationWasPurged = didPurgeConversationResult(result.data, conversationId);
         if (conversationWasPurged) {
-          showSuccess("Acción completada");
+          showSuccess(getActionSuccessMessage(result.data));
           router.replace("/(tabs)/chats");
           return true;
         }
@@ -639,7 +664,7 @@ export default function ConversationLayout() {
         }
 
         if (action.executor?.execution_type !== "client_command") {
-          showSuccess("Acción completada");
+          showSuccess(getActionSuccessMessage(result.data));
         }
 
         return true;

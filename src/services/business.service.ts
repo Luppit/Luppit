@@ -1,3 +1,5 @@
+import { RPC_FUNCTIONS } from "../db/functions";
+import { COL_BUSINESS, TB_BUSINESS } from "../db/tables";
 import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
@@ -80,20 +82,6 @@ function parseStringArray(value: unknown): string[] {
         .filter(Boolean)
     )
   );
-}
-
-function isMissingRpcError(error: any, functionName: string) {
-  if (!error || error.code !== "PGRST202") return false;
-  const message = typeof error.message === "string" ? error.message : "";
-  return message.includes(functionName);
-}
-
-function getMaskedBusinessDocumentLabel(value: string | null | undefined) {
-  const documentValue = value?.trim() ?? "";
-  if (!documentValue) return null;
-
-  const digits = documentValue.replace(/\D/g, "");
-  return `Registrado${digits ? ` **** ${digits.slice(-4)}` : ""}`;
 }
 
 function parseBuyerBusinessOverview(
@@ -196,262 +184,6 @@ function parseBuyerBusinessOverview(
   };
 }
 
-async function getFallbackBusinessIdForBuyerContext({
-  profileId,
-  conversationId,
-  purchaseRequestId,
-  purchaseOfferId,
-}: {
-  profileId: string;
-  conversationId: string | null;
-  purchaseRequestId: string | null;
-  purchaseOfferId: string | null;
-}): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
-  if (conversationId) {
-    const conversationResult = await supabase
-      .from("conversation")
-      .select("purchase_request_id,purchase_offer_id,seller_profile_id")
-      .eq("id", conversationId)
-      .eq("buyer_profile_id", profileId)
-      .maybeSingle();
-
-    if (conversationResult.error) {
-      return { ok: false, error: fromSupabaseError(conversationResult.error) };
-    }
-    if (!conversationResult.data) return { ok: false, error: fromAppError("not_found") };
-
-    const offerId =
-      typeof conversationResult.data.purchase_offer_id === "string"
-        ? conversationResult.data.purchase_offer_id
-        : null;
-    const requestId =
-      typeof conversationResult.data.purchase_request_id === "string"
-        ? conversationResult.data.purchase_request_id
-        : null;
-
-    if (offerId) {
-      const offerResult = await supabase
-        .from("purchase_offer")
-        .select("business_id,purchase_request_id")
-        .eq("id", offerId)
-        .maybeSingle();
-
-      if (offerResult.error) {
-        return { ok: false, error: fromSupabaseError(offerResult.error) };
-      }
-
-      const businessId =
-        typeof offerResult.data?.business_id === "string"
-          ? offerResult.data.business_id
-          : null;
-      const offerRequestId =
-        typeof offerResult.data?.purchase_request_id === "string"
-          ? offerResult.data.purchase_request_id
-          : null;
-
-      if (businessId && (!requestId || offerRequestId === requestId)) {
-        return { ok: true, data: businessId };
-      }
-    }
-
-    const sellerProfileId =
-      typeof conversationResult.data.seller_profile_id === "string"
-        ? conversationResult.data.seller_profile_id
-        : null;
-    if (!sellerProfileId) return { ok: false, error: fromAppError("not_found") };
-
-    const profileBusinessResult = await supabase
-      .from("profile_business")
-      .select("business_id")
-      .eq("profile_id", sellerProfileId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (profileBusinessResult.error) {
-      return { ok: false, error: fromSupabaseError(profileBusinessResult.error) };
-    }
-
-    const businessId =
-      typeof profileBusinessResult.data?.business_id === "string"
-        ? profileBusinessResult.data.business_id
-        : null;
-    if (!businessId) return { ok: false, error: fromAppError("not_found") };
-
-    return { ok: true, data: businessId };
-  }
-
-  if (!purchaseRequestId || !purchaseOfferId) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-
-  const requestResult = await supabase
-    .from("purchase_request")
-    .select("id")
-    .eq("id", purchaseRequestId)
-    .eq("profile_id", profileId)
-    .maybeSingle();
-
-  if (requestResult.error) {
-    return { ok: false, error: fromSupabaseError(requestResult.error) };
-  }
-  if (!requestResult.data) return { ok: false, error: fromAppError("not_found") };
-
-  const offerResult = await supabase
-    .from("purchase_offer")
-    .select("business_id")
-    .eq("id", purchaseOfferId)
-    .eq("purchase_request_id", purchaseRequestId)
-    .maybeSingle();
-
-  if (offerResult.error) {
-    return { ok: false, error: fromSupabaseError(offerResult.error) };
-  }
-
-  const businessId =
-    typeof offerResult.data?.business_id === "string"
-      ? offerResult.data.business_id
-      : null;
-  if (!businessId) return { ok: false, error: fromAppError("not_found") };
-
-  return { ok: true, data: businessId };
-}
-
-async function getFallbackBuyerVisibleBusinessOverview({
-  profileId,
-  conversationId,
-  purchaseRequestId,
-  purchaseOfferId,
-}: {
-  profileId: string;
-  conversationId: string | null;
-  purchaseRequestId: string | null;
-  purchaseOfferId: string | null;
-}): Promise<
-  { ok: true; data: BuyerVisibleBusinessOverview } | { ok: false; error: AppError }
-> {
-  const businessIdResult = await getFallbackBusinessIdForBuyerContext({
-    profileId,
-    conversationId,
-    purchaseRequestId,
-    purchaseOfferId,
-  });
-  if (!businessIdResult.ok) return businessIdResult;
-
-  const businessResult = await supabase
-    .from("business")
-    .select("id,name,id_document,created_at,location_id")
-    .eq("id", businessIdResult.data)
-    .maybeSingle();
-
-  if (businessResult.error) {
-    return { ok: false, error: fromSupabaseError(businessResult.error) };
-  }
-  if (!businessResult.data) return { ok: false, error: fromAppError("not_found") };
-
-  const ratingResult = await supabase
-    .from("business_rating_summary")
-    .select("rating,num_ratings")
-    .eq("business_id", businessResult.data.id)
-    .maybeSingle();
-
-  if (ratingResult.error) {
-    return { ok: false, error: fromSupabaseError(ratingResult.error) };
-  }
-
-  let location: BuyerBusinessLocation | null = null;
-  if (businessResult.data.location_id) {
-    const locationResult = await supabase
-      .from("location")
-      .select("id,province,canton,district")
-      .eq("id", businessResult.data.location_id)
-      .maybeSingle();
-
-    if (locationResult.error) {
-      return { ok: false, error: fromSupabaseError(locationResult.error) };
-    }
-
-    if (locationResult.data) {
-      location = {
-        id: locationResult.data.id,
-        province: locationResult.data.province,
-        canton: locationResult.data.canton,
-        district: locationResult.data.district,
-      };
-    }
-  }
-
-  const preferenceResult = await supabase
-    .from("business_category_preference")
-    .select("id,category_id")
-    .eq("business_id", businessResult.data.id);
-
-  if (preferenceResult.error) {
-    return { ok: false, error: fromSupabaseError(preferenceResult.error) };
-  }
-
-  const preferences = preferenceResult.data ?? [];
-  const categoryIds = Array.from(
-    new Set(
-      preferences
-        .map((preference) => preference.category_id)
-        .filter((categoryId): categoryId is string => typeof categoryId === "string")
-    )
-  );
-  const categoryById = new Map<string, { name: string; path: string | null }>();
-
-  if (categoryIds.length > 0) {
-    const categoryResult = await supabase
-      .from("category")
-      .select("id,name,path")
-      .in("id", categoryIds);
-
-    if (categoryResult.error) {
-      return { ok: false, error: fromSupabaseError(categoryResult.error) };
-    }
-
-    for (const category of categoryResult.data ?? []) {
-      const path = typeof category.path === "string" ? category.path : null;
-      categoryById.set(category.id, { name: category.name, path });
-    }
-  }
-
-  const categories = preferences
-    .map((preference) => {
-      const category = categoryById.get(preference.category_id);
-      if (!category) return null;
-
-      return {
-        id: preference.id,
-        categoryId: preference.category_id,
-        name: category.name,
-        path: category.path,
-      } satisfies BuyerBusinessCategory;
-    })
-    .filter((category): category is BuyerBusinessCategory => Boolean(category))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  return {
-    ok: true,
-    data: {
-      business: {
-        id: businessResult.data.id,
-        name: businessResult.data.name,
-        documentLabel: getMaskedBusinessDocumentLabel(
-          businessResult.data.id_document
-        ),
-        createdAt: businessResult.data.created_at,
-        rating: parseNumber(ratingResult.data?.rating),
-        numRatings: parseNumber(ratingResult.data?.num_ratings) ?? 0,
-        location,
-      },
-      categories,
-      ratingTags: [],
-      reviews: [],
-    },
-  };
-}
-
 async function getCurrentBuyerVisibleBusinessOverview(
   args:
     | { conversationId: string; purchaseRequestId?: never; purchaseOfferId?: never }
@@ -469,30 +201,31 @@ async function getCurrentBuyerVisibleBusinessOverview(
   const purchaseOfferId =
     "purchaseOfferId" in args ? args.purchaseOfferId?.trim() || null : null;
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "get_buyer_visible_business_profile",
-    {
-      p_profile_id: profileResult.data,
-      p_conversation_id: conversationId,
-      p_purchase_request_id: purchaseRequestId,
-      p_purchase_offer_id: purchaseOfferId,
-    }
+  const rpcArgs = conversationId
+    ? {
+        p_profile_id: profileResult.data,
+        p_conversation_id: conversationId,
+      }
+    : purchaseRequestId && purchaseOfferId
+      ? {
+          p_profile_id: profileResult.data,
+          p_purchase_request_id: purchaseRequestId,
+          p_purchase_offer_id: purchaseOfferId,
+        }
+      : null;
+
+  if (!rpcArgs) return { ok: false, error: fromAppError("validation") };
+
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.GET_BUYER_VISIBLE_BUSINESS_PROFILE,
+    rpcArgs
   );
 
-  if (rpcResult?.error) {
-    if (isMissingRpcError(rpcResult.error, "get_buyer_visible_business_profile")) {
-      return getFallbackBuyerVisibleBusinessOverview({
-        profileId: profileResult.data,
-        conversationId,
-        purchaseRequestId,
-        purchaseOfferId,
-      });
-    }
-
-    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  if (error) {
+    return { ok: false, error: fromSupabaseError(error) };
   }
 
-  const parsed = parseBuyerBusinessOverview(rpcResult?.data);
+  const parsed = parseBuyerBusinessOverview(data);
   if (!parsed) return { ok: false, error: fromAppError("not_found") };
 
   return { ok: true, data: parsed };
@@ -502,9 +235,9 @@ export async function getBusinessById(
   businessId: string
 ): Promise<{ ok: true; data: Business } | { ok: false; error: AppError } | null> {
   const { data, error } = await supabase
-    .from("business")
+    .from(TB_BUSINESS)
     .select("*")
-    .eq("id", businessId)
+    .eq(COL_BUSINESS.id, businessId)
     .maybeSingle();
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
