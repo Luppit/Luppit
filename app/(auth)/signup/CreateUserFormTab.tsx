@@ -1,6 +1,11 @@
 import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
 import { InputPhone } from "@/src/components/inputPhone/InputPhone";
+import {
+  COSTA_RICA_PERSONAL_ID_ERROR,
+  COSTA_RICA_PERSONAL_ID_LENGTH,
+  isValidCostaRicaPersonalId,
+} from "@/src/utils/costaRicaIdDocument";
 import React, { useState } from "react";
 import { View } from "react-native";
 
@@ -12,7 +17,6 @@ export type CreateUserFormTabProps = {
 }
 
 const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
-const ID_DOCUMENT_ERROR = "El documento de identificación es obligatorio.";
 const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 
@@ -34,7 +38,9 @@ const [errors, setErrors] = useState({
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
     if (!values.fullName.trim()) newErrors.fullName = FULL_NAME_ERROR;
-    if (!values.idDocument.trim()) newErrors.idDocument = ID_DOCUMENT_ERROR;
+    if (!isValidCostaRicaPersonalId(values.idDocument)) {
+      newErrors.idDocument = COSTA_RICA_PERSONAL_ID_ERROR;
+    }
     if (!isSeller) {
       if (!values.phoneNumber.trim()) newErrors.phoneNumber = PHONE_NUMBER_ERROR;
 
@@ -73,12 +79,15 @@ const [errors, setErrors] = useState({
         value={values.idDocument}
         onChangeText={(text) => {
           setValues({ ...values, idDocument: text });
-          if (errors.idDocument && text.trim()) {
+          if (errors.idDocument && isValidCostaRicaPersonalId(text)) {
             setErrors({ ...errors, idDocument: "" });
           }
         }}
         hasError={!!errors.idDocument}
         error={errors.idDocument}
+        keyboardType="number-pad"
+        inputMode="numeric"
+        maxLength={COSTA_RICA_PERSONAL_ID_LENGTH}
       />
       {!isSeller && (
         <InputPhone

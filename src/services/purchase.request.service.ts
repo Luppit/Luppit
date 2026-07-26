@@ -1,3 +1,10 @@
+import { RPC_FUNCTIONS } from "../db/functions";
+import {
+  COL_PURCHASE_REQUEST,
+  COL_PURCHASE_REQUEST_VISUALIZATION,
+  TB_PURCHASE_REQUEST,
+  TB_PURCHASE_REQUEST_VISUALIZATION,
+} from "../db/tables";
 import { Row } from "../db/types";
 import { BuyerHomeFilters } from "./buyer.home.filters.service";
 import {
@@ -68,6 +75,16 @@ export type SellerHomeFilterCategoryOption = {
   label: string;
 };
 export type MarketplaceHubRole = "buyer" | "seller";
+export type MarketplaceHubSortOption = {
+  code: string;
+  label: string;
+  sort_order: number;
+};
+export type MarketplaceHubSortConfig = {
+  default_code: string;
+  selected_code: string;
+  options: MarketplaceHubSortOption[];
+};
 export type MarketplaceHubOverview = {
   active_request_count: number;
   attention_request_count: number;
@@ -100,6 +117,7 @@ export type MarketplaceHubNavigation = {
   purchase_request_id: string | null;
 };
 export type MarketplaceHubItem = SellerHomePurchaseRequestItem & {
+  buyer_display_name: string | null;
   hub_item_id: string;
   entity_type: string | null;
   purchase_request_id: string;
@@ -133,16 +151,21 @@ export type MarketplaceHub = {
   version: number;
   role_code: MarketplaceHubRole;
   generated_at: string | null;
+  sort: MarketplaceHubSortConfig | null;
   overview: MarketplaceHubOverview;
   stages: MarketplaceHubStage[];
   rail: MarketplaceHubRail;
 };
+
+export const DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE = "request_newest";
+export const DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE = "recommended";
 export type MarketplaceHubItemsPage = {
   items: MarketplaceHubItem[];
   total: number;
   page: number;
   page_size: number;
   has_more: boolean;
+  sort: MarketplaceHubSortConfig | null;
 };
 export type PurchaseRequestCategoryRequirementInfo = {
   categoryId: string;
@@ -163,7 +186,19 @@ export type PurchaseRequestCategoryInfo = {
 export type CancelPurchaseRequestResult = {
   purchaseRequestId: string | null;
   status: string | null;
+  alreadyCanceled: boolean;
   conversationsCanceled: number;
+  sellersNotified: number;
+};
+export type PurchaseRequestCancellationEligibility = {
+  canCancel: boolean;
+  reasonCode: string | null;
+};
+export type DeleteBuyerPurchaseRequestResult = {
+  purchaseRequestId: string;
+  alreadyDeleted: boolean;
+  deletedConversations: number;
+  deletedOffers: number;
 };
 const PURCHASE_REQUEST_SELECT = [
   "id",
@@ -187,9 +222,9 @@ export async function getPurchaseRequestById(
   if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
 
   const { data, error } = await supabase
-    .from("purchase_request")
+    .from(TB_PURCHASE_REQUEST)
     .select(PURCHASE_REQUEST_SELECT)
-    .eq("id", purchaseRequestId)
+    .eq(COL_PURCHASE_REQUEST.id, purchaseRequestId)
     .maybeSingle();
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
@@ -218,8 +253,10 @@ export async function getCategoryInfoForPurchaseRequest(
   }
 
   const [lineageResult, requirementsResult] = await Promise.allSettled([
-    (supabase as any).rpc("get_category_lineage", { leaf_id: categoryId }),
-    (supabase as any).rpc("get_category_requirements", { category_ids: [categoryId] }),
+    supabase.rpc(RPC_FUNCTIONS.GET_CATEGORY_LINEAGE, { leaf_id: categoryId }),
+    supabase.rpc(RPC_FUNCTIONS.GET_CATEGORY_REQUIREMENTS, {
+      category_ids: [categoryId],
+    }),
   ]);
 
   const lineagePayload =
@@ -266,27 +303,95 @@ export async function cancelCurrentBuyerPurchaseRequest(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "cancel_current_buyer_purchase_request",
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.CANCEL_CURRENT_BUYER_PURCHASE_REQUEST,
     {
       p_profile_id: profile.data.id,
       p_purchase_request_id: purchaseRequestId,
     }
   );
 
-  if (rpcResult?.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
-  return { ok: true, data: mapCancelPurchaseRequestResult(rpcResult?.data) };
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  return { ok: true, data: mapCancelPurchaseRequestResult(data) };
+}
+
+export async function getCurrentBuyerPurchaseRequestCancellationEligibility(
+  purchaseRequestId: string
+): Promise<
+  | { ok: true; data: PurchaseRequestCancellationEligibility }
+  | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_BUYER_PURCHASE_REQUEST_CANCELLATION_ELIGIBILITY,
+    {
+      p_profile_id: profile.data.id,
+      p_purchase_request_id: purchaseRequestId,
+    }
+  );
+
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+
+  return {
+    ok: true,
+    data: mapPurchaseRequestCancellationEligibility(data),
+  };
+}
+
+export async function deleteCurrentBuyerPurchaseRequest(
+  purchaseRequestId: string
+): Promise<
+  { ok: true; data: DeleteBuyerPurchaseRequestResult } | { ok: false; error: AppError }
+> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+
+  const functionResult = await supabase.functions.invoke(
+    "delete-buyer-purchase-request",
+    {
+      body: {
+        profileId: profile.data.id,
+        purchaseRequestId,
+      },
+    }
+  );
+
+  if (functionResult.error) {
+    return {
+      ok: false,
+      error: await mapPurchaseRequestDeletionFunctionError(functionResult.error),
+    };
+  }
+
+  return {
+    ok: true,
+    data: mapDeleteBuyerPurchaseRequestResult(functionResult.data, purchaseRequestId),
+  };
 }
 
 export async function getPurchaseRequestByProfileId(
   profileId: string
 ): Promise<{ ok: true; data: PurchaseRequest } | { ok: false; error: AppError } | null> {
   const visualization = await supabase
-    .from("purchase_request_visualization")
+    .from(TB_PURCHASE_REQUEST_VISUALIZATION)
     .select("purchase_request_id")
-    .eq("profile_id", profileId)
-    .not("purchase_request_id", "is", null)
-    .order("created_at", { ascending: false })
+    .eq(COL_PURCHASE_REQUEST_VISUALIZATION.profile_id, profileId)
+    .not(COL_PURCHASE_REQUEST_VISUALIZATION.purchase_request_id, "is", null)
+    .order(COL_PURCHASE_REQUEST_VISUALIZATION.created_at, { ascending: false })
     .limit(25);
 
   if (visualization.error) {
@@ -340,6 +445,18 @@ function parseCount(raw: unknown): number {
 
 function normalizeNullableString(raw: unknown): string | null {
   return typeof raw === "string" && raw.trim().length > 0 ? raw : null;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function hasJsonResponse(
+  value: unknown
+): value is { json: () => Promise<unknown>; clone?: () => unknown } {
+  return typeof toRecord(value)?.json === "function";
 }
 
 function normalizeCategoryFieldLabel(raw: unknown): string | null {
@@ -399,16 +516,72 @@ function mapCategoryRequirementInfo(
 
 function mapCancelPurchaseRequestResult(raw: unknown): CancelPurchaseRequestResult {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const count = value.conversations_canceled;
 
   return {
     purchaseRequestId: normalizeNullableString(value.purchase_request_id),
     status: normalizeNullableString(value.status),
-    conversationsCanceled:
-      typeof count === "number" && Number.isFinite(count)
-        ? Math.max(0, Math.floor(count))
-        : 0,
+    alreadyCanceled: value.already_canceled === true,
+    conversationsCanceled: parseCount(value.conversations_canceled),
+    sellersNotified: parseCount(value.sellers_notified),
   };
+}
+
+function mapPurchaseRequestCancellationEligibility(
+  raw: unknown
+): PurchaseRequestCancellationEligibility {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    canCancel: value.can_cancel === true,
+    reasonCode: normalizeNullableString(value.reason_code),
+  };
+}
+
+function mapDeleteBuyerPurchaseRequestResult(
+  raw: unknown,
+  fallbackPurchaseRequestId: string
+): DeleteBuyerPurchaseRequestResult {
+  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+
+  return {
+    purchaseRequestId:
+      normalizeNullableString(value.purchaseRequestId) ??
+      normalizeNullableString(value.purchase_request_id) ??
+      fallbackPurchaseRequestId,
+    alreadyDeleted: value.alreadyDeleted === true || value.already_deleted === true,
+    deletedConversations: parseCount(
+      value.deletedConversations ?? value.deleted_conversations
+    ),
+    deletedOffers: parseCount(value.deletedOffers ?? value.deleted_offers),
+  };
+}
+
+async function mapPurchaseRequestDeletionFunctionError(error: unknown): Promise<AppError> {
+  let payload: Record<string, unknown> | null = null;
+  const response = toRecord(error)?.context;
+
+  if (hasJsonResponse(response)) {
+    try {
+      const clonedResponse =
+        typeof response.clone === "function" ? response.clone() : response;
+      const readableResponse = hasJsonResponse(clonedResponse)
+        ? clonedResponse
+        : response;
+      const parsed = await readableResponse.json();
+      payload = toRecord(parsed);
+    } catch {
+      payload = null;
+    }
+  }
+
+  const code = normalizeNullableString(
+    payload?.code ?? payload?.error_code ?? payload?.error
+  );
+  if (code) {
+    return fromSupabaseError({ error_code: code, message: code, code });
+  }
+
+  return fromSupabaseError(error);
 }
 
 function parseSellerHomePurchaseRequestItem(
@@ -548,6 +721,7 @@ function parseMarketplaceHubItem(raw: unknown): MarketplaceHubItem | null {
 
   return {
     ...item,
+    buyer_display_name: normalizeNullableString(value.buyer_display_name),
     hub_item_id: hubItemId,
     entity_type: normalizeNullableString(value.entity_type),
     purchase_request_id: purchaseRequestId,
@@ -582,6 +756,60 @@ function parseMarketplaceHubStage(raw: unknown): MarketplaceHubStage | null {
   };
 }
 
+function parseMarketplaceHubSortOption(raw: unknown): MarketplaceHubSortOption | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const code = normalizeNullableString(value.code) ?? "";
+  const label = normalizeNullableString(value.label) ?? "";
+  if (!code || !label) return null;
+
+  return {
+    code,
+    label,
+    sort_order: parseCount(value.sort_order),
+  };
+}
+
+function parseMarketplaceHubSort(
+  raw: unknown,
+  role: MarketplaceHubRole,
+  fallbackSelectedCode?: string
+): MarketplaceHubSortConfig | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const value = raw as Record<string, unknown>;
+  const parsedOptions = Array.isArray(value.options)
+    ? value.options
+        .map(parseMarketplaceHubSortOption)
+        .filter((option): option is MarketplaceHubSortOption => option !== null)
+        .sort((a, b) => a.sort_order - b.sort_order)
+    : [];
+  if (parsedOptions.length === 0) return null;
+
+  const options = parsedOptions;
+  const requestedDefaultCode =
+    normalizeNullableString(value.default_code) ??
+    (role === "buyer"
+      ? DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE
+      : DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE);
+  const defaultCode = options.some((option) => option.code === requestedDefaultCode)
+    ? requestedDefaultCode
+    : options[0].code;
+  const requestedSelectedCode =
+    normalizeNullableString(value.selected_code) ??
+    fallbackSelectedCode ??
+    defaultCode;
+  const selectedCode = options.some((option) => option.code === requestedSelectedCode)
+    ? requestedSelectedCode
+    : defaultCode;
+
+  return {
+    default_code: defaultCode,
+    selected_code: selectedCode,
+    options,
+  };
+}
+
 function parseMarketplaceHubOverview(raw: unknown): MarketplaceHubOverview {
   const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
 
@@ -610,7 +838,8 @@ function parseMarketplaceHubRail(raw: unknown): MarketplaceHubRail {
 
 function extractMarketplaceHub(
   payload: unknown,
-  fallbackRole: MarketplaceHubRole
+  fallbackRole: MarketplaceHubRole,
+  fallbackSelectedSortCode?: string
 ): MarketplaceHub {
   const value = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const rawStages = Array.isArray(value.stages) ? value.stages : [];
@@ -622,6 +851,7 @@ function extractMarketplaceHub(
     version: parseCount(value.version) || 2,
     role_code: roleCode,
     generated_at: normalizeNullableString(value.generated_at),
+    sort: parseMarketplaceHubSort(value.sort, roleCode, fallbackSelectedSortCode),
     overview: parseMarketplaceHubOverview(value.overview),
     stages: rawStages
       .map(parseMarketplaceHubStage)
@@ -638,7 +868,9 @@ function parsePositiveInteger(raw: unknown, fallback: number): number {
 function extractMarketplaceHubItemsPage(
   payload: unknown,
   fallbackPage: number,
-  fallbackPageSize: number
+  fallbackPageSize: number,
+  role: MarketplaceHubRole,
+  fallbackSelectedSortCode?: string
 ): MarketplaceHubItemsPage {
   const value = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
   const rawItems = Array.isArray(value.items) ? value.items : [];
@@ -658,14 +890,13 @@ function extractMarketplaceHubItemsPage(
       typeof value.has_more === "boolean"
         ? value.has_more
         : page * pageSize < total,
+    sort: parseMarketplaceHubSort(value.sort, role, fallbackSelectedSortCode),
   };
 }
 
 function extractPurchaseRequestFavoriteItems(payload: unknown): PurchaseRequestFavoriteItem[] {
-  const itemsRaw: unknown[] =
-    payload && typeof payload === "object" && Array.isArray((payload as any).items)
-      ? (payload as any).items
-      : [];
+  const items = toRecord(payload)?.items;
+  const itemsRaw: unknown[] = Array.isArray(items) ? items : [];
 
   return itemsRaw
     .map(parsePurchaseRequestFavoriteItem)
@@ -675,10 +906,8 @@ function extractPurchaseRequestFavoriteItems(payload: unknown): PurchaseRequestF
 function extractBuyerHomePurchaseRequestGroups(
   payload: unknown
 ): BuyerHomePurchaseRequestGroup[] {
-  const groupsRaw: unknown[] =
-    payload && typeof payload === "object" && Array.isArray((payload as any).groups)
-      ? (payload as any).groups
-      : [];
+  const groups = toRecord(payload)?.groups;
+  const groupsRaw: unknown[] = Array.isArray(groups) ? groups : [];
 
   return groupsRaw
     .map(parseSellerHomePurchaseRequestGroup)
@@ -688,10 +917,8 @@ function extractBuyerHomePurchaseRequestGroups(
 function extractSellerHomePurchaseRequestGroups(
   payload: unknown
 ): SellerHomePurchaseRequestGroup[] {
-  const groupsRaw: unknown[] =
-    payload && typeof payload === "object" && Array.isArray((payload as any).groups)
-      ? (payload as any).groups
-      : [];
+  const groups = toRecord(payload)?.groups;
+  const groupsRaw: unknown[] = Array.isArray(groups) ? groups : [];
 
   return groupsRaw
     .map(parseSellerHomePurchaseRequestGroup)
@@ -833,16 +1060,32 @@ function applySellerHomeFiltersToGroups(
   });
 }
 
-function isBuyerHomeLegacyRpcError(error: any) {
-  if (!error || error.code !== "PGRST202") return false;
-  const message = typeof error.message === "string" ? error.message : "";
-  return message.includes("get_buyer_home_purchase_requests");
+function isBuyerHomeLegacyRpcError(error: unknown) {
+  const value = toRecord(error);
+  if (value?.code !== "PGRST202") return false;
+  const message = typeof value.message === "string" ? value.message : "";
+  return message.includes(RPC_FUNCTIONS.GET_BUYER_HOME_PURCHASE_REQUESTS);
 }
 
-function isSellerHomeLegacyRpcError(error: any) {
-  if (!error || error.code !== "PGRST202") return false;
-  const message = typeof error.message === "string" ? error.message : "";
-  return message.includes("get_seller_home_purchase_requests");
+function isSellerHomeLegacyRpcError(error: unknown) {
+  const value = toRecord(error);
+  if (value?.code !== "PGRST202") return false;
+  const message = typeof value.message === "string" ? value.message : "";
+  return message.includes(RPC_FUNCTIONS.GET_SELLER_HOME_PURCHASE_REQUESTS);
+}
+
+function isMarketplaceHubSortRpcCompatibilityError(error: unknown, rpcName: string) {
+  const value = toRecord(error);
+  if (value?.code !== "PGRST202") return false;
+  const message = typeof value.message === "string" ? value.message : "";
+  return message.includes(rpcName) && message.includes("p_sort_code");
+}
+
+function isSellerFilterOptionsRpcCompatibilityError(error: unknown) {
+  const value = toRecord(error);
+  if (value?.code !== "PGRST202") return false;
+  const message = typeof value.message === "string" ? value.message : "";
+  return message.includes(RPC_FUNCTIONS.GET_SELLER_HOME_FILTER_OPTIONS);
 }
 
 function mapPurchaseRequestStatusUiOption(
@@ -885,23 +1128,6 @@ function mapRemovePurchaseRequestFavoriteResult(
   };
 }
 
-function buildFallbackSellerCategoryOptions(
-  groups: SellerHomePurchaseRequestGroup[]
-): SellerHomeFilterCategoryOption[] {
-  const map = new Map<string, SellerHomeFilterCategoryOption>();
-
-  groups.forEach((group) => {
-    group.items.forEach((item) => {
-      const id = item.category_id?.trim();
-      const label = item.category_name?.trim();
-      if (!id || !label || map.has(id)) return;
-      map.set(id, { id, label });
-    });
-  });
-
-  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, "es"));
-}
-
 function getHomeSegmentRpcValue(segmentSvgName?: string) {
   const normalized = segmentSvgName?.trim();
   if (!normalized || normalized === ALL_SEGMENTS_SVG_NAME) return null;
@@ -938,15 +1164,16 @@ export async function getCurrentSellerHomePurchaseRequestGroups(
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "get_seller_home_purchase_requests",
-    rpcArgs
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_SELLER_HOME_PURCHASE_REQUESTS,
+    rpcArgs as never
   );
 
   if (rpcResult?.error && isSellerHomeLegacyRpcError(rpcResult.error)) {
-    const legacyRpcResult: any = await (supabase as any).rpc("get_seller_home_purchase_requests", {
-      p_profile_id: profile.data.id,
-    });
+    const legacyRpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_SELLER_HOME_PURCHASE_REQUESTS,
+      { p_profile_id: profile.data.id }
+    );
 
     if (legacyRpcResult?.error) {
       return { ok: false, error: fromSupabaseError(legacyRpcResult.error) };
@@ -994,12 +1221,16 @@ export async function getCurrentBuyerHomePurchaseRequestGroups(
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc("get_buyer_home_purchase_requests", rpcArgs);
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_BUYER_HOME_PURCHASE_REQUESTS,
+    rpcArgs as never
+  );
 
   if (rpcResult?.error && isBuyerHomeLegacyRpcError(rpcResult.error)) {
-    const legacyRpcResult: any = await (supabase as any).rpc("get_buyer_home_purchase_requests", {
-      p_profile_id: profile.data.id,
-    });
+    const legacyRpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_BUYER_HOME_PURCHASE_REQUESTS,
+      { p_profile_id: profile.data.id }
+    );
 
     if (legacyRpcResult?.error) {
       return { ok: false, error: fromSupabaseError(legacyRpcResult.error) };
@@ -1053,7 +1284,10 @@ export async function getCurrentSellerMarketplaceHub(
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc("get_seller_marketplace_hub", rpcArgs);
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_SELLER_MARKETPLACE_HUB,
+    rpcArgs as never
+  );
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -1065,7 +1299,8 @@ export async function getCurrentSellerMarketplaceHub(
 export async function getCurrentBuyerMarketplaceHub(
   filters?: BuyerHomeFilters,
   segmentSvgName?: string,
-  stageCode?: string
+  stageCode?: string,
+  sortCode: string = DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE
 ): Promise<{ ok: true; data: MarketplaceHub } | { ok: false; error: AppError }> {
   const session = await getSession();
   if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
@@ -1073,10 +1308,11 @@ export async function getCurrentBuyerMarketplaceHub(
   const profile = await getCurrentProfileResult();
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) {
-    return { ok: true, data: extractMarketplaceHub(null, "buyer") };
+    return { ok: true, data: extractMarketplaceHub(null, "buyer", sortCode) };
   }
 
   const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const normalizedSortCode = sortCode.trim() || DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE;
   const rpcArgs = {
     p_profile_id: profile.data.id,
     p_search_text: filters?.searchValue?.trim() || null,
@@ -1087,16 +1323,37 @@ export async function getCurrentBuyerMarketplaceHub(
         ? filters.selectedChipIds
         : null,
     p_stage_code: stageCode?.trim() || "all",
+    p_sort_code: normalizedSortCode,
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc("get_buyer_marketplace_hub", rpcArgs);
+  let rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB,
+    rpcArgs as never
+  );
+
+  if (
+    rpcResult?.error &&
+    isMarketplaceHubSortRpcCompatibilityError(
+      rpcResult.error,
+      RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB
+    )
+  ) {
+    const { p_sort_code: _sortCode, ...legacyRpcArgs } = rpcArgs;
+    rpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB,
+      legacyRpcArgs as never
+    );
+  }
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
   }
 
-  return { ok: true, data: extractMarketplaceHub(rpcResult?.data, "buyer") };
+  return {
+    ok: true,
+    data: extractMarketplaceHub(rpcResult?.data, "buyer", normalizedSortCode),
+  };
 }
 
 export async function getCurrentSellerMarketplaceHubItems(
@@ -1104,7 +1361,8 @@ export async function getCurrentSellerMarketplaceHubItems(
   segmentSvgName?: string,
   stageCode?: string,
   page?: number,
-  pageSize?: number
+  pageSize?: number,
+  sortCode: string = DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE
 ): Promise<
   { ok: true; data: MarketplaceHubItemsPage } | { ok: false; error: AppError }
 > {
@@ -1119,11 +1377,19 @@ export async function getCurrentSellerMarketplaceHubItems(
   if (!profile) {
     return {
       ok: true,
-      data: extractMarketplaceHubItemsPage(null, normalizedPage, normalizedPageSize),
+      data: extractMarketplaceHubItemsPage(
+        null,
+        normalizedPage,
+        normalizedPageSize,
+        "seller",
+        sortCode
+      ),
     };
   }
 
   const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const normalizedSortCode =
+    sortCode.trim() || DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE;
   const rpcArgs = {
     p_profile_id: profile.data.id,
     p_search_text: filters?.searchValue?.trim() || null,
@@ -1140,13 +1406,28 @@ export async function getCurrentSellerMarketplaceHubItems(
     p_stage_code: stageCode?.trim() || "for_you",
     p_page: normalizedPage,
     p_page_size: normalizedPageSize,
+    p_sort_code: normalizedSortCode,
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "get_seller_marketplace_hub_items",
-    rpcArgs
+  let rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_SELLER_MARKETPLACE_HUB_ITEMS,
+    rpcArgs as never
   );
+
+  if (
+    rpcResult?.error &&
+    isMarketplaceHubSortRpcCompatibilityError(
+      rpcResult.error,
+      RPC_FUNCTIONS.GET_SELLER_MARKETPLACE_HUB_ITEMS
+    )
+  ) {
+    const { p_sort_code: _sortCode, ...legacyRpcArgs } = rpcArgs;
+    rpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_SELLER_MARKETPLACE_HUB_ITEMS,
+      legacyRpcArgs as never
+    );
+  }
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -1157,7 +1438,9 @@ export async function getCurrentSellerMarketplaceHubItems(
     data: extractMarketplaceHubItemsPage(
       rpcResult?.data,
       normalizedPage,
-      normalizedPageSize
+      normalizedPageSize,
+      "seller",
+      normalizedSortCode
     ),
   };
 }
@@ -1166,6 +1449,7 @@ export async function getCurrentBuyerMarketplaceHubItems(
   filters?: BuyerHomeFilters,
   segmentSvgName?: string,
   stageCode?: string,
+  sortCode: string = DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
   page?: number,
   pageSize?: number
 ): Promise<
@@ -1182,11 +1466,18 @@ export async function getCurrentBuyerMarketplaceHubItems(
   if (!profile) {
     return {
       ok: true,
-      data: extractMarketplaceHubItemsPage(null, normalizedPage, normalizedPageSize),
+      data: extractMarketplaceHubItemsPage(
+        null,
+        normalizedPage,
+        normalizedPageSize,
+        "buyer",
+        sortCode
+      ),
     };
   }
 
   const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const normalizedSortCode = sortCode.trim() || DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE;
   const rpcArgs = {
     p_profile_id: profile.data.id,
     p_search_text: filters?.searchValue?.trim() || null,
@@ -1197,15 +1488,30 @@ export async function getCurrentBuyerMarketplaceHubItems(
         ? filters.selectedChipIds
         : null,
     p_stage_code: stageCode?.trim() || "all",
+    p_sort_code: normalizedSortCode,
     p_page: normalizedPage,
     p_page_size: normalizedPageSize,
     ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
   };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "get_buyer_marketplace_hub_items",
-    rpcArgs
+  let rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB_ITEMS,
+    rpcArgs as never
   );
+
+  if (
+    rpcResult?.error &&
+    isMarketplaceHubSortRpcCompatibilityError(
+      rpcResult.error,
+      RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB_ITEMS
+    )
+  ) {
+    const { p_sort_code: _sortCode, ...legacyRpcArgs } = rpcArgs;
+    rpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_BUYER_MARKETPLACE_HUB_ITEMS,
+      legacyRpcArgs as never
+    );
+  }
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -1216,7 +1522,9 @@ export async function getCurrentBuyerMarketplaceHubItems(
     data: extractMarketplaceHubItemsPage(
       rpcResult?.data,
       normalizedPage,
-      normalizedPageSize
+      normalizedPageSize,
+      "buyer",
+      normalizedSortCode
     ),
   };
 }
@@ -1235,8 +1543,8 @@ export async function addCurrentBuyerPurchaseRequestFavorite(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "add_buyer_purchase_request_favorite",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.ADD_BUYER_PURCHASE_REQUEST_FAVORITE,
     {
       p_profile_id: profile.data.id,
       p_purchase_request_id: purchaseRequestId,
@@ -1264,8 +1572,8 @@ export async function removeCurrentBuyerPurchaseRequestFavorite(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "remove_buyer_purchase_request_favorite",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.REMOVE_BUYER_PURCHASE_REQUEST_FAVORITE,
     {
       p_profile_id: profile.data.id,
       p_purchase_request_id: purchaseRequestId,
@@ -1293,8 +1601,8 @@ export async function addCurrentSellerPurchaseRequestFavorite(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "add_seller_purchase_request_favorite",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.ADD_SELLER_PURCHASE_REQUEST_FAVORITE,
     {
       p_profile_id: profile.data.id,
       p_purchase_request_id: purchaseRequestId,
@@ -1322,8 +1630,8 @@ export async function removeCurrentSellerPurchaseRequestFavorite(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "remove_seller_purchase_request_favorite",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.REMOVE_SELLER_PURCHASE_REQUEST_FAVORITE,
     {
       p_profile_id: profile.data.id,
       p_purchase_request_id: purchaseRequestId,
@@ -1360,7 +1668,9 @@ function buildPurchaseRequestFavoriteRpcArgs(
 }
 
 async function getCurrentPurchaseRequestFavorites(
-  rpcName: "get_buyer_purchase_request_favorites" | "get_seller_purchase_request_favorites",
+  rpcName:
+    | typeof RPC_FUNCTIONS.GET_BUYER_PURCHASE_REQUEST_FAVORITES
+    | typeof RPC_FUNCTIONS.GET_SELLER_PURCHASE_REQUEST_FAVORITES,
   filters?: PurchaseRequestFavoriteFilters,
   sortCode?: string
 ): Promise<
@@ -1373,9 +1683,9 @@ async function getCurrentPurchaseRequestFavorites(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
+  const rpcResult = await supabase.rpc(
     rpcName,
-    buildPurchaseRequestFavoriteRpcArgs(profile.data.id, filters, sortCode)
+    buildPurchaseRequestFavoriteRpcArgs(profile.data.id, filters, sortCode) as never
   );
 
   if (rpcResult?.error) {
@@ -1392,7 +1702,7 @@ export async function getCurrentBuyerPurchaseRequestFavorites(
   { ok: true; data: PurchaseRequestFavoriteItem[] } | { ok: false; error: AppError }
 > {
   return getCurrentPurchaseRequestFavorites(
-    "get_buyer_purchase_request_favorites",
+    RPC_FUNCTIONS.GET_BUYER_PURCHASE_REQUEST_FAVORITES,
     filters,
     sortCode
   );
@@ -1419,7 +1729,7 @@ export async function getCurrentSellerPurchaseRequestFavorites(
   { ok: true; data: PurchaseRequestFavoriteItem[] } | { ok: false; error: AppError }
 > {
   return getCurrentPurchaseRequestFavorites(
-    "get_seller_purchase_request_favorites",
+    RPC_FUNCTIONS.GET_SELLER_PURCHASE_REQUEST_FAVORITES,
     filters,
     sortCode
   );
@@ -1430,12 +1740,53 @@ export async function getCurrentSellerHomeFilterCategoryOptions(
 ): Promise<
   { ok: true; data: SellerHomeFilterCategoryOption[] } | { ok: false; error: AppError }
 > {
-  const groupsResult = await getCurrentSellerHomePurchaseRequestGroups(undefined, segmentSvgName);
-  if (!groupsResult.ok) return groupsResult;
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: true, data: [] };
+
+  const segmentRpcValue = getHomeSegmentRpcValue(segmentSvgName);
+  const rpcArgs = {
+    p_profile_id: profile.data.id,
+    ...(segmentRpcValue ? { p_segment_svg_name: segmentRpcValue } : {}),
+  };
+  let rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_SELLER_HOME_FILTER_OPTIONS,
+    rpcArgs as never
+  );
+
+  if (
+    rpcResult.error &&
+    segmentRpcValue &&
+    isSellerFilterOptionsRpcCompatibilityError(rpcResult.error)
+  ) {
+    rpcResult = await supabase.rpc(
+      RPC_FUNCTIONS.GET_SELLER_HOME_FILTER_OPTIONS,
+      { p_profile_id: profile.data.id } as never
+    );
+  }
+
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  const categories = toRecord(rpcResult.data)?.categories;
+  const data = (Array.isArray(categories) ? categories : [])
+    .map((raw): SellerHomeFilterCategoryOption | null => {
+      const value = toRecord(raw);
+      const id = normalizeNullableString(value?.id);
+      const label = normalizeNullableString(value?.label);
+      return id && label ? { id, label } : null;
+    })
+    .filter(
+      (item): item is SellerHomeFilterCategoryOption => item !== null
+    );
 
   return {
     ok: true,
-    data: buildFallbackSellerCategoryOptions(groupsResult.data),
+    data,
   };
 }
 
@@ -1450,8 +1801,8 @@ export async function getPurchaseRequestStatusUiOptions(): Promise<
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
   const { data, error } = await supabase.rpc(
-    "get_purchase_request_status_ui_options",
-    { p_profile_id: profile.data.id }
+    RPC_FUNCTIONS.GET_PURCHASE_REQUEST_STATUS_UI_OPTIONS,
+    { p_profile_id: profile.data.id } as never
   );
 
   if (error) return { ok: false, error: fromSupabaseError(error) };

@@ -15,6 +15,7 @@ export type OtpValidatorStyles = {
   inputBoxFocused: ViewStyle;
   inputBoxError: ViewStyle;
   inputText: TextStyle;
+  inputCaret: ViewStyle;
   errorText: TextStyle;
   hiddenInput: TextStyle;
 };
@@ -74,6 +75,12 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       color: t.colors.textDark,
       paddingVertical: 0,
       includeFontPadding: false,
+    },
+    inputCaret: {
+      width: 2,
+      height: t.typography.title.lineHeight,
+      borderRadius: 1,
+      backgroundColor: t.colors.primary,
     },
     errorText: {
       color: t.colors.error,

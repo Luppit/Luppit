@@ -112,6 +112,8 @@ export type PopupSummaryConfig = {
   type: "summary";
   title: string;
   icon?: LucideIconName;
+  metadata?: string;
+  showCloseButton?: boolean;
   description?: string;
   descriptionPlacement?: "beforeRows" | "afterRows";
   descriptionScroll?: boolean;
@@ -168,6 +170,7 @@ export type PopupFilterConfig = {
   applyLabel?: string;
   clearLabel?: string;
   dismissOnBackdropPress?: boolean;
+  onDismiss?: () => void;
   onApply?: (values: PopupFilterValues) => void;
   onClear?: () => void;
 };
@@ -183,6 +186,7 @@ export type PopupSortConfig = {
   options: PopupSortOption[];
   initialSelectedId?: string;
   dismissOnBackdropPress?: boolean;
+  onDismiss?: () => void;
   onSelect?: (optionId: string) => void;
 };
 
@@ -240,8 +244,12 @@ export function openPopup(config: PopupConfig) {
 }
 
 export function closePopup() {
+  const config = currentState.config;
+  const onDismiss =
+    config && "onDismiss" in config ? config.onDismiss : undefined;
   currentState = { config: null };
   emit();
+  onDismiss?.();
 }
 
 export function subscribePopup(listener: PopupListener) {

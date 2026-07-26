@@ -1,3 +1,4 @@
+import { RPC_FUNCTIONS } from "../db/functions";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -9,14 +10,22 @@ export type DeliveryCatalog = Row<"delivery_catalog"> & {
 export async function getDeliveryCatalog(): Promise<
   { ok: true; data: DeliveryCatalog[] } | { ok: false; error: AppError }
 > {
-  const { data, error } = await (supabase as any).rpc("get_delivery_catalog_options");
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.GET_DELIVERY_CATALOG_OPTIONS
+  );
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
+
+  const options: DeliveryCatalog[] = [];
+  for (const item of data) {
+    if (item.method_kind !== "shipping" && item.method_kind !== "pickup") {
+      continue;
+    }
+    options.push({ ...item, method_kind: item.method_kind });
+  }
+
   return {
     ok: true,
-    data: (Array.isArray(data) ? data : []).filter(
-      (item): item is DeliveryCatalog =>
-        item?.method_kind === "shipping" || item?.method_kind === "pickup"
-    ),
+    data: options,
   };
 }

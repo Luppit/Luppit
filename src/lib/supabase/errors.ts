@@ -9,7 +9,7 @@ export type AppError = {
 const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message: string }> = {
   transaction_code_expired: {
     type: "validation",
-    message: "El código venció. Solicita uno nuevo al comprador e inténtalo de nuevo.",
+    message: "El código venció. Pídele al comprador que genere uno nuevo.",
   },
   transaction_code_expired_new_code_sent: {
     type: "validation",
@@ -18,7 +18,7 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
   },
   transaction_code_not_found: {
     type: "validation",
-    message: "No encontramos un código activo para esta transacción.",
+    message: "No hay un código activo. Pídele al comprador que genere uno nuevo.",
   },
   transaction_code_not_found_new_code_sent: {
     type: "validation",
@@ -63,10 +63,14 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "validation",
     message: "Ingresa el código proporcionado por el comprador.",
   },
+  pickup_not_available_yet: {
+    type: "validation",
+    message: "El retiro todavía no está disponible. Revisa la fecha indicada en el chat.",
+  },
   transaction_code_delivery_unavailable: {
     type: "validation",
     message:
-      "No pudimos enviar un código nuevo al comprador. Verifica que tenga un correo habilitado.",
+      "No pudimos enviar el código. Verifica que tu correo esté configurado y verificado.",
   },
   otp_delivery_not_configured: {
     type: "validation",
@@ -115,6 +119,37 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "validation",
     message: "Esta solicitud ya no está activa para recibir nuevas ofertas.",
   },
+  purchase_request_cancellation_locked: {
+    type: "validation",
+    message:
+      "El vendedor ya concretó esta compra. La solicitud ya no se puede cancelar ni eliminar.",
+  },
+  purchase_request_not_canceled: {
+    type: "validation",
+    message: "Solo puedes eliminar permanentemente una solicitud cancelada.",
+  },
+  purchase_request_not_found: {
+    type: "not_found",
+    message: "Esta solicitud ya no está disponible.",
+  },
+  purchase_request_not_owned: {
+    type: "auth",
+    message: "No tienes permiso para modificar esta solicitud.",
+  },
+  profile_not_owned: {
+    type: "auth",
+    message: "No tienes permiso para eliminar esta solicitud.",
+  },
+  storage_cleanup_failed: {
+    type: "unknown",
+    message:
+      "No pudimos eliminar todos los archivos. La solicitud se conservó y puedes intentarlo de nuevo.",
+  },
+  storage_deletion_failed: {
+    type: "unknown",
+    message:
+      "No pudimos eliminar todos los archivos. La solicitud se conservó y puedes intentarlo de nuevo.",
+  },
   rating_already_submitted: {
     type: "validation",
     message: "Ya enviaste una calificación para esta transacción.",
@@ -135,10 +170,65 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "auth",
     message: "No tienes permiso para ejecutar esta acción.",
   },
+  business_owner_required: {
+    type: "auth",
+    message: "Solo la persona propietaria puede cambiar la información del negocio.",
+  },
+  phone_required: {
+    type: "validation",
+    message: "Ingresa un número de teléfono.",
+  },
+  luppit_login_not_found: {
+    type: "not_found",
+    message: "No encontramos una cuenta de Luppit con ese número.",
+  },
+  cannot_invite_self: {
+    type: "validation",
+    message: "No puedes invitar tu propio número.",
+  },
+  business_membership_already_exists: {
+    type: "validation",
+    message: "Esta persona ya pertenece a tu negocio.",
+  },
+  invitation_not_available: {
+    type: "not_found",
+    message: "Esta invitación ya no está disponible.",
+  },
+  business_member_not_found: {
+    type: "not_found",
+    message: "Esta persona ya no pertenece al negocio.",
+  },
+  business_owner_cannot_be_removed: {
+    type: "validation",
+    message: "La persona propietaria no puede quitarse del equipo.",
+  },
+  business_member_has_conversation_history: {
+    type: "validation",
+    message: "Esta persona tiene conversaciones vinculadas al negocio.",
+  },
+  seller_business_required: {
+    type: "auth",
+    message: "Este perfil vendedor ya no tiene acceso a un negocio.",
+  },
+  notification_input_required: {
+    type: "validation",
+    message: "No pudimos identificar la notificación.",
+  },
+  notification_not_found: {
+    type: "not_found",
+    message: "Esta notificación ya no está disponible.",
+  },
 };
 
-function getSafeSupabaseError(error: any) {
-  const candidates = [error?.error_code, error?.message, error?.code];
+function toErrorRecord(error: unknown): Record<string, unknown> | null {
+  return error && typeof error === "object"
+    ? (error as Record<string, unknown>)
+    : null;
+}
+
+function getSafeSupabaseError(error: unknown) {
+  const value = toErrorRecord(error);
+  const candidates = [value?.error_code, value?.message, value?.code];
 
   for (const candidate of candidates) {
     if (typeof candidate !== "string") continue;
@@ -150,7 +240,7 @@ function getSafeSupabaseError(error: any) {
   return null;
 }
 
-export function fromSupabaseError(error: any): AppError {
+export function fromSupabaseError(error: unknown): AppError {
   if (!error) {
     return { type: "unknown", message: "Error desconocido" };
   }
@@ -158,14 +248,17 @@ export function fromSupabaseError(error: any): AppError {
   const safeError = getSafeSupabaseError(error);
   if (safeError) return safeError;
 
-  if (error.code === "PGRST116") {
-    return { type: "not_found", message: "No se encontraron resultados", code: error.code };
+  const value = toErrorRecord(error);
+  const code = typeof value?.code === "string" ? value.code : undefined;
+
+  if (code === "PGRST116") {
+    return { type: "not_found", message: "No se encontraron resultados", code };
   }
 
   return {
     type: "unknown",
     message: "Ocurrió un error, intenta de nuevo.",
-    code: error.code,
+    code,
   };
 }
 

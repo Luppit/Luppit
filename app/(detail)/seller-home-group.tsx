@@ -6,7 +6,6 @@ import {
   getCurrentSellerHomePurchaseRequestGroups,
   SellerHomePurchaseRequestItem,
 } from "@/src/services/purchase.request.service";
-import { registerPurchaseRequestVisualization } from "@/src/services/purchase.request.visualization.service";
 import { useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -54,7 +53,6 @@ export default function SellerHomeGroupScreen() {
     [params.segmentSvgName]
   );
   const openRequestConversation = useCallback(async (item: SellerHomePurchaseRequestItem) => {
-    await registerPurchaseRequestVisualization(item.id);
     const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
 
     if (!conversation?.ok) {

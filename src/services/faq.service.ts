@@ -1,3 +1,4 @@
+import { COL_FAQ, TB_FAQ } from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -15,11 +16,11 @@ export async function getActiveFaqItems(): Promise<
   { ok: true; data: FaqListItem[] } | { ok: false; error: AppError }
 > {
   const { data, error } = await supabase
-    .from("faq")
+    .from(TB_FAQ)
     .select("id,question,answer,sort_order,is_active,created_at,updated_at")
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+    .eq(COL_FAQ.is_active, true)
+    .order(COL_FAQ.sort_order, { ascending: true })
+    .order(COL_FAQ.created_at, { ascending: true });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 

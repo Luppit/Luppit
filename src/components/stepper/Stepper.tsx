@@ -111,12 +111,11 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
 
     return (
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[s.base.parent, style]}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
-            automaticallyAdjustKeyboardInsets
             contentContainerStyle={s.base.scrollContent}
             keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             keyboardShouldPersistTaps="handled"

@@ -1,5 +1,6 @@
 import { Theme } from "@/src/themes";
-import { Platform, TextStyle, ViewStyle } from "react-native";
+import { TextStyle, ViewStyle } from "react-native";
+import { createInputFieldStyles } from "../inputField/styles";
 
 export type InputPhoneStyles = {
   label: TextStyle;
@@ -19,61 +20,31 @@ export type InputPhoneStyles = {
 };
 
 export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
+  const inputFieldStyles = createInputFieldStyles(t);
+
   return {
-    label: {
-      paddingLeft: t.spacing.sm,
-    },
-    phoneInputContainer: {
-        marginBottom: t.spacing.lg,
-    },
+    label: inputFieldStyles.label,
+    phoneInputContainer: inputFieldStyles.baseContainer,
     baseInputContainer: {
-        paddingHorizontal: t.spacing.sm,
-        flex: 1,
-        justifyContent: "center",
+      ...inputFieldStyles.inputContent,
+      paddingHorizontal: t.spacing.md,
     },
     inputContainer: {
-      borderWidth: 1,
-      borderRadius: t.borders.sm,
-      borderColor: t.colors.border,
-      height: 44,
+      ...inputFieldStyles.inputContainer,
+      paddingHorizontal: 0,
       flexDirection: "row",
     },
-    inputFocused: {
-        borderWidth: 2
-    },
+    inputFocused: inputFieldStyles.inputFocused,
     error: {
-      errorLabel: {
-        color: t.colors.error,
-        marginTop: t.spacing.sm,
-      },
-      inputError: {
-        borderColor: t.colors.error,
-      }
+      errorLabel: inputFieldStyles.errorLabel,
+      inputError: inputFieldStyles.inputError,
     },
-    input: {
-      flex: 1,
-      ...t.typography.body,
-      ...Platform.select({
-        android: {
-          height: "100%",
-          includeFontPadding: false,
-          paddingVertical: 0,
-          textAlignVertical: "center",
-        } as TextStyle,
-        web: {
-          outlineWidth: 0,
-          outlineColor: "transparent",
-          borderWidth: 0,
-          backgroundColor: "transparent",
-        } as TextStyle,
-        default: {},
-      }),
-    },
+    input: inputFieldStyles.input,
     country: {
       countryCodeContainer: {
         borderRightWidth: 1,
         borderColor: t.colors.border,
-        width: 66,
+        paddingHorizontal: t.spacing.md,
         justifyContent: "center",
         alignItems: "center",
       },

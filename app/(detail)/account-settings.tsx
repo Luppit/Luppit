@@ -4,10 +4,9 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
-import { SUPPORT_EMAIL } from "@/src/config/appInfo";
+import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import { signOut } from "@/src/lib/supabase";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
-import { formatLocationLabel } from "@/src/services/location.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   BuyerProfileOverview,
@@ -19,7 +18,6 @@ import {
   requestCurrentProfileDeletion,
 } from "@/src/services/profile.service";
 import { Roles } from "@/src/services/role.service";
-import { openSupportEmail } from "@/src/services/support.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
@@ -158,7 +156,6 @@ function SellerAccountSettingsContent() {
     <AccountSettingsContent
       role={Roles.SELLER}
       profile={overview?.profile}
-      business={overview?.business}
     />
   );
 }
@@ -166,11 +163,9 @@ function SellerAccountSettingsContent() {
 function AccountSettingsContent({
   role,
   profile,
-  business,
 }: {
   role: Roles;
   profile?: Profile | null;
-  business?: SellerProfileOverview["business"];
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -236,11 +231,12 @@ function AccountSettingsContent({
         />
       </GroupedListSection>
 
-      {isSeller && isBusinessOwner ? (
-        <GroupedListSection title="Preferencias">
+      {isSeller ? (
+        <GroupedListSection title="Negocio">
           <GroupedListRow
             icon="house"
-            label="Perfil del negocio"
+            label="Información del negocio"
+            showSeparator={isBusinessOwner}
             onPress={() =>
               router.push({
                 pathname: "/(detail)/business-profile",
@@ -248,49 +244,22 @@ function AccountSettingsContent({
               })
             }
           />
-          <GroupedListRow
-            icon="tag"
-            label="Categorías de venta"
-            onPress={business
-              ? () =>
+          {isBusinessOwner ? (
+            <GroupedListRow
+              icon="user"
+              label="Equipo"
+              showSeparator={false}
+              onPress={() =>
                 router.push({
-                  pathname: "/(detail)/business-categories",
+                  pathname: "/(detail)/business-invitations",
                   params: {
-                    title: "Categorías de venta",
+                    title: "Equipo",
                     hideMenu: "true",
                   },
                 })
-              : undefined}
-          />
-          <GroupedListRow
-            icon="map-pin"
-            label="Ubicación del negocio"
-            onPress={business
-              ? () =>
-                router.push({
-                  pathname: "/(modal)/business-location-edit",
-                  params: {
-                    title: "Editar ubicación",
-                    locationId: business.location?.id ?? "",
-                    locationLabel: formatLocationLabel(business.location),
-                  },
-                })
-              : undefined}
-          />
-          <GroupedListRow
-            icon="circle-plus"
-            label="Invitaciones del negocio"
-            showSeparator={false}
-            onPress={() =>
-              router.push({
-                pathname: "/(detail)/business-invitations",
-                params: {
-                  title: "Invitaciones",
-                  hideMenu: "true",
-                },
-              })
-            }
-          />
+              }
+            />
+          ) : null}
         </GroupedListSection>
       ) : null}
 
@@ -315,13 +284,7 @@ function AccountSettingsContent({
             })
           }
         />
-        <GroupedListRow
-          icon="life-buoy"
-          label="Contactar soporte"
-          description={`Escríbenos a ${SUPPORT_EMAIL}.`}
-          showSeparator={false}
-          onPress={() => void openSupportEmail()}
-        />
+        <SupportContactRow />
       </GroupedListSection>
 
       <GroupedListSection title="Legal">

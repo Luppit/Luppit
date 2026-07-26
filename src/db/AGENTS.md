@@ -40,6 +40,7 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 - Broadcast only lightweight hints (`conversation_id`, diagnostic `reason`, and `refresh` targets such as `messages`/`view`); never broadcast message text, action metadata, OTPs, ratings, or role-specific content.
 
 ## Delivery, OTP, And Email
+- Non-sensitive client-readable runtime variables live in `app_config`; `support_email` is the support contact source of truth. Keep secrets out of this exposed configuration table.
 - Delivery source of truth is `purchase_offer_delivery_method` for shipping and `purchase_offer_pickup_method` for pickup. Timing fields are integer days and method rows remain valid when timing is null.
 - Store pickup transaction completion uses a 4-digit OTP stored as a hash in `otp_code` with `otp_type_code='conversation_transaction'`; shipping must not depend on pickup OTP logic.
 - Email verification uses `send_email_verification_otp` and `verify_email_verification_otp`; verification updates `profile.email`, `email_opt_in`, and `email_opt_in_at` atomically.

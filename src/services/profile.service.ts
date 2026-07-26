@@ -1,6 +1,41 @@
+import { RPC_FUNCTIONS } from "../db/functions";
+import {
+    COL_BUSINESS,
+    COL_BUSINESS_CATEGORY_PREFERENCE,
+    COL_BUSINESS_RATING_SUMMARY,
+    COL_CATEGORY,
+    COL_HOME_GROUP,
+    COL_HOME_GROUP_PRESET,
+    COL_HOME_GROUP_PRESET_ITEM,
+    COL_LOCATION,
+    COL_PROFILE,
+    COL_PROFILE_BUSINESS,
+    COL_PROFILE_HOME_GROUP_PRESET,
+    COL_PROFILE_RATING_SUMMARY,
+    COL_PURCHASE_OFFER,
+    COL_PURCHASE_REQUEST,
+    TB_BUSINESS,
+    TB_BUSINESS_CATEGORY_PREFERENCE,
+    TB_BUSINESS_RATING_SUMMARY,
+    TB_CATEGORY,
+    TB_HOME_GROUP,
+    TB_HOME_GROUP_PRESET,
+    TB_HOME_GROUP_PRESET_ITEM,
+    TB_LOCATION,
+    TB_PROFILE,
+    TB_PROFILE_BUSINESS,
+    TB_PROFILE_HOME_GROUP_PRESET,
+    TB_PROFILE_RATING_SUMMARY,
+    TB_PURCHASE_OFFER,
+    TB_PURCHASE_REQUEST,
+} from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import {
+    COSTA_RICA_PERSONAL_ID_ERROR,
+    isValidCostaRicaPersonalId,
+} from "../utils/costaRicaIdDocument";
 import {
     getCurrentProfileResult,
     requestActiveProfileRefresh,
@@ -93,8 +128,11 @@ function normalizeProfileEmail(email: string) {
     return email.trim().toLowerCase();
 }
 
-function mapProfileEmailVerificationError(error: any): AppError {
-    const rawMessage = typeof error?.message === "string" ? error.message : "";
+function mapProfileEmailVerificationError(error: unknown): AppError {
+    const value = error && typeof error === "object"
+        ? error as Record<string, unknown>
+        : null;
+    const rawMessage = typeof value?.message === "string" ? value.message : "";
 
     if (rawMessage.includes("email_already_in_use")) {
         return {
@@ -190,9 +228,9 @@ async function getCurrentAuthenticatedProfile(): Promise<
 
 export async function getProfileById(id: string): Promise<{ok: true; data: Profile} | {ok: false; error: AppError} | null > {
     const { data, error } = await supabase
-        .from("profile")
+        .from(TB_PROFILE)
         .select("*")
-        .eq("id", id)
+        .eq(COL_PROFILE.id, id)
         .maybeSingle();
     if (error) return {ok: false, error: fromSupabaseError(error) };
     if (!data) return null;
@@ -206,9 +244,9 @@ async function getProfileHomePresetSummary(
     { ok: true; data: HomePresetSummary | null } | { ok: false; error: AppError }
 > {
     const assignmentResult = await supabase
-        .from("profile_home_group_preset")
+        .from(TB_PROFILE_HOME_GROUP_PRESET)
         .select("preset_id")
-        .eq("profile_id", profileId)
+        .eq(COL_PROFILE_HOME_GROUP_PRESET.profile_id, profileId)
         .maybeSingle();
 
     if (assignmentResult.error) {
@@ -217,22 +255,22 @@ async function getProfileHomePresetSummary(
 
     const getPresetById = (presetId: string) =>
         supabase
-            .from("home_group_preset")
+            .from(TB_HOME_GROUP_PRESET)
             .select("id,code,name,description")
-            .eq("surface_code", surface)
-            .eq("is_active", true)
-            .eq("id", presetId)
+            .eq(COL_HOME_GROUP_PRESET.surface_code, surface)
+            .eq(COL_HOME_GROUP_PRESET.is_active, true)
+            .eq(COL_HOME_GROUP_PRESET.id, presetId)
             .maybeSingle();
 
     const assignedPresetId = assignmentResult.data?.preset_id ?? null;
     const presetResult = assignedPresetId
         ? await getPresetById(assignedPresetId)
         : await supabase
-            .from("home_group_preset")
+            .from(TB_HOME_GROUP_PRESET)
             .select("id,code,name,description")
-            .eq("surface_code", surface)
-            .eq("is_active", true)
-            .eq("code", "default")
+            .eq(COL_HOME_GROUP_PRESET.surface_code, surface)
+            .eq(COL_HOME_GROUP_PRESET.is_active, true)
+            .eq(COL_HOME_GROUP_PRESET.code, "default")
             .maybeSingle();
 
     if (presetResult.error) {
@@ -252,11 +290,11 @@ async function getProfileHomePresetSummary(
     }
 
     const fallbackResult = await supabase
-        .from("home_group_preset")
+        .from(TB_HOME_GROUP_PRESET)
         .select("id,code,name,description")
-        .eq("surface_code", surface)
-        .eq("is_active", true)
-        .eq("code", "default")
+        .eq(COL_HOME_GROUP_PRESET.surface_code, surface)
+        .eq(COL_HOME_GROUP_PRESET.is_active, true)
+        .eq(COL_HOME_GROUP_PRESET.code, "default")
         .maybeSingle();
 
     if (fallbackResult.error) {
@@ -285,11 +323,11 @@ async function getCurrentProfileHomePresetOptions(
     if (!profileResult.ok) return profileResult;
 
     const presetResult = await supabase
-        .from("home_group_preset")
+        .from(TB_HOME_GROUP_PRESET)
         .select("id,code,name,description")
-        .eq("surface_code", surface)
-        .eq("is_active", true)
-        .order("created_at", { ascending: true });
+        .eq(COL_HOME_GROUP_PRESET.surface_code, surface)
+        .eq(COL_HOME_GROUP_PRESET.is_active, true)
+        .order(COL_HOME_GROUP_PRESET.created_at, { ascending: true });
 
     if (presetResult.error) {
         return { ok: false, error: fromSupabaseError(presetResult.error) };
@@ -299,9 +337,9 @@ async function getCurrentProfileHomePresetOptions(
     const presetIds = presets.map((preset) => preset.id);
 
     const assignmentResult = await supabase
-        .from("profile_home_group_preset")
+        .from(TB_PROFILE_HOME_GROUP_PRESET)
         .select("preset_id")
-        .eq("profile_id", profileResult.data.id)
+        .eq(COL_PROFILE_HOME_GROUP_PRESET.profile_id, profileResult.data.id)
         .maybeSingle();
 
     if (assignmentResult.error) {
@@ -319,10 +357,10 @@ async function getCurrentProfileHomePresetOptions(
     let presetItems: Row<"home_group_preset_item">[] = [];
     if (presetIds.length > 0) {
         const itemResult = await supabase
-            .from("home_group_preset_item")
+            .from(TB_HOME_GROUP_PRESET_ITEM)
             .select("*")
-            .in("preset_id", presetIds)
-            .order("sort_order", { ascending: true });
+            .in(COL_HOME_GROUP_PRESET_ITEM.preset_id, presetIds)
+            .order(COL_HOME_GROUP_PRESET_ITEM.sort_order, { ascending: true });
 
         if (itemResult.error) {
             return { ok: false, error: fromSupabaseError(itemResult.error) };
@@ -336,11 +374,11 @@ async function getCurrentProfileHomePresetOptions(
 
     if (groupIds.length > 0) {
         const groupResult = await supabase
-            .from("home_group")
+            .from(TB_HOME_GROUP)
             .select("*")
-            .in("id", groupIds)
-            .eq("surface_code", surface)
-            .eq("is_active", true);
+            .in(COL_HOME_GROUP.id, groupIds)
+            .eq(COL_HOME_GROUP.surface_code, surface)
+            .eq(COL_HOME_GROUP.is_active, true);
 
         if (groupResult.error) {
             return { ok: false, error: fromSupabaseError(groupResult.error) };
@@ -398,9 +436,9 @@ export async function getCurrentBusinessCategoryOptions(): Promise<
     { ok: true; data: BusinessCategoryOption[] } | { ok: false; error: AppError }
 > {
     const categoryResult = await supabase
-        .from("category")
+        .from(TB_CATEGORY)
         .select("id,name,path")
-        .order("name", { ascending: true });
+        .order(COL_CATEGORY.name, { ascending: true });
 
     if (categoryResult.error) {
         return { ok: false, error: fromSupabaseError(categoryResult.error) };
@@ -426,8 +464,8 @@ export async function updateCurrentBusinessCategoryPreferences(
         new Set(categoryIds.map((categoryId) => categoryId.trim()).filter(Boolean))
     );
 
-    const rpcResult: any = await (supabase as any).rpc(
-        "set_current_business_category_preferences",
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.SET_CURRENT_BUSINESS_CATEGORY_PREFERENCES,
         {
             p_profile_id: profileResult.data.id,
             p_category_ids: uniqueCategoryIds,
@@ -438,8 +476,12 @@ export async function updateCurrentBusinessCategoryPreferences(
         return { ok: false, error: fromSupabaseError(rpcResult.error) };
     }
 
-    const returnedCategoryIds = Array.isArray(rpcResult?.data?.category_ids)
-        ? rpcResult.data.category_ids.filter(
+    const rpcData =
+        rpcResult.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+            ? rpcResult.data
+            : null;
+    const returnedCategoryIds = Array.isArray(rpcData?.category_ids)
+        ? rpcData.category_ids.filter(
             (categoryId: unknown): categoryId is string => typeof categoryId === "string"
         )
         : uniqueCategoryIds;
@@ -463,8 +505,8 @@ export async function updateCurrentBusinessLocation(
         return { ok: false, error: fromAppError("validation") };
     }
 
-    const rpcResult: any = await (supabase as any).rpc(
-        "set_current_business_location",
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.SET_CURRENT_BUSINESS_LOCATION,
         {
             p_profile_id: profileResult.data.id,
             p_location_id: normalizedLocationId,
@@ -475,9 +517,13 @@ export async function updateCurrentBusinessLocation(
         return { ok: false, error: fromSupabaseError(rpcResult.error) };
     }
 
+    const rpcData =
+        rpcResult.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+            ? rpcResult.data
+            : null;
     const returnedLocationId =
-        typeof rpcResult?.data?.location_id === "string"
-            ? rpcResult.data.location_id
+        typeof rpcData?.location_id === "string"
+            ? rpcData.location_id
             : normalizedLocationId;
 
     return {
@@ -492,9 +538,9 @@ async function getBuyerProfileStats(profileId: string): Promise<
     { ok: true; data: BuyerProfileStats } | { ok: false; error: AppError }
 > {
     const requestResult = await supabase
-        .from("purchase_request")
+        .from(TB_PURCHASE_REQUEST)
         .select("id", { count: "exact" })
-        .eq("profile_id", profileId);
+        .eq(COL_PURCHASE_REQUEST.profile_id, profileId);
 
     if (requestResult.error) {
         return { ok: false, error: fromSupabaseError(requestResult.error) };
@@ -507,9 +553,9 @@ async function getBuyerProfileStats(profileId: string): Promise<
     let offersReceivedCount = 0;
     if (purchaseRequestIds.length > 0) {
         const offerResult = await supabase
-            .from("purchase_offer")
+            .from(TB_PURCHASE_OFFER)
             .select("id", { count: "exact", head: true })
-            .in("purchase_request_id", purchaseRequestIds);
+            .in(COL_PURCHASE_OFFER.purchase_request_id, purchaseRequestIds);
 
         if (offerResult.error) {
             return { ok: false, error: fromSupabaseError(offerResult.error) };
@@ -519,9 +565,9 @@ async function getBuyerProfileStats(profileId: string): Promise<
     }
 
     const ratingResult = await supabase
-        .from("profile_rating_summary")
+        .from(TB_PROFILE_RATING_SUMMARY)
         .select("rating,num_ratings")
-        .eq("profile_id", profileId)
+        .eq(COL_PROFILE_RATING_SUMMARY.profile_id, profileId)
         .maybeSingle();
 
     if (ratingResult.error) {
@@ -571,9 +617,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     { ok: true; data: SellerBusinessOverview | null } | { ok: false; error: AppError }
 > {
     const profileBusinessResult = await supabase
-        .from("profile_business")
+        .from(TB_PROFILE_BUSINESS)
         .select("business_id")
-        .eq("profile_id", profileId)
+        .eq(COL_PROFILE_BUSINESS.profile_id, profileId)
         .maybeSingle();
 
     if (profileBusinessResult.error) {
@@ -586,9 +632,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     }
 
     const businessResult = await supabase
-        .from("business")
+        .from(TB_BUSINESS)
         .select("*")
-        .eq("id", businessId)
+        .eq(COL_BUSINESS.id, businessId)
         .maybeSingle();
 
     if (businessResult.error) {
@@ -600,9 +646,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     }
 
     const ratingResult = await supabase
-        .from("business_rating_summary")
+        .from(TB_BUSINESS_RATING_SUMMARY)
         .select("rating,num_ratings")
-        .eq("business_id", businessId)
+        .eq(COL_BUSINESS_RATING_SUMMARY.business_id, businessId)
         .maybeSingle();
 
     if (ratingResult.error) {
@@ -612,9 +658,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     let location: SellerBusinessLocation | null = null;
     if (businessResult.data.location_id) {
         const locationResult = await supabase
-            .from("location")
+            .from(TB_LOCATION)
             .select("id,province,canton,district")
-            .eq("id", businessResult.data.location_id)
+            .eq(COL_LOCATION.id, businessResult.data.location_id)
             .maybeSingle();
 
         if (locationResult.error) {
@@ -632,9 +678,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     }
 
     const preferenceResult = await supabase
-        .from("business_category_preference")
+        .from(TB_BUSINESS_CATEGORY_PREFERENCE)
         .select("id,category_id")
-        .eq("business_id", businessId);
+        .eq(COL_BUSINESS_CATEGORY_PREFERENCE.business_id, businessId);
 
     if (preferenceResult.error) {
         return { ok: false, error: fromSupabaseError(preferenceResult.error) };
@@ -646,9 +692,9 @@ async function getSellerBusinessOverview(profileId: string): Promise<
 
     if (categoryIds.length > 0) {
         const categoryResult = await supabase
-            .from("category")
+            .from(TB_CATEGORY)
             .select("id,name,path")
-            .in("id", categoryIds);
+            .in(COL_CATEGORY.id, categoryIds);
 
         if (categoryResult.error) {
             return { ok: false, error: fromSupabaseError(categoryResult.error) };
@@ -723,9 +769,9 @@ export async function getCurrentSellerBusinessCategorySetupStatus(): Promise<
     if (!profileResult.ok) return profileResult;
 
     const profileBusinessResult = await supabase
-        .from("profile_business")
+        .from(TB_PROFILE_BUSINESS)
         .select("business_id")
-        .eq("profile_id", profileResult.data.id)
+        .eq(COL_PROFILE_BUSINESS.profile_id, profileResult.data.id)
         .maybeSingle();
 
     if (profileBusinessResult.error) {
@@ -745,9 +791,9 @@ export async function getCurrentSellerBusinessCategorySetupStatus(): Promise<
     }
 
     const preferenceResult = await supabase
-        .from("business_category_preference")
+        .from(TB_BUSINESS_CATEGORY_PREFERENCE)
         .select("id", { count: "exact", head: true })
-        .eq("business_id", businessId);
+        .eq(COL_BUSINESS_CATEGORY_PREFERENCE.business_id, businessId);
 
     if (preferenceResult.error) {
         return { ok: false, error: fromSupabaseError(preferenceResult.error) };
@@ -776,11 +822,17 @@ export async function updateCurrentProfileField(
     if (!normalizedValue) {
         return { ok: false, error: fromAppError("validation") };
     }
+    if (field === "id_document" && !isValidCostaRicaPersonalId(value)) {
+        return {
+            ok: false,
+            error: { type: "validation", message: COSTA_RICA_PERSONAL_ID_ERROR },
+        };
+    }
 
     const { data, error } = await supabase
-        .from("profile")
+        .from(TB_PROFILE)
         .update({ [field]: normalizedValue })
-        .eq("id", profileResult.data.id)
+        .eq(COL_PROFILE.id, profileResult.data.id)
         .select("*")
         .single();
 
@@ -809,11 +861,11 @@ async function updateCurrentProfileHomePreset(
     if (!profileResult.ok) return profileResult;
 
     const presetResult = await supabase
-        .from("home_group_preset")
+        .from(TB_HOME_GROUP_PRESET)
         .select("id,code,name,description")
-        .eq("id", presetId)
-        .eq("surface_code", surface)
-        .eq("is_active", true)
+        .eq(COL_HOME_GROUP_PRESET.id, presetId)
+        .eq(COL_HOME_GROUP_PRESET.surface_code, surface)
+        .eq(COL_HOME_GROUP_PRESET.is_active, true)
         .maybeSingle();
 
     if (presetResult.error) {
@@ -825,13 +877,13 @@ async function updateCurrentProfileHomePreset(
     }
 
     const { error } = await supabase
-        .from("profile_home_group_preset")
+        .from(TB_PROFILE_HOME_GROUP_PRESET)
         .upsert(
             {
                 profile_id: profileResult.data.id,
                 preset_id: presetResult.data.id,
             },
-            { onConflict: "profile_id" }
+            { onConflict: COL_PROFILE_HOME_GROUP_PRESET.profile_id }
         );
 
     if (error) return { ok: false, error: fromSupabaseError(error) };
@@ -889,10 +941,13 @@ async function sendCurrentProfileEmailSetupVerificationOtp(email: string): Promi
         return { ok: false, error: fromAppError("validation") };
     }
 
-    const rpcResult: any = await (supabase as any).rpc("send_email_verification_otp", {
-        p_profile_id: profileResult.data.id,
-        p_email: normalizedEmail,
-    });
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.SEND_EMAIL_VERIFICATION_OTP,
+        {
+            p_profile_id: profileResult.data.id,
+            p_email: normalizedEmail,
+        }
+    );
 
     if (rpcResult?.error) {
         return { ok: false, error: mapProfileEmailVerificationError(rpcResult.error) };
@@ -949,25 +1004,28 @@ export async function verifyCurrentProfileEmailSetup({
         return { ok: false, error: fromAppError("validation") };
     }
 
-    const rpcResult: any = await (supabase as any).rpc("verify_email_verification_otp", {
-        p_profile_id: profileResult.data.id,
-        p_email: normalizedEmail,
-        p_code: normalizedToken,
-        p_email_opt_in: emailOptIn,
-    });
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.VERIFY_EMAIL_VERIFICATION_OTP,
+        {
+            p_profile_id: profileResult.data.id,
+            p_email: normalizedEmail,
+            p_code: normalizedToken,
+            p_email_opt_in: emailOptIn,
+        }
+    );
 
     if (rpcResult?.error) {
         return { ok: false, error: mapProfileEmailVerificationError(rpcResult.error) };
     }
 
-    if (
-        rpcResult?.data &&
-        typeof rpcResult.data === "object" &&
-        rpcResult.data.ok === false
-    ) {
+    const rpcData =
+        rpcResult.data && typeof rpcResult.data === "object" && !Array.isArray(rpcResult.data)
+            ? rpcResult.data
+            : null;
+    if (rpcData?.ok === false) {
         const errorCode =
-            typeof rpcResult.data.error === "string"
-                ? rpcResult.data.error
+            typeof rpcData.error === "string"
+                ? rpcData.error
                 : "invalid_otp_code";
         const message =
             errorCode === "otp_attempt_limit_reached"
@@ -992,7 +1050,9 @@ export async function verifyCurrentProfileEmailSetup({
 export async function requestCurrentLoginDeletion(): Promise<
     { ok: true; data: AccountDeletionRequestStatus } | { ok: false; error: AppError }
 > {
-    const rpcResult: any = await (supabase as any).rpc("request_current_login_deletion");
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.REQUEST_CURRENT_LOGIN_DELETION
+    );
 
     if (rpcResult?.error) {
         return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -1015,8 +1075,8 @@ export async function requestCurrentProfileDeletion(): Promise<
     const profileResult = await getCurrentAuthenticatedProfile();
     if (!profileResult.ok) return profileResult;
 
-    const rpcResult: any = await (supabase as any).rpc(
-        "request_current_profile_deletion",
+    const rpcResult = await supabase.rpc(
+        RPC_FUNCTIONS.REQUEST_CURRENT_PROFILE_DELETION,
         {
             p_profile_id: profileResult.data.id,
         }

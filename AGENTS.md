@@ -17,6 +17,12 @@ Entrypoint for repository guidance. Keep this file compact; put only durable, hi
 - Conversation actions, menu items, confirmations, passive status/deadline cards, rating visibility, deadlines, transitions, and message open-state belong to DB metadata/RPCs.
 - Navigation/menu/segment labels and icons come from DB configuration; do not hardcode buyer/seller menus or segment arrays.
 - Profile/account data stays profile-driven: one auth user may own multiple profiles, the active profile is resolved through the root provider, phone is read-only login identity, email changes use OTP verification, and ratings come from summary tables/views.
+- Non-sensitive runtime application variables belong in `app_config`; screens and components must read them through services rather than build-time constants. Never store secrets in client-readable configuration.
+
+## Supabase Repository Boundary
+- The Supabase database repository is a separate sibling repository at `../luppit-supabase`; never create, clone, or nest it inside this application repository.
+- Do not create or restore a root `supabase/` directory here. All migrations, functions, seeds, database tests/scripts, CLI configuration, and schema automation belong only in `../luppit-supabase`.
+- This application repository may keep the generated `src/types/database.types.ts`, Supabase client/runtime integration under `src/lib/supabase/`, and required client dependencies.
 
 ## Shared Glass UI
 - Render glass through `src/components/glass/GlassSurface.tsx` and tune material roles in `src/themes/glass.ts`; avoid one-off blur/rgba/shadow recipes.

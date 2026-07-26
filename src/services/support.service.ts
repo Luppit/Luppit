@@ -1,24 +1,28 @@
 import { Linking } from "react-native";
-import { SUPPORT_EMAIL } from "../config/appInfo";
 import { showError } from "../utils/useToast";
+import { APP_CONFIG_KEYS, getAppConfigValue } from "./app.config.service";
 
 const SUPPORT_EMAIL_SUBJECT = "Ayuda Luppit";
 
-function buildSupportEmailUrls() {
-  const encodedEmail = encodeURIComponent(SUPPORT_EMAIL);
+function buildSupportEmailUrls(supportEmail: string) {
+  const encodedEmail = encodeURIComponent(supportEmail);
   const encodedSubject = encodeURIComponent(SUPPORT_EMAIL_SUBJECT);
 
   return [
-    `mailto:${SUPPORT_EMAIL}?subject=${encodedSubject}`,
-    `mailto:${SUPPORT_EMAIL}`,
+    `mailto:${supportEmail}?subject=${encodedSubject}`,
+    `mailto:${supportEmail}`,
     `googlegmail://co?to=${encodedEmail}&subject=${encodedSubject}`,
     `ms-outlook://compose?to=${encodedEmail}&subject=${encodedSubject}`,
     `https://mail.google.com/mail/?view=cm&fs=1&to=${encodedEmail}&su=${encodedSubject}`,
   ];
 }
 
-export async function openSupportEmail() {
-  const urls = buildSupportEmailUrls();
+export function getSupportEmail() {
+  return getAppConfigValue(APP_CONFIG_KEYS.supportEmail);
+}
+
+export async function openSupportEmail(supportEmail: string) {
+  const urls = buildSupportEmailUrls(supportEmail);
 
   for (const url of urls) {
     try {
@@ -29,5 +33,5 @@ export async function openSupportEmail() {
     }
   }
 
-  showError("No se pudo abrir el correo", `Escríbenos a ${SUPPORT_EMAIL}.`);
+  showError("No se pudo abrir el correo", `Escríbenos a ${supportEmail}.`);
 }

@@ -1,3 +1,10 @@
+import { RPC_FUNCTIONS } from "../db/functions";
+import {
+  COL_NOTIFICATION_TYPE_CATALOG,
+  COL_PROFILE_NOTIFICATION,
+  TB_NOTIFICATION_TYPE_CATALOG,
+  TB_PROFILE_NOTIFICATION,
+} from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -19,9 +26,54 @@ export type ProfileNotificationListItem = {
   typeCode: string;
   typeLabel: string | null;
   typeDescription: string | null;
+  eventCode: string | null;
+  navigation: ProfileNotificationNavigation | null;
   createdAt: string;
   readAt: string | null;
 };
+
+export type ProfileNotificationNavigation =
+  | { kind: "conversation"; conversationId: string }
+  | { kind: "purchaseRequest"; purchaseRequestId: string };
+
+export type MarkCurrentProfileNotificationReadResult = {
+  notificationId: string;
+  readAt: string;
+  wasUnread: boolean;
+  remainingUnreadCount: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getNonEmptyString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function parseNotificationNavigation(
+  payload: NotificationRow["payload"]
+): ProfileNotificationNavigation | null {
+  if (!isRecord(payload) || !isRecord(payload.navigation)) return null;
+
+  const pathname = getNonEmptyString(payload.navigation.pathname);
+  const params = isRecord(payload.navigation.params) ? payload.navigation.params : null;
+  if (!pathname || !params) return null;
+
+  if (pathname === "/(conversation)/offer") {
+    const conversationId = getNonEmptyString(params.conversationId);
+    return conversationId ? { kind: "conversation", conversationId } : null;
+  }
+
+  if (pathname === "/request/[purchaseRequestId]") {
+    const purchaseRequestId = getNonEmptyString(params.purchaseRequestId);
+    return purchaseRequestId
+      ? { kind: "purchaseRequest", purchaseRequestId }
+      : null;
+  }
+
+  return null;
+}
 
 async function getCurrentProfileId(): Promise<
   { ok: true; data: string } | { ok: false; error: AppError }
@@ -46,17 +98,17 @@ export async function getCurrentProfileNotifications(): Promise<
   if (!profileResult.ok) return profileResult;
 
   const { data, error } = await supabase
-    .from("profile_notification")
+    .from(TB_PROFILE_NOTIFICATION)
     .select(
       [
         "notification_id",
         "profile_id",
         "read_at",
         "created_at",
-        "notification:notification_id(id,title,message,type_code,created_at)",
+        "notification:notification_id(id,title,message,type_code,event_code,payload,created_at)",
       ].join(",")
     )
-    .eq("profile_id", profileResult.data);
+    .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data);
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -74,9 +126,9 @@ export async function getCurrentProfileNotifications(): Promise<
 
   if (typeCodes.length > 0) {
     const typeResult = await supabase
-      .from("notification_type_catalog")
+      .from(TB_NOTIFICATION_TYPE_CATALOG)
       .select("code,label,description,is_active,sort_order,created_at")
-      .in("code", typeCodes);
+      .in(COL_NOTIFICATION_TYPE_CATALOG.code, typeCodes);
 
     if (typeResult.error) return { ok: false, error: fromSupabaseError(typeResult.error) };
 
@@ -98,6 +150,8 @@ export async function getCurrentProfileNotifications(): Promise<
         typeCode: notification.type_code,
         typeLabel: type?.label ?? null,
         typeDescription: type?.description ?? null,
+        eventCode: notification.event_code,
+        navigation: parseNotificationNavigation(notification.payload),
         createdAt: notification.created_at,
         readAt: row.read_at,
       };
@@ -117,13 +171,67 @@ export async function markAllCurrentProfileNotificationsRead(): Promise<
   const profileResult = await getCurrentProfileId();
   if (!profileResult.ok) return profileResult;
 
-  const result = await supabase.rpc("mark_all_profile_notifications_read", {
-    p_profile_id: profileResult.data,
-  });
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.MARK_ALL_PROFILE_NOTIFICATIONS_READ,
+    { p_profile_id: profileResult.data }
+  );
 
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
 
   return { ok: true, data: result.data };
+}
+
+export async function markCurrentProfileNotificationRead(
+  notificationId: string
+): Promise<
+  | { ok: true; data: MarkCurrentProfileNotificationReadResult }
+  | { ok: false; error: AppError }
+> {
+  const normalizedNotificationId = notificationId.trim();
+  if (!normalizedNotificationId) {
+    return { ok: false, error: fromAppError("validation") };
+  }
+
+  const profileResult = await getCurrentProfileId();
+  if (!profileResult.ok) return profileResult;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.MARK_PROFILE_NOTIFICATION_READ,
+    {
+      p_profile_id: profileResult.data,
+      p_notification_id: normalizedNotificationId,
+    }
+  );
+
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  if (!isRecord(result.data)) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+
+  const returnedNotificationId = getNonEmptyString(result.data.notification_id);
+  const readAt = getNonEmptyString(result.data.read_at);
+  const remainingUnreadCount = result.data.remaining_unread_count;
+  const wasUnread = result.data.was_unread;
+
+  if (
+    !returnedNotificationId ||
+    !readAt ||
+    typeof wasUnread !== "boolean" ||
+    typeof remainingUnreadCount !== "number" ||
+    !Number.isFinite(remainingUnreadCount)
+  ) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+
+  return {
+    ok: true,
+    data: {
+      notificationId: returnedNotificationId,
+      readAt,
+      wasUnread,
+      remainingUnreadCount: Math.max(0, Math.trunc(remainingUnreadCount)),
+    },
+  };
 }
 
 export async function getCurrentProfileUnreadNotificationCount(): Promise<
@@ -133,10 +241,10 @@ export async function getCurrentProfileUnreadNotificationCount(): Promise<
   if (!profileResult.ok) return profileResult;
 
   const { count, error } = await supabase
-    .from("profile_notification")
+    .from(TB_PROFILE_NOTIFICATION)
     .select("notification_id", { count: "exact", head: true })
-    .eq("profile_id", profileResult.data)
-    .is("read_at", null);
+    .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data)
+    .is(COL_PROFILE_NOTIFICATION.read_at, null);
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 

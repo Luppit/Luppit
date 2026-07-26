@@ -1,9 +1,10 @@
 import { Text } from "@/src/components/Text";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { ConversationViewSlot } from "@/src/services/conversation.service";
-import { useTheme } from "@/src/themes";
+import { Theme, useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import React, { useMemo, useState } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 
 type Props = {
@@ -39,26 +40,25 @@ function formatDeadlineDate(date: string | null, formattedDate: string | null) {
   return `El ${dayText} a las ${timeText}`;
 }
 
+function getDeadlineCaption(slot: ConversationViewSlot) {
+  if (slot.is_overdue) return "Este plazo ya venció:";
+  if (slot.trigger_transition_to?.startsWith("DELAYED_")) {
+    return "Se marcará con atraso después de esta fecha:";
+  }
+  return "Fecha límite:";
+}
+
 export default function ConversationStatusSlotCard({ slot }: Props) {
   const t = useTheme();
+  const s = useMemo(() => createStyles(t), [t]);
   const [assetFailed, setAssetFailed] = useState(false);
   const deadlineBoxUri = useMemo(() => Asset.fromModule(deadlineBoxAsset).uri, []);
   const formattedDate = formatDeadlineDate(slot.due_at, slot.formatted_due_at);
+  const deadlineCaption = getDeadlineCaption(slot);
 
   return (
-    <View
-      style={{
-        alignSelf: "stretch",
-        borderWidth: 1,
-        borderColor: t.colors.border,
-        borderRadius: 28,
-        paddingHorizontal: t.spacing.lg,
-        paddingVertical: t.spacing.lg,
-        backgroundColor: t.colors.backgroudWhite,
-        gap: t.spacing.md,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+    <View style={s.card}>
+      <View style={s.header}>
         {!assetFailed ? (
           <SvgUri
             uri={deadlineBoxUri}
@@ -67,9 +67,9 @@ export default function ConversationStatusSlotCard({ slot }: Props) {
             onError={() => setAssetFailed(true)}
           />
         ) : null}
-        <View style={{ flexShrink: 1 }}>
+        <View style={s.headerCopy}>
           {slot.eyebrow_label ? (
-            <Text variant="subtitle" color="stateAnulated">
+            <Text variant="small" color="textMedium" style={s.eyebrow}>
               {slot.eyebrow_label}
             </Text>
           ) : null}
@@ -81,35 +81,81 @@ export default function ConversationStatusSlotCard({ slot }: Props) {
         </View>
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
-        <View style={{ flex: 1, height: 1, backgroundColor: t.colors.border }} />
-        <Text variant="subtitle" color="stateAnulated">
+      <View style={s.sectionHeader}>
+        <View style={s.divider} />
+        <Text variant="small" color="textMedium">
           {slot.section_label || "Información"}
         </Text>
-        <View style={{ flex: 1, height: 1, backgroundColor: t.colors.border }} />
+        <View style={s.divider} />
       </View>
 
       {slot.message ? (
-        <Text
-          variant="body"
-          color="textDark"
-          align="center"
-          style={{ paddingHorizontal: t.spacing.sm }}
-        >
+        <Text variant="body" color="textDark" align="center" style={s.message}>
           {slot.message}
         </Text>
       ) : null}
 
       {formattedDate ? (
-        <Text
-          variant="subtitle"
-          color="textDark"
-          align="center"
-          style={{ paddingHorizontal: t.spacing.sm }}
+        <View
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`${deadlineCaption} ${formattedDate}`}
+          style={s.deadline}
         >
-          {formattedDate}
-        </Text>
+          <Text variant="small" color="textMedium" align="center">
+            {deadlineCaption}
+          </Text>
+          <Text variant="body" color="textDark" align="center" style={s.deadlineDate}>
+            {formattedDate}
+          </Text>
+        </View>
       ) : null}
     </View>
   );
+}
+
+function createStyles(t: Theme) {
+  return StyleSheet.create({
+    card: {
+      alignSelf: "stretch",
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      ...createRoundedSurfaceStyle(t),
+      paddingHorizontal: t.spacing.lg,
+      paddingVertical: t.spacing.lg,
+      gap: t.spacing.md,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    headerCopy: {
+      flexShrink: 1,
+    },
+    eyebrow: {
+      fontFamily: t.typography.subtitle.fontFamily,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    divider: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: t.colors.border,
+    },
+    message: {
+      paddingHorizontal: t.spacing.sm,
+    },
+    deadline: {
+      alignItems: "center",
+      gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.sm,
+    },
+    deadlineDate: {
+      fontFamily: t.typography.subtitle.fontFamily,
+    },
+  });
 }

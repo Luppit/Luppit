@@ -21,7 +21,7 @@ Applies to tab screens, buyer/seller home behavior, profile tab, and standalone 
 - Profile switcher uses the authenticated database profile list and the shared popup system. Active profile shows the shared `Activo` status chip.
 - Switching profiles keeps the same auth session, changes the root active-profile context by profile ID, and remounts profile-scoped tab state.
 - Profile subtitles and unread counts come from `get_current_user_profiles()`; do not cache cross-account profile snapshots.
-- Notifications route to `/(detail)/notifications`; unread badge comes from `notification.service.ts`, refreshes on profile focus, and must not block screen render.
+- Notifications route to `/(detail)/notifications`; active-profile unread state lives in `ActiveProfileContext`, appears as a quiet dot on the DB `SHARED_PROFILE` tab and a numeric profile-row badge, refreshes without blocking screen render, and updates from authoritative service/RPC results.
 - Buyer/seller profile stats and ratings are DB-backed through services/summary tables. Seller business category/location editing belongs on `/(detail)/business-profile`, not main profile metric cards.
 - Home preset settings read active DB presets for the current surface, preview metadata non-destructively, and save only on `Guardar cambios`.
 

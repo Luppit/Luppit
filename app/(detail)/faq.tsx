@@ -1,17 +1,15 @@
 import { Icon } from "@/src/components/Icon";
 import {
-  GroupedListRow,
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import {
   createRoundedSurfaceStyle,
   ROUNDED_SURFACE_RADIUS,
 } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
-import { SUPPORT_EMAIL } from "@/src/config/appInfo";
 import { FaqListItem, getActiveFaqItems } from "@/src/services/faq.service";
-import { openSupportEmail } from "@/src/services/support.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -143,14 +141,7 @@ export default function FaqScreen() {
 function SupportSection() {
   return (
     <GroupedListSection title="Soporte">
-      <GroupedListRow
-        icon="life-buoy"
-        label="Contactar soporte"
-        description={`Escríbenos a ${SUPPORT_EMAIL}.`}
-        showSeparator={false}
-        accessibilityLabel="Enviar correo a soporte"
-        onPress={openSupportEmail}
-      />
+      <SupportContactRow />
     </GroupedListSection>
   );
 }

@@ -1,3 +1,4 @@
+import { RPC_FUNCTIONS } from "../db/functions";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
@@ -12,15 +13,16 @@ export type NavbarMenuItem = {
   roleName: string;
 };
 
-function mapNavbarMenuItem(value: any): NavbarMenuItem | null {
+function mapNavbarMenuItem(value: unknown): NavbarMenuItem | null {
   if (!value || typeof value !== "object") return null;
 
-  const menuCode = typeof value.menu_code === "string" ? value.menu_code : "";
-  const label = typeof value.label === "string" ? value.label : "";
-  const route = typeof value.route === "string" ? value.route : "";
-  const icon = typeof value.icon === "string" ? value.icon : "";
-  const sortOrder = typeof value.sort_order === "number" ? value.sort_order : 0;
-  const roleName = typeof value.role_name === "string" ? value.role_name : "";
+  const row = value as Record<string, unknown>;
+  const menuCode = typeof row.menu_code === "string" ? row.menu_code : "";
+  const label = typeof row.label === "string" ? row.label : "";
+  const route = typeof row.route === "string" ? row.route : "";
+  const icon = typeof row.icon === "string" ? row.icon : "";
+  const sortOrder = typeof row.sort_order === "number" ? row.sort_order : 0;
+  const roleName = typeof row.role_name === "string" ? row.role_name : "";
 
   if (!menuCode || !label || !route) return null;
 
@@ -37,9 +39,10 @@ export async function getCurrentUserNavbarItems(): Promise<
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: true, data: [] };
 
-  const rpcResult: any = await (supabase as any).rpc("get_navbar_items_by_profile", {
-    p_profile_id: profile.data.id,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_NAVBAR_ITEMS_BY_PROFILE,
+    { p_profile_id: profile.data.id }
+  );
 
   if (rpcResult?.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };

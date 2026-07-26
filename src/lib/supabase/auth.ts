@@ -6,6 +6,7 @@ import {
   setCurrentProfileSummary,
   setCurrentUserProfileCount,
 } from "@/src/services/active.profile.service";
+import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { router } from "expo-router";
 import { supabase } from "./client";
 import { fromAppError } from "./errors";
@@ -42,8 +43,8 @@ async function sendPhoneOtp(phone: string, event: AuthEvent) {
 }
 
 async function isPhoneNumberRegistered(phone: string) {
-  const { data, error } = await (supabase as any).rpc(
-    "phone_number_is_registered",
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.PHONE_NUMBER_IS_REGISTERED,
     { p_phone: phone }
   );
   if (error) throw error;

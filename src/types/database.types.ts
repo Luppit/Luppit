@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -135,6 +155,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      app_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
       }
       auth_user_account_deletion_request: {
         Row: {
@@ -759,6 +803,13 @@ export type Database = {
           trigger_transition_to?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_deadline_conversation_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_deadline_deadline_type_fkey"
             columns: ["deadline_type"]
@@ -3260,6 +3311,24 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_accept_offer_before_fulfillment_copy: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_accept_offer_before_request_cancellation: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       buyer_cancel_purchase: {
         Args: {
           p_action_code: string
@@ -3278,9 +3347,9 @@ export type Database = {
         }
         Returns: Json
       }
-      buyer_report_not_received: {
+      buyer_confirm_received_base_20260716: {
         Args: {
-          p_action_code: string
+          p_action_code?: string
           p_conversation_id: string
           p_payload?: Json
           p_profile_id: string
@@ -3294,6 +3363,28 @@ export type Database = {
           p_payload?: Json
           p_profile_id: string
         }
+        Returns: Json
+      }
+      buyer_reject_offer_base_20260716: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_report_not_received: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      cancel_current_buyer_purchase_request: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
       check_ai_completar_rate_limit: {
@@ -3386,7 +3477,26 @@ export type Database = {
         Args: { p_invitation_id: string }
         Returns: boolean
       }
+      finalize_canceled_purchase_request_deletion: {
+        Args: {
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       get_buyer_home_purchase_requests: {
+        Args: {
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_segment_svg_name?: string
+          p_start_date?: string
+          p_status_codes?: string[]
+        }
+        Returns: Json
+      }
+      get_buyer_home_purchase_requests_before_request_cancellation: {
         Args: {
           p_end_date?: string
           p_profile_id: string
@@ -3463,6 +3573,7 @@ export type Database = {
           business_num_ratings: number
           business_province: string
           business_rating: number
+          conversation_id: string
           created_at: string
           currency_id: string
           description: string
@@ -3471,6 +3582,40 @@ export type Database = {
           price: number
           purchase_request_id: string
         }[]
+      }
+      get_buyer_purchase_request_offers_before_request_cancellation: {
+        Args: {
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_num_ratings: number
+          business_province: string
+          business_rating: number
+          created_at: string
+          currency_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+        }[]
+      }
+      get_buyer_visible_business_profile: {
+        Args: {
+          p_conversation_id?: string
+          p_profile_id: string
+          p_purchase_offer_id?: string
+          p_purchase_request_id?: string
+        }
+        Returns: Json
       }
       get_category_children: {
         Args: { category_id_input: string }
@@ -3547,15 +3692,39 @@ export type Database = {
       get_conversation_timeline: {
         Args: { p_conversation_id: string }
         Returns: {
+          accessibility_label: string
+          detail: string
           icon: string
           is_completed: boolean
           is_next: boolean
           label: string
+          method_kind: string
+          method_label: string
           pre_label: string
           reached_at: string
           reached_at_label: string
           sort_order: number
           status_code: string
+          style_code: string
+        }[]
+      }
+      get_conversation_timeline_base_20260716: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          accessibility_label: string
+          detail: string
+          icon: string
+          is_completed: boolean
+          is_next: boolean
+          label: string
+          method_kind: string
+          method_label: string
+          pre_label: string
+          reached_at: string
+          reached_at_label: string
+          sort_order: number
+          status_code: string
+          style_code: string
         }[]
       }
       get_conversation_ui_slots: {
@@ -3563,6 +3732,14 @@ export type Database = {
         Returns: Json
       }
       get_conversation_view: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_view_base_20260716: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_view_base_before_fulfillment_timeline: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
@@ -3576,6 +3753,14 @@ export type Database = {
           status: string
         }[]
       }
+      get_current_business_team: {
+        Args: { p_owner_profile_id: string }
+        Returns: Json
+      }
+      get_current_buyer_purchase_request_cancellation_eligibility: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       get_current_profile_conversations: {
         Args: {
           p_category_ids?: string[]
@@ -3586,7 +3771,49 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_profile_conversations_before_request_cancellation: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
       get_current_seller_purchase_offers: {
+        Args: {
+          p_category_ids?: string[]
+          p_conversation_status_codes?: string[]
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          conversation_id: string
+          conversation_is_terminal: boolean
+          conversation_status_code: string
+          conversation_status_label: string
+          conversation_status_sort_order: number
+          conversation_status_style_code: string
+          created_at: string
+          currency_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+          request_category_id: string
+          request_category_name: string
+          request_profile_name: string
+          request_title: string
+        }[]
+      }
+      get_current_seller_purchase_offers_before_request_cancellation: {
         Args: {
           p_category_ids?: string[]
           p_conversation_status_codes?: string[]
@@ -3679,6 +3906,7 @@ export type Database = {
           id: string
           purchase_offer_id: string | null
           purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
           seller_profile_id: string | null
           status_code: string | null
         }
@@ -3715,7 +3943,7 @@ export type Database = {
         Returns: number
       }
       get_seller_home_filter_options: {
-        Args: { p_profile_id: string }
+        Args: { p_profile_id: string; p_segment_svg_name?: string }
         Returns: Json
       }
       get_seller_home_purchase_requests: {
@@ -3766,6 +3994,7 @@ export type Database = {
           p_search_text?: string
           p_segment_svg_name?: string
           p_seller_interaction_states?: string[]
+          p_sort_code?: string
           p_stage_code?: string
           p_start_date?: string
         }
@@ -3799,9 +4028,21 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: Json
       }
+      mark_profile_notification_read: {
+        Args: { p_notification_id: string; p_profile_id: string }
+        Returns: Json
+      }
       phone_number_is_registered: {
         Args: { p_phone: string }
         Returns: boolean
+      }
+      prepare_canceled_purchase_request_deletion: {
+        Args: {
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
       publish_purchase_request: {
@@ -3829,6 +4070,10 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      remove_current_business_member: {
+        Args: { p_membership_id: string; p_owner_profile_id: string }
+        Returns: Json
+      }
       remove_seller_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
@@ -3840,6 +4085,15 @@ export type Database = {
       }
       request_current_profile_deletion: {
         Args: { p_profile_id: string }
+        Returns: Json
+      }
+      request_pickup_transaction_code: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
         Returns: Json
       }
       revoke_current_user_business_invitation: {
@@ -3863,6 +4117,15 @@ export type Database = {
         }
         Returns: Json
       }
+      seller_cancel_offer_base_20260716: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       seller_concretar_request: {
         Args: {
           p_action_code?: string
@@ -3872,7 +4135,25 @@ export type Database = {
         }
         Returns: Json
       }
+      seller_concretar_request_before_request_cancellation: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       seller_discard_request_conversation: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_discard_request_conversation_base_20260716: {
         Args: {
           p_action_code?: string
           p_conversation_id: string
@@ -3921,10 +4202,10 @@ export type Database = {
         | {
             Args: {
               p_conversation_id: string
-              p_image_path?: string
-              p_message_kind?: string
+              p_image_path: string
+              p_message_kind: string
               p_profile_id: string
-              p_text?: string
+              p_text: string
             }
             Returns: {
               buyer_open_state: string | null
@@ -3960,6 +4241,15 @@ export type Database = {
         Returns: Json
       }
       submit_conversation_rating: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      submit_conversation_rating_base_20260716: {
         Args: {
           p_action_code: string
           p_conversation_id: string
@@ -4125,6 +4415,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

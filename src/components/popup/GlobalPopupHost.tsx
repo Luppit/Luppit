@@ -25,7 +25,7 @@ import {
 } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
 import * as Haptics from "expo-haptics";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import {
   Animated,
@@ -38,6 +38,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  findNodeHandle,
   ScrollView,
   StyleSheet,
   View,
@@ -189,6 +190,9 @@ export default function GlobalPopupHost() {
   const [isSuccessActionPending, setSuccessActionPending] = useState(false);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
+  const summaryActionsHeightRef = useRef(0);
+  const summaryScrollViewRef = useRef<ScrollView | null>(null);
+  const sheetHeadingRef = useRef<View | null>(null);
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
@@ -200,6 +204,17 @@ export default function GlobalPopupHost() {
   const sheetBottomPadding = isKeyboardVisible
     ? t.spacing.sm
     : Math.max(insets.bottom, t.spacing.md);
+
+  useEffect(() => {
+    if (!isMounted || (!filterConfig && !sortConfig)) return;
+
+    const timeout = setTimeout(() => {
+      const headingHandle = findNodeHandle(sheetHeadingRef.current);
+      if (headingHandle) AccessibilityInfo.setAccessibilityFocus(headingHandle);
+    }, ANIMATION_DURATION + 80);
+
+    return () => clearTimeout(timeout);
+  }, [filterConfig, isMounted, sortConfig]);
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -395,6 +410,14 @@ export default function GlobalPopupHost() {
   }, [successConfig]);
 
   useEffect(() => {
+    if (!summaryConfig) return;
+
+    AccessibilityInfo.announceForAccessibility(
+      [summaryConfig.title, summaryConfig.metadata].filter(Boolean).join(". ")
+    );
+  }, [summaryConfig]);
+
+  useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
     const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
@@ -404,6 +427,24 @@ export default function GlobalPopupHost() {
       hideSub.remove();
     };
   }, []);
+
+  const scrollSummaryInputIntoView = useCallback(
+    (target?: unknown | null) => {
+      if (target == null) return;
+
+      const scrollToTarget = () => {
+        summaryScrollViewRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+          target,
+          summaryActionsHeightRef.current + t.spacing.sm,
+          true
+        );
+      };
+
+      requestAnimationFrame(scrollToTarget);
+      setTimeout(scrollToTarget, 250);
+    },
+    [t.spacing.sm]
+  );
 
   const handleOptionPress = (option: PopupOption) => {
     closePopup();
@@ -779,7 +820,11 @@ export default function GlobalPopupHost() {
         style={StyleSheet.absoluteFillObject}
         accessibilityViewIsModal
         onAccessibilityEscape={
-          successConfig ? () => void handleSuccessActionPress() : undefined
+          successConfig
+            ? () => void handleSuccessActionPress()
+            : canDismissPopup
+              ? closePopup
+              : undefined
         }
       >
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity }]}>
@@ -830,6 +875,7 @@ export default function GlobalPopupHost() {
               <Animated.View
                 style={[
                   s.bottomSheet,
+                  isKeyboardVisible ? s.bottomSheetKeyboardVisible : null,
                   {
                     maxHeight: sheetMaxHeight,
                     transform: [{ translateY }],
@@ -838,12 +884,15 @@ export default function GlobalPopupHost() {
               >
                 <GlassSurface
                   variant="sheet"
-                  style={s.bottomSheetSurface}
+                  style={[
+                    s.bottomSheetSurface,
+                    isKeyboardVisible ? s.bottomSheetFill : null,
+                  ]}
                   contentStyle={[
                     s.bottomSheetContent,
+                    isKeyboardVisible ? s.bottomSheetFill : null,
                     { paddingBottom: t.spacing.sm },
                   ]}
-                  onTouchStart={Keyboard.dismiss}
                   onLayout={(event) => {
                     sheetHeightRef.current = event.nativeEvent.layout.height;
                   }}
@@ -859,15 +908,24 @@ export default function GlobalPopupHost() {
                     <ScrollView
                       style={[
                         s.sheetContentScroll,
+                        isKeyboardVisible ? s.sheetContentScrollKeyboardVisible : null,
                         { maxHeight: sheetContentMaxHeight },
                       ]}
                       contentContainerStyle={s.sheetContentScrollContent}
                       showsVerticalScrollIndicator={false}
                       nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
                     >
                       <View style={s.section}>
                         <View style={s.summaryHeaderBlock}>
-                          <View style={s.summaryHeader}>
+                          <View
+                            ref={sheetHeadingRef}
+                            accessible
+                            accessibilityRole="header"
+                            accessibilityLabel={filterConfig.title}
+                            style={s.summaryHeader}
+                          >
                             <Text variant="subtitle" style={s.summaryTitle}>
                               {filterConfig.title}
                             </Text>
@@ -1020,6 +1078,7 @@ export default function GlobalPopupHost() {
                   <ScrollView
                     style={[
                       s.sheetContentScroll,
+                      isKeyboardVisible ? s.sheetContentScrollKeyboardVisible : null,
                       { maxHeight: sheetContentMaxHeight },
                     ]}
                     contentContainerStyle={s.sheetContentScrollContent}
@@ -1028,7 +1087,13 @@ export default function GlobalPopupHost() {
                   >
                     <View style={s.section}>
                       <View style={s.summaryHeaderBlock}>
-                        <View style={s.summaryHeader}>
+                        <View
+                          ref={sheetHeadingRef}
+                          accessible
+                          accessibilityRole="header"
+                          accessibilityLabel={sortConfig.title}
+                          style={s.summaryHeader}
+                        >
                           <Text
                             variant="subtitle"
                             style={s.summaryTitle}
@@ -1074,6 +1139,7 @@ export default function GlobalPopupHost() {
                   <ScrollView
                     style={[
                       s.sheetContentScroll,
+                      isKeyboardVisible ? s.sheetContentScrollKeyboardVisible : null,
                       { maxHeight: sheetContentMaxHeight },
                     ]}
                     contentContainerStyle={s.sheetContentScrollContent}
@@ -1155,16 +1221,17 @@ export default function GlobalPopupHost() {
                 ) : summaryConfig ? (
                 <>
                   <ScrollView
+                    ref={summaryScrollViewRef}
                     style={[
                       s.sheetContentScroll,
+                      isKeyboardVisible ? s.sheetContentScrollKeyboardVisible : null,
                       { maxHeight: sheetContentMaxHeight },
                     ]}
                     contentContainerStyle={s.sheetContentScrollContent}
-                    showsVerticalScrollIndicator={false}
+                    showsVerticalScrollIndicator={isKeyboardVisible}
                     nestedScrollEnabled
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-                    automaticallyAdjustKeyboardInsets
                   >
                     <View style={s.section}>
                       <View style={s.summaryHeaderBlock}>
@@ -1179,7 +1246,25 @@ export default function GlobalPopupHost() {
                           {summaryConfig.icon ? (
                             <Icon name={summaryConfig.icon} size={20} color={t.colors.textDark} />
                           ) : null}
+                          {summaryConfig.showCloseButton ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Cerrar"
+                              accessibilityHint="Cierra el detalle de la notificación."
+                              disabled={pendingSummaryActionId != null}
+                              hitSlop={4}
+                              onPress={closePopup}
+                              style={s.summaryCloseButton}
+                            >
+                              <Icon name="x" size={22} color={t.colors.textDark} />
+                            </Pressable>
+                          ) : null}
                         </View>
+                        {summaryConfig.metadata ? (
+                          <Text variant="small" style={s.summaryMetadata}>
+                            {summaryConfig.metadata}
+                          </Text>
+                        ) : null}
                         <View style={s.summaryHeaderSeparator} />
                       </View>
 
@@ -1219,6 +1304,9 @@ export default function GlobalPopupHost() {
                                   helperText={input.helper_text}
                                   errorText={summaryInputErrors[input.id]}
                                   otpLength={input.otp_length ?? 4}
+                                  onFocus={(event) =>
+                                    scrollSummaryInputIntoView(event.nativeEvent.target)
+                                  }
                                   onHelperPress={
                                     helper
                                       ? () => {
@@ -1252,6 +1340,7 @@ export default function GlobalPopupHost() {
                                   helperText={input.helper_text}
                                   errorText={summaryInputErrors[input.id]}
                                   componentConfig={input.component_config}
+                                  onCommentFocus={scrollSummaryInputIntoView}
                                   onChange={(value) => {
                                     if (value.stars >= 1) {
                                       setSummaryInputErrors((current) => {
@@ -1515,7 +1604,12 @@ export default function GlobalPopupHost() {
                   ) : null}
 
                   {summaryConfig.actions && summaryConfig.actions.length > 0 ? (
-                    <View style={s.summaryActionsRow}>
+                    <View
+                      style={s.summaryActionsRow}
+                      onLayout={(event) => {
+                        summaryActionsHeightRef.current = event.nativeEvent.layout.height;
+                      }}
+                    >
                       {summaryConfig.actions.slice(0, 2).map((action) => {
                         const textColor =
                           action.textColorKey != null
@@ -1572,6 +1666,7 @@ export default function GlobalPopupHost() {
                 <ScrollView
                   style={[
                     s.sheetContentScroll,
+                    isKeyboardVisible ? s.sheetContentScrollKeyboardVisible : null,
                     { maxHeight: sheetContentMaxHeight },
                   ]}
                   contentContainerStyle={s.sheetContentScrollContent}

@@ -1,4 +1,6 @@
-import { Row } from "../db/types";
+import { RPC_FUNCTIONS } from "../db/functions";
+import { COL_CONVERSATION, TB_CONVERSATION } from "../db/tables";
+import { FunctionName, Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -144,6 +146,11 @@ export type ConversationStatusTimelineItem = {
   reached_at: string | null;
   reached_at_label: string | null;
   pre_label: string | null;
+  detail: string | null;
+  style_code: string | null;
+  method_kind: "shipping" | "pickup" | "both" | null;
+  method_label: string | null;
+  accessibility_label: string | null;
   is_next: boolean;
   is_completed: boolean;
 };
@@ -172,6 +179,10 @@ export type ConversationListItem = {
   unopened_count: number;
   has_unopened: boolean;
 };
+
+function toOptionalText(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
 
 function parseConversationActionExecutor(raw: unknown): ConversationActionExecutor | null {
   if (!raw || typeof raw !== "object") return null;
@@ -625,9 +636,9 @@ export async function getConversationByPurchaseOfferId(
   purchaseOfferId: string
 ): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {
   const { data, error } = await supabase
-    .from("conversation")
+    .from(TB_CONVERSATION)
     .select("*")
-    .eq("purchase_offer_id", purchaseOfferId)
+    .eq(COL_CONVERSATION.purchase_offer_id, purchaseOfferId)
     .maybeSingle();
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
@@ -647,8 +658,8 @@ export async function getOrCreateCurrentSellerConversationByPurchaseRequestId(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const rpcResult: any = await (supabase as any).rpc(
-    "get_or_create_seller_purchase_request_conversation",
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_OR_CREATE_SELLER_PURCHASE_REQUEST_CONVERSATION,
     {
       p_purchase_request_id: purchaseRequestId,
       p_profile_id: profile.data.id,
@@ -666,73 +677,15 @@ export async function getOrCreateCurrentSellerConversationByPurchaseRequestId(
   return { ok: true, data: data as Conversation };
 }
 
-export async function getAcceptedConversationByPurchaseRequestId(
-  purchaseRequestId: string
-): Promise<{ ok: true; data: Conversation } | { ok: false; error: AppError } | null> {
-  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
-
-  const conversationsResult = await supabase
-    .from("conversation")
-    .select("id,purchase_offer_id,status_code,purchase_request_id,buyer_profile_id,seller_profile_id,created_at")
-    .eq("purchase_request_id", purchaseRequestId)
-    .not("purchase_offer_id", "is", null)
-    .order("created_at", { ascending: false });
-
-  if (conversationsResult.error) {
-    return { ok: false, error: fromSupabaseError(conversationsResult.error) };
-  }
-
-  const conversations = (conversationsResult.data ?? []) as Conversation[];
-  if (conversations.length === 0) return null;
-
-  const actionResult = await supabase
-    .from("conversation_action")
-    .select("id")
-    .eq("code", "BUYER_ACCEPT_OFFER")
-    .maybeSingle();
-
-  if (actionResult.error) {
-    return { ok: false, error: fromSupabaseError(actionResult.error) };
-  }
-
-  const actionId = actionResult.data?.id;
-  if (!actionId) {
-    return { ok: true, data: conversations[0] };
-  }
-
-  const conversationIds = conversations.map((conversation) => conversation.id);
-  const historyResult = await supabase
-    .from("conversation_status_history")
-    .select("conversation_id,created_at")
-    .eq("action_id", actionId)
-    .in("conversation_id", conversationIds)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (historyResult.error) {
-    return { ok: false, error: fromSupabaseError(historyResult.error) };
-  }
-
-  const acceptedConversationId = historyResult.data?.[0]?.conversation_id ?? null;
-  if (!acceptedConversationId) {
-    return { ok: true, data: conversations[0] };
-  }
-
-  const acceptedConversation =
-    conversations.find((conversation) => conversation.id === acceptedConversationId) ?? null;
-  if (!acceptedConversation) return { ok: true, data: conversations[0] };
-
-  return { ok: true, data: acceptedConversation };
-}
-
 export async function getConversationTimeline(
   conversationId: string
 ): Promise<{ ok: true; data: ConversationStatusTimelineItem[] } | { ok: false; error: AppError }> {
   if (!conversationId) return { ok: false, error: fromAppError("validation") };
 
-  const rpcResult: any = await (supabase as any).rpc("get_conversation_timeline", {
-    p_conversation_id: conversationId,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CONVERSATION_TIMELINE,
+    { p_conversation_id: conversationId }
+  );
 
   if (rpcResult.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };
@@ -743,18 +696,33 @@ export async function getConversationTimeline(
 
   const timeline = rows
     .map((row) => {
-      const statusCode = typeof row.status_code === "string" ? row.status_code : "";
-      const label = typeof row.label === "string" ? row.label : "";
+      const statusCode =
+        typeof row.status_code === "string" ? row.status_code.trim() : "";
+      const label = typeof row.label === "string" ? row.label.trim() : "";
       if (!statusCode || !label) return null;
+
+      const rawMethodKind =
+        typeof row.method_kind === "string" ? row.method_kind.trim().toLowerCase() : "";
+      const methodKind =
+        rawMethodKind === "shipping" ||
+        rawMethodKind === "pickup" ||
+        rawMethodKind === "both"
+          ? rawMethodKind
+          : null;
 
       return {
         status_code: statusCode,
         label,
-        icon: typeof row.icon === "string" ? row.icon : null,
-        reached_at: typeof row.reached_at === "string" ? row.reached_at : null,
+        icon: toOptionalText(row.icon),
+        reached_at: toOptionalText(row.reached_at),
         reached_at_label:
-          typeof row.reached_at_label === "string" ? row.reached_at_label : null,
-        pre_label: typeof row.pre_label === "string" ? row.pre_label : null,
+          toOptionalText(row.reached_at_label),
+        pre_label: toOptionalText(row.pre_label),
+        detail: toOptionalText(row.detail),
+        style_code: toOptionalText(row.style_code),
+        method_kind: methodKind,
+        method_label: toOptionalText(row.method_label),
+        accessibility_label: toOptionalText(row.accessibility_label),
         is_next: row.is_next === true,
         is_completed: row.is_completed === true,
       } satisfies ConversationStatusTimelineItem;
@@ -772,10 +740,13 @@ export async function getConversationView(
     return { ok: false, error: fromAppError("validation") };
   }
 
-  const { data, error } = await supabase.rpc("get_conversation_view", {
-    p_conversation_id: conversationId,
-    p_profile_id: profileId,
-  });
+  const { data, error } = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CONVERSATION_VIEW,
+    {
+      p_conversation_id: conversationId,
+      p_profile_id: profileId,
+    }
+  );
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -800,13 +771,16 @@ export async function getCurrentProfileConversations(
   const endDate = filters?.endDate.trim() || null;
   const categoryIds =
     filters?.selectedCategoryIds.filter((id) => id.trim().length > 0) ?? [];
-  const rpcResult: any = await (supabase as any).rpc("get_current_profile_conversations", {
-    p_profile_id: profile.data.id,
-    p_search_text: searchValue,
-    p_start_date: startDate,
-    p_end_date: endDate,
-    p_category_ids: categoryIds.length > 0 ? categoryIds : null,
-  });
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_PROFILE_CONVERSATIONS,
+    {
+      p_profile_id: profile.data.id,
+      p_search_text: searchValue,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_category_ids: categoryIds.length > 0 ? categoryIds : null,
+    } as never
+  );
 
   if (rpcResult.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
 
@@ -869,29 +843,6 @@ export async function getCurrentUserConversationView(
   return { ok: true, data: view.data, profileId: profile.data.id };
 }
 
-export async function executeConversationAction(
-  input: ExecuteConversationActionInput
-): Promise<{ ok: true; data: unknown } | { ok: false; error: AppError }> {
-  const actionCode = input.actionCode.trim();
-  if (!input.conversationId || !input.profileId || !actionCode) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-
-  const rpcResult: any = await (supabase as any).rpc("execute_conversation_action", {
-    p_conversation_id: input.conversationId,
-    p_profile_id: input.profileId,
-    p_action_code: actionCode,
-    p_payload: input.payload ?? null,
-  });
-
-  if (rpcResult.error) return { ok: false, error: fromSupabaseError(rpcResult.error) };
-
-  const actionError = getConversationActionResultError(rpcResult.data);
-  if (actionError) return { ok: false, error: actionError };
-
-  return { ok: true, data: rpcResult.data ?? null };
-}
-
 function normalizeRpcTarget(target: string): string {
   return target.includes(".") ? target.split(".").pop() ?? target : target;
 }
@@ -905,15 +856,22 @@ export async function executeConversationActionByExecutor(
 
   const rpcName = normalizeRpcTarget(input.executor.target).trim();
   if (!rpcName) {
-    return executeConversationAction(input);
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "conversation_action_executor_missing",
+        message: "Esta acción no tiene un ejecutor configurado.",
+      },
+    };
   }
 
-  const rpcResult: any = await (supabase as any).rpc(rpcName, {
+  const rpcResult = await supabase.rpc(rpcName as FunctionName, {
     p_conversation_id: input.conversationId,
     p_profile_id: input.profileId,
     p_action_code: input.actionCode,
     p_payload: input.payload ?? null,
-  });
+  } as never);
 
   if (rpcResult.error) {
     return { ok: false, error: fromSupabaseError(rpcResult.error) };

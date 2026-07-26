@@ -1,7 +1,11 @@
 import Button from "@/src/components/button/Button";
-import { GroupedListSection } from "@/src/components/groupedList/GroupedList";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
 import {
   LocationOption,
@@ -20,7 +24,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "../(detail)/detail-top-bar";
 
 type SelectOption = {
   code: string;
@@ -30,10 +33,11 @@ type SelectOption = {
 export default function BusinessLocationEditScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
+  const { state: activeProfileState, activeProfile } = useActiveProfile();
+  const isBusinessOwner = activeProfile?.membershipRole === "owner";
   const s = useMemo(
-    () => createBusinessLocationEditStyles(t, insets.bottom, topContentInset),
-    [insets.bottom, t, topContentInset]
+    () => createBusinessLocationEditStyles(t, insets.bottom),
+    [insets.bottom, t]
   );
   const params = useLocalSearchParams<{
     locationId?: string | string[];
@@ -50,6 +54,13 @@ export default function BusinessLocationEditScreen() {
 
   useEffect(() => {
     let active = true;
+
+    if (!isBusinessOwner) {
+      setIsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
 
     const loadLocations = async () => {
       setIsLoading(true);
@@ -80,7 +91,7 @@ export default function BusinessLocationEditScreen() {
     return () => {
       active = false;
     };
-  }, [initialLocationId]);
+  }, [initialLocationId, isBusinessOwner]);
 
   const provinceOptions = useMemo(
     () => getUniqueOptions(locations, "province_code", "province"),
@@ -123,6 +134,14 @@ export default function BusinessLocationEditScreen() {
     !isSaving;
 
   const saveLocation = async () => {
+    if (!isBusinessOwner) {
+      showError(
+        "Acceso restringido",
+        "Solo la persona propietaria puede cambiar la ubicación del negocio."
+      );
+      return;
+    }
+
     if (!selectedLocationId || !canSave) return;
 
     setIsSaving(true);
@@ -138,7 +157,28 @@ export default function BusinessLocationEditScreen() {
     router.back();
   };
 
-  if (isLoading) {
+  if (activeProfileState !== "loading" && !isBusinessOwner) {
+    return (
+      <View style={s.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.content}
+        >
+          <GroupedListSection title="Ubicación del negocio">
+            <GroupedListRow
+              icon="lock"
+              label="Solo para propietarios"
+              description="Tu perfil puede consultar la ubicación, pero solo la persona propietaria puede cambiarla."
+              descriptionMaxLines={3}
+              showSeparator={false}
+            />
+          </GroupedListSection>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (activeProfileState === "loading" || isLoading) {
     return <LoadingState label="Cargando ubicaciones..." style={s.loadingBox} />;
   }
 
@@ -320,11 +360,7 @@ function LocationOptionRow({
   );
 }
 
-function createBusinessLocationEditStyles(
-  t: Theme,
-  bottomInset = 0,
-  topContentInset = 0
-) {
+function createBusinessLocationEditStyles(t: Theme, bottomInset = 0) {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -332,7 +368,7 @@ function createBusinessLocationEditStyles(
     content: {
       flexGrow: 1,
       gap: t.spacing.lg,
-      paddingTop: topContentInset + t.spacing.sm,
+      paddingTop: t.spacing.lg,
       paddingBottom: 96 + bottomInset,
     },
     loadingBox: {
@@ -340,7 +376,6 @@ function createBusinessLocationEditStyles(
       alignItems: "center",
       justifyContent: "center",
       gap: t.spacing.sm,
-      paddingTop: topContentInset,
     },
     warningBox: {
       borderRadius: t.borders.md,

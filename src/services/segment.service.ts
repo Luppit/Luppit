@@ -1,3 +1,5 @@
+import { COL_SEGMENT, TB_SEGMENT } from "../db/tables";
+import { Row } from "../db/types";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
 import { supabase } from "../lib/supabase/client";
 
@@ -9,19 +11,24 @@ export type Segment = {
 };
 
 type SelectedSegmentListener = (segmentSvgName: string) => void;
+type SegmentRow = Pick<
+  Row<"segment">,
+  "name" | "svg_name" | "is_disabled" | "sort_order"
+>;
 
 export const ALL_SEGMENTS_SVG_NAME = "todas";
 
 const selectedSegmentListeners = new Set<SelectedSegmentListener>();
 let currentSelectedSegmentSvgName = ALL_SEGMENTS_SVG_NAME;
 
-function mapSegment(value: any): Segment | null {
+function mapSegment(value: unknown): Segment | null {
   if (!value || typeof value !== "object") return null;
 
-  const name = typeof value.name === "string" ? value.name : "";
-  const svgName = typeof value.svg_name === "string" ? value.svg_name : "";
-  const isDisabled = typeof value.is_disabled === "boolean" ? value.is_disabled : false;
-  const sortOrder = typeof value.sort_order === "number" ? value.sort_order : 100;
+  const row = value as Partial<SegmentRow>;
+  const name = typeof row.name === "string" ? row.name : "";
+  const svgName = typeof row.svg_name === "string" ? row.svg_name : "";
+  const isDisabled = typeof row.is_disabled === "boolean" ? row.is_disabled : false;
+  const sortOrder = typeof row.sort_order === "number" ? row.sort_order : 100;
 
   if (!name || !svgName) return null;
 
@@ -36,11 +43,11 @@ function mapSegment(value: any): Segment | null {
 export async function getSegments(): Promise<
   { ok: true; data: Segment[] } | { ok: false; error: AppError }
 > {
-  const { data, error } = await (supabase as any)
-    .from("segment")
+  const { data, error } = await supabase
+    .from(TB_SEGMENT)
     .select("name, svg_name, is_disabled, sort_order")
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+    .order(COL_SEGMENT.sort_order, { ascending: true })
+    .order(COL_SEGMENT.created_at, { ascending: true });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 

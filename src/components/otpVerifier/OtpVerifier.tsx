@@ -155,7 +155,11 @@ export const OtpVerifier = ({
               isValid ? s.inputState.success : undefined,
             ]}
           >
-            <Text style={s.otpCodeInput}>{values[index]}</Text>
+            {values[index] ? (
+              <Text style={s.otpCodeInput}>{values[index]}</Text>
+            ) : focusedIndex === index ? (
+              <View style={s.otpCaret} />
+            ) : null}
           </View>
         ))}
       </Pressable>

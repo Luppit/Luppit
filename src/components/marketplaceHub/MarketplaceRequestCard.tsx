@@ -13,6 +13,7 @@ export type MarketplaceRequestCardItem = {
   created_at: string;
   published_at: string | null;
   offers_count?: number | null;
+  buyer_display_name?: string | null;
   status_label?: string | null;
   status_style_code?: string | null;
   views_count?: number | null;
@@ -29,6 +30,7 @@ type MarketplaceRequestCardProps = {
   metricLabel?: string | null;
   showSellerActivity?: boolean;
   showSellerStatus?: boolean;
+  showSellerDiscoveryDetails?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
 };
@@ -105,6 +107,22 @@ function getSellerMetricLabel(item: MarketplaceRequestCardItem) {
   return `${isPublicationActivity ? "Publicada" : "Actividad"} ${naturalActivity}`;
 }
 
+function getSellerPublicationLabel(item: MarketplaceRequestCardItem) {
+  const activity = formatActivityLabel(item.published_at ?? item.created_at);
+  if (!activity) return "Publicada recientemente";
+
+  if (activity === "Ahora") return "Publicada ahora";
+  if (activity.startsWith("Hace ")) {
+    return `Publicada hace ${activity.slice(5)}`;
+  }
+  return `Publicada el ${activity}`;
+}
+
+function getSellerOfferLabel(item: MarketplaceRequestCardItem) {
+  const offersCount = typeof item.offers_count === "number" ? item.offers_count : 0;
+  return `${offersCount} ${offersCount === 1 ? "oferta activa" : "ofertas activas"}`;
+}
+
 export default function MarketplaceRequestCard({
   item,
   role,
@@ -113,6 +131,7 @@ export default function MarketplaceRequestCard({
   metricLabel,
   showSellerActivity = false,
   showSellerStatus = false,
+  showSellerDiscoveryDetails = false,
   onPress,
   onLongPress,
 }: MarketplaceRequestCardProps) {
@@ -120,13 +139,19 @@ export default function MarketplaceRequestCard({
   const s = useMemo(() => createMarketplaceRequestCardStyles(t), [t]);
   const titleLabel = item.title?.trim() || "Solicitud";
   const categoryLabel = item.category_name?.trim();
+  const buyerLabel =
+    item.buyer_display_name?.trim() || "Comprador no disponible";
   const statusLabel =
     role === "buyer" || (role === "seller" && showSellerStatus)
       ? item.status_label?.trim()
       : undefined;
   const displayedContext =
     role === "seller"
-      ? getSellerContextLabel(item, contextLabel, !showSellerStatus)
+      ? showSellerDiscoveryDetails
+        ? contextLabel?.trim() ||
+          item.reason?.label?.trim() ||
+          item.status_label?.trim()
+        : getSellerContextLabel(item, contextLabel, !showSellerStatus)
       : contextLabel?.trim() || item.reason?.label?.trim();
   const sellerActivityLabel =
     role === "seller" && showSellerActivity ? getSellerMetricLabel(item) : undefined;
@@ -136,13 +161,18 @@ export default function MarketplaceRequestCard({
     : role === "seller"
       ? [getSellerMetricLabel(item)]
       : [getBuyerOfferLabel(item), getBuyerViewsLabel(item)];
+  const sellerDiscoveryActivity = getSellerPublicationLabel(item);
+  const sellerDiscoveryOffers = getSellerOfferLabel(item);
   const accessibilityLabel = [
     categoryLabel,
     titleLabel,
+    showSellerDiscoveryDetails ? `Comprador: ${buyerLabel}` : undefined,
     statusLabel,
     displayedContext,
     sellerActivityLabel,
-    ...footerLabels,
+    ...(showSellerDiscoveryDetails
+      ? [sellerDiscoveryActivity, sellerDiscoveryOffers]
+      : footerLabels),
   ]
     .filter(Boolean)
     .join(". ");
@@ -159,7 +189,7 @@ export default function MarketplaceRequestCard({
       }
       compact={compact}
       glassSurface
-      fullText
+      fullText={!showSellerDiscoveryDetails}
       prominentTitle
       footerDivider
       onPress={onPress}
@@ -171,7 +201,18 @@ export default function MarketplaceRequestCard({
           : "Toca dos veces para abrir la solicitud."
       }
       body={
-        statusLabel || displayedContext || sellerActivityLabel ? (
+        showSellerDiscoveryDetails ? (
+          <View style={s.contextStack}>
+            <Text variant="body" color="textMedium">
+              Comprador: {buyerLabel}
+            </Text>
+            {displayedContext ? (
+              <Text variant="body" color="textMedium">
+                {displayedContext}
+              </Text>
+            ) : null}
+          </View>
+        ) : statusLabel || displayedContext || sellerActivityLabel ? (
           <View style={s.contextStack}>
             {statusLabel ? (
               <StatusChip
@@ -194,7 +235,16 @@ export default function MarketplaceRequestCard({
         ) : null
       }
       footerLeft={
-        explicitMetricLabel || role === "seller" ? (
+        showSellerDiscoveryDetails ? (
+          <View style={s.discoveryMetricGroup}>
+            <Text variant="small" color="textMedium">
+              {sellerDiscoveryActivity}
+            </Text>
+            <Text variant="small" color="textMedium">
+              {sellerDiscoveryOffers}
+            </Text>
+          </View>
+        ) : explicitMetricLabel || role === "seller" ? (
           <Text variant="small" color="textMedium">
             {footerLabels[0]}
           </Text>
@@ -239,6 +289,13 @@ function createMarketplaceRequestCardStyles(t: Theme) {
       flexWrap: "wrap",
       alignItems: "center",
       gap: t.spacing.md,
+    },
+    discoveryMetricGroup: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: t.spacing.sm,
     },
     metricItem: {
       flexDirection: "row",

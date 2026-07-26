@@ -1,21 +1,19 @@
 import { Icon } from "@/src/components/Icon";
 import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
-import {
-  createRoundedSurfaceStyle,
-  ROUNDED_SURFACE_RADIUS,
-} from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   getCurrentProfileNotifications,
-  markAllCurrentProfileNotificationsRead,
+  markCurrentProfileNotificationRead,
   ProfileNotificationListItem,
 } from "@/src/services/notification.service";
-import { openPopup } from "@/src/services/popup.service";
-import { Theme, useTheme } from "@/src/themes";
+import { openPopup, PopupSummaryAction } from "@/src/services/popup.service";
+import { fontFamilies, Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
+import { router } from "expo-router";
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,32 +23,69 @@ function formatNotificationTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
   const diffHours = Math.floor(diffMs / 3600000);
 
   if (diffMinutes < 1) return "Ahora";
   if (diffMinutes < 60) return `${diffMinutes} min`;
   if (diffHours < 24) return `${diffHours} h`;
 
+  const isCurrentYear = date.getFullYear() === new Date().getFullYear();
   return date.toLocaleDateString("es-CR", {
     day: "numeric",
     month: "short",
+    ...(isCurrentYear ? {} : { year: "numeric" as const }),
   });
+}
+
+function formatNotificationAccessibleTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "en una fecha desconocida";
+
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  const diffHours = Math.floor(diffMs / 3600000);
+
+  if (diffMinutes < 1) return "ahora";
+  if (diffMinutes === 1) return "hace 1 minuto";
+  if (diffMinutes < 60) return `hace ${diffMinutes} minutos`;
+  if (diffHours === 1) return "hace 1 hora";
+  if (diffHours < 24) return `hace ${diffHours} horas`;
+
+  return `el ${date.toLocaleDateString("es-CR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })}`;
 }
 
 function formatNotificationReceivedAt(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
 
-  return date.toLocaleString("es-CR", {
+  const dateLabel = date.toLocaleDateString("es-CR", {
     day: "numeric",
-    month: "long",
+    month: "short",
     year: "numeric",
+  });
+  const timeLabel = date.toLocaleTimeString("es-CR", {
     hour: "numeric",
     minute: "2-digit",
   });
+
+  return `${dateLabel} · ${timeLabel}`;
+}
+
+function getNotificationTypeLabel(notification: ProfileNotificationListItem) {
+  if (notification.typeCode.trim().toLowerCase() === "information") return null;
+  return notification.typeLabel?.trim() || null;
+}
+
+function getNotificationAccessiblePreview(message: string) {
+  const normalized = message.trim().replace(/\s+/g, " ");
+  if (normalized.length <= 100) return normalized;
+  return `${normalized.slice(0, 97).trimEnd()}…`;
 }
 
 function getNotificationTone(t: Theme, typeCode: string) {
@@ -79,9 +114,54 @@ function getNotificationTone(t: Theme, typeCode: string) {
   };
 }
 
+function getNotificationActions(
+  notification: ProfileNotificationListItem
+): PopupSummaryAction[] {
+  if (notification.navigation?.kind === "conversation") {
+    const conversationId = notification.navigation.conversationId;
+    return [
+      {
+        id: "open-conversation",
+        label: "Ver conversación",
+        icon: "message-circle",
+        backgroundColorKey: "primary",
+        textColorKey: "backgroudWhite",
+        iconColorKey: "backgroudWhite",
+        onPress: () =>
+          router.push({
+            pathname: "/(conversation)/offer",
+            params: { conversationId },
+          }),
+      },
+    ];
+  }
+
+  if (notification.navigation?.kind === "purchaseRequest") {
+    const purchaseRequestId = notification.navigation.purchaseRequestId;
+    return [
+      {
+        id: "open-request",
+        label: "Ver solicitud",
+        icon: "file-text",
+        backgroundColorKey: "primary",
+        textColorKey: "backgroudWhite",
+        iconColorKey: "backgroudWhite",
+        onPress: () =>
+          router.push({
+            pathname: "/request/[purchaseRequestId]",
+            params: { purchaseRequestId },
+          }),
+      },
+    ];
+  }
+
+  return [];
+}
+
 export default function NotificationsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const { refreshUnreadNotificationCount } = useActiveProfile();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = React.useMemo(
     () => createNotificationsStyles(t, topContentInset),
@@ -91,41 +171,13 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const isMountedRef = React.useRef(true);
+  const markingNotificationIdsRef = React.useRef(new Set<string>());
 
   React.useEffect(() => {
     return () => {
       isMountedRef.current = false;
     };
   }, []);
-
-  const markLoadedNotificationsRead = React.useCallback(
-    async (items: ProfileNotificationListItem[]) => {
-      const unreadNotificationIds = new Set(
-        items
-          .filter((item) => item.readAt == null)
-          .map((item) => item.notificationId)
-      );
-      if (unreadNotificationIds.size === 0) return;
-
-      const result = await markAllCurrentProfileNotificationsRead();
-      if (!isMountedRef.current) return;
-
-      if (!result.ok) {
-        showError("No se pudieron actualizar tus notificaciones", result.error.message);
-        return;
-      }
-
-      const readAt = new Date().toISOString();
-      setNotifications((current) =>
-        current.map((item) =>
-          item.readAt == null && unreadNotificationIds.has(item.notificationId)
-            ? { ...item, readAt }
-            : item
-        )
-      );
-    },
-    []
-  );
 
   const loadNotifications = React.useCallback(async () => {
     setIsLoading(true);
@@ -143,9 +195,65 @@ export default function NotificationsScreen() {
     }
 
     setNotifications(result.data);
+    void refreshUnreadNotificationCount();
     setIsLoading(false);
-    void markLoadedNotificationsRead(result.data);
-  }, [markLoadedNotificationsRead]);
+  }, [refreshUnreadNotificationCount]);
+
+  const markNotificationRead = React.useCallback(
+    async (notification: ProfileNotificationListItem) => {
+      if (
+        notification.readAt != null ||
+        markingNotificationIdsRef.current.has(notification.notificationId)
+      ) {
+        return;
+      }
+
+      markingNotificationIdsRef.current.add(notification.notificationId);
+      const result = await markCurrentProfileNotificationRead(
+        notification.notificationId
+      );
+      markingNotificationIdsRef.current.delete(notification.notificationId);
+      if (!isMountedRef.current) return;
+
+      if (!result.ok) {
+        showError("No se pudo marcar como leída", result.error.message);
+        return;
+      }
+
+      setNotifications((current) =>
+        current.map((item) =>
+          item.notificationId === result.data.notificationId
+            ? { ...item, readAt: result.data.readAt }
+            : item
+        )
+      );
+      void refreshUnreadNotificationCount();
+    },
+    [refreshUnreadNotificationCount]
+  );
+
+  const openNotificationDetail = React.useCallback(
+    (notification: ProfileNotificationListItem) => {
+      const title = notification.title?.trim() || "Novedad en Luppit";
+      const metadata = [
+        getNotificationTypeLabel(notification),
+        formatNotificationReceivedAt(notification.createdAt),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      openPopup({
+        type: "summary",
+        title,
+        metadata,
+        showCloseButton: true,
+        description: notification.message,
+        actions: getNotificationActions(notification),
+      });
+      void markNotificationRead(notification);
+    },
+    [markNotificationRead]
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -161,19 +269,13 @@ export default function NotificationsScreen() {
   if (loadError) {
     return (
       <View style={s.centerState}>
-        <View style={s.emptyIconBadge}>
-          <Icon name="bell" size={28} color={t.colors.stateAnulated} />
-        </View>
-        <Text variant="subtitle" align="center">
-          No se pudieron cargar tus notificaciones.
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void loadNotifications()}
-          style={s.retryButton}
-        >
-          <Text color="primary">Reintentar</Text>
-        </Pressable>
+        <StandaloneListEmptyState
+          icon="bell"
+          title="No pudimos cargar tus notificaciones"
+          description="Inténtalo nuevamente."
+          actionLabel="Reintentar"
+          onAction={() => void loadNotifications()}
+        />
       </View>
     );
   }
@@ -184,7 +286,7 @@ export default function NotificationsScreen() {
         <StandaloneListEmptyState
           icon="bell"
           title="Sin notificaciones"
-          description="Cuando haya novedades sobre tus solicitudes, ofertas o chats, aparecerán aquí."
+          description="Las novedades importantes de tu actividad aparecerán aquí."
         />
       </View>
     );
@@ -201,6 +303,7 @@ export default function NotificationsScreen() {
             key={notification.notificationId}
             notification={notification}
             showSeparator={index < notifications.length - 1}
+            onPress={() => openNotificationDetail(notification)}
           />
         ))}
       </GroupedList>
@@ -211,70 +314,57 @@ export default function NotificationsScreen() {
 function NotificationRow({
   notification,
   showSeparator,
+  onPress,
 }: {
   notification: ProfileNotificationListItem;
   showSeparator: boolean;
+  onPress: () => void;
 }) {
   const t = useTheme();
   const s = React.useMemo(() => createNotificationsStyles(t), [t]);
   const tone = getNotificationTone(t, notification.typeCode);
   const isUnread = notification.readAt == null;
-  const title = notification.title || notification.typeLabel || "Notificación";
-  const openNotificationDetail = () => {
-    openPopup({
-      type: "summary",
-      title,
-      icon: tone.icon,
-      rows: [
-        {
-          label: "Recibida",
-          value: formatNotificationReceivedAt(notification.createdAt),
-        },
-      ],
-      description: notification.message,
-      descriptionPlacement: "afterRows",
-      actions: [
-        {
-          id: "done",
-          label: "Listo",
-          icon: "check",
-          backgroundColorKey: "primary",
-          textColorKey: "backgroudWhite",
-          iconColorKey: "backgroudWhite",
-        },
-      ],
-    });
-  };
+  const title = notification.title?.trim() || "Novedad en Luppit";
+  const accessibleTime = formatNotificationAccessibleTime(notification.createdAt);
+  const accessiblePreview = getNotificationAccessiblePreview(notification.message);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}. ${notification.message}`}
+      accessibilityLabel={`${isUnread ? "Sin leer. " : ""}${title}. ${accessiblePreview}. Recibida ${accessibleTime}.`}
       accessibilityHint="Abre el detalle de la notificación."
-      onPress={openNotificationDetail}
+      onPress={onPress}
       style={s.row}
     >
-      <View style={s.unreadSlot}>
+      <View style={s.unreadSlot} accessibilityElementsHidden importantForAccessibility="no">
         {isUnread ? <View style={s.unreadDot} /> : null}
       </View>
-      <View style={s.iconBadge}>
-        <Icon name={tone.icon} size={22} color={tone.color} />
+      <View
+        style={[s.iconBadge, { backgroundColor: tone.backgroundColor }]}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        <Icon name={tone.icon} size={20} color={tone.color} />
       </View>
       <View style={s.rowBody}>
         <View style={s.rowHeader}>
           <Text
-            variant={isUnread ? "subtitle" : "body"}
+            variant="body"
             color={isUnread ? "textDark" : "textMedium"}
             maxLines={1}
-            style={s.rowTitle}
+            style={[s.rowTitle, isUnread ? s.rowTitleUnread : null]}
           >
             {title}
           </Text>
-          <Text variant="small" color="stateAnulated" maxLines={1}>
+          <Text variant="small" color="textMedium" maxLines={1}>
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>
-        <Text color={isUnread ? "textMedium" : "stateAnulated"} maxLines={2}>
+        <Text
+          variant="small"
+          color="textMedium"
+          maxLines={2}
+        >
           {notification.message}
         </Text>
       </View>
@@ -301,7 +391,7 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     },
     row: {
       position: "relative",
-      minHeight: 72,
+      minHeight: 76,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
@@ -319,8 +409,9 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       backgroundColor: t.colors.primary,
     },
     iconBadge: {
-      width: 32,
-      minHeight: 54,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -338,9 +429,12 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     rowTitle: {
       flex: 1,
     },
+    rowTitleUnread: {
+      fontFamily: fontFamilies.medium,
+    },
     rowSeparator: {
       position: "absolute",
-      left: t.spacing.md + 8 + t.spacing.sm + 32 + t.spacing.sm,
+      left: t.spacing.md + 8 + t.spacing.sm + 36 + t.spacing.sm,
       right: t.spacing.md,
       bottom: 0,
       height: StyleSheet.hairlineWidth,
@@ -350,25 +444,8 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      gap: t.spacing.sm,
       paddingTop: topContentInset,
       paddingHorizontal: t.spacing.lg,
-    },
-    emptyIconBadge: {
-      width: 56,
-      height: 56,
-      borderRadius: ROUNDED_SURFACE_RADIUS,
-      alignItems: "center",
-      justifyContent: "center",
-      ...createRoundedSurfaceStyle(t),
-      borderWidth: 1,
-      borderColor: t.colors.border,
-    },
-    retryButton: {
-      minHeight: 40,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: t.spacing.md,
     },
   });
 }

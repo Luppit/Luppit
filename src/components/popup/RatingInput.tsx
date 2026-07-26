@@ -19,6 +19,7 @@ type RatingInputProps = {
   helperText?: string | null;
   errorText?: string | null;
   componentConfig?: Record<string, unknown> | null;
+  onCommentFocus?: (target?: unknown | null) => void;
   onChange?: (value: RatingValue) => void;
 };
 
@@ -41,6 +42,7 @@ export default function RatingInput({
   helperText,
   errorText,
   componentConfig,
+  onCommentFocus,
   onChange,
 }: RatingInputProps) {
   const t = useTheme();
@@ -198,6 +200,7 @@ export default function RatingInput({
           placeholderTextColor={t.colors.textMedium}
           accessibilityLabel="Comentarios, opcional"
           baseContainerStyle={s.commentTextArea}
+          onFocus={(event) => onCommentFocus?.(event.nativeEvent.target)}
         />
       </View>
     </View>

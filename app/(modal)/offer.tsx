@@ -1338,7 +1338,6 @@ export default function OfferScreen() {
         <ScrollView
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
             paddingTop: t.spacing.md,

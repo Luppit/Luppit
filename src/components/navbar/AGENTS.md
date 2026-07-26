@@ -16,6 +16,7 @@ Applies to navbar UI components and rendering behavior.
 - Applied filters should show a dismissible localized chip such as `Filtros (1)`.
 - Profile name row opens the shared profile-switcher popup. Active profile presses are ignored; non-active presses switch the root active-profile context without changing the auth session.
 - Switcher rows come from `get_current_user_profiles()` and are identified only by profile ID; never restore the removed saved-profile or OTP handoff state.
+- The DB item with code `SHARED_PROFILE` may render the active profile's unread-notification dot from `ActiveProfileContext`; keep its label and icon DB-driven and expose the count through the tab accessibility label.
 
 ## Visual Rules
 - Top-navbar chrome must use shared glass (`GlassSurface` + `t.glass.chrome/control/chip`) and attach through the safe area with only bottom corners rounded.

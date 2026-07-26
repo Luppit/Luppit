@@ -1,3 +1,9 @@
+import {
+  COL_LEGAL_DOCUMENT,
+  COL_LEGAL_DOCUMENT_SECTION,
+  TB_LEGAL_DOCUMENT,
+  TB_LEGAL_DOCUMENT_SECTION,
+} from "../db/tables";
 import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
@@ -34,10 +40,10 @@ export async function getActiveLegalDocument(
   { ok: true; data: LegalDocument | null } | { ok: false; error: AppError }
 > {
   const documentResult = await supabase
-    .from("legal_document")
+    .from(TB_LEGAL_DOCUMENT)
     .select("code,title,version_label,effective_date,is_active,created_at,updated_at")
-    .eq("code", code)
-    .eq("is_active", true)
+    .eq(COL_LEGAL_DOCUMENT.code, code)
+    .eq(COL_LEGAL_DOCUMENT.is_active, true)
     .maybeSingle();
 
   if (documentResult.error) {
@@ -49,12 +55,12 @@ export async function getActiveLegalDocument(
   }
 
   const sectionResult = await supabase
-    .from("legal_document_section")
+    .from(TB_LEGAL_DOCUMENT_SECTION)
     .select("id,document_code,heading,body,sort_order,is_active,created_at,updated_at")
-    .eq("document_code", code)
-    .eq("is_active", true)
-    .order("sort_order", { ascending: true })
-    .order("created_at", { ascending: true });
+    .eq(COL_LEGAL_DOCUMENT_SECTION.document_code, code)
+    .eq(COL_LEGAL_DOCUMENT_SECTION.is_active, true)
+    .order(COL_LEGAL_DOCUMENT_SECTION.sort_order, { ascending: true })
+    .order(COL_LEGAL_DOCUMENT_SECTION.created_at, { ascending: true });
 
   if (sectionResult.error) {
     return { ok: false, error: fromSupabaseError(sectionResult.error) };

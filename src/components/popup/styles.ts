@@ -12,12 +12,15 @@ export type GlobalPopupStyles = {
   backdrop: ViewStyle;
   bottomSheetFrame: ViewStyle;
   bottomSheet: ViewStyle;
+  bottomSheetKeyboardVisible: ViewStyle;
+  bottomSheetFill: ViewStyle;
   bottomSheetSurface: ViewStyle;
   bottomSheetContent: ViewStyle;
   successSheetFrame: ViewStyle;
   successSheet: ViewStyle;
   successSheetContent: ViewStyle;
   sheetContentScroll: ViewStyle;
+  sheetContentScrollKeyboardVisible: ViewStyle;
   sheetContentScrollContent: ViewStyle;
   indicatorTouchArea: ViewStyle;
   indicator: ViewStyle;
@@ -50,7 +53,9 @@ export type GlobalPopupStyles = {
   summaryHeaderBlock: ViewStyle;
   summaryHeader: ViewStyle;
   summaryHeaderSeparator: ViewStyle;
+  summaryCloseButton: ViewStyle;
   summaryTitle: TextStyle;
+  summaryMetadata: TextStyle;
   summaryDescription: TextStyle;
   summaryDescriptionScroll: ViewStyle;
   summaryDescriptionScrollContent: ViewStyle;
@@ -145,13 +150,22 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       width: "100%",
       maxWidth: 560,
       alignSelf: "center",
+      flexShrink: 1,
+    },
+    bottomSheetKeyboardVisible: {
+      height: "100%",
+    },
+    bottomSheetFill: {
+      flex: 1,
     },
     bottomSheetSurface: {
       width: "100%",
+      flexShrink: 1,
     },
     bottomSheetContent: {
       overflow: "hidden",
       borderRadius: t.glass.radius.sheet,
+      flexShrink: 1,
     },
     successSheetFrame: {
       width: "100%",
@@ -167,6 +181,10 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     sheetContentScroll: {
       flexGrow: 0,
+      flexShrink: 1,
+    },
+    sheetContentScrollKeyboardVisible: {
+      flex: 1,
     },
     sheetContentScrollContent: {
       paddingBottom: t.spacing.xs,
@@ -194,7 +212,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       marginHorizontal: t.spacing.md,
       marginBottom: t.spacing.sm,
       overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
+      borderRadius: ROUNDED_SURFACE_RADIUS,
     },
     optionLabel: {
       flex: 1,
@@ -338,8 +356,20 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: SOFT_SEPARATOR_COLOR,
     },
+    summaryCloseButton: {
+      width: 44,
+      height: 44,
+      marginVertical: -4,
+      marginRight: -8,
+      borderRadius: 22,
+      alignItems: "center",
+      justifyContent: "center",
+    },
     summaryTitle: {
       flex: 1,
+    },
+    summaryMetadata: {
+      color: t.colors.textMedium,
     },
     summaryDescription: {
       color: t.colors.textDark,

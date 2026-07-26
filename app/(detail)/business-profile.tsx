@@ -4,11 +4,11 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { formatLocationLabel } from "@/src/services/location.service";
 import {
-  SellerBusinessCategoryPreference,
   SellerProfileOverview,
   getCurrentSellerProfileOverview,
 } from "@/src/services/profile.service";
@@ -24,6 +24,8 @@ import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 export default function BusinessProfileScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useActiveProfile();
+  const canManageBusiness = activeProfile?.membershipRole === "owner";
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = useMemo(
     () => createBusinessProfileStyles(t, topContentInset),
@@ -57,9 +59,6 @@ export default function BusinessProfileScreen() {
   const business = overview?.business ?? null;
   const selectedCategories = business?.categoryPreferences ?? [];
   const categoryLabel = getCategoryCountLabel(selectedCategories.length);
-  const categoryPreview = getCategoryPreviewLabel(
-    selectedCategories.map((preference) => preference.categoryName)
-  );
   const locationLabel = formatLocationLabel(business?.location);
   const ratingLabel =
     typeof business?.rating === "number" && business.numRatings > 0
@@ -67,6 +66,8 @@ export default function BusinessProfileScreen() {
       : "Sin calificaciones";
 
   const openCategoryEditor = () => {
+    if (!canManageBusiness) return;
+
     router.push({
       pathname: "/(detail)/business-categories",
       params: {
@@ -109,8 +110,8 @@ export default function BusinessProfileScreen() {
           <Text variant="title" maxLines={2}>
             {business.name || "Negocio sin nombre"}
           </Text>
-          <Text color="stateAnulated" maxLines={2}>
-            {categoryPreview || categoryLabel}
+          <Text color="textMedium" maxLines={2}>
+            {locationLabel}
           </Text>
         </View>
       </View>
@@ -125,23 +126,23 @@ export default function BusinessProfileScreen() {
         <GroupedListRow
           icon="map-pin"
           label="Ubicación"
-          value={locationLabel}
-          onPress={() =>
-            router.push({
-              pathname: "/(modal)/business-location-edit",
-              params: {
-                title: "Editar ubicación",
-                locationId: business.location?.id ?? "",
-                locationLabel,
-              },
-            })
-          }
-        />
-        <GroupedListRow
-          icon="info"
-          label="Fecha de creación"
-          value={formatDate(business.createdAt)}
+          description={locationLabel}
+          descriptionColor="textMedium"
+          descriptionMaxLines={3}
           showSeparator={false}
+          onPress={
+            canManageBusiness
+              ? () =>
+                  router.push({
+                    pathname: "/(modal)/business-location-edit",
+                    params: {
+                      title: "Editar ubicación",
+                      locationId: business.location?.id ?? "",
+                      locationLabel,
+                    },
+                  })
+              : undefined
+          }
         />
       </GroupedListSection>
 
@@ -154,60 +155,33 @@ export default function BusinessProfileScreen() {
         />
       </GroupedListSection>
 
-      <GroupedListSection title="Preferencias de oportunidades">
-        <GroupedListRow
-          icon="tag"
-          label="Categorías de venta"
-          description={
-            selectedCategories.length === 0
-              ? "Elige dónde quieres recibir oportunidades."
-              : categoryLabel
-          }
-          showSeparator={selectedCategories.length > 0}
-          onPress={openCategoryEditor}
-        />
-        {selectedCategories.length === 0 ? (
-          null
-        ) : (
-          <CategoryPreview preferences={selectedCategories} />
-        )}
-      </GroupedListSection>
+      {canManageBusiness ? (
+        <GroupedListSection title="Administración">
+          <GroupedListRow
+            icon="tag"
+            label="Categorías de venta"
+            description={
+              selectedCategories.length === 0
+                ? "Elige dónde recibir oportunidades."
+                : categoryLabel
+            }
+            onPress={openCategoryEditor}
+          />
+          <GroupedListRow
+            icon="user"
+            label="Equipo"
+            description="Consulta miembros e invitaciones pendientes."
+            showSeparator={false}
+            onPress={() =>
+              router.push({
+                pathname: "/(detail)/business-invitations",
+                params: { title: "Equipo", hideMenu: "true" },
+              })
+            }
+          />
+        </GroupedListSection>
+      ) : null}
     </ScrollView>
-  );
-}
-
-function CategoryPreview({
-  preferences,
-}: {
-  preferences: SellerBusinessCategoryPreference[];
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessProfileStyles(t), [t]);
-  const visiblePreferences = preferences.slice(0, 3);
-  const hiddenCount = preferences.length - visiblePreferences.length;
-
-  return (
-    <View style={s.previewRow}>
-      <Text variant="small" color="stateAnulated" style={s.previewTitle}>
-        Recibes oportunidades en
-      </Text>
-      <View style={s.previewChips}>
-        {visiblePreferences.map((preference) => (
-          <View key={preference.categoryId} style={s.previewChip}>
-            <Text variant="small" maxLines={1} style={s.previewChipLabel}>
-              {preference.categoryName}
-            </Text>
-          </View>
-        ))}
-        {hiddenCount > 0 ? (
-          <View style={s.previewChip}>
-            <Text variant="small" style={s.previewChipLabel}>
-              +{hiddenCount}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
   );
 }
 
@@ -215,25 +189,6 @@ function getCategoryCountLabel(count: number) {
   if (count === 0) return "Sin categorías configuradas";
   if (count === 1) return "1 categoría seleccionada";
   return `${count} categorías seleccionadas`;
-}
-
-function getCategoryPreviewLabel(names: string[]) {
-  if (names.length === 0) return "";
-
-  const previewNames = names.slice(0, 3);
-  const remainingCount = names.length - previewNames.length;
-  return `${previewNames.join(", ")}${remainingCount > 0 ? `, +${remainingCount}` : ""}`;
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Sin fecha";
-
-  return new Intl.DateTimeFormat("es-CR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  }).format(date);
 }
 
 function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
@@ -285,38 +240,6 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
     heroText: {
       flex: 1,
       gap: t.spacing.xs,
-    },
-    previewRow: {
-      minHeight: 72,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
-      justifyContent: "center",
-      gap: t.spacing.sm,
-    },
-    previewTitle: {
-      paddingLeft: t.spacing.xs,
-    },
-    previewChips: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: t.spacing.sm,
-    },
-    previewChip: {
-      maxWidth: "100%",
-      minHeight: 32,
-      borderRadius: 999,
-      backgroundColor: t.colors.background,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: "rgba(0,0,0,0.08)",
-      paddingHorizontal: t.spacing.sm,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: t.spacing.xs,
-    },
-    previewChipLabel: {
-      color: t.colors.textDark,
-      flexShrink: 1,
     },
   });
 }
