@@ -29,7 +29,7 @@ export type ConversationActionConfirmationField = {
 
 export type ConversationChoiceOption = {
   value: string;
-  method_kind: "shipping" | "pickup";
+  method_kind: "shipping" | "pickup" | null;
   label: string;
   fee_label: string | null;
   total_label: string | null;
@@ -240,7 +240,17 @@ function parseConversationActionConfirmationInput(
   const label = typeof value.label === "string" ? value.label : "";
   if (!id || !kind || !payloadKey || !label) return null;
 
-  const rawOptions = Array.isArray(value.options) ? value.options : [];
+  const componentConfig =
+    value.component_config &&
+    typeof value.component_config === "object" &&
+    !Array.isArray(value.component_config)
+      ? (value.component_config as Record<string, unknown>)
+      : null;
+  const rawOptions = Array.isArray(value.options)
+    ? value.options
+    : Array.isArray(componentConfig?.options)
+      ? componentConfig.options
+      : [];
   const options = rawOptions
     .map((option, index): ConversationChoiceOption | null => {
       if (!option || typeof option !== "object" || Array.isArray(option)) return null;
@@ -255,11 +265,7 @@ function parseConversationActionConfirmationInput(
       const optionLabel =
         typeof optionValue.label === "string" ? optionValue.label.trim() : "";
 
-      if (
-        !catalogId ||
-        (methodKind !== "shipping" && methodKind !== "pickup") ||
-        !optionLabel
-      ) {
+      if (!catalogId || !optionLabel) {
         return null;
       }
 
@@ -283,7 +289,10 @@ function parseConversationActionConfirmationInput(
 
       return {
         value: catalogId,
-        method_kind: methodKind,
+        method_kind:
+          methodKind === "shipping" || methodKind === "pickup"
+            ? methodKind
+            : null,
         label: optionLabel,
         fee_label: optionalText(
           optionValue.fee_label,
@@ -318,10 +327,7 @@ function parseConversationActionConfirmationInput(
     otp_length: typeof value.otp_length === "number" ? value.otp_length : 4,
     is_required: typeof value.is_required === "boolean" ? value.is_required : true,
     sort_order: typeof value.sort_order === "number" ? value.sort_order : 0,
-    component_config:
-      value.component_config && typeof value.component_config === "object"
-        ? (value.component_config as Record<string, unknown>)
-        : null,
+    component_config: componentConfig,
     options,
   };
 }

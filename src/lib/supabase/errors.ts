@@ -166,6 +166,36 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "validation",
     message: "La conversación cambió de estado. Actualízala e intenta nuevamente.",
   },
+  content_not_allowed: {
+    type: "validation",
+    message:
+      "No pudimos enviar este contenido porque podría incumplir las normas de seguridad.",
+  },
+  moderation_unavailable: {
+    type: "network",
+    message:
+      "No pudimos revisar el contenido en este momento. Inténtalo nuevamente.",
+  },
+  image_processing_failed: {
+    type: "network",
+    message: "No pudimos procesar la imagen. Inténtalo nuevamente.",
+  },
+  conversation_interaction_blocked: {
+    type: "auth",
+    message: "La comunicación con este contacto está restringida.",
+  },
+  safety_contact_blocked: {
+    type: "auth",
+    message: "No puedes iniciar contacto con esta persona o negocio.",
+  },
+  legal_acceptance_required: {
+    type: "auth",
+    message: "Acepta los documentos legales vigentes para continuar.",
+  },
+  safety_block_not_found: {
+    type: "not_found",
+    message: "Este bloqueo ya no está activo.",
+  },
   profile_not_allowed: {
     type: "auth",
     message: "No tienes permiso para ejecutar esta acción.",

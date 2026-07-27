@@ -60,7 +60,7 @@ export type PopupSummaryAction = {
 
 export type PopupSummaryChoiceOption = {
   value: string;
-  methodKind: "shipping" | "pickup";
+  methodKind?: "shipping" | "pickup" | null;
   label: string;
   feeLabel?: string | null;
   totalLabel?: string | null;

@@ -61,6 +61,10 @@ export type GlobalPopupStyles = {
   summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
   summaryInputsList: ViewStyle;
+  summaryTextArea: ViewStyle;
+  summaryTextAreaInput: ViewStyle;
+  summaryTextAreaText: TextStyle;
+  summaryTextAreaHelper: TextStyle;
   choiceInput: ViewStyle;
   choiceInputLabel: TextStyle;
   choiceHelperText: TextStyle;
@@ -387,6 +391,21 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryInputsList: {
       gap: t.spacing.md,
+    },
+    summaryTextArea: {
+      gap: t.spacing.xs,
+    },
+    summaryTextAreaInput: {
+      minHeight: 120,
+      alignItems: "flex-start",
+      paddingVertical: t.spacing.sm,
+    },
+    summaryTextAreaText: {
+      minHeight: 96,
+      textAlignVertical: "top",
+    },
+    summaryTextAreaHelper: {
+      color: t.colors.textMedium,
     },
     choiceInput: {
       gap: t.spacing.xs,

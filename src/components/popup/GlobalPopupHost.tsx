@@ -187,6 +187,9 @@ export default function GlobalPopupHost() {
   const [summaryChoiceValues, setSummaryChoiceValues] = useState<
     Record<string, string>
   >({});
+  const [summaryTextValues, setSummaryTextValues] = useState<
+    Record<string, string>
+  >({});
   const [isSuccessActionPending, setSuccessActionPending] = useState(false);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -292,6 +295,7 @@ export default function GlobalPopupHost() {
             setSummaryInputErrors({});
             setSummaryInputResetKeys({});
             setSummaryChoiceValues({});
+            setSummaryTextValues({});
             setSuccessActionPending(false);
           }
         });
@@ -379,6 +383,7 @@ export default function GlobalPopupHost() {
       setSummaryInputErrors({});
       setSummaryInputResetKeys({});
       setSummaryChoiceValues({});
+      setSummaryTextValues({});
       setSuccessActionPending(false);
       setMounted(true);
       opacity.setValue(0);
@@ -1506,6 +1511,63 @@ export default function GlobalPopupHost() {
                                       style={s.choiceInputError}
                                     >
                                       {summaryInputErrors[input.id]}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                              );
+                            }
+
+                            if (input.kind === "textarea") {
+                              const configuredMaxLength =
+                                typeof input.component_config?.max_length === "number"
+                                  ? Math.max(
+                                      1,
+                                      Math.trunc(input.component_config.max_length)
+                                    )
+                                  : 1000;
+                              const placeholder =
+                                typeof input.component_config?.placeholder === "string"
+                                  ? input.component_config.placeholder
+                                  : undefined;
+
+                              return (
+                                <View key={input.id} style={s.summaryTextArea}>
+                                  <TextField
+                                    label={input.label}
+                                    value={summaryTextValues[input.id] ?? ""}
+                                    placeholder={placeholder}
+                                    multiline
+                                    maxLength={configuredMaxLength}
+                                    editable={pendingSummaryActionId == null}
+                                    hasError={Boolean(summaryInputErrors[input.id])}
+                                    error={summaryInputErrors[input.id]}
+                                    baseContainerStyle={{ marginBottom: 0 }}
+                                    inputContainerStyle={s.summaryTextAreaInput}
+                                    inputStyle={s.summaryTextAreaText}
+                                    textAlignVertical="top"
+                                    onFocus={(event) =>
+                                      scrollSummaryInputIntoView(event.nativeEvent.target)
+                                    }
+                                    onChangeText={(value) => {
+                                      setSummaryTextValues((current) => ({
+                                        ...current,
+                                        [input.id]: value,
+                                      }));
+                                      setSummaryInputErrors((current) => {
+                                        if (!current[input.id]) return current;
+                                        const next = { ...current };
+                                        delete next[input.id];
+                                        return next;
+                                      });
+                                      input.onValueChange?.(value);
+                                    }}
+                                  />
+                                  {input.helper_text ? (
+                                    <Text
+                                      variant="small"
+                                      style={s.summaryTextAreaHelper}
+                                    >
+                                      {input.helper_text}
                                     </Text>
                                   ) : null}
                                 </View>

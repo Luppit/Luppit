@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUpDown,
   Bell,
+  Ban,
   BookOpen,
   Check,
   CheckCheck,
@@ -36,6 +37,7 @@ import {
   Plus,
   Search,
   Send,
+  ShieldCheck,
   Share2,
   SlidersHorizontal,
   Smartphone,
@@ -52,6 +54,7 @@ import {
 } from "lucide-react-native";
 
 export const lucideIcons = {
+  ban: Ban,
   heart: Heart,
   check: Check,
   "chevron-down": ChevronDown,
@@ -102,6 +105,7 @@ export const lucideIcons = {
   "mail-warning": MailWarning,
   "map-pin": MapPin,
   "send": Send,
+  "shield-check": ShieldCheck,
 } as const;
 
 export type LucideIconName = keyof typeof lucideIcons;
