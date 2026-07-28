@@ -2793,7 +2793,9 @@ export type Database = {
           description: string | null
           id: string
           price: number | null
+          price_basis: string | null
           purchase_request_id: string | null
+          quantity_offered: number | null
         }
         Insert: {
           business_id?: string | null
@@ -2802,7 +2804,9 @@ export type Database = {
           description?: string | null
           id?: string
           price?: number | null
+          price_basis?: string | null
           purchase_request_id?: string | null
+          quantity_offered?: number | null
         }
         Update: {
           business_id?: string | null
@@ -2811,7 +2815,9 @@ export type Database = {
           description?: string | null
           id?: string
           price?: number | null
+          price_basis?: string | null
           purchase_request_id?: string | null
+          quantity_offered?: number | null
         }
         Relationships: [
           {
@@ -3908,6 +3914,25 @@ export type Database = {
         }
         Returns: Json
       }
+      create_seller_offer_priced_fulfillment_from_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_price_basis?: string
+          p_profile_id: string
+          p_quantity_offered?: number
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
       decline_current_user_business_invitation: {
         Args: { p_invitation_id: string }
         Returns: boolean
@@ -4210,6 +4235,10 @@ export type Database = {
         Returns: Json
       }
       get_conversation_view_base_before_fulfillment_timeline: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_view_before_report_inputs_20260727: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
