@@ -3852,6 +3852,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      consume_otp_email_delivery_request: {
+        Args: { p_purpose: string; p_request_id: string }
+        Returns: Json
+      }
       create_current_user_profile: {
         Args: {
           p_business_id_document?: string
