@@ -42,3 +42,7 @@ app-example
 /ios
 /android
 .idea
+.env.local
+
+# separate Edge Functions repository
+/ai-edge-functions/
