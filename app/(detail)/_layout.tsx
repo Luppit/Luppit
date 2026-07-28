@@ -11,6 +11,7 @@ export const unstable_settings = {
 
 const DEFAULT_DETAIL_TITLES: Record<string, string> = {
   "/account-settings": "Configuración",
+  "/blocked-accounts": "Cuentas bloqueadas",
   "/business-categories": "Categorías de venta",
   "/business-invitation-new": "Nueva invitación",
   "/business-invitations": "Equipo",

@@ -197,6 +197,14 @@ function createOptimisticMessageId(index: number) {
   return `optimistic-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
 }
 
+function createClientRequestId() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = token === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 function interpolateTemplate(
   template: string,
   context: Record<string, unknown>
@@ -698,8 +706,11 @@ export default function ConversationLayout() {
         return;
       }
 
+      const clientRequestId =
+        action.code === "REPORT_CONVERSATION" ? createClientRequestId() : null;
       const inputValues: Record<string, unknown> = {
         ...confirmation.payload_defaults,
+        ...(clientRequestId ? { client_request_id: clientRequestId } : null),
       };
       const description = interpolateTemplate(
         confirmation.description_template,
@@ -742,6 +753,12 @@ export default function ConversationLayout() {
       const ratingInputTitle =
         confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
+      const hasUnavailableRequiredChoice = confirmation.inputs.some(
+        (input) =>
+          input.kind === "choice" &&
+          input.is_required &&
+          input.options.length === 0
+      );
 
       openPopup({
         type: "summary",
@@ -786,7 +803,8 @@ export default function ConversationLayout() {
               : confirmStyle.isDanger
                 ? "error"
                 : "textDark",
-            disabled: confirmation.blocker != null,
+            disabled:
+              confirmation.blocker != null || hasUnavailableRequiredChoice,
             onPress: () => {
               const invalidInput = confirmation.inputs.find((input) => {
                 const raw = inputValues[input.payload_key];
@@ -816,10 +834,22 @@ export default function ConversationLayout() {
 
                 const value = typeof raw === "string" ? raw.trim() : "";
                 if (input.is_required && !value) return true;
+                if (
+                  input.kind === "textarea" &&
+                  typeof input.component_config?.max_length === "number" &&
+                  value.length > input.component_config.max_length
+                ) {
+                  return true;
+                }
                 return false;
               });
 
               if (invalidInput) {
+                const invalidRawValue = inputValues[invalidInput.payload_key];
+                const invalidTextLength =
+                  typeof invalidRawValue === "string"
+                    ? invalidRawValue.trim().length
+                    : 0;
                 const message =
                   invalidInput.kind === "otp"
                     ? `Ingresa un código de ${invalidInput.otp_length} dígitos.`
@@ -827,13 +857,20 @@ export default function ConversationLayout() {
                       ? "Selecciona una calificación en estrellas."
                     : invalidInput.kind === "choice"
                       ? invalidInput.options.length === 0
-                        ? "Los métodos disponibles no se pudieron cargar. Actualiza la conversación."
-                        : "Selecciona un método de entrega."
+                        ? "Las opciones no se pudieron cargar. Actualiza la conversación."
+                        : "Selecciona una opción."
+                      : invalidInput.kind === "textarea" &&
+                          typeof invalidInput.component_config?.max_length ===
+                            "number" &&
+                          invalidTextLength >
+                            invalidInput.component_config.max_length
+                        ? `Usa ${invalidInput.component_config.max_length} caracteres o menos.`
                       : `${invalidInput.label} es obligatorio.`;
                 if (
                   invalidInput.kind === "otp" ||
                   invalidInput.kind === "rating" ||
-                  invalidInput.kind === "choice"
+                  invalidInput.kind === "choice" ||
+                  invalidInput.kind === "textarea"
                 ) {
                   return {
                     shouldClose: false,
@@ -879,7 +916,12 @@ export default function ConversationLayout() {
                   }
                   return acc;
                 },
-                { ...confirmation.payload_defaults }
+                {
+                  ...confirmation.payload_defaults,
+                  ...(clientRequestId
+                    ? { client_request_id: clientRequestId }
+                    : null),
+                }
               );
               const actionPayload = Object.keys(payload).length > 0 ? payload : null;
 

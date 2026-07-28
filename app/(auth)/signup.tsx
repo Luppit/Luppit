@@ -1,4 +1,5 @@
 import { defaultCountryCode } from "@/src/components/inputPhone/InputPhone";
+import { Icon } from "@/src/components/Icon";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
@@ -8,11 +9,11 @@ import {
   verifyPhoneOtp,
 } from "@/src/lib/supabase/auth";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
-import { spacing } from "@/src/themes/spacing";
+import { borders, colors, spacing } from "@/src/themes";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import CreateSellerAdminFormTab from "./signup/CreateSellerAdminFormTab";
 import CreateSellerBusinessFormTab from "./signup/CreateSellerBusinessFormTab";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
@@ -45,6 +46,7 @@ function SignupEntryStep({
   setBuyerValues,
   sellerBusinessValues,
   setSellerBusinessValues,
+  legalAccepted,
 }: {
   next: () => void;
   userType: UserType;
@@ -53,8 +55,16 @@ function SignupEntryStep({
   setBuyerValues: (values: BuyerFormValues) => void;
   sellerBusinessValues: SellerBusinessValues;
   setSellerBusinessValues: (values: SellerBusinessValues) => void;
+  legalAccepted: boolean;
 }) {
   const createBuyer = async () => {
+    if (!legalAccepted) {
+      showError(
+        "Aceptación requerida",
+        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
+      );
+      return;
+    }
     try {
       await signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber);
       next();
@@ -64,6 +74,13 @@ function SignupEntryStep({
   };
 
   const goToSellerAdminStep = async () => {
+    if (!legalAccepted) {
+      showError(
+        "Aceptación requerida",
+        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
+      );
+      return;
+    }
     next();
   };
 
@@ -105,12 +122,21 @@ function SellerAdminStep({
   next,
   sellerAdminValues,
   setSellerAdminValues,
+  legalAccepted,
 }: {
   next: () => void;
   sellerAdminValues: SellerAdminValues;
   setSellerAdminValues: (values: SellerAdminValues) => void;
+  legalAccepted: boolean;
 }) {
   const createSellerAdmin = async () => {
+    if (!legalAccepted) {
+      showError(
+        "Aceptación requerida",
+        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
+      );
+      return;
+    }
     try {
       await signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber);
       next();
@@ -134,12 +160,14 @@ function VerifyStep({
   buyerValues,
   sellerBusinessValues,
   sellerAdminValues,
+  legalAccepted,
 }: {
   next: () => void;
   userType: UserType;
   buyerValues: BuyerFormValues;
   sellerBusinessValues: SellerBusinessValues;
   sellerAdminValues: SellerAdminValues;
+  legalAccepted: boolean;
 }) {
   const isSeller = userType === "seller";
 
@@ -161,6 +189,7 @@ function VerifyStep({
       businessIdDocument: isSeller
         ? sellerBusinessValues.businessIdDocument
         : null,
+      legalAccepted,
     };
 
     return await verifyPhoneOtp(
@@ -198,6 +227,7 @@ export default function Signup() {
   const stepperRef = useRef<StepperRef>(null);
 
   const [userType, setUserType] = useState<UserType>("buyer");
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const [buyerValues, setBuyerValues] = useState<BuyerFormValues>({
     fullName: "",
@@ -235,6 +265,7 @@ export default function Signup() {
               setBuyerValues={setBuyerValues}
               sellerBusinessValues={sellerBusinessValues}
               setSellerBusinessValues={setSellerBusinessValues}
+              legalAccepted={legalAccepted}
             />
           ),
         },
@@ -249,6 +280,7 @@ export default function Signup() {
               {...api}
               sellerAdminValues={sellerAdminValues}
               setSellerAdminValues={setSellerAdminValues}
+              legalAccepted={legalAccepted}
             />
           ),
         },
@@ -263,6 +295,7 @@ export default function Signup() {
               buyerValues={buyerValues}
               sellerBusinessValues={sellerBusinessValues}
               sellerAdminValues={sellerAdminValues}
+              legalAccepted={legalAccepted}
             />
           ),
         },
@@ -283,6 +316,7 @@ export default function Signup() {
             setBuyerValues={setBuyerValues}
             sellerBusinessValues={sellerBusinessValues}
             setSellerBusinessValues={setSellerBusinessValues}
+            legalAccepted={legalAccepted}
           />
         ),
       },
@@ -297,12 +331,14 @@ export default function Signup() {
             buyerValues={buyerValues}
             sellerBusinessValues={sellerBusinessValues}
             sellerAdminValues={sellerAdminValues}
+            legalAccepted={legalAccepted}
           />
         ),
       },
     ];
   }, [
     buyerValues,
+    legalAccepted,
     sellerAdminValues,
     sellerBusinessValues,
     userType,
@@ -317,27 +353,58 @@ export default function Signup() {
         onFinish={() => router.replace("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
-      <View style={styles.footer} pointerEvents="box-none">
-        <Text variant="small" align="center">
-          Al ingresar tu número, aceptas automáticamente los
-        </Text>
-        <Link
-          href={{
-            pathname: "/(detail)/legal-document",
-            params: {
-              code: LEGAL_DOCUMENT_CODES.termsConditions,
-              title: "Términos y condiciones",
-              hideMenu: "true",
-            },
-          }}
+      <View style={styles.footer}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: legalAccepted }}
+          style={styles.acceptanceRow}
+          onPress={() => setLegalAccepted((value) => !value)}
         >
-          <Text
-            variant="small"
-            style={{ textDecorationLine: "underline" }}
+          <View
+            style={[
+              styles.checkbox,
+              legalAccepted ? styles.checkboxSelected : null,
+            ]}
           >
-            Términos y condiciones
+            {legalAccepted ? (
+              <Icon name="check" size={15} color={colors.backgroudWhite} />
+            ) : null}
+          </View>
+          <Text variant="small" style={styles.acceptanceLabel}>
+            He leído y acepto los documentos legales.
           </Text>
-        </Link>
+        </Pressable>
+        <View style={styles.legalLinks}>
+          <Link
+            href={{
+              pathname: "/(detail)/legal-document",
+              params: {
+                code: LEGAL_DOCUMENT_CODES.termsConditions,
+                title: "Términos y condiciones",
+                hideMenu: "true",
+              },
+            }}
+          >
+            <Text variant="small" style={styles.legalLink}>
+              Términos y condiciones
+            </Text>
+          </Link>
+          <Text variant="small">y</Text>
+          <Link
+            href={{
+              pathname: "/(detail)/legal-document",
+              params: {
+                code: LEGAL_DOCUMENT_CODES.privacyPolicy,
+                title: "Política de privacidad",
+                hideMenu: "true",
+              },
+            }}
+          >
+            <Text variant="small" style={styles.legalLink}>
+              Política de privacidad
+            </Text>
+          </Link>
+        </View>
       </View>
     </View>
   );
@@ -355,5 +422,37 @@ const styles = StyleSheet.create({
     right: 0,
     padding: spacing.md,
     alignItems: "center",
+    gap: spacing.xs,
+  },
+  acceptanceRow: {
+    minHeight: 32,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borders.sm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  acceptanceLabel: {
+    color: colors.textDark,
+  },
+  legalLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  legalLink: {
+    textDecorationLine: "underline",
   },
 });

@@ -61,12 +61,27 @@ export type GlobalPopupStyles = {
   summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
   summaryInputsList: ViewStyle;
+  summaryInputLabel: TextStyle;
+  summaryTextArea: ViewStyle;
+  summaryTextAreaInput: ViewStyle;
+  summaryTextAreaText: TextStyle;
+  summaryTextAreaHelper: TextStyle;
   choiceInput: ViewStyle;
   choiceInputLabel: TextStyle;
   choiceHelperText: TextStyle;
   choiceOptionsList: ViewStyle;
+  choiceOptionsListCompact: ViewStyle;
   choiceOption: ViewStyle;
   choiceOptionSelected: ViewStyle;
+  choiceOptionCompact: ViewStyle;
+  choiceOptionCompactSelected: ViewStyle;
+  choiceOptionCompactWithSeparator: ViewStyle;
+  choiceSelectTrigger: ViewStyle;
+  choiceSelectTriggerError: ViewStyle;
+  choiceSelectValue: TextStyle;
+  choiceSelectPlaceholder: TextStyle;
+  choicePickerHeader: ViewStyle;
+  choicePickerBackButton: ViewStyle;
   choiceOptionDisabled: ViewStyle;
   choiceOptionContent: ViewStyle;
   choiceOptionHeader: ViewStyle;
@@ -388,6 +403,25 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     summaryInputsList: {
       gap: t.spacing.md,
     },
+    summaryInputLabel: {
+      color: t.colors.textMedium,
+      paddingLeft: t.spacing.sm,
+    },
+    summaryTextArea: {
+      gap: t.spacing.xs,
+    },
+    summaryTextAreaInput: {
+      minHeight: 96,
+      alignItems: "flex-start",
+      paddingVertical: t.spacing.sm,
+    },
+    summaryTextAreaText: {
+      minHeight: 72,
+      textAlignVertical: "top",
+    },
+    summaryTextAreaHelper: {
+      color: t.colors.textMedium,
+    },
     choiceInput: {
       gap: t.spacing.xs,
     },
@@ -400,6 +434,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     choiceOptionsList: {
       gap: t.spacing.sm,
       marginTop: t.spacing.xs,
+    },
+    choiceOptionsListCompact: {
+      marginTop: t.spacing.xs,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: SOFT_BORDER_COLOR,
+      ...createRoundedSurfaceStyle(t),
     },
     choiceOption: {
       minHeight: 72,
@@ -415,6 +456,55 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     choiceOptionSelected: {
       borderColor: t.colors.primary,
       backgroundColor: t.colors.primaryLight,
+    },
+    choiceOptionCompact: {
+      minHeight: 52,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.sm,
+    },
+    choiceOptionCompactSelected: {
+      backgroundColor: t.colors.primaryLight,
+    },
+    choiceOptionCompactWithSeparator: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: SOFT_SEPARATOR_COLOR,
+    },
+    choiceSelectTrigger: {
+      minHeight: 54,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
+      ...createRoundedSurfaceStyle(t),
+    },
+    choiceSelectTriggerError: {
+      borderWidth: 1,
+      borderColor: t.colors.error,
+    },
+    choiceSelectValue: {
+      flex: 1,
+      minWidth: 0,
+      color: t.colors.textDark,
+    },
+    choiceSelectPlaceholder: {
+      color: t.colors.stateAnulated,
+    },
+    choicePickerHeader: {
+      minHeight: 44,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
+    },
+    choicePickerBackButton: {
+      width: 44,
+      height: 44,
+      marginLeft: -t.spacing.sm,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 22,
     },
     choiceOptionDisabled: {
       opacity: 0.66,

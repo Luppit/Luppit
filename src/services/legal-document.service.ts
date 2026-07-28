@@ -4,9 +4,11 @@ import {
   TB_LEGAL_DOCUMENT,
   TB_LEGAL_DOCUMENT_SECTION,
 } from "../db/tables";
+import { RPC_FUNCTIONS } from "../db/functions";
 import { Row } from "../db/types";
+import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
-import { AppError, fromSupabaseError } from "../lib/supabase/errors";
+import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 
 export const LEGAL_DOCUMENT_CODES = {
   privacyPolicy: "privacy_policy",
@@ -33,6 +35,100 @@ export type LegalDocument = {
   effectiveDate: string | null;
   sections: LegalDocumentSection[];
 };
+
+export type LegalAcceptanceDocument = {
+  code: string;
+  title: string;
+  versionLabel: string;
+  effectiveDate: string | null;
+  accepted: boolean;
+};
+
+export type LegalAcceptanceState = {
+  accepted: boolean;
+  documents: LegalAcceptanceDocument[];
+};
+
+function parseLegalAcceptanceState(raw: unknown): LegalAcceptanceState {
+  const value =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const documents = Array.isArray(value.documents)
+    ? value.documents
+        .map((document): LegalAcceptanceDocument | null => {
+          if (!document || typeof document !== "object" || Array.isArray(document)) {
+            return null;
+          }
+          const item = document as Record<string, unknown>;
+          if (
+            typeof item.code !== "string" ||
+            typeof item.title !== "string" ||
+            typeof item.version_label !== "string"
+          ) {
+            return null;
+          }
+          return {
+            code: item.code,
+            title: item.title,
+            versionLabel: item.version_label,
+            effectiveDate:
+              typeof item.effective_date === "string"
+                ? item.effective_date
+                : null,
+            accepted: item.accepted === true,
+          };
+        })
+        .filter((document): document is LegalAcceptanceDocument =>
+          Boolean(document)
+        )
+    : [];
+
+  return {
+    accepted: value.accepted === true,
+    documents,
+  };
+}
+
+export async function getCurrentLegalAcceptanceState(): Promise<
+  { ok: true; data: LegalAcceptanceState } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_LEGAL_ACCEPTANCE_STATE
+  );
+  if (result.error) {
+    return { ok: false, error: fromSupabaseError(result.error) };
+  }
+
+  return { ok: true, data: parseLegalAcceptanceState(result.data) };
+}
+
+export async function acceptCurrentLegalDocuments(): Promise<
+  { ok: true } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.ACCEPT_CURRENT_LEGAL_DOCUMENTS,
+    { p_source: "APP" }
+  );
+  if (result.error) {
+    return { ok: false, error: fromSupabaseError(result.error) };
+  }
+
+  const value =
+    result.data && typeof result.data === "object"
+      ? (result.data as Record<string, unknown>)
+      : null;
+  if (value?.accepted !== true) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+  return { ok: true };
+}
 
 export async function getActiveLegalDocument(
   code: string

@@ -29,6 +29,34 @@ type SendConversationMessageInput = {
   images?: ConversationMessageImage[];
 };
 
+const MAX_CONVERSATION_IMAGE_BYTES = 4_000_000;
+const ALLOWED_CONVERSATION_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+const ALLOWED_CONVERSATION_IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+]);
+const CONVERSATION_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+function createUuid() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = token === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
+
 function getFileExtension(file: ConversationMessageImage, fallback = "jpg") {
   const fromName = file.name?.split(".").pop()?.toLowerCase();
   if (fromName) return fromName;
@@ -44,19 +72,46 @@ function getFileExtension(file: ConversationMessageImage, fallback = "jpg") {
 
 async function uploadConversationImage(
   conversationId: string,
+  profileId: string,
   file: ConversationMessageImage,
-  index: number
 ): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
   const extension = getFileExtension(file);
-  const filePath = `${conversationId}/${Date.now()}_${index}.${extension}`;
+  const mime = file.mime?.toLowerCase() ?? null;
+  if (
+    !ALLOWED_CONVERSATION_IMAGE_EXTENSIONS.has(extension) ||
+    (mime && !ALLOWED_CONVERSATION_IMAGE_MIME_TYPES.has(mime)) ||
+    (typeof file.size === "number" && file.size > MAX_CONVERSATION_IMAGE_BYTES)
+  ) {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "invalid_conversation_image",
+        message: "Usa una imagen JPG, PNG o WebP de hasta 4 MB.",
+      },
+    };
+  }
 
   const response = await fetch(file.uri);
   const body = await response.arrayBuffer();
+  if (body.byteLength > MAX_CONVERSATION_IMAGE_BYTES) {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "conversation_image_too_large",
+        message: "La imagen debe pesar 4 MB o menos.",
+      },
+    };
+  }
+
+  const filePath =
+    `pending/${profileId}/${conversationId}/${createUuid()}.${extension}`;
 
   const { error } = await supabase.storage
     .from(STORAGE_BUCKETS.conversations)
     .upload(filePath, body, {
-      contentType: file.mime ?? undefined,
+      contentType: mime ?? CONVERSATION_IMAGE_MIME_BY_EXTENSION[extension],
       upsert: false,
     });
 
@@ -143,42 +198,86 @@ export async function createConversationTextMessage(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  return sendConversationMessage(conversationId, profile.data.id, {
+  return sendModeratedConversationMessage(conversationId, profile.data.id, {
     text: text.trim(),
-    kind: "TEXT",
-    imagePath: null,
+    pendingImagePath: null,
   });
 }
 
-async function sendConversationMessage(
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function hasJsonResponse(
+  value: unknown
+): value is { json: () => Promise<unknown>; clone?: () => unknown } {
+  return Boolean(value) && typeof (value as { json?: unknown }).json === "function";
+}
+
+async function mapModeratedMessageFunctionError(error: unknown): Promise<AppError> {
+  const context = toRecord(error)?.context;
+  let payload: Record<string, unknown> | null = null;
+
+  if (hasJsonResponse(context)) {
+    try {
+      const response = typeof context.clone === "function" ? context.clone() : context;
+      payload = toRecord(await (hasJsonResponse(response) ? response : context).json());
+    } catch {
+      payload = null;
+    }
+  }
+
+  const errorCode =
+    typeof payload?.error_code === "string" ? payload.error_code.trim() : "";
+  return errorCode
+    ? fromSupabaseError({
+        error_code: errorCode,
+        code: errorCode,
+        message: errorCode,
+      })
+    : fromSupabaseError(error);
+}
+
+async function sendModeratedConversationMessage(
   conversationId: string,
   profileId: string,
   message: {
     text: string | null;
-    kind: "TEXT" | "IMAGE";
-    imagePath: string | null;
+    pendingImagePath: string | null;
   }
 ): Promise<{ ok: true; data: ConversationMessage } | { ok: false; error: AppError }> {
-  const rpcResult = await supabase.rpc(
-    RPC_FUNCTIONS.SEND_CONVERSATION_MESSAGE,
+  const functionResult = await supabase.functions.invoke(
+    "send-moderated-conversation-message",
     {
-      p_conversation_id: conversationId,
-      p_profile_id: profileId,
-      p_text: message.text,
-      p_message_kind: message.kind,
-      p_image_path: message.imagePath,
-    } as never
+      body: {
+        conversationId,
+        profileId,
+        text: message.text,
+        pendingImagePath: message.pendingImagePath,
+      },
+    }
   );
 
-  if (rpcResult.error) {
-    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  if (functionResult.error) {
+    if (message.pendingImagePath) {
+      await supabase.storage
+        .from(STORAGE_BUCKETS.conversations)
+        .remove([message.pendingImagePath]);
+    }
+    return {
+      ok: false,
+      error: await mapModeratedMessageFunctionError(functionResult.error),
+    };
   }
 
-  const rpcData = Array.isArray(rpcResult.data)
-    ? rpcResult.data[0]
-    : rpcResult.data;
-  if (!rpcData) return { ok: false, error: fromAppError("unknown") };
-  return { ok: true, data: rpcData as ConversationMessage };
+  const response = toRecord(functionResult.data);
+  const createdMessage = response?.message;
+  if (!createdMessage || typeof createdMessage !== "object") {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+  return { ok: true, data: createdMessage as ConversationMessage };
 }
 
 export async function createConversationMessages(
@@ -202,23 +301,27 @@ export async function createConversationMessages(
   const created: ConversationMessage[] = [];
 
   if (text) {
-    const textMessage = await sendConversationMessage(
+    const textMessage = await sendModeratedConversationMessage(
       conversationId,
       profile.data.id,
-      { text, kind: "TEXT", imagePath: null }
+      { text, pendingImagePath: null }
     );
     if (!textMessage.ok) return textMessage;
     created.push(textMessage.data);
   }
 
   for (let i = 0; i < images.length; i += 1) {
-    const uploaded = await uploadConversationImage(conversationId, images[i], i);
-    if (!uploaded.ok) return uploaded;
-
-    const imageMessage = await sendConversationMessage(
+    const uploaded = await uploadConversationImage(
       conversationId,
       profile.data.id,
-      { text: null, kind: "IMAGE", imagePath: uploaded.data }
+      images[i]
+    );
+    if (!uploaded.ok) return uploaded;
+
+    const imageMessage = await sendModeratedConversationMessage(
+      conversationId,
+      profile.data.id,
+      { text: null, pendingImagePath: uploaded.data }
     );
     if (!imageMessage.ok) return imageMessage;
     created.push(imageMessage.data);

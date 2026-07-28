@@ -58,25 +58,39 @@ export default function auth() {
 
         <View style={styles.footer}>
           <Text variant="small" align="center">
-            Al continuar, aceptas automáticamente los
+            Antes de crear tu cuenta, revisa nuestros documentos legales.
           </Text>
-          <Link
-            href={{
-              pathname: "/(detail)/legal-document",
-              params: {
-                code: LEGAL_DOCUMENT_CODES.termsConditions,
-                title: "Términos y condiciones",
-                hideMenu: "true",
-              },
-            }}
-          >
-            <Text
-              variant="small"
-              style={{ textDecorationLine: "underline" }}
+          <View style={styles.legalLinks}>
+            <Link
+              href={{
+                pathname: "/(detail)/legal-document",
+                params: {
+                  code: LEGAL_DOCUMENT_CODES.termsConditions,
+                  title: "Términos y condiciones",
+                  hideMenu: "true",
+                },
+              }}
             >
-              Términos y condiciones
-            </Text>
-          </Link>
+              <Text variant="small" style={styles.legalLink}>
+                Términos y condiciones
+              </Text>
+            </Link>
+            <Text variant="small">y</Text>
+            <Link
+              href={{
+                pathname: "/(detail)/legal-document",
+                params: {
+                  code: LEGAL_DOCUMENT_CODES.privacyPolicy,
+                  title: "Política de privacidad",
+                  hideMenu: "true",
+                },
+              }}
+            >
+              <Text variant="small" style={styles.legalLink}>
+                Política de privacidad
+              </Text>
+            </Link>
+          </View>
         </View>
       </View>
     </View>
@@ -104,6 +118,16 @@ const styles = StyleSheet.create({
   footer: {
     paddingTop: spacing.xl,
     alignItems: "center",
+    gap: spacing.xs,
+  },
+  legalLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  legalLink: {
+    textDecorationLine: "underline",
   },
   parentContainer: {
     width: "100%",

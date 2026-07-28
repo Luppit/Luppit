@@ -394,6 +394,70 @@ export type Database = {
           },
         ]
       }
+      content_moderation_event: {
+        Row: {
+          categories: Json
+          content_kind: string
+          content_sha256: string | null
+          conversation_id: string
+          created_at: string
+          id: string
+          model: string | null
+          outcome: string
+          provider: string
+          provider_request_id: string | null
+          sender_profile_id: string
+        }
+        Insert: {
+          categories?: Json
+          content_kind: string
+          content_sha256?: string | null
+          conversation_id: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          outcome: string
+          provider?: string
+          provider_request_id?: string | null
+          sender_profile_id: string
+        }
+        Update: {
+          categories?: Json
+          content_kind?: string
+          content_sha256?: string | null
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          model?: string | null
+          outcome?: string
+          provider?: string
+          provider_request_id?: string | null
+          sender_profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_moderation_event_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_moderation_event_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_moderation_event_sender_profile_id_fkey"
+            columns: ["sender_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation: {
         Row: {
           buyer_profile_id: string | null
@@ -1040,6 +1104,146 @@ export type Database = {
           {
             foreignKeyName: "conversation_rating_rater_profile_id_fkey"
             columns: ["rater_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_safety_report: {
+        Row: {
+          admin_notes: string | null
+          client_request_id: string
+          conversation_id: string
+          created_at: string
+          details: string | null
+          evidence_cutoff_at: string
+          id: string
+          priority: string
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          reason_code: string
+          reported_business_id: string | null
+          reported_profile_id: string
+          reporter_profile_id: string
+          reporter_role_code: string
+          resolution_code: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          client_request_id: string
+          conversation_id: string
+          created_at?: string
+          details?: string | null
+          evidence_cutoff_at?: string
+          id?: string
+          priority?: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          reason_code: string
+          reported_business_id?: string | null
+          reported_profile_id: string
+          reporter_profile_id: string
+          reporter_role_code: string
+          resolution_code?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          client_request_id?: string
+          conversation_id?: string
+          created_at?: string
+          details?: string | null
+          evidence_cutoff_at?: string
+          id?: string
+          priority?: string
+          purchase_offer_id?: string | null
+          purchase_request_id?: string | null
+          reason_code?: string
+          reported_business_id?: string | null
+          reported_profile_id?: string
+          reporter_profile_id?: string
+          reporter_role_code?: string
+          resolution_code?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_safety_report_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_purchase_request_id_fkey"
+            columns: ["purchase_request_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reason_code_fkey"
+            columns: ["reason_code"]
+            isOneToOne: false
+            referencedRelation: "safety_report_reason_catalog"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reported_business_id_fkey"
+            columns: ["reported_business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reported_business_id_fkey"
+            columns: ["reported_business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reported_profile_id_fkey"
+            columns: ["reported_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reported_profile_id_fkey"
+            columns: ["reported_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reporter_profile_id_fkey"
+            columns: ["reporter_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_safety_report_reporter_profile_id_fkey"
+            columns: ["reporter_profile_id"]
             isOneToOne: false
             referencedRelation: "profile_with_rating"
             referencedColumns: ["id"]
@@ -1774,6 +1978,41 @@ export type Database = {
           version_label?: string | null
         }
         Relationships: []
+      }
+      legal_document_acceptance: {
+        Row: {
+          accepted_at: string
+          document_code: string
+          id: string
+          source: string
+          user_id: string
+          version_label: string
+        }
+        Insert: {
+          accepted_at?: string
+          document_code: string
+          id?: string
+          source?: string
+          user_id: string
+          version_label: string
+        }
+        Update: {
+          accepted_at?: string
+          document_code?: string
+          id?: string
+          source?: string
+          user_id?: string
+          version_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_acceptance_document_code_fkey"
+            columns: ["document_code"]
+            isOneToOne: false
+            referencedRelation: "legal_document"
+            referencedColumns: ["code"]
+          },
+        ]
       }
       legal_document_section: {
         Row: {
@@ -3185,6 +3424,123 @@ export type Database = {
           },
         ]
       }
+      safety_block: {
+        Row: {
+          blocked_by_side: string
+          business_id: string
+          buyer_profile_id: string
+          created_at: string
+          created_by_profile_id: string
+          id: string
+          revoked_at: string | null
+          revoked_by_profile_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          blocked_by_side: string
+          business_id: string
+          buyer_profile_id: string
+          created_at?: string
+          created_by_profile_id: string
+          id?: string
+          revoked_at?: string | null
+          revoked_by_profile_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          blocked_by_side?: string
+          business_id?: string
+          buyer_profile_id?: string
+          created_at?: string
+          created_by_profile_id?: string
+          id?: string
+          revoked_at?: string | null
+          revoked_by_profile_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "safety_block_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "business_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_buyer_profile_id_fkey"
+            columns: ["buyer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_buyer_profile_id_fkey"
+            columns: ["buyer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_created_by_profile_id_fkey"
+            columns: ["created_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_revoked_by_profile_id_fkey"
+            columns: ["revoked_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "safety_block_revoked_by_profile_id_fkey"
+            columns: ["revoked_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      safety_report_reason_catalog: {
+        Row: {
+          code: string
+          created_at: string
+          is_active: boolean
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       segment: {
         Row: {
           created_at: string
@@ -3267,6 +3623,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_current_legal_documents: {
+        Args: { p_source?: string }
+        Returns: Json
+      }
       accept_current_user_business_invitation: {
         Args: { p_id_document: string; p_invitation_id: string; p_name: string }
         Returns: {
@@ -3292,8 +3652,21 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      add_seller_favorite_impl_20260727: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       add_seller_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
+      block_conversation_counterpart: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
         Returns: Json
       }
       build_purchase_request_first_message: {
@@ -3329,7 +3702,25 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_accept_offer_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       buyer_cancel_purchase: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_cancel_purchase_implementation_20260727: {
         Args: {
           p_action_code: string
           p_conversation_id: string
@@ -3356,6 +3747,15 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_confirm_received_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       buyer_reject_offer: {
         Args: {
           p_action_code?: string
@@ -3374,7 +3774,25 @@ export type Database = {
         }
         Returns: Json
       }
+      buyer_reject_offer_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       buyer_report_not_received: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      buyer_report_not_received_implementation_20260727: {
         Args: {
           p_action_code: string
           p_conversation_id: string
@@ -3473,9 +3891,35 @@ export type Database = {
         }
         Returns: Json
       }
+      create_seller_offer_impl_20260727: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_profile_id: string
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
       decline_current_user_business_invitation: {
         Args: { p_invitation_id: string }
         Returns: boolean
+      }
+      execute_conversation_action: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
       }
       finalize_canceled_purchase_request_deletion: {
         Args: {
@@ -3599,6 +4043,32 @@ export type Database = {
           business_num_ratings: number
           business_province: string
           business_rating: number
+          created_at: string
+          currency_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+        }[]
+      }
+      get_buyer_purchase_request_offers_before_safety: {
+        Args: {
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_num_ratings: number
+          business_province: string
+          business_rating: number
+          conversation_id: string
           created_at: string
           currency_id: string
           description: string
@@ -3743,6 +4213,10 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_conversation_view_before_safety_20260727: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_current_business_invitations: {
         Args: { p_owner_profile_id: string }
         Returns: {
@@ -3761,6 +4235,7 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      get_current_legal_acceptance_state: { Args: never; Returns: Json }
       get_current_profile_conversations: {
         Args: {
           p_category_ids?: string[]
@@ -3779,6 +4254,10 @@ export type Database = {
           p_search_text?: string
           p_start_date?: string
         }
+        Returns: Json
+      }
+      get_current_safety_blocks: {
+        Args: { p_profile_id: string }
         Returns: Json
       }
       get_current_seller_purchase_offers: {
@@ -3898,6 +4377,25 @@ export type Database = {
           sort_order: number
         }[]
       }
+      get_or_create_seller_conversation_impl_20260727: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_or_create_seller_purchase_request_conversation: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: {
@@ -4016,6 +4514,40 @@ export type Database = {
         }
         Returns: Json
       }
+      insert_moderated_conversation_message: {
+        Args: {
+          p_categories?: Json
+          p_content_sha256?: string
+          p_conversation_id: string
+          p_image_path: string
+          p_message_kind: string
+          p_model: string
+          p_profile_id: string
+          p_provider_request_id?: string
+          p_text: string
+          p_user_id: string
+        }
+        Returns: {
+          buyer_open_state: string | null
+          buyer_opened_at: string | null
+          conversation_id: string | null
+          created_at: string
+          id: string
+          image_path: string | null
+          message_kind: string | null
+          seller_open_state: string | null
+          seller_opened_at: string | null
+          sender_profile_id: string | null
+          text: string | null
+          visible_to_role_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_message"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       invite_current_user_to_business: {
         Args: { p_owner_profile_id: string; p_phone: string }
         Returns: string
@@ -4058,6 +4590,20 @@ export type Database = {
         }
         Returns: string
       }
+      record_content_moderation_event: {
+        Args: {
+          p_categories?: Json
+          p_content_kind: string
+          p_content_sha256?: string
+          p_conversation_id: string
+          p_model: string
+          p_outcome: string
+          p_profile_id: string
+          p_provider_request_id?: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       refresh_business_rating_summary: {
         Args: { p_business_id: string }
         Returns: undefined
@@ -4085,6 +4631,15 @@ export type Database = {
       }
       request_current_profile_deletion: {
         Args: { p_profile_id: string }
+        Returns: Json
+      }
+      request_pickup_code_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
         Returns: Json
       }
       request_pickup_transaction_code: {
@@ -4126,6 +4681,24 @@ export type Database = {
         }
         Returns: Json
       }
+      seller_cancel_offer_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_concretar_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       seller_concretar_request: {
         Args: {
           p_action_code?: string
@@ -4144,6 +4717,15 @@ export type Database = {
         }
         Returns: Json
       }
+      seller_discard_implementation_20260727: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       seller_discard_request_conversation: {
         Args: {
           p_action_code?: string
@@ -4154,6 +4736,15 @@ export type Database = {
         Returns: Json
       }
       seller_discard_request_conversation_base_20260716: {
+        Args: {
+          p_action_code?: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_finalize_implementation_20260727: {
         Args: {
           p_action_code?: string
           p_conversation_id: string
@@ -4258,9 +4849,58 @@ export type Database = {
         }
         Returns: Json
       }
+      submit_conversation_report: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      submit_rating_implementation_20260727: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       text2ltree: { Args: { "": string }; Returns: unknown }
       unaccent: { Args: { "": string }; Returns: string }
+      unblock_conversation_counterpart: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      unblock_safety_block: {
+        Args: { p_block_id: string; p_profile_id: string }
+        Returns: Json
+      }
       update_seller_offer_fulfillment_from_conversation: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_keep_offer_image_ids?: string[]
+          p_new_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_profile_id: string
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
+      update_seller_offer_impl_20260727: {
         Args: {
           p_conversation_id: string
           p_conversation_image_paths?: string[]

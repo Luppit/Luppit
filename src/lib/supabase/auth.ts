@@ -19,6 +19,7 @@ export type InitialProfileInput = {
   role: "buyer" | "seller";
   businessName?: string | null;
   businessIdDocument?: string | null;
+  legalAccepted?: boolean;
 };
 
 export class InitialProfileSetupError extends Error {}
@@ -68,8 +69,22 @@ async function VerifyPhoneOtpInternal(
       await requestActiveProfileRefresh();
       return data;
     }
+    if (!initialProfile.legalAccepted) {
+      throw new InitialProfileSetupError(
+        "Debes aceptar los documentos legales para crear tu cuenta."
+      );
+    }
     const verifiedUserId = data.user?.id ?? data.session?.user.id;
     if (!verifiedUserId) throw new Error(fromAppError("auth").message);
+    const legalAcceptanceResult = await supabase.rpc(
+      RPC_FUNCTIONS.ACCEPT_CURRENT_LEGAL_DOCUMENTS,
+      { p_source: "APP" }
+    );
+    if (legalAcceptanceResult.error) {
+      throw new InitialProfileSetupError(
+        "No pudimos guardar la aceptación de los documentos legales."
+      );
+    }
     const profileResult = await createCurrentUserProfile({
       name: initialProfile.name,
       idDocument: initialProfile.idDocument,

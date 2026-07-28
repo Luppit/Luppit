@@ -318,6 +318,16 @@ function AccountSettingsContent({
 
       <GroupedListSection title="Seguridad">
         <GroupedListRow
+          icon="ban"
+          label="Cuentas bloqueadas"
+          onPress={() =>
+            router.push({
+              pathname: "/(detail)/blocked-accounts",
+              params: { title: "Cuentas bloqueadas", hideMenu: "true" },
+            })
+          }
+        />
+        <GroupedListRow
           icon="log-out"
           label="Cerrar sesión"
           destructive

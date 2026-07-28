@@ -1,6 +1,7 @@
 import { FunctionName } from "../types";
 
 export const RPC_FUNCTIONS = {
+  ACCEPT_CURRENT_LEGAL_DOCUMENTS: "accept_current_legal_documents",
   ADD_BUYER_PURCHASE_REQUEST_FAVORITE:
     "add_buyer_purchase_request_favorite",
   ADD_SELLER_PURCHASE_REQUEST_FAVORITE:
@@ -28,6 +29,9 @@ export const RPC_FUNCTIONS = {
   GET_CURRENT_BUYER_PURCHASE_REQUEST_CANCELLATION_ELIGIBILITY:
     "get_current_buyer_purchase_request_cancellation_eligibility",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
+  GET_CURRENT_LEGAL_ACCEPTANCE_STATE:
+    "get_current_legal_acceptance_state",
+  GET_CURRENT_SAFETY_BLOCKS: "get_current_safety_blocks",
   GET_CURRENT_SELLER_PURCHASE_OFFERS: "get_current_seller_purchase_offers",
   GET_CURRENT_USER_BUSINESS_INVITATIONS:
     "get_current_user_business_invitations",
@@ -61,12 +65,12 @@ export const RPC_FUNCTIONS = {
   REQUEST_CURRENT_PROFILE_DELETION: "request_current_profile_deletion",
   REVOKE_CURRENT_USER_BUSINESS_INVITATION:
     "revoke_current_user_business_invitation",
-  SEND_CONVERSATION_MESSAGE: "send_conversation_message",
   SEND_EMAIL_VERIFICATION_OTP: "send_email_verification_otp",
   SET_CURRENT_BUSINESS_CATEGORY_PREFERENCES:
     "set_current_business_category_preferences",
   SET_CURRENT_BUSINESS_LOCATION: "set_current_business_location",
   UPDATE_SELLER_OFFER_FULFILLMENT_FROM_CONVERSATION:
     "update_seller_offer_fulfillment_from_conversation",
+  UNBLOCK_SAFETY_BLOCK: "unblock_safety_block",
   VERIFY_EMAIL_VERIFICATION_OTP: "verify_email_verification_otp",
 } as const satisfies Record<string, FunctionName>;
