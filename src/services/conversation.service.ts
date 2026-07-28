@@ -486,7 +486,12 @@ function parseConversationView(raw: unknown): ConversationView | null {
   const rawActions = Array.isArray(value.actions) ? value.actions : [];
   const actions = rawActions
     .map((action) => parseConversationViewAction(action))
-    .filter((action): action is ConversationViewAction => Boolean(action));
+    .filter((action): action is ConversationViewAction => Boolean(action))
+    .sort(
+      (a, b) =>
+        (a.sort_order ?? Number.MAX_SAFE_INTEGER) -
+        (b.sort_order ?? Number.MAX_SAFE_INTEGER)
+    );
   const rawSlots = Array.isArray(value.slots) ? value.slots : [];
   const slots = rawSlots
     .map((slot) => parseConversationViewSlot(slot))

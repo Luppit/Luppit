@@ -1,15 +1,14 @@
 import Button from "@/src/components/button/Button";
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import {
-  GroupedList,
+  GroupedListSection,
   GroupedListRow,
 } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { signOut } from "@/src/lib/supabase";
-import { supabase } from "@/src/lib/supabase/client";
 import {
   acceptCurrentLegalDocuments,
   getCurrentLegalAcceptanceState,
@@ -19,7 +18,7 @@ import { useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { router, usePathname } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LegalAcceptanceGate({
@@ -31,20 +30,13 @@ export default function LegalAcceptanceGate({
   const styles = useMemo(() => createStyles(t), [t]);
   const pathname = usePathname();
   const { state, revision } = useActiveProfile();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isAccepted, setIsAccepted] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAccepted, setIsAccepted] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const refresh = useCallback(async () => {
     if (state === "signed_out") {
-      setIsAccepted(true);
-      setIsLoading(false);
-      return;
-    }
-
-    const session = await supabase.auth.getSession();
-    if (!session.data.session?.user.id) {
       setIsAccepted(true);
       setIsLoading(false);
       return;
@@ -63,10 +55,6 @@ export default function LegalAcceptanceGate({
 
   useEffect(() => {
     void refresh();
-    const { data } = supabase.auth.onAuthStateChange(() => {
-      void refresh();
-    });
-    return () => data.subscription.unsubscribe();
   }, [refresh, revision]);
 
   if (pathname === "/legal-document" || pathname.endsWith("/legal-document")) {
@@ -100,22 +88,22 @@ export default function LegalAcceptanceGate({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <GlassSurface
-        variant="surface"
-        style={styles.card}
-        contentStyle={styles.cardContent}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.content}
       >
-        <View style={styles.icon}>
-          <Icon name="shield-check" size={30} color={t.colors.primary} />
+        <View style={styles.header}>
+          <View style={styles.icon}>
+            <Icon name="shield-check" size={28} color={t.colors.primary} />
+          </View>
+          <Text variant="title">Documentos legales actualizados</Text>
+          <Text variant="body" color="textMedium">
+            Revisa los documentos vigentes y confirma tu aceptación para
+            continuar usando Luppit.
+          </Text>
         </View>
-        <Text variant="title" align="center">
-          Documentos legales actualizados
-        </Text>
-        <Text variant="body" color="textMedium" align="center">
-          Revisa y acepta los documentos vigentes para continuar usando Luppit.
-        </Text>
 
-        <GroupedList>
+        <GroupedListSection title="Documentos vigentes">
           <GroupedListRow
             icon="file-pen-line"
             label="Términos y condiciones"
@@ -137,7 +125,7 @@ export default function LegalAcceptanceGate({
               )
             }
           />
-        </GroupedList>
+        </GroupedListSection>
 
         <Pressable
           accessibilityRole="checkbox"
@@ -150,30 +138,36 @@ export default function LegalAcceptanceGate({
               <Icon name="check" size={16} color={t.colors.backgroudWhite} />
             ) : null}
           </View>
-          <Text variant="small" style={styles.checkboxLabel}>
-            He leído y acepto los Términos y condiciones y la Política de
-            privacidad vigentes.
-          </Text>
+          <View style={styles.checkboxCopy}>
+            <Text variant="body" style={styles.checkboxLabel}>
+              Acepto los documentos vigentes
+            </Text>
+            <Text variant="small" color="textMedium">
+              Confirmo que leí los Términos y la Política de privacidad.
+            </Text>
+          </View>
         </Pressable>
 
-        <Button
-          title="Aceptar y continuar"
-          variant="dark"
-          disabled={!isChecked}
-          loading={isSubmitting}
-          onPress={() => void accept()}
-        />
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          style={styles.signOut}
-          onPress={() => void signOut()}
-        >
-          <Text variant="small" color="textMedium">
-            Cerrar sesión
-          </Text>
-        </Pressable>
-      </GlassSurface>
+        <View style={styles.actions}>
+          <Button
+            title="Aceptar y continuar"
+            variant="dark"
+            disabled={!isChecked}
+            loading={isSubmitting}
+            onPress={() => void accept()}
+          />
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            style={styles.signOut}
+            onPress={() => void signOut()}
+          >
+            <Text variant="small" color="textMedium">
+              Cerrar sesión
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -182,31 +176,34 @@ function createStyles(t: ReturnType<typeof useTheme>) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      justifyContent: "center",
-      padding: t.spacing.md,
       backgroundColor: t.colors.background,
     },
-    card: {
-      width: "100%",
+    content: {
+      flexGrow: 1,
+      gap: t.spacing.lg,
+      paddingHorizontal: t.spacing.md,
+      paddingTop: t.spacing.lg,
+      paddingBottom: t.spacing.lg,
     },
-    cardContent: {
-      padding: t.spacing.xl,
-      gap: t.spacing.md,
+    header: {
+      gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.sm,
     },
     icon: {
-      width: 58,
-      height: 58,
-      borderRadius: 29,
-      alignSelf: "center",
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.primaryLight,
     },
     checkboxRow: {
-      minHeight: 48,
+      minHeight: 78,
       flexDirection: "row",
-      alignItems: "flex-start",
-      gap: t.spacing.sm,
+      alignItems: "center",
+      gap: t.spacing.md,
+      padding: t.spacing.md,
+      ...createRoundedSurfaceStyle(t),
     },
     checkbox: {
       width: 24,
@@ -221,9 +218,17 @@ function createStyles(t: ReturnType<typeof useTheme>) {
       borderColor: t.colors.primary,
       backgroundColor: t.colors.primary,
     },
-    checkboxLabel: {
+    checkboxCopy: {
       flex: 1,
+      gap: t.spacing.xs,
+    },
+    checkboxLabel: {
       color: t.colors.textDark,
+    },
+    actions: {
+      marginTop: "auto",
+      gap: t.spacing.sm,
+      paddingTop: t.spacing.md,
     },
     signOut: {
       alignSelf: "center",

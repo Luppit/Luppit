@@ -8,6 +8,7 @@ import SuccessPopupContent from "@/src/components/popup/SuccessPopupContent";
 import SuccessScreenConfetti from "@/src/components/popup/SuccessScreenConfetti";
 import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
+import TextArea from "@/src/components/textArea/TextArea";
 import { getToastVariantPresentation } from "@/src/components/toast/presentation";
 import {
   closePopup,
@@ -144,6 +145,17 @@ function getOtpHelperConfig(input: PopupSummaryInput): PopupHelperConfig | null 
   };
 }
 
+function getSummaryChoicePresentation(input: PopupSummaryInput) {
+  return toOptionalText(input.component_config?.presentation);
+}
+
+function getSummaryChoiceConfigText(
+  input: PopupSummaryInput,
+  key: "placeholder" | "picker_title"
+) {
+  return toOptionalText(input.component_config?.[key]);
+}
+
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -187,6 +199,8 @@ export default function GlobalPopupHost() {
   const [summaryChoiceValues, setSummaryChoiceValues] = useState<
     Record<string, string>
   >({});
+  const [activeSummaryChoiceInputId, setActiveSummaryChoiceInputId] =
+    useState<string | null>(null);
   const [summaryTextValues, setSummaryTextValues] = useState<
     Record<string, string>
   >({});
@@ -199,6 +213,13 @@ export default function GlobalPopupHost() {
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
+  const activeSummaryChoiceInput =
+    summaryConfig?.inputs?.find(
+      (input) =>
+        input.id === activeSummaryChoiceInputId &&
+        input.kind === "choice" &&
+        getSummaryChoicePresentation(input) === "selection_sheet"
+    ) ?? null;
   const summaryDescriptionMaxHeight = Math.round(windowHeight * 0.45);
   const helperContentMaxHeight = Math.round(windowHeight * 0.62);
   const sheetMaxHeight = Math.round(windowHeight * 0.9);
@@ -209,7 +230,15 @@ export default function GlobalPopupHost() {
     : Math.max(insets.bottom, t.spacing.md);
 
   useEffect(() => {
-    if (!isMounted || (!filterConfig && !sortConfig)) return;
+    if (
+      !isMounted ||
+      (!filterConfig &&
+        !sortConfig &&
+        !summaryConfig &&
+        !activeSummaryChoiceInput)
+    ) {
+      return;
+    }
 
     const timeout = setTimeout(() => {
       const headingHandle = findNodeHandle(sheetHeadingRef.current);
@@ -217,7 +246,21 @@ export default function GlobalPopupHost() {
     }, ANIMATION_DURATION + 80);
 
     return () => clearTimeout(timeout);
-  }, [filterConfig, isMounted, sortConfig]);
+  }, [
+    activeSummaryChoiceInput,
+    filterConfig,
+    isMounted,
+    sortConfig,
+    summaryConfig,
+  ]);
+
+  const dismissCurrentLayer = () => {
+    if (activeSummaryChoiceInputId) {
+      setActiveSummaryChoiceInputId(null);
+      return;
+    }
+    closePopup();
+  };
 
   const resetSheetPosition = () => {
     Animated.parallel([
@@ -254,7 +297,7 @@ export default function GlobalPopupHost() {
         canDismissPopup &&
         (gestureState.dy >= dismissThreshold || gestureState.vy >= 1.2)
       ) {
-        closePopup();
+        dismissCurrentLayer();
         return;
       }
       resetSheetPosition();
@@ -295,6 +338,7 @@ export default function GlobalPopupHost() {
             setSummaryInputErrors({});
             setSummaryInputResetKeys({});
             setSummaryChoiceValues({});
+            setActiveSummaryChoiceInputId(null);
             setSummaryTextValues({});
             setSuccessActionPending(false);
           }
@@ -383,6 +427,7 @@ export default function GlobalPopupHost() {
       setSummaryInputErrors({});
       setSummaryInputResetKeys({});
       setSummaryChoiceValues({});
+      setActiveSummaryChoiceInputId(null);
       setSummaryTextValues({});
       setSuccessActionPending(false);
       setMounted(true);
@@ -462,6 +507,25 @@ export default function GlobalPopupHost() {
     closePopup();
   };
 
+  const handleSummaryChoiceSelect = (
+    input: PopupSummaryInput,
+    value: string
+  ) => {
+    setSummaryChoiceValues((current) => ({
+      ...current,
+      [input.id]: value,
+    }));
+    setSummaryInputErrors((current) => {
+      if (!current[input.id]) return current;
+      const next = { ...current };
+      delete next[input.id];
+      return next;
+    });
+    input.onValueChange?.(value);
+    setActiveSummaryChoiceInputId(null);
+    void Haptics.selectionAsync().catch(() => undefined);
+  };
+
   const handleProfileSwitcherPress = (profileIndex: number) => {
     const profile = profileSwitcherConfig?.profiles[profileIndex];
     if (!profile || profile.isActive) return;
@@ -506,6 +570,20 @@ export default function GlobalPopupHost() {
 
         const inputErrors = result.inputErrors ?? {};
         setSummaryInputErrors(inputErrors);
+        const firstInputErrorId = Object.keys(inputErrors).find((inputId) =>
+          inputErrors[inputId]?.trim()
+        );
+        const firstInputWithError = summaryConfig?.inputs?.find(
+          (input) => input.id === firstInputErrorId
+        );
+        if (
+          firstInputWithError?.kind === "choice" &&
+          getSummaryChoicePresentation(firstInputWithError) ===
+            "selection_sheet"
+        ) {
+          Keyboard.dismiss();
+          setActiveSummaryChoiceInputId(firstInputWithError.id);
+        }
         const firstInputError = Object.values(inputErrors).find((message) =>
           message.trim()
         );
@@ -819,7 +897,15 @@ export default function GlobalPopupHost() {
       statusBarTranslucent
       visible={isMounted}
       animationType="none"
-      onRequestClose={successConfig ? () => undefined : canDismissPopup ? closePopup : undefined}
+      onRequestClose={
+        successConfig
+          ? () => undefined
+          : activeSummaryChoiceInputId
+            ? dismissCurrentLayer
+            : canDismissPopup
+              ? closePopup
+              : undefined
+      }
     >
       <View
         style={StyleSheet.absoluteFillObject}
@@ -827,6 +913,8 @@ export default function GlobalPopupHost() {
         onAccessibilityEscape={
           successConfig
             ? () => void handleSuccessActionPress()
+            : activeSummaryChoiceInputId
+              ? dismissCurrentLayer
             : canDismissPopup
               ? closePopup
               : undefined
@@ -835,7 +923,13 @@ export default function GlobalPopupHost() {
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity }]}>
           <Pressable
             style={[s.backdrop, { opacity: 0.34 }]}
-            onPress={canDismissPopup ? closePopup : undefined}
+            onPress={
+              activeSummaryChoiceInputId
+                ? dismissCurrentLayer
+                : canDismissPopup
+                  ? closePopup
+                  : undefined
+            }
           />
         </Animated.View>
 
@@ -1224,7 +1318,140 @@ export default function GlobalPopupHost() {
                     </View>
                   </ScrollView>
                 ) : summaryConfig ? (
-                <>
+                  activeSummaryChoiceInput ? (
+                    <ScrollView
+                      style={[
+                        s.sheetContentScroll,
+                        { maxHeight: sheetContentMaxHeight },
+                      ]}
+                      contentContainerStyle={s.sheetContentScrollContent}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled
+                    >
+                      <View style={s.section}>
+                        <View style={s.summaryHeaderBlock}>
+                          <View
+                            ref={sheetHeadingRef}
+                            accessible
+                            accessibilityRole="header"
+                            accessibilityLabel={
+                              getSummaryChoiceConfigText(
+                                activeSummaryChoiceInput,
+                                "picker_title"
+                              ) ?? activeSummaryChoiceInput.label
+                            }
+                            style={s.choicePickerHeader}
+                          >
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Volver al reporte"
+                              hitSlop={4}
+                              style={s.choicePickerBackButton}
+                              onPress={() =>
+                                setActiveSummaryChoiceInputId(null)
+                              }
+                            >
+                              <Icon
+                                name="arrow-left"
+                                size={20}
+                                color={t.colors.textDark}
+                              />
+                            </Pressable>
+                            <Text variant="subtitle" style={s.summaryTitle}>
+                              {getSummaryChoiceConfigText(
+                                activeSummaryChoiceInput,
+                                "picker_title"
+                              ) ?? activeSummaryChoiceInput.label}
+                            </Text>
+                          </View>
+                          <View style={s.summaryHeaderSeparator} />
+                        </View>
+
+                        {activeSummaryChoiceInput.helper_text ? (
+                          <Text variant="small" style={s.choiceHelperText}>
+                            {activeSummaryChoiceInput.helper_text}
+                          </Text>
+                        ) : null}
+
+                        {activeSummaryChoiceInput.options &&
+                        activeSummaryChoiceInput.options.length > 0 ? (
+                          <View
+                            accessibilityRole="radiogroup"
+                            style={s.sortOptionsList}
+                          >
+                            {activeSummaryChoiceInput.options.map(
+                              (option, index) => {
+                                const isSelected =
+                                  summaryChoiceValues[
+                                    activeSummaryChoiceInput.id
+                                  ] === option.value;
+                                const isDisabled =
+                                  option.disabled === true ||
+                                  pendingSummaryActionId != null;
+
+                                return (
+                                  <React.Fragment key={option.value}>
+                                    {index > 0 ? (
+                                      <View style={s.sortSeparator} />
+                                    ) : null}
+                                    <Pressable
+                                      accessibilityRole="radio"
+                                      accessibilityState={{
+                                        checked: isSelected,
+                                        disabled: isDisabled,
+                                      }}
+                                      disabled={isDisabled}
+                                      style={[
+                                        s.sortOptionButton,
+                                        isDisabled
+                                          ? s.choiceOptionDisabled
+                                          : null,
+                                      ]}
+                                      onPress={() =>
+                                        handleSummaryChoiceSelect(
+                                          activeSummaryChoiceInput,
+                                          option.value
+                                        )
+                                      }
+                                    >
+                                      <View
+                                        style={[
+                                          s.sortRadioOuter,
+                                          isSelected
+                                            ? s.sortRadioOuterSelected
+                                            : null,
+                                        ]}
+                                      >
+                                        {isSelected ? (
+                                          <View style={s.sortRadioInner} />
+                                        ) : null}
+                                      </View>
+                                      <Text
+                                        variant="body"
+                                        style={s.sortOptionLabel}
+                                      >
+                                        {option.label}
+                                      </Text>
+                                    </Pressable>
+                                  </React.Fragment>
+                                );
+                              }
+                            )}
+                          </View>
+                        ) : (
+                          <Text
+                            accessibilityRole="alert"
+                            variant="small"
+                            style={s.choiceInputError}
+                          >
+                            Las opciones no se pudieron cargar. Actualiza la
+                            conversación.
+                          </Text>
+                        )}
+                      </View>
+                    </ScrollView>
+                  ) : (
+                  <>
                   <ScrollView
                     ref={summaryScrollViewRef}
                     style={[
@@ -1238,13 +1465,18 @@ export default function GlobalPopupHost() {
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
                   >
-                    <View style={s.section}>
-                      <View style={s.summaryHeaderBlock}>
-                        <View style={s.summaryHeader}>
+                      <View style={s.section}>
+                        <View style={s.summaryHeaderBlock}>
+                        <View
+                          ref={sheetHeadingRef}
+                          accessible
+                          accessibilityRole="header"
+                          accessibilityLabel={summaryConfig.title}
+                          style={s.summaryHeader}
+                        >
                           <Text
                             variant="subtitle"
                             style={s.summaryTitle}
-                            accessibilityRole="header"
                           >
                             {summaryConfig.title}
                           </Text>
@@ -1364,6 +1596,109 @@ export default function GlobalPopupHost() {
                             if (input.kind === "choice") {
                               const choiceOptions = input.options ?? [];
                               const selectedValue = summaryChoiceValues[input.id];
+                              const presentation =
+                                getSummaryChoicePresentation(input);
+
+                              if (presentation === "selection_sheet") {
+                                const selectedOption = choiceOptions.find(
+                                  (option) => option.value === selectedValue
+                                );
+                                const optionsAvailable =
+                                  choiceOptions.length > 0;
+                                const isDisabled =
+                                  !optionsAvailable ||
+                                  pendingSummaryActionId != null;
+
+                                return (
+                                  <View key={input.id} style={s.choiceInput}>
+                                    <Text
+                                      variant="small"
+                                      style={s.summaryInputLabel}
+                                    >
+                                      {input.label}
+                                    </Text>
+                                    <Pressable
+                                      accessibilityRole="button"
+                                      accessibilityLabel={[
+                                        input.label,
+                                        selectedOption?.label ??
+                                          getSummaryChoiceConfigText(
+                                            input,
+                                            "placeholder"
+                                          ) ??
+                                          "Selecciona una opción",
+                                      ].join(". ")}
+                                      accessibilityHint="Abre la lista de opciones."
+                                      accessibilityState={{
+                                        disabled: isDisabled,
+                                        expanded:
+                                          activeSummaryChoiceInputId ===
+                                          input.id,
+                                      }}
+                                      disabled={isDisabled}
+                                      style={[
+                                        s.choiceSelectTrigger,
+                                        isDisabled
+                                          ? s.choiceOptionDisabled
+                                          : null,
+                                        summaryInputErrors[input.id]
+                                          ? s.choiceSelectTriggerError
+                                          : null,
+                                      ]}
+                                      onPress={() => {
+                                        Keyboard.dismiss();
+                                        setActiveSummaryChoiceInputId(input.id);
+                                      }}
+                                    >
+                                      <Text
+                                        variant="body"
+                                        maxLines={2}
+                                        style={[
+                                          s.choiceSelectValue,
+                                          !selectedOption
+                                            ? s.choiceSelectPlaceholder
+                                            : null,
+                                        ]}
+                                      >
+                                        {selectedOption?.label ??
+                                          getSummaryChoiceConfigText(
+                                            input,
+                                            "placeholder"
+                                          ) ??
+                                          (optionsAvailable
+                                            ? "Selecciona una opción"
+                                            : "Opciones no disponibles")}
+                                      </Text>
+                                      <Icon
+                                        name="chevron-down"
+                                        size={18}
+                                        color={t.colors.stateAnulated}
+                                      />
+                                    </Pressable>
+                                    {!optionsAvailable ? (
+                                      <Text
+                                        accessibilityRole="alert"
+                                        variant="small"
+                                        style={s.choiceInputError}
+                                      >
+                                        Las opciones no se pudieron cargar.
+                                        Actualiza la conversación.
+                                      </Text>
+                                    ) : summaryInputErrors[input.id] ? (
+                                      <Text
+                                        accessibilityRole="alert"
+                                        variant="small"
+                                        style={s.choiceInputError}
+                                      >
+                                        {summaryInputErrors[input.id]}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                );
+                              }
+
+                              const useCompactList =
+                                presentation === "inline_compact";
 
                               return (
                                 <View
@@ -1381,8 +1716,14 @@ export default function GlobalPopupHost() {
                                   ) : null}
 
                                   {choiceOptions.length > 0 ? (
-                                    <View style={s.choiceOptionsList}>
-                                      {choiceOptions.map((option) => {
+                                    <View
+                                      style={
+                                        useCompactList
+                                          ? s.choiceOptionsListCompact
+                                          : s.choiceOptionsList
+                                      }
+                                    >
+                                      {choiceOptions.map((option, optionIndex) => {
                                         const isSelected = selectedValue === option.value;
                                         const isDisabled =
                                           option.disabled === true ||
@@ -1408,23 +1749,26 @@ export default function GlobalPopupHost() {
                                               disabled: isDisabled,
                                             }}
                                             style={[
-                                              s.choiceOption,
-                                              isSelected ? s.choiceOptionSelected : null,
+                                              useCompactList
+                                                ? s.choiceOptionCompact
+                                                : s.choiceOption,
+                                              useCompactList &&
+                                              optionIndex < choiceOptions.length - 1
+                                                ? s.choiceOptionCompactWithSeparator
+                                                : null,
+                                              isSelected
+                                                ? useCompactList
+                                                  ? s.choiceOptionCompactSelected
+                                                  : s.choiceOptionSelected
+                                                : null,
                                               option.disabled ? s.choiceOptionDisabled : null,
                                             ]}
                                             onPress={() => {
                                               if (isDisabled) return;
-                                              setSummaryChoiceValues((current) => ({
-                                                ...current,
-                                                [input.id]: option.value,
-                                              }));
-                                              setSummaryInputErrors((current) => {
-                                                if (!current[input.id]) return current;
-                                                const next = { ...current };
-                                                delete next[input.id];
-                                                return next;
-                                              });
-                                              input.onValueChange?.(option.value);
+                                              handleSummaryChoiceSelect(
+                                                input,
+                                                option.value
+                                              );
                                             }}
                                           >
                                             <View
@@ -1532,13 +1876,18 @@ export default function GlobalPopupHost() {
 
                               return (
                                 <View key={input.id} style={s.summaryTextArea}>
-                                  <TextField
-                                    label={input.label}
+                                  <Text
+                                    variant="small"
+                                    style={s.summaryInputLabel}
+                                  >
+                                    {input.label}
+                                  </Text>
+                                  <TextArea
                                     value={summaryTextValues[input.id] ?? ""}
                                     placeholder={placeholder}
                                     multiline
                                     maxLength={configuredMaxLength}
-                                    editable={pendingSummaryActionId == null}
+                                    disabled={pendingSummaryActionId != null}
                                     hasError={Boolean(summaryInputErrors[input.id])}
                                     error={summaryInputErrors[input.id]}
                                     baseContainerStyle={{ marginBottom: 0 }}
@@ -1723,7 +2072,8 @@ export default function GlobalPopupHost() {
                       })}
                     </View>
                   ) : null}
-                </>
+                  </>
+                  )
               ) : (
                 <ScrollView
                   style={[

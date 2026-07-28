@@ -706,11 +706,11 @@ export default function ConversationLayout() {
         return;
       }
 
+      const clientRequestId =
+        action.code === "REPORT_CONVERSATION" ? createClientRequestId() : null;
       const inputValues: Record<string, unknown> = {
         ...confirmation.payload_defaults,
-        ...(action.code === "REPORT_CONVERSATION"
-          ? { client_request_id: createClientRequestId() }
-          : null),
+        ...(clientRequestId ? { client_request_id: clientRequestId } : null),
       };
       const description = interpolateTemplate(
         confirmation.description_template,
@@ -753,6 +753,12 @@ export default function ConversationLayout() {
       const ratingInputTitle =
         confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
+      const hasUnavailableRequiredChoice = confirmation.inputs.some(
+        (input) =>
+          input.kind === "choice" &&
+          input.is_required &&
+          input.options.length === 0
+      );
 
       openPopup({
         type: "summary",
@@ -797,7 +803,8 @@ export default function ConversationLayout() {
               : confirmStyle.isDanger
                 ? "error"
                 : "textDark",
-            disabled: confirmation.blocker != null,
+            disabled:
+              confirmation.blocker != null || hasUnavailableRequiredChoice,
             onPress: () => {
               const invalidInput = confirmation.inputs.find((input) => {
                 const raw = inputValues[input.payload_key];
@@ -909,7 +916,12 @@ export default function ConversationLayout() {
                   }
                   return acc;
                 },
-                { ...confirmation.payload_defaults }
+                {
+                  ...confirmation.payload_defaults,
+                  ...(clientRequestId
+                    ? { client_request_id: clientRequestId }
+                    : null),
+                }
               );
               const actionPayload = Object.keys(payload).length > 0 ? payload : null;
 

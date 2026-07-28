@@ -21,7 +21,8 @@ Entrypoint for repository guidance. Keep this file compact; put only durable, hi
 
 ## Supabase Repository Boundary
 - The Supabase database repository is a separate sibling repository at `../luppit-supabase`; never create, clone, or nest it inside this application repository.
-- Do not create or restore a root `supabase/` directory here. All migrations, functions, seeds, database tests/scripts, CLI configuration, and schema automation belong only in `../luppit-supabase`.
+- The Edge Functions source repository is `Luppit/ai-edge-functions`; Edge Function source, function tests, and deployment configuration belong there, not in this app or `../luppit-supabase`.
+- Do not create or restore a root `supabase/` directory here. Migrations, seeds, database tests/scripts, CLI configuration, and schema automation belong only in `../luppit-supabase`.
 - This application repository may keep the generated `src/types/database.types.ts`, Supabase client/runtime integration under `src/lib/supabase/`, and required client dependencies.
 
 ## Shared Glass UI
