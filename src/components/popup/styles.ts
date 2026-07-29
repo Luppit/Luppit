@@ -96,6 +96,7 @@ export type GlobalPopupStyles = {
   summaryBlockerAction: ViewStyle;
   summaryBlockerActionLabel: TextStyle;
   summaryFeedback: ViewStyle;
+  summaryFeedbackToast: ViewStyle;
   summaryFeedbackIcon: ViewStyle;
   summaryFeedbackContent: ViewStyle;
   summaryFeedbackTitle: TextStyle;
@@ -570,6 +571,15 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
+    },
+    summaryFeedbackToast: {
+      ...createRoundedSurfaceStyle(t),
+      position: "absolute",
+      left: t.spacing.md,
+      right: t.spacing.md,
+      marginHorizontal: 0,
+      zIndex: 10,
+      elevation: 10,
     },
     summaryFeedbackIcon: {
       width: 32,
