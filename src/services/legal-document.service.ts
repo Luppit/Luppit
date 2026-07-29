@@ -1,10 +1,10 @@
+import { RPC_FUNCTIONS } from "../db/functions";
 import {
   COL_LEGAL_DOCUMENT,
   COL_LEGAL_DOCUMENT_SECTION,
   TB_LEGAL_DOCUMENT,
   TB_LEGAL_DOCUMENT_SECTION,
 } from "../db/tables";
-import { RPC_FUNCTIONS } from "../db/functions";
 import { Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
@@ -18,9 +18,6 @@ export const LEGAL_DOCUMENT_CODES = {
 export type LegalDocumentCode =
   (typeof LEGAL_DOCUMENT_CODES)[keyof typeof LEGAL_DOCUMENT_CODES];
 
-type LegalDocumentRow = Row<"legal_document">;
-type LegalDocumentSectionRow = Row<"legal_document_section">;
-
 export type LegalDocumentSection = {
   id: string;
   heading: string | null;
@@ -29,6 +26,7 @@ export type LegalDocumentSection = {
 };
 
 export type LegalDocument = {
+  versionId: string | null;
   code: string;
   title: string;
   versionLabel: string | null;
@@ -37,6 +35,7 @@ export type LegalDocument = {
 };
 
 export type LegalAcceptanceDocument = {
+  versionId: string;
   code: string;
   title: string;
   versionLabel: string;
@@ -48,6 +47,75 @@ export type LegalAcceptanceState = {
   accepted: boolean;
   documents: LegalAcceptanceDocument[];
 };
+
+type LegalDocumentRow = Row<"legal_document">;
+type LegalDocumentSectionRow = Row<"legal_document_section">;
+
+function isMissingActiveLegalDocumentRpc(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const value = error as Record<string, unknown>;
+  const code = typeof value.code === "string" ? value.code : "";
+  const message = typeof value.message === "string" ? value.message : "";
+  return (
+    code === "PGRST202" ||
+    (message.includes("get_active_legal_document") &&
+      message.toLowerCase().includes("schema cache"))
+  );
+}
+
+async function getActiveLegalDocumentFromTables(
+  code: string
+): Promise<
+  { ok: true; data: LegalDocument | null } | { ok: false; error: AppError }
+> {
+  const documentResult = await supabase
+    .from(TB_LEGAL_DOCUMENT)
+    .select("code,title,version_label,effective_date,is_active,created_at,updated_at")
+    .eq(COL_LEGAL_DOCUMENT.code, code)
+    .eq(COL_LEGAL_DOCUMENT.is_active, true)
+    .maybeSingle();
+
+  if (documentResult.error) {
+    return { ok: false, error: fromSupabaseError(documentResult.error) };
+  }
+  if (!documentResult.data) {
+    return { ok: true, data: null };
+  }
+
+  const sectionResult = await supabase
+    .from(TB_LEGAL_DOCUMENT_SECTION)
+    .select("id,document_code,heading,body,sort_order,is_active,created_at,updated_at")
+    .eq(COL_LEGAL_DOCUMENT_SECTION.document_code, code)
+    .eq(COL_LEGAL_DOCUMENT_SECTION.is_active, true)
+    .order(COL_LEGAL_DOCUMENT_SECTION.sort_order, { ascending: true })
+    .order(COL_LEGAL_DOCUMENT_SECTION.created_at, { ascending: true });
+
+  if (sectionResult.error) {
+    return { ok: false, error: fromSupabaseError(sectionResult.error) };
+  }
+
+  const document = documentResult.data as LegalDocumentRow;
+  const sections = ((sectionResult.data ?? []) as LegalDocumentSectionRow[]).map(
+    (section) => ({
+      id: section.id,
+      heading: section.heading,
+      body: section.body,
+      sortOrder: section.sort_order,
+    })
+  );
+
+  return {
+    ok: true,
+    data: {
+      versionId: null,
+      code: document.code,
+      title: document.title,
+      versionLabel: document.version_label,
+      effectiveDate: document.effective_date,
+      sections,
+    },
+  };
+}
 
 function parseLegalAcceptanceState(raw: unknown): LegalAcceptanceState {
   const value =
@@ -62,6 +130,7 @@ function parseLegalAcceptanceState(raw: unknown): LegalAcceptanceState {
           }
           const item = document as Record<string, unknown>;
           if (
+            typeof item.version_id !== "string" ||
             typeof item.code !== "string" ||
             typeof item.title !== "string" ||
             typeof item.version_label !== "string"
@@ -69,6 +138,7 @@ function parseLegalAcceptanceState(raw: unknown): LegalAcceptanceState {
             return null;
           }
           return {
+            versionId: item.version_id,
             code: item.code,
             title: item.title,
             versionLabel: item.version_label,
@@ -135,50 +205,73 @@ export async function getActiveLegalDocument(
 ): Promise<
   { ok: true; data: LegalDocument | null } | { ok: false; error: AppError }
 > {
-  const documentResult = await supabase
-    .from(TB_LEGAL_DOCUMENT)
-    .select("code,title,version_label,effective_date,is_active,created_at,updated_at")
-    .eq(COL_LEGAL_DOCUMENT.code, code)
-    .eq(COL_LEGAL_DOCUMENT.is_active, true)
-    .maybeSingle();
-
-  if (documentResult.error) {
-    return { ok: false, error: fromSupabaseError(documentResult.error) };
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.GET_ACTIVE_LEGAL_DOCUMENT,
+    { p_code: code } as never
+  );
+  if (result.error) {
+    if (isMissingActiveLegalDocumentRpc(result.error)) {
+      return getActiveLegalDocumentFromTables(code);
+    }
+    return { ok: false, error: fromSupabaseError(result.error) };
   }
-
-  if (!documentResult.data) {
+  if (!result.data) {
     return { ok: true, data: null };
   }
 
-  const sectionResult = await supabase
-    .from(TB_LEGAL_DOCUMENT_SECTION)
-    .select("id,document_code,heading,body,sort_order,is_active,created_at,updated_at")
-    .eq(COL_LEGAL_DOCUMENT_SECTION.document_code, code)
-    .eq(COL_LEGAL_DOCUMENT_SECTION.is_active, true)
-    .order(COL_LEGAL_DOCUMENT_SECTION.sort_order, { ascending: true })
-    .order(COL_LEGAL_DOCUMENT_SECTION.created_at, { ascending: true });
-
-  if (sectionResult.error) {
-    return { ok: false, error: fromSupabaseError(sectionResult.error) };
+  const document =
+    result.data && typeof result.data === "object" && !Array.isArray(result.data)
+      ? result.data as Record<string, unknown>
+      : null;
+  if (
+    !document ||
+    typeof document.version_id !== "string" ||
+    typeof document.code !== "string" ||
+    typeof document.title !== "string"
+  ) {
+    return { ok: false, error: fromAppError("validation") };
   }
 
-  const document = documentResult.data as LegalDocumentRow;
-  const sections = ((sectionResult.data ?? []) as LegalDocumentSectionRow[]).map(
-    (section) => ({
-      id: section.id,
-      heading: section.heading,
-      body: section.body,
-      sortOrder: section.sort_order,
+  const sections = (Array.isArray(document.sections) ? document.sections : [])
+    .map((rawSection): LegalDocumentSection | null => {
+      if (
+        !rawSection ||
+        typeof rawSection !== "object" ||
+        Array.isArray(rawSection)
+      ) {
+        return null;
+      }
+      const section = rawSection as Record<string, unknown>;
+      if (
+        typeof section.id !== "string" ||
+        typeof section.body !== "string" ||
+        typeof section.sort_order !== "number"
+      ) {
+        return null;
+      }
+      return {
+        id: section.id,
+        heading: typeof section.heading === "string" ? section.heading : null,
+        body: section.body,
+        sortOrder: section.sort_order,
+      };
     })
-  );
+    .filter((section): section is LegalDocumentSection => section !== null);
 
   return {
     ok: true,
     data: {
+      versionId: document.version_id,
       code: document.code,
       title: document.title,
-      versionLabel: document.version_label,
-      effectiveDate: document.effective_date,
+      versionLabel:
+        typeof document.version_label === "string"
+          ? document.version_label
+          : null,
+      effectiveDate:
+        typeof document.effective_date === "string"
+          ? document.effective_date
+          : null,
       sections,
     },
   };

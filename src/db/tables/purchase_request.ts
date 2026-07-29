@@ -15,5 +15,6 @@ export const COL_PURCHASE_REQUEST = {
   status: "status",
   created_at: "created_at",
   published_at: "published_at",
+  privacy_purge_after: "privacy_purge_after",
   updated_at: "updated_at",
 } as const satisfies { [K in keyof Row<"purchase_request"> & string]: K };

@@ -5,10 +5,16 @@ import {
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { SupportContactRow } from "@/src/components/support/SupportContactRow";
-import { signOut } from "@/src/lib/supabase";
+import {
+  requestDeletionReauthenticationOtp,
+  signOut,
+  signOutLocally,
+  verifyDeletionReauthenticationOtp,
+} from "@/src/lib/supabase";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
+  AccountDeletionRequestStatus,
   BuyerProfileOverview,
   Profile,
   SellerProfileOverview,
@@ -23,6 +29,7 @@ import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import Constants from "expo-constants";
+import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -176,8 +183,9 @@ function AccountSettingsContent({
   );
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const isSeller = role === Roles.SELLER;
-  const { activeProfile, profiles } = useActiveProfile();
+  const { activeProfile, profiles, refreshProfiles } = useActiveProfile();
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
+  const phone = profile?.phone?.trim() || "";
 
   return (
     <ScrollView
@@ -337,8 +345,14 @@ function AccountSettingsContent({
           icon="user"
           label="Eliminar este perfil"
           destructive
-          onPress={
-            profiles.length > 1 ? openProfileDeletionConfirmation : undefined
+          onPress={() =>
+            profiles.length > 1
+              ? openProfileDeletionConfirmation({
+                  phone,
+                  isBusinessOwner,
+                  refreshProfiles,
+                })
+              : openLastProfileDeletionExplanation()
           }
         />
         <GroupedListRow
@@ -346,7 +360,7 @@ function AccountSettingsContent({
           label="Eliminar cuenta"
           destructive
           showSeparator={false}
-          onPress={openAccountDeletionConfirmation}
+          onPress={() => openAccountDeletionConfirmation({ phone })}
         />
       </GroupedListSection>
     </ScrollView>
@@ -399,13 +413,43 @@ function openSignOutConfirmation() {
   });
 }
 
-function openProfileDeletionConfirmation() {
+function openLastProfileDeletionExplanation() {
   openPopup({
     type: "summary",
-    title: "Eliminar perfil",
+    title: "Este es tu último perfil",
     icon: "user",
     description:
-      "Solicitaremos la eliminación de este perfil. Tu inicio de sesión y tus otros perfiles se conservarán.",
+      "El último perfil no se puede eliminar por separado. Para eliminarlo debes solicitar la eliminación de la cuenta completa.",
+    actions: [
+      {
+        id: "close-last-profile-message",
+        label: "Entendido",
+        icon: "check",
+      },
+    ],
+  });
+}
+
+function openProfileDeletionConfirmation({
+  phone,
+  isBusinessOwner,
+  refreshProfiles,
+}: {
+  phone: string;
+  isBusinessOwner: boolean;
+  refreshProfiles: (preferredProfileId?: string | null) => Promise<boolean>;
+}) {
+  const businessConsequence = isBusinessOwner
+    ? " Si tu negocio tiene otros miembros, la administración pasará al integrante de mayor antigüedad."
+    : "";
+
+  openPopup({
+    type: "summary",
+    title: "Eliminar este perfil",
+    icon: "user",
+    description:
+      "Esta acción no tiene periodo de gracia. Cerraremos las negociaciones activas y eliminaremos la identidad, archivos y contenido personal de este perfil dentro de cinco días hábiles. Tu acceso y tus otros perfiles se conservarán." +
+      businessConsequence,
     actions: [
       {
         id: "cancel-profile-deletion",
@@ -413,35 +457,45 @@ function openProfileDeletionConfirmation() {
         icon: "arrow-left",
       },
       {
-        id: "confirm-profile-deletion",
-        label: "Solicitar eliminación",
+        id: "continue-profile-deletion",
+        label: "Verificar teléfono",
         icon: "trash-2",
         textColorKey: "error",
         iconColorKey: "error",
         onPress: async () => {
-          const result = await requestCurrentProfileDeletion();
-          if (!result.ok) {
-            showError("No se pudo solicitar la eliminación", result.error.message);
+          try {
+            const verification =
+              await requestDeletionReauthenticationOtp(phone);
+            setTimeout(
+              () =>
+                openDeletionOtpConfirmation({
+                  scope: "PROFILE",
+                  verification,
+                  refreshProfiles,
+                }),
+              250
+            );
+            return true;
+          } catch (error) {
+            showError(
+              "No pudimos enviar el código",
+              error instanceof Error ? error.message : undefined
+            );
             return false;
           }
-          showSuccess(
-            "Solicitud recibida",
-            "Revisaremos la eliminación de este perfil."
-          );
-          return true;
         },
       },
     ],
   });
 }
 
-function openAccountDeletionConfirmation() {
+function openAccountDeletionConfirmation({ phone }: { phone: string }) {
   openPopup({
     type: "summary",
     title: "Eliminar cuenta",
     icon: "trash-2",
     description:
-      "Solicitaremos la eliminación de tu cuenta completa y los datos personales asociados. El proceso puede requerir revisión manual; te avisaremos cuando se complete.",
+      "Esta acción elimina el acceso y todos tus perfiles, sin periodo de gracia. Cerraremos negociaciones activas, transferiremos la administración de negocios con miembros sobrevivientes y eliminaremos tu identidad, archivos y contenido personal dentro de cinco días hábiles. Las retenciones anonimizadas y legales se limitan a lo descrito en la Política de Privacidad.",
     actions: [
       {
         id: "keep-account",
@@ -452,25 +506,206 @@ function openAccountDeletionConfirmation() {
         iconColorKey: "textDark",
       },
       {
-        id: "confirm-account-deletion",
-        label: "Solicitar eliminación",
+        id: "continue-account-deletion",
+        label: "Verificar teléfono",
         icon: "trash-2",
         backgroundColorKey: "backgroudWhite",
         textColorKey: "error",
         iconColorKey: "error",
         onPress: async () => {
-          const result = await requestCurrentLoginDeletion();
+          try {
+            const verification =
+              await requestDeletionReauthenticationOtp(phone);
+            setTimeout(
+              () =>
+                openDeletionOtpConfirmation({
+                  scope: "ACCOUNT",
+                  verification,
+                }),
+              250
+            );
+            return true;
+          } catch (error) {
+            showError(
+              "No pudimos enviar el código",
+              error instanceof Error ? error.message : undefined
+            );
+            return false;
+          }
+        },
+      },
+    ],
+  });
+}
+
+function openDeletionOtpConfirmation({
+  scope,
+  verification,
+  refreshProfiles,
+}: {
+  scope: "ACCOUNT" | "PROFILE";
+  verification: { phone: string; userId: string };
+  refreshProfiles?: (preferredProfileId?: string | null) => Promise<boolean>;
+}) {
+  let otpCode = "";
+  openPopup({
+    type: "summary",
+    title: "Confirma que sos vos",
+    icon: "smartphone",
+    description:
+      "Ingresá el código de 6 dígitos enviado a tu teléfono. La solicitud solo se registrará después de verificarlo.",
+    dismissOnBackdropPress: false,
+    inputs: [
+      {
+        id: "account-deletion-otp",
+        kind: "otp",
+        payload_key: "otp",
+        label: "Código de verificación",
+        helper_text: "El código vence pronto y solo puede usarse una vez.",
+        otp_length: 6,
+        is_required: true,
+        onValueChange: (value) => {
+          otpCode = typeof value === "string"
+            ? value.replace(/\D/g, "").slice(0, 6)
+            : "";
+        },
+      },
+    ],
+    actions: [
+      {
+        id: "cancel-deletion-otp",
+        label: "Volver",
+        icon: "arrow-left",
+      },
+      {
+        id: "submit-deletion-request",
+        label: "Eliminar",
+        icon: "trash-2",
+        textColorKey: "error",
+        iconColorKey: "error",
+        onPress: async () => {
+          if (otpCode.length !== 6) {
+            return {
+              shouldClose: false,
+              inputErrors: {
+                "account-deletion-otp": "Ingresá el código completo de 6 dígitos.",
+              },
+            };
+          }
+
+          try {
+            await verifyDeletionReauthenticationOtp(
+              verification.phone,
+              otpCode,
+              verification.userId
+            );
+          } catch (error) {
+            return {
+              shouldClose: false,
+              inputErrors: {
+                "account-deletion-otp":
+                  error instanceof Error
+                    ? error.message
+                    : "El código no es válido.",
+              },
+              resetInputIds: ["account-deletion-otp"],
+            };
+          }
+
+          const result =
+            scope === "ACCOUNT"
+              ? await requestCurrentLoginDeletion()
+              : await requestCurrentProfileDeletion();
           if (!result.ok) {
-            showError("No se pudo solicitar", result.error.message);
+            showError(
+              "No se pudo registrar la eliminación",
+              result.error.message
+            );
             return false;
           }
 
-          showSuccess("Solicitud enviada");
+          try {
+            await Clipboard.setStringAsync(result.data.statusUrl);
+          } catch {
+            // The confirmation popup still offers an explicit copy action.
+          }
+
+          if (scope === "ACCOUNT") {
+            await signOutLocally();
+          } else {
+            await refreshProfiles?.();
+          }
+
+          setTimeout(() => openDeletionAccepted(result.data), 250);
           return true;
         },
       },
     ],
   });
+}
+
+function openDeletionAccepted(request: AccountDeletionRequestStatus) {
+  const dueDate = new Intl.DateTimeFormat("es-CR", {
+    dateStyle: "long",
+  }).format(new Date(request.dueAt));
+  const isFailed = request.status === "failed";
+
+  openPopup({
+    type: "summary",
+    title: isFailed ? "Solicitud con incidencia" : "Solicitud recibida",
+    icon: isFailed ? "alert-circle" : "shield-check",
+    metadata: `Estado: ${deletionStatusLabel(request.status)}`,
+    description: isFailed
+      ? "La solicitud quedó registrada, pero necesita revisión de soporte. Guardá la referencia y el enlace de estado; no lo compartás."
+      : "Tu solicitud quedó registrada y se procesará automáticamente. No tenés que hacer nada más. Guardá el enlace de estado en un lugar seguro y no lo compartás.",
+    dismissOnBackdropPress: false,
+    rows: [
+      { label: "Código de referencia", value: request.requestId },
+      { label: "Plazo máximo", value: dueDate },
+    ],
+    actions: [
+      {
+        id: "copy-deletion-status",
+        label: "Copiar enlace",
+        icon: "copy",
+        onPress: async () => {
+          try {
+            await Clipboard.setStringAsync(request.statusUrl);
+            showSuccess("Enlace copiado");
+          } catch {
+            showError(
+              "No se pudo copiar el enlace",
+              "Intentá nuevamente."
+            );
+          }
+          return false;
+        },
+      },
+      {
+        id: "close-deletion-confirmation",
+        label: "Entendido",
+        icon: "check",
+        backgroundColorKey: "primary",
+        textColorKey: "backgroudWhite",
+        iconColorKey: "backgroudWhite",
+      },
+    ],
+  });
+}
+
+function deletionStatusLabel(status: AccountDeletionRequestStatus["status"]) {
+  switch (status) {
+    case "completed":
+      return "Completada";
+    case "failed":
+      return "Requiere soporte";
+    case "processing":
+      return "Procesando";
+    case "canceled":
+      return "Cancelada";
+    default:
+      return "En cola";
+  }
 }
 
 function createAccountSettingsStyles(t: Theme, topContentInset = 0) {

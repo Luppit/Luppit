@@ -11,5 +11,6 @@ export const COL_PURCHASE_OFFER = {
   description: "description",
   price: "price",
   price_basis: "price_basis",
+  privacy_purge_after: "privacy_purge_after",
   quantity_offered: "quantity_offered",
 } as const satisfies { [K in keyof Row<"purchase_offer"> & string]: K };

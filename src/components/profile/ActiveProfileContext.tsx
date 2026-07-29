@@ -144,6 +144,13 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
         const profileResult = await listCurrentUserProfiles();
         if (refreshSequence !== refreshSequenceRef.current) return false;
         if (!profileResult.ok) {
+          if (profileResult.error.code === "account_deletion_pending") {
+            await supabase.auth.signOut({ scope: "local" });
+            clearMemory();
+            setState("signed_out");
+            router.replace("/(auth)/auth");
+            return false;
+          }
           setShouldRetryRefresh(true);
           return false;
         }
