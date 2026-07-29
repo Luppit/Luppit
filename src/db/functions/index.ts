@@ -20,6 +20,7 @@ export const RPC_FUNCTIONS = {
     "get_buyer_purchase_request_favorites",
   GET_BUYER_PURCHASE_REQUEST_OFFERS: "get_buyer_purchase_request_offers",
   GET_BUYER_VISIBLE_BUSINESS_PROFILE: "get_buyer_visible_business_profile",
+  GET_ACTIVE_LEGAL_DOCUMENT: "get_active_legal_document",
   GET_CATEGORY_LINEAGE: "get_category_lineage",
   GET_CATEGORY_REQUIREMENTS: "get_category_requirements",
   GET_CONVERSATION_MESSAGES: "get_conversation_messages",
@@ -61,8 +62,6 @@ export const RPC_FUNCTIONS = {
   REMOVE_CURRENT_BUSINESS_MEMBER: "remove_current_business_member",
   REMOVE_SELLER_PURCHASE_REQUEST_FAVORITE:
     "remove_seller_purchase_request_favorite",
-  REQUEST_CURRENT_LOGIN_DELETION: "request_current_login_deletion",
-  REQUEST_CURRENT_PROFILE_DELETION: "request_current_profile_deletion",
   REVOKE_CURRENT_USER_BUSINESS_INVITATION:
     "revoke_current_user_business_invitation",
   SEND_EMAIL_VERIFICATION_OTP: "send_email_verification_otp",

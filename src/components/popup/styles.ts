@@ -101,6 +101,7 @@ export type GlobalPopupStyles = {
   summaryFeedbackTitle: TextStyle;
   summaryFeedbackMessage: TextStyle;
   summaryRowBlock: ViewStyle;
+  summaryRowSeparator: ViewStyle;
   summaryImageBlock: ViewStyle;
   summaryRowLabel: TextStyle;
   summaryRowValue: TextStyle;
@@ -387,7 +388,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textMedium,
     },
     summaryDescription: {
-      color: t.colors.textDark,
+      color: t.colors.textMedium,
     },
     summaryDescriptionScroll: {
       ...createRoundedSurfaceStyle(t),
@@ -396,8 +397,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       padding: t.spacing.md,
     },
     summaryRowsList: {
-      gap: t.spacing.md,
-      padding: t.spacing.md,
+      overflow: "hidden",
       ...createRoundedSurfaceStyle(t),
     },
     summaryInputsList: {
@@ -590,13 +590,22 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textMedium,
     },
     summaryRowBlock: {
+      minHeight: 64,
+      justifyContent: "center",
       gap: t.spacing.xs,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.sm,
+    },
+    summaryRowSeparator: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: SOFT_SEPARATOR_COLOR,
+      marginHorizontal: t.spacing.md,
     },
     summaryImageBlock: {
       gap: t.spacing.md,
     },
     summaryRowLabel: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMedium,
     },
     summaryRowValue: {
       color: t.colors.textDark,
