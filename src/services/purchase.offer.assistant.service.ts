@@ -3,14 +3,12 @@ import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
 import {
   getCurrentProfile,
-  getCurrentUserProfileCount,
   registerProfileScopedAbortController,
 } from "./active.profile.service";
 
 const SELLER_OFFER_ASSISTANT_EDGE_FUNCTION = "ai-vendedor-completar";
 const MAX_PROMPT_LENGTH = 4000;
 const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
-const MULTI_PROFILE_AI_UNAVAILABLE = "MULTI_PROFILE_AI_UNAVAILABLE";
 const MAX_IMAGES_PER_REQUEST = 6;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -330,23 +328,6 @@ export async function callSellerOfferAssistant(
       requestId: null,
       retryAfterSeconds: null,
       backendMessage: null,
-    };
-  }
-
-  if (getCurrentUserProfileCount() !== 1) {
-    const error: AppError = {
-      type: "validation",
-      code: MULTI_PROFILE_AI_UNAVAILABLE,
-      message:
-        "El asistente no está disponible temporalmente para cuentas con varios perfiles.",
-    };
-    return {
-      ok: false,
-      error,
-      statusCode: null,
-      requestId: null,
-      retryAfterSeconds: null,
-      backendMessage: error.message,
     };
   }
 
