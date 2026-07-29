@@ -123,9 +123,55 @@ export async function verifyPhoneOtp(
   );
 }
 
+export async function requestDeletionReauthenticationOtp(phone: string) {
+  const session = await getSession();
+  const userId = session?.user.id;
+  if (!userId) throw new Error(fromAppError("auth").message);
+
+  const normalizedPhone = phone.trim();
+  if (!normalizedPhone) throw new Error("No encontramos el teléfono de acceso.");
+
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: normalizedPhone,
+    options: { shouldCreateUser: false },
+  });
+  if (error) throw error;
+
+  return { phone: normalizedPhone, userId };
+}
+
+export async function verifyDeletionReauthenticationOtp(
+  phone: string,
+  token: string,
+  expectedUserId: string
+) {
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: phone.trim(),
+    token: token.trim(),
+    type: "sms",
+  });
+  if (error) throw error;
+
+  const verifiedUserId = data.user?.id ?? data.session?.user.id;
+  if (!verifiedUserId || verifiedUserId !== expectedUserId) {
+    await supabase.auth.signOut({ scope: "local" });
+    throw new Error("No pudimos verificar la cuenta correcta.");
+  }
+
+  return data;
+}
+
 export async function getSession() {
   const { data } = await supabase.auth.getSession();
   return data.session ?? null;
+}
+
+export async function signOutLocally() {
+  abortProfileScopedRequests();
+  await supabase.auth.signOut({ scope: "local" });
+  setCurrentProfileSummary(null);
+  setCurrentUserProfileCount(0);
+  router.replace("/(auth)/auth");
 }
 
 export async function signOut() {

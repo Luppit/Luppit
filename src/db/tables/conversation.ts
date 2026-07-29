@@ -9,6 +9,7 @@ export const COL_CONVERSATION = {
   buyer_profile_id: "buyer_profile_id",
   seller_profile_id: "seller_profile_id",
   purchase_offer_id: "purchase_offer_id",
+  privacy_purge_after: "privacy_purge_after",
   selected_fulfillment_catalog_id: "selected_fulfillment_catalog_id",
   status_code: "status_code",
 } as const satisfies { [K in keyof Row<"conversation"> & string]: K };

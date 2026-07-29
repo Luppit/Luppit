@@ -4,6 +4,7 @@ export const TB_LEGAL_DOCUMENT =
   "legal_document" as const satisfies TableName;
 
 export const COL_LEGAL_DOCUMENT = {
+  active_version_id: "active_version_id",
   code: "code",
   created_at: "created_at",
   effective_date: "effective_date",

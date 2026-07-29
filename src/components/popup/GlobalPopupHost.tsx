@@ -1511,15 +1511,24 @@ export default function GlobalPopupHost() {
 
                       {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
                         <View style={s.summaryRowsList}>
-                          {summaryConfig.rows.map((row) => (
-                            <View key={`${row.label}-${row.value}`} style={s.summaryRowBlock}>
-                              <Text variant="body" style={s.summaryRowLabel}>
-                                {row.label}
-                              </Text>
-                              <Text variant="body" style={s.summaryRowValue}>
-                                {row.value}
-                              </Text>
-                            </View>
+                          {summaryConfig.rows.map((row, index) => (
+                            <React.Fragment key={`${row.label}-${row.value}`}>
+                              <View
+                                accessible
+                                accessibilityLabel={`${row.label}: ${row.value}`}
+                                style={s.summaryRowBlock}
+                              >
+                                <Text variant="small" style={s.summaryRowLabel}>
+                                  {row.label}
+                                </Text>
+                                <Text variant="body" style={s.summaryRowValue}>
+                                  {row.value}
+                                </Text>
+                              </View>
+                              {index < summaryConfig.rows!.length - 1 ? (
+                                <View style={s.summaryRowSeparator} />
+                              ) : null}
+                            </React.Fragment>
                           ))}
                         </View>
                       ) : null}
@@ -2043,6 +2052,7 @@ export default function GlobalPopupHost() {
                           <Pressable
                             key={action.id}
                             accessibilityRole="button"
+                            accessibilityLabel={action.label}
                             accessibilityState={{
                               disabled: isDisabled,
                               busy: isPending,

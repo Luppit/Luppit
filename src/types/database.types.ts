@@ -183,27 +183,63 @@ export type Database = {
       auth_user_account_deletion_request: {
         Row: {
           admin_note: string | null
+          attempt_count: number
           completed_at: string | null
+          due_at: string
           id: string
+          last_error_code: string | null
+          lease_expires_at: string | null
+          next_attempt_at: string
+          prepared_at: string | null
+          processing_started_at: string | null
+          request_channel: string
           requested_at: string
+          retain_until: string
           status: string
-          user_id: string
+          status_token_hash: string
+          storage_manifest: Json
+          subject_hash: string
+          user_id: string | null
         }
         Insert: {
           admin_note?: string | null
+          attempt_count?: number
           completed_at?: string | null
+          due_at: string
           id?: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          prepared_at?: string | null
+          processing_started_at?: string | null
+          request_channel?: string
           requested_at?: string
+          retain_until: string
           status?: string
-          user_id: string
+          status_token_hash: string
+          storage_manifest?: Json
+          subject_hash: string
+          user_id?: string | null
         }
         Update: {
           admin_note?: string | null
+          attempt_count?: number
           completed_at?: string | null
+          due_at?: string
           id?: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          prepared_at?: string | null
+          processing_started_at?: string | null
+          request_channel?: string
           requested_at?: string
+          retain_until?: string
           status?: string
-          user_id?: string
+          status_token_hash?: string
+          storage_manifest?: Json
+          subject_hash?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -214,6 +250,7 @@ export type Database = {
           id_document: string | null
           location_id: string | null
           name: string | null
+          privacy_purge_after: string | null
         }
         Insert: {
           created_at?: string
@@ -221,6 +258,7 @@ export type Database = {
           id_document?: string | null
           location_id?: string | null
           name?: string | null
+          privacy_purge_after?: string | null
         }
         Update: {
           created_at?: string
@@ -228,6 +266,7 @@ export type Database = {
           id_document?: string | null
           location_id?: string | null
           name?: string | null
+          privacy_purge_after?: string | null
         }
         Relationships: [
           {
@@ -463,6 +502,7 @@ export type Database = {
           buyer_profile_id: string | null
           created_at: string
           id: string
+          privacy_purge_after: string | null
           purchase_offer_id: string | null
           purchase_request_id: string | null
           selected_fulfillment_catalog_id: string | null
@@ -473,6 +513,7 @@ export type Database = {
           buyer_profile_id?: string | null
           created_at?: string
           id?: string
+          privacy_purge_after?: string | null
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           selected_fulfillment_catalog_id?: string | null
@@ -483,6 +524,7 @@ export type Database = {
           buyer_profile_id?: string | null
           created_at?: string
           id?: string
+          privacy_purge_after?: string | null
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           selected_fulfillment_catalog_id?: string | null
@@ -1951,6 +1993,7 @@ export type Database = {
       }
       legal_document: {
         Row: {
+          active_version_id: string | null
           code: string
           created_at: string
           effective_date: string | null
@@ -1960,6 +2003,7 @@ export type Database = {
           version_label: string | null
         }
         Insert: {
+          active_version_id?: string | null
           code: string
           created_at?: string
           effective_date?: string | null
@@ -1969,6 +2013,7 @@ export type Database = {
           version_label?: string | null
         }
         Update: {
+          active_version_id?: string | null
           code?: string
           created_at?: string
           effective_date?: string | null
@@ -1977,31 +2022,45 @@ export type Database = {
           updated_at?: string
           version_label?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_active_version_id_fkey"
+            columns: ["active_version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_version"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       legal_document_acceptance: {
         Row: {
           accepted_at: string
           document_code: string
+          document_version_id: string
           id: string
           source: string
-          user_id: string
+          subject_hash: string
+          user_id: string | null
           version_label: string
         }
         Insert: {
           accepted_at?: string
           document_code: string
+          document_version_id: string
           id?: string
           source?: string
-          user_id: string
+          subject_hash: string
+          user_id?: string | null
           version_label: string
         }
         Update: {
           accepted_at?: string
           document_code?: string
+          document_version_id?: string
           id?: string
           source?: string
-          user_id?: string
+          subject_hash?: string
+          user_id?: string | null
           version_label?: string
         }
         Relationships: [
@@ -2011,6 +2070,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "legal_document"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "legal_document_acceptance_document_version_id_fkey"
+            columns: ["document_version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_version"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2052,6 +2118,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "legal_document"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      legal_document_version: {
+        Row: {
+          approval_reference: string | null
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          document_code: string
+          effective_date: string | null
+          id: string
+          published_at: string | null
+          review_status: string
+          version_label: string
+        }
+        Insert: {
+          approval_reference?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          document_code: string
+          effective_date?: string | null
+          id?: string
+          published_at?: string | null
+          review_status?: string
+          version_label: string
+        }
+        Update: {
+          approval_reference?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          document_code?: string
+          effective_date?: string | null
+          id?: string
+          published_at?: string | null
+          review_status?: string
+          version_label?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_version_document_code_fkey"
+            columns: ["document_code"]
+            isOneToOne: false
+            referencedRelation: "legal_document"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      legal_document_version_section: {
+        Row: {
+          body: string
+          created_at: string
+          document_version_id: string
+          heading: string | null
+          id: string
+          sort_order: number
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          document_version_id: string
+          heading?: string | null
+          id?: string
+          sort_order?: number
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          document_version_id?: string
+          heading?: string | null
+          id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_version_section_document_version_id_fkey"
+            columns: ["document_version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_version"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2497,7 +2645,7 @@ export type Database = {
           is_default: boolean
           name: string
           phone: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -2509,7 +2657,7 @@ export type Database = {
           is_default?: boolean
           name: string
           phone?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -2521,34 +2669,70 @@ export type Database = {
           is_default?: boolean
           name?: string
           phone?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
       profile_account_deletion_request: {
         Row: {
           admin_note: string | null
+          attempt_count: number
           completed_at: string | null
+          due_at: string
           id: string
-          profile_id: string
+          last_error_code: string | null
+          lease_expires_at: string | null
+          next_attempt_at: string
+          prepared_at: string | null
+          processing_started_at: string | null
+          profile_id: string | null
+          request_channel: string
           requested_at: string
+          retain_until: string
           status: string
+          status_token_hash: string
+          storage_manifest: Json
+          subject_hash: string
         }
         Insert: {
           admin_note?: string | null
+          attempt_count?: number
           completed_at?: string | null
+          due_at: string
           id?: string
-          profile_id: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          prepared_at?: string | null
+          processing_started_at?: string | null
+          profile_id?: string | null
+          request_channel?: string
           requested_at?: string
+          retain_until: string
           status?: string
+          status_token_hash: string
+          storage_manifest?: Json
+          subject_hash: string
         }
         Update: {
           admin_note?: string | null
+          attempt_count?: number
           completed_at?: string | null
+          due_at?: string
           id?: string
-          profile_id?: string
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          next_attempt_at?: string
+          prepared_at?: string | null
+          processing_started_at?: string | null
+          profile_id?: string | null
+          request_channel?: string
           requested_at?: string
+          retain_until?: string
           status?: string
+          status_token_hash?: string
+          storage_manifest?: Json
+          subject_hash?: string
         }
         Relationships: [
           {
@@ -2793,6 +2977,7 @@ export type Database = {
           description: string | null
           id: string
           price: number | null
+          privacy_purge_after: string | null
           purchase_request_id: string | null
         }
         Insert: {
@@ -2802,6 +2987,7 @@ export type Database = {
           description?: string | null
           id?: string
           price?: number | null
+          privacy_purge_after?: string | null
           purchase_request_id?: string | null
         }
         Update: {
@@ -2811,6 +2997,7 @@ export type Database = {
           description?: string | null
           id?: string
           price?: number | null
+          privacy_purge_after?: string | null
           purchase_request_id?: string | null
         }
         Relationships: [
@@ -2969,6 +3156,7 @@ export type Database = {
           created_at: string
           draft_id: string | null
           id: string
+          privacy_purge_after: string | null
           profile_id: string
           published_at: string
           status: string
@@ -2984,6 +3172,7 @@ export type Database = {
           created_at?: string
           draft_id?: string | null
           id?: string
+          privacy_purge_after?: string | null
           profile_id: string
           published_at?: string
           status?: string
@@ -2999,6 +3188,7 @@ export type Database = {
           created_at?: string
           draft_id?: string | null
           id?: string
+          privacy_purge_after?: string | null
           profile_id?: string
           published_at?: string
           status?: string
@@ -3639,7 +3829,7 @@ export type Database = {
           is_default: boolean
           name: string
           phone: string | null
-          user_id: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -3837,7 +4027,7 @@ export type Database = {
           is_default: boolean
           name: string
           phone: string | null
-          user_id: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -3865,7 +4055,7 @@ export type Database = {
           is_default: boolean
           name: string
           phone: string | null
-          user_id: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -3929,6 +4119,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_active_legal_document: { Args: { p_code: string }; Returns: Json }
       get_buyer_home_purchase_requests: {
         Args: {
           p_end_date?: string
@@ -4383,6 +4574,7 @@ export type Database = {
           buyer_profile_id: string | null
           created_at: string
           id: string
+          privacy_purge_after: string | null
           purchase_offer_id: string | null
           purchase_request_id: string | null
           selected_fulfillment_catalog_id: string | null
@@ -4402,6 +4594,7 @@ export type Database = {
           buyer_profile_id: string | null
           created_at: string
           id: string
+          privacy_purge_after: string | null
           purchase_offer_id: string | null
           purchase_request_id: string | null
           selected_fulfillment_catalog_id: string | null
@@ -4823,6 +5016,52 @@ export type Database = {
         Args: { p_email: string; p_profile_id: string }
         Returns: Json
       }
+      service_claim_deletion_request: {
+        Args: { p_request_id?: string; p_request_type?: string }
+        Returns: Json
+      }
+      service_complete_deletion_request: {
+        Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
+      service_enqueue_account_deletion: {
+        Args: {
+          p_request_channel?: string
+          p_status_token_hash: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      service_enqueue_profile_deletion: {
+        Args: {
+          p_profile_id: string
+          p_request_channel?: string
+          p_status_token_hash: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      service_get_deletion_status: {
+        Args: { p_status_token_hash: string }
+        Returns: Json
+      }
+      service_prepare_deletion_request: {
+        Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
+      service_replay_deletion_ledger: {
+        Args: { p_entries: Json }
+        Returns: Json
+      }
+      service_reschedule_deletion_request: {
+        Args: {
+          p_error_code: string
+          p_request_id: string
+          p_request_type: string
+          p_retryable?: boolean
+        }
+        Returns: Json
+      }
       set_current_business_category_preferences: {
         Args: { p_category_ids?: string[]; p_profile_id: string }
         Returns: Json
@@ -4917,6 +5156,10 @@ export type Database = {
           p_shipping_price?: number
         }
         Returns: Json
+      }
+      validate_fresh_deletion_session: {
+        Args: { p_session_id: string; p_user_id: string }
+        Returns: boolean
       }
       verify_email_verification_otp: {
         Args: {

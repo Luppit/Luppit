@@ -54,9 +54,13 @@ export type SellerBusinessCategorySetupStatus = {
     isComplete: boolean;
 };
 export type AccountDeletionRequestStatus = {
-    status: "pending" | "completed" | "canceled";
+    requestId: string;
+    requestType: "ACCOUNT" | "PROFILE";
+    status: "queued" | "processing" | "completed" | "failed" | "canceled";
     requestedAt: string;
+    dueAt: string;
     completedAt: string | null;
+    statusUrl: string;
 };
 export type BuyerProfileStats = {
     purchaseRequestsCount: number;
@@ -167,31 +171,101 @@ function mapAccountDeletionRequestStatus(
     if (!value || typeof value !== "object") return null;
 
     const record = value as {
+        requestId?: unknown;
+        request_id?: unknown;
+        requestType?: unknown;
+        request_type?: unknown;
         status?: unknown;
         requested_at?: unknown;
         requestedAt?: unknown;
+        due_at?: unknown;
+        dueAt?: unknown;
         completed_at?: unknown;
         completedAt?: unknown;
+        status_url?: unknown;
+        statusUrl?: unknown;
     };
+    const requestId = record.requestId ?? record.request_id;
+    const requestType = record.requestType ?? record.request_type;
     const status = record.status;
     const requestedAt = record.requested_at ?? record.requestedAt;
+    const dueAt = record.due_at ?? record.dueAt;
     const completedAt = record.completed_at ?? record.completedAt;
+    const statusUrl = record.status_url ?? record.statusUrl;
 
-    if (status !== "pending" && status !== "completed" && status !== "canceled") {
+    if (
+        status !== "queued" &&
+        status !== "processing" &&
+        status !== "completed" &&
+        status !== "failed" &&
+        status !== "canceled"
+    ) {
         return null;
     }
 
-    if (typeof requestedAt !== "string" || requestedAt.length === 0) {
+    if (
+        typeof requestId !== "string" ||
+        (requestType !== "ACCOUNT" && requestType !== "PROFILE") ||
+        typeof requestedAt !== "string" ||
+        typeof dueAt !== "string" ||
+        typeof statusUrl !== "string" ||
+        !requestId ||
+        !requestedAt ||
+        !dueAt ||
+        !statusUrl
+    ) {
         return null;
     }
 
     return {
+        requestId,
+        requestType,
         status,
         requestedAt,
+        dueAt,
         completedAt: typeof completedAt === "string" && completedAt.length > 0
             ? completedAt
             : null,
+        statusUrl,
     };
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    return value && typeof value === "object"
+        ? value as Record<string, unknown>
+        : null;
+}
+
+function hasJsonResponse(
+    value: unknown
+): value is { json: () => Promise<unknown>; clone?: () => unknown } {
+    return Boolean(value) &&
+        typeof (value as { json?: unknown }).json === "function";
+}
+
+async function mapAccountDeletionFunctionError(error: unknown): Promise<AppError> {
+    const context = toRecord(error)?.context;
+    let payload: Record<string, unknown> | null = null;
+
+    if (hasJsonResponse(context)) {
+        try {
+            const response =
+                typeof context.clone === "function" ? context.clone() : context;
+            payload = toRecord(
+                await (hasJsonResponse(response) ? response : context).json()
+            );
+        } catch {
+            payload = null;
+        }
+    }
+
+    const code =
+        typeof payload?.error_code === "string"
+            ? payload.error_code.trim()
+            : "";
+    return code
+        ? fromSupabaseError({ error_code: code, code, message: code })
+        : fromSupabaseError(error);
 }
 
 function formatCategoryPath(path: unknown): string | null {
@@ -1050,15 +1124,24 @@ export async function verifyCurrentProfileEmailSetup({
 export async function requestCurrentLoginDeletion(): Promise<
     { ok: true; data: AccountDeletionRequestStatus } | { ok: false; error: AppError }
 > {
-    const rpcResult = await supabase.rpc(
-        RPC_FUNCTIONS.REQUEST_CURRENT_LOGIN_DELETION
+    const functionResult = await supabase.functions.invoke(
+        "request-account-deletion",
+        {
+            body: {
+                channel: "APP",
+                confirmed: true,
+            },
+        }
     );
 
-    if (rpcResult?.error) {
-        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    if (functionResult.error) {
+        return {
+            ok: false,
+            error: await mapAccountDeletionFunctionError(functionResult.error),
+        };
     }
 
-    const status = mapAccountDeletionRequestStatus(rpcResult?.data);
+    const status = mapAccountDeletionRequestStatus(functionResult.data);
     if (!status) {
         return { ok: false, error: fromAppError("validation") };
     }
@@ -1075,18 +1158,25 @@ export async function requestCurrentProfileDeletion(): Promise<
     const profileResult = await getCurrentAuthenticatedProfile();
     if (!profileResult.ok) return profileResult;
 
-    const rpcResult = await supabase.rpc(
-        RPC_FUNCTIONS.REQUEST_CURRENT_PROFILE_DELETION,
+    const functionResult = await supabase.functions.invoke(
+        "request-profile-deletion",
         {
-            p_profile_id: profileResult.data.id,
+            body: {
+                profileId: profileResult.data.id,
+                channel: "APP",
+                confirmed: true,
+            },
         }
     );
 
-    if (rpcResult?.error) {
-        return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    if (functionResult.error) {
+        return {
+            ok: false,
+            error: await mapAccountDeletionFunctionError(functionResult.error),
+        };
     }
 
-    const status = mapAccountDeletionRequestStatus(rpcResult?.data);
+    const status = mapAccountDeletionRequestStatus(functionResult.data);
     if (!status) return { ok: false, error: fromAppError("validation") };
     return { ok: true, data: status };
 }

@@ -10,4 +10,5 @@ export const COL_PURCHASE_OFFER = {
   currency_id: "currency_id",
   description: "description",
   price: "price",
+  privacy_purge_after: "privacy_purge_after",
 } as const satisfies { [K in keyof Row<"purchase_offer"> & string]: K };

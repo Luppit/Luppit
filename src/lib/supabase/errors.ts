@@ -192,6 +192,40 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "auth",
     message: "Acepta los documentos legales vigentes para continuar.",
   },
+  fresh_authentication_required: {
+    type: "auth",
+    message: "Verifica nuevamente tu teléfono para continuar.",
+  },
+  last_profile_requires_account_deletion: {
+    type: "validation",
+    message:
+      "Este es tu último perfil. Para eliminarlo debes eliminar la cuenta completa.",
+  },
+  account_deletion_pending: {
+    type: "auth",
+    message:
+      "Esta cuenta ya tiene una solicitud de eliminación en proceso.",
+  },
+  profile_deletion_pending: {
+    type: "auth",
+    message:
+      "Este perfil ya tiene una solicitud de eliminación en proceso.",
+  },
+  deletion_request_failed: {
+    type: "network",
+    message:
+      "No pudimos registrar la solicitud. Tu sesión sigue activa; inténtalo nuevamente.",
+  },
+  deletion_configuration_error: {
+    type: "unknown",
+    message:
+      "La eliminación de cuenta no está disponible en este momento. Contacta a soporte.",
+  },
+  invalid_deletion_response: {
+    type: "unknown",
+    message:
+      "No pudimos confirmar la referencia de eliminación. Contacta a soporte.",
+  },
   safety_block_not_found: {
     type: "not_found",
     message: "Este bloqueo ya no está activo.",
