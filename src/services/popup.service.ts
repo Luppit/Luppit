@@ -33,6 +33,7 @@ export type PopupSummaryFeedback = {
   tone: ToastVariant;
   title: string;
   message: string;
+  presentation?: "inline" | "toast";
 };
 
 export type PopupSummaryActionOutcome = {
@@ -55,6 +56,7 @@ export type PopupSummaryAction = {
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;
   disabled?: boolean;
+  showPendingState?: boolean;
   onPress?: () => PopupSummaryActionResult | Promise<PopupSummaryActionResult>;
 };
 

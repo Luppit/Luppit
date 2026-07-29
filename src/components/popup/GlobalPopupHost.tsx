@@ -49,6 +49,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createGlobalPopupStyles } from "./styles";
 
 const ANIMATION_DURATION = 220;
+const SUMMARY_TOAST_DURATION = 2_800;
 
 function parseDateValue(rawValue: string): Date | null {
   if (!rawValue) return null;
@@ -228,6 +229,17 @@ export default function GlobalPopupHost() {
   const sheetBottomPadding = isKeyboardVisible
     ? t.spacing.sm
     : Math.max(insets.bottom, t.spacing.md);
+
+  useEffect(() => {
+    if (summaryFeedback?.presentation !== "toast") return;
+
+    const timeout = setTimeout(
+      () => setSummaryFeedback(null),
+      SUMMARY_TOAST_DURATION
+    );
+
+    return () => clearTimeout(timeout);
+  }, [summaryFeedback]);
 
   useEffect(() => {
     if (
@@ -1988,7 +2000,19 @@ export default function GlobalPopupHost() {
                   {summaryFeedback && summaryFeedbackPresentation ? (
                     <View
                       accessibilityRole={summaryFeedback.tone === "error" ? "alert" : undefined}
-                      style={s.summaryFeedback}
+                      pointerEvents="none"
+                      style={[
+                        s.summaryFeedback,
+                        summaryFeedback.presentation === "toast"
+                          ? [
+                              s.summaryFeedbackToast,
+                              {
+                                bottom:
+                                  summaryActionsHeightRef.current + t.spacing.xs,
+                              },
+                            ]
+                          : null,
+                      ]}
                     >
                       <View
                         pointerEvents="none"
@@ -2031,6 +2055,10 @@ export default function GlobalPopupHost() {
                       }}
                     >
                       {summaryConfig.actions.slice(0, 2).map((action) => {
+                        const pendingAction = summaryConfig.actions?.find(
+                          (candidate) =>
+                            candidate.id === pendingSummaryActionId
+                        );
                         const textColor =
                           action.textColorKey != null
                             ? t.colors[action.textColorKey]
@@ -2045,6 +2073,10 @@ export default function GlobalPopupHost() {
                             : t.colors.backgroudWhite;
                         const isSingle = summaryConfig.actions?.length === 1;
                         const isPending = pendingSummaryActionId === action.id;
+                        const showPendingState =
+                          isPending && action.showPendingState !== false;
+                        const showSharedPendingState =
+                          pendingAction?.showPendingState !== false;
                         const isDisabled =
                           action.disabled === true || pendingSummaryActionId != null;
 
@@ -2065,11 +2097,15 @@ export default function GlobalPopupHost() {
                               backgroundColor !== t.colors.backgroudWhite
                                 ? { borderColor: backgroundColor }
                                 : null,
-                              isDisabled && !isPending ? { opacity: 0.55 } : null,
+                              isDisabled &&
+                              !isPending &&
+                              showSharedPendingState
+                                ? { opacity: 0.55 }
+                                : null,
                             ]}
                             onPress={() => handleSummaryActionPress(action)}
                           >
-                            {isPending ? (
+                            {showPendingState ? (
                               <ActivityIndicator size="small" color={iconColor} />
                             ) : action.icon ? (
                               <Icon name={action.icon} size={20} color={iconColor} />

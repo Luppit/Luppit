@@ -26,7 +26,7 @@ import {
 import { Roles } from "@/src/services/role.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
@@ -668,17 +668,30 @@ function openDeletionAccepted(request: AccountDeletionRequestStatus) {
         id: "copy-deletion-status",
         label: "Copiar enlace",
         icon: "copy",
+        showPendingState: false,
         onPress: async () => {
           try {
             await Clipboard.setStringAsync(request.statusUrl);
-            showSuccess("Enlace copiado");
+            return {
+              shouldClose: false,
+              feedback: {
+                tone: "success",
+                title: "Enlace copiado",
+                message: "Guardado en tu portapapeles.",
+                presentation: "toast",
+              },
+            };
           } catch {
-            showError(
-              "No se pudo copiar el enlace",
-              "Intentá nuevamente."
-            );
+            return {
+              shouldClose: false,
+              feedback: {
+                tone: "error",
+                title: "No se pudo copiar el enlace",
+                message: "Intentá nuevamente.",
+                presentation: "toast",
+              },
+            };
           }
-          return false;
         },
       },
       {
