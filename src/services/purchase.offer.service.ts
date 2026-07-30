@@ -122,6 +122,28 @@ export type EditablePurchaseOfferDraft = {
 };
 
 const purchaseOffersByRequestCache = new Map<string, PurchaseOfferCardData[]>();
+const MAX_OFFER_IMAGE_BYTES = 4_000_000;
+const ALLOWED_OFFER_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+const ALLOWED_OFFER_IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+]);
+const OFFER_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
 
 function normalizeSellerOfferRequestTitle(value: unknown) {
   if (typeof value !== "string") return null;
@@ -602,60 +624,76 @@ export async function getPurchaseOfferById(
   return { ok: true, data: data as PurchaseOffer };
 }
 
-function getFileExtension(file: OfferFile, fallback = "jpg") {
-  const fromName = file.name?.split(".").pop()?.toLowerCase();
+function getPathExtension(value: string | null | undefined) {
+  const normalized = value?.split("?")[0]?.trim();
+  if (!normalized) return null;
+
+  const fileName = normalized.split("/").pop() ?? "";
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex <= 0 || dotIndex === fileName.length - 1) return null;
+  return fileName.slice(dotIndex + 1).toLowerCase();
+}
+
+function getFileExtension(file: OfferFile) {
+  const fromName = getPathExtension(file.name);
   if (fromName) return fromName;
 
-  const fromUri = file.uri.split("?")[0].split(".").pop()?.toLowerCase();
+  const fromUri = getPathExtension(file.uri);
   if (fromUri) return fromUri;
 
-  const fromMime = file.mime?.split("/").pop()?.toLowerCase();
+  const fromMime = file.mime?.split(";")[0]?.split("/").pop()?.trim().toLowerCase();
   if (fromMime) return fromMime;
 
-  return fallback;
+  return null;
 }
 
-function isValidMimeType(value: string | null | undefined) {
-  if (!value) return false;
-  return /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i.test(value);
+function normalizeMimeType(value: string | null | undefined) {
+  return value?.split(";")[0]?.trim().toLowerCase() || null;
 }
 
-function getMimeTypeFromExtension(extension: string) {
-  switch (extension.toLowerCase()) {
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "png":
-      return "image/png";
-    case "webp":
-      return "image/webp";
-    case "gif":
-      return "image/gif";
-    case "heic":
-      return "image/heic";
-    case "heif":
-      return "image/heif";
-    case "pdf":
-      return "application/pdf";
-    default:
-      return "application/octet-stream";
-  }
+function normalizeJpegMimeType(value: string) {
+  return value === "image/jpg" ? "image/jpeg" : value;
 }
 
-function resolveUploadContentType(
+function validateOfferImage(
   file: OfferFile,
-  extension: string,
-  fetchedContentType?: string | null
-): string {
-  const normalizedFileMime = file.mime?.split(";")[0]?.trim() ?? null;
-  if (normalizedFileMime && isValidMimeType(normalizedFileMime)) return normalizedFileMime;
-
-  const normalizedFetchedMime = fetchedContentType?.split(";")[0]?.trim() ?? null;
-  if (normalizedFetchedMime && isValidMimeType(normalizedFetchedMime)) {
-    return normalizedFetchedMime;
+  mimeType = file.mime,
+  size = file.size
+): { ok: true; extension: string; contentType: string } | { ok: false; error: AppError } {
+  if (typeof size === "number" && size > MAX_OFFER_IMAGE_BYTES) {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "offer_image_too_large",
+        message: "Cada imagen debe pesar 4 MB o menos.",
+      },
+    };
   }
 
-  return getMimeTypeFromExtension(extension);
+  const extension = getFileExtension(file);
+  const normalizedMime = normalizeMimeType(mimeType);
+  const extensionMime = extension ? OFFER_IMAGE_MIME_BY_EXTENSION[extension] : null;
+  if (
+    file.isImage === false ||
+    !extension ||
+    !ALLOWED_OFFER_IMAGE_EXTENSIONS.has(extension) ||
+    !normalizedMime ||
+    !ALLOWED_OFFER_IMAGE_MIME_TYPES.has(normalizedMime) ||
+    !extensionMime ||
+    normalizeJpegMimeType(normalizedMime) !== extensionMime
+  ) {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "invalid_offer_image",
+        message: "Usa una imagen JPG, PNG, WebP o GIF de hasta 4 MB.",
+      },
+    };
+  }
+
+  return { ok: true, extension, contentType: normalizedMime };
 }
 
 function getFileNameFromPath(path: string | null | undefined) {
@@ -913,24 +951,55 @@ async function uploadImageToBucket(
   file: OfferFile,
   index: number
 ): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
-  const extension = getFileExtension(file);
-  const filePath = `${storagePrefix}/${Date.now()}_${index}.${extension}`;
+  const selectedFileValidation = validateOfferImage(file);
+  if (!selectedFileValidation.ok) return selectedFileValidation;
 
-  const response = await fetch(file.uri);
-  const body = await response.arrayBuffer();
-  const contentType = resolveUploadContentType(
+  let response: Response;
+  let body: ArrayBuffer;
+  try {
+    response = await fetch(file.uri);
+    body = await response.arrayBuffer();
+  } catch {
+    return { ok: false, error: fromAppError("network") };
+  }
+
+  const fetchedContentType =
+    normalizeMimeType(response.headers.get("content-type")) ??
+    selectedFileValidation.contentType;
+  const fetchedFileValidation = validateOfferImage(
     file,
-    extension,
-    response.headers.get("content-type")
+    fetchedContentType,
+    body.byteLength
   );
+  if (!fetchedFileValidation.ok) return fetchedFileValidation;
+
+  const filePath =
+    `${storagePrefix}/${Date.now()}_${index}.${fetchedFileValidation.extension}`;
 
   const { error } = await supabase.storage.from(bucket).upload(filePath, body, {
-    contentType,
+    contentType: fetchedFileValidation.contentType,
     upsert: false,
   });
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
   return { ok: true, data: filePath };
+}
+
+function getConversationImageStorageReference(file: OfferFile) {
+  const storagePath = file.storagePath?.trim();
+  if (!storagePath) return null;
+  return storagePath.startsWith(STORAGE_URI_PREFIX)
+    ? storagePath
+    : `${STORAGE_URI_PREFIX}${STORAGE_BUCKETS.offers}/${storagePath}`;
+}
+
+async function removeNewOfferImages(paths: string[]) {
+  if (paths.length === 0) return;
+  try {
+    await supabase.storage.from(STORAGE_BUCKETS.offers).remove(paths);
+  } catch {
+    return;
+  }
 }
 
 export async function updatePurchaseOffer(
@@ -975,32 +1044,37 @@ export async function updatePurchaseOffer(
     .filter((id): id is string => Boolean(id));
 
   const offerUploadStoragePrefix = `${input.purchaseRequestId}/${input.conversationId}`;
-  const conversationUploadStoragePrefix = input.conversationId;
   const newOfferImagePaths: string[] = [];
   const conversationImagePaths: string[] = [];
 
   for (let i = 0; i < input.files.length; i += 1) {
     const file = input.files[i];
 
-    if (file.isExisting !== true) {
-      const offerUpload = await uploadImageToBucket(
-        STORAGE_BUCKETS.offers,
-        offerUploadStoragePrefix,
-        file,
-        i
-      );
-      if (!offerUpload.ok) return offerUpload;
-      newOfferImagePaths.push(offerUpload.data);
+    if (file.isExisting === true) {
+      const existingStorageReference = getConversationImageStorageReference(file);
+      if (!existingStorageReference) {
+        await removeNewOfferImages(newOfferImagePaths);
+        return { ok: false, error: fromAppError("validation") };
+      }
+      conversationImagePaths.push(existingStorageReference);
+      continue;
     }
 
-    const conversationUpload = await uploadImageToBucket(
-      STORAGE_BUCKETS.conversations,
-      conversationUploadStoragePrefix,
+    const offerUpload = await uploadImageToBucket(
+      STORAGE_BUCKETS.offers,
+      offerUploadStoragePrefix,
       file,
       i
     );
-    if (!conversationUpload.ok) return conversationUpload;
-    conversationImagePaths.push(conversationUpload.data);
+    if (!offerUpload.ok) {
+      await removeNewOfferImages(newOfferImagePaths);
+      return offerUpload;
+    }
+
+    newOfferImagePaths.push(offerUpload.data);
+    conversationImagePaths.push(
+      `${STORAGE_URI_PREFIX}${STORAGE_BUCKETS.offers}/${offerUpload.data}`
+    );
   }
 
   const rpcResult = await supabase.rpc(
@@ -1023,7 +1097,9 @@ export async function updatePurchaseOffer(
   );
 
   if (rpcResult?.error) {
-    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+    const rpcError = fromSupabaseError(rpcResult.error);
+    await removeNewOfferImages(newOfferImagePaths);
+    return { ok: false, error: rpcError };
   }
 
   const payload =
