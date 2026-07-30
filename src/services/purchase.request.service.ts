@@ -189,16 +189,11 @@ export type CancelPurchaseRequestResult = {
   alreadyCanceled: boolean;
   conversationsCanceled: number;
   sellersNotified: number;
+  privacyPurgeAfter: string | null;
 };
 export type PurchaseRequestCancellationEligibility = {
   canCancel: boolean;
   reasonCode: string | null;
-};
-export type DeleteBuyerPurchaseRequestResult = {
-  purchaseRequestId: string;
-  alreadyDeleted: boolean;
-  deletedConversations: number;
-  deletedOffers: number;
 };
 const PURCHASE_REQUEST_SELECT = [
   "id",
@@ -346,43 +341,6 @@ export async function getCurrentBuyerPurchaseRequestCancellationEligibility(
   };
 }
 
-export async function deleteCurrentBuyerPurchaseRequest(
-  purchaseRequestId: string
-): Promise<
-  { ok: true; data: DeleteBuyerPurchaseRequestResult } | { ok: false; error: AppError }
-> {
-  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
-
-  const session = await getSession();
-  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
-
-  const profile = await getCurrentProfileResult();
-  if (profile?.ok === false) return { ok: false, error: profile.error };
-  if (!profile) return { ok: false, error: fromAppError("not_found") };
-
-  const functionResult = await supabase.functions.invoke(
-    "delete-buyer-purchase-request",
-    {
-      body: {
-        profileId: profile.data.id,
-        purchaseRequestId,
-      },
-    }
-  );
-
-  if (functionResult.error) {
-    return {
-      ok: false,
-      error: await mapPurchaseRequestDeletionFunctionError(functionResult.error),
-    };
-  }
-
-  return {
-    ok: true,
-    data: mapDeleteBuyerPurchaseRequestResult(functionResult.data, purchaseRequestId),
-  };
-}
-
 export async function getPurchaseRequestByProfileId(
   profileId: string
 ): Promise<{ ok: true; data: PurchaseRequest } | { ok: false; error: AppError } | null> {
@@ -453,12 +411,6 @@ function toRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function hasJsonResponse(
-  value: unknown
-): value is { json: () => Promise<unknown>; clone?: () => unknown } {
-  return typeof toRecord(value)?.json === "function";
-}
-
 function normalizeCategoryFieldLabel(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const value = raw.trim();
@@ -523,6 +475,7 @@ function mapCancelPurchaseRequestResult(raw: unknown): CancelPurchaseRequestResu
     alreadyCanceled: value.already_canceled === true,
     conversationsCanceled: parseCount(value.conversations_canceled),
     sellersNotified: parseCount(value.sellers_notified),
+    privacyPurgeAfter: normalizeNullableString(value.privacy_purge_after),
   };
 }
 
@@ -535,53 +488,6 @@ function mapPurchaseRequestCancellationEligibility(
     canCancel: value.can_cancel === true,
     reasonCode: normalizeNullableString(value.reason_code),
   };
-}
-
-function mapDeleteBuyerPurchaseRequestResult(
-  raw: unknown,
-  fallbackPurchaseRequestId: string
-): DeleteBuyerPurchaseRequestResult {
-  const value = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-
-  return {
-    purchaseRequestId:
-      normalizeNullableString(value.purchaseRequestId) ??
-      normalizeNullableString(value.purchase_request_id) ??
-      fallbackPurchaseRequestId,
-    alreadyDeleted: value.alreadyDeleted === true || value.already_deleted === true,
-    deletedConversations: parseCount(
-      value.deletedConversations ?? value.deleted_conversations
-    ),
-    deletedOffers: parseCount(value.deletedOffers ?? value.deleted_offers),
-  };
-}
-
-async function mapPurchaseRequestDeletionFunctionError(error: unknown): Promise<AppError> {
-  let payload: Record<string, unknown> | null = null;
-  const response = toRecord(error)?.context;
-
-  if (hasJsonResponse(response)) {
-    try {
-      const clonedResponse =
-        typeof response.clone === "function" ? response.clone() : response;
-      const readableResponse = hasJsonResponse(clonedResponse)
-        ? clonedResponse
-        : response;
-      const parsed = await readableResponse.json();
-      payload = toRecord(parsed);
-    } catch {
-      payload = null;
-    }
-  }
-
-  const code = normalizeNullableString(
-    payload?.code ?? payload?.error_code ?? payload?.error
-  );
-  if (code) {
-    return fromSupabaseError({ error_code: code, message: code, code });
-  }
-
-  return fromSupabaseError(error);
 }
 
 function parseSellerHomePurchaseRequestItem(

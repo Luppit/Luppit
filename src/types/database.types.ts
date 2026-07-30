@@ -4140,14 +4140,6 @@ export type Database = {
         }
         Returns: Json
       }
-      finalize_canceled_purchase_request_deletion: {
-        Args: {
-          p_profile_id: string
-          p_purchase_request_id: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
       get_active_legal_document: { Args: { p_code: string }; Returns: Json }
       get_buyer_home_purchase_requests: {
         Args: {
@@ -4794,14 +4786,6 @@ export type Database = {
         Args: { p_phone: string }
         Returns: boolean
       }
-      prepare_canceled_purchase_request_deletion: {
-        Args: {
-          p_profile_id: string
-          p_purchase_request_id: string
-          p_user_id: string
-        }
-        Returns: Json
-      }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
       publish_purchase_request: {
         Args: {
@@ -5053,8 +5037,16 @@ export type Database = {
         Args: { p_request_id?: string; p_request_type?: string }
         Returns: Json
       }
+      service_claim_purchase_request_privacy_cleanup: {
+        Args: { p_purchase_request_id?: string }
+        Returns: Json
+      }
       service_complete_deletion_request: {
         Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
+      service_complete_purchase_request_privacy_cleanup: {
+        Args: { p_purchase_request_id: string }
         Returns: Json
       }
       service_enqueue_account_deletion: {
@@ -5082,6 +5074,10 @@ export type Database = {
         Args: { p_request_id: string; p_request_type: string }
         Returns: Json
       }
+      service_prepare_purchase_request_privacy_cleanup: {
+        Args: { p_purchase_request_id: string }
+        Returns: Json
+      }
       service_replay_deletion_ledger: {
         Args: { p_entries: Json }
         Returns: Json
@@ -5091,6 +5087,14 @@ export type Database = {
           p_error_code: string
           p_request_id: string
           p_request_type: string
+          p_retryable?: boolean
+        }
+        Returns: Json
+      }
+      service_reschedule_purchase_request_privacy_cleanup: {
+        Args: {
+          p_error_code: string
+          p_purchase_request_id: string
           p_retryable?: boolean
         }
         Returns: Json

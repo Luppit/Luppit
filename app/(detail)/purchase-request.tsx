@@ -1,5 +1,4 @@
 import { Icon } from "@/src/components/Icon";
-import Button from "@/src/components/button/Button";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import {
   GroupedListRow,
@@ -21,7 +20,6 @@ import {
 import { openPopup } from "@/src/services/popup.service";
 import { getPurchaseRequestVisualizationCount } from "@/src/services/purchase.request.visualization.service";
 import {
-  deleteCurrentBuyerPurchaseRequest,
   getPurchaseRequestById,
   PurchaseRequest,
 } from "@/src/services/purchase.request.service";
@@ -33,7 +31,6 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
-import { showError, showSuccess } from "@/src/utils/useToast";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 const BUYER_OFFER_SORT_OPTIONS = [
@@ -171,7 +168,6 @@ export default function PurchaseRequestDetailScreen() {
   >(null);
   const [timelineReloadKey, setTimelineReloadKey] = useState(0);
   const [viewsCount, setViewsCount] = useState(0);
-  const [isDeletingRequest, setIsDeletingRequest] = useState(false);
   const params = useGlobalSearchParams<{
     purchaseRequest?: string | string[];
   }>();
@@ -504,51 +500,6 @@ export default function PurchaseRequestDetailScreen() {
     });
   };
 
-  const openPermanentDeleteConfirmation = useCallback(() => {
-    if (!purchaseRequestId || isDeletingRequest) return;
-
-    openPopup({
-      type: "summary",
-      title: "Eliminar permanentemente",
-      icon: "trash-2",
-      description:
-        "Esta acción es irreversible. Se eliminarán la solicitud, sus ofertas, conversaciones, mensajes y archivos. No podrás recuperarlos.",
-      dismissOnBackdropPress: false,
-      actions: [
-        {
-          id: "keep-canceled-request",
-          label: "Volver",
-          icon: "arrow-left",
-        },
-        {
-          id: "confirm-permanent-delete",
-          label: "Eliminar permanentemente",
-          icon: "trash-2",
-          textColorKey: "error",
-          iconColorKey: "error",
-          onPress: async () => {
-            setIsDeletingRequest(true);
-            try {
-              const result = await deleteCurrentBuyerPurchaseRequest(
-                purchaseRequestId
-              );
-              if (!result.ok) {
-                showError("No se pudo eliminar", result.error.message);
-                return false;
-              }
-
-              showSuccess("Solicitud eliminada permanentemente");
-              router.replace("/(tabs)");
-              return true;
-            } finally {
-              setIsDeletingRequest(false);
-            }
-          },
-        },
-      ],
-    });
-  }, [isDeletingRequest, purchaseRequestId]);
-
   useEffect(() => {
     let active = true;
 
@@ -607,16 +558,10 @@ export default function PurchaseRequestDetailScreen() {
             </View>
             <Text color="textMedium">
               La solicitud está cerrada. Si aceptaste una oferta antes de cancelarla,
-              puedes revisar su seguimiento y abrir el chat.
+              puedes revisar su seguimiento y abrir el chat. El historial se
+              conservará durante el período de privacidad y luego se eliminará
+              automáticamente.
             </Text>
-            <Button
-              title="Eliminar permanentemente"
-              icon="trash-2"
-              variant="white"
-              loading={isDeletingRequest}
-              onPress={openPermanentDeleteConfirmation}
-              labelStyle={s.permanentDeleteLabel}
-            />
           </View>
         ) : null}
 
@@ -796,9 +741,6 @@ function createPurchaseRequestDetailStyles(t: Theme, topContentInset = 0) {
     },
     canceledTitle: {
       color: t.colors.stateCanceled,
-    },
-    permanentDeleteLabel: {
-      color: t.colors.error,
     },
     offersSection: {
       gap: t.spacing.md,
