@@ -26,7 +26,11 @@ import {
   isValidCostaRicaLegalId,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import {
+  showError,
+  showMissingFields,
+  showSuccess,
+} from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -117,12 +121,16 @@ export default function CreateProfileScreen() {
   const selectedInvitation =
     invitations.find((invitation) => invitation.id === invitationId) ?? null;
   const idDocumentError =
-    didSubmit && !isRepair && !isValidCostaRicaPersonalId(idDocument)
+    didSubmit &&
+    !isRepair &&
+    idDocument.trim().length > 0 &&
+    !isValidCostaRicaPersonalId(idDocument)
       ? COSTA_RICA_PERSONAL_ID_ERROR
       : "";
   const businessIdDocumentError =
     didSubmit &&
     sellerCreatesBusiness &&
+    businessIdDocument.trim().length > 0 &&
     !isValidCostaRicaLegalId(businessIdDocument)
       ? COSTA_RICA_LEGAL_ID_ERROR
       : "";
@@ -156,25 +164,24 @@ export default function CreateProfileScreen() {
     }
 
     setDidSubmit(true);
-    if (!isRepair && !name.trim()) {
-      showError("Faltan datos", "Completa el nombre.");
-      return;
-    }
-    if (!isRepair && !isValidCostaRicaPersonalId(idDocument)) {
-      return;
+    const missingFields: string[] = [];
+    if (!isRepair && !name.trim()) missingFields.push("nombre");
+    if (!isRepair && !idDocument.trim()) {
+      missingFields.push("identificación personal");
     }
     if (sellerNeedsInvitation && !invitationId) {
-      showError(
-        "Invitación requerida",
-        "Para crear otro perfil vendedor debes aceptar una invitación de negocio."
-      );
-      return;
+      missingFields.push("invitación de negocio");
     }
-    if (
-      sellerCreatesBusiness &&
-      !businessName.trim()
-    ) {
-      showError("Faltan datos", "Completa el nombre del negocio.");
+    if (sellerCreatesBusiness && !businessName.trim()) {
+      missingFields.push("nombre del negocio");
+    }
+    if (sellerCreatesBusiness && !businessIdDocument.trim()) {
+      missingFields.push("identificación del negocio");
+    }
+    showMissingFields(missingFields);
+    if (missingFields.length > 0) return;
+
+    if (!isRepair && !isValidCostaRicaPersonalId(idDocument)) {
       return;
     }
     if (
@@ -446,7 +453,6 @@ export default function CreateProfileScreen() {
                 : "Crear y activar"
           }
           loading={isSaving}
-          disabled={sellerNeedsInvitation && !invitationId}
           onPress={() => void save()}
         />
       </ScrollView>

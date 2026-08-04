@@ -5,6 +5,7 @@ import {
   COSTA_RICA_LEGAL_ID_LENGTH,
   isValidCostaRicaLegalId,
 } from "@/src/utils/costaRicaIdDocument";
+import { showMissingFields } from "@/src/utils/useToast";
 import React, { useState } from "react";
 import { View } from "react-native";
 
@@ -18,14 +19,14 @@ export type CreateSellerBusinessFormTabProps = {
     businessIdDocument: string;
   }) => void;
   onCreate: () => Promise<void>;
+  additionalMissingFields?: string[];
 };
-
-const BUSINESS_NAME_ERROR = "El nombre del negocio es obligatorio.";
 
 export default function CreateSellerBusinessFormTab({
   values,
   setValues,
   onCreate,
+  additionalMissingFields = [],
 }: CreateSellerBusinessFormTabProps) {
   const [errors, setErrors] = useState({
     businessName: "",
@@ -34,13 +35,17 @@ export default function CreateSellerBusinessFormTab({
 
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
-    if (!values.businessName.trim()) newErrors.businessName = BUSINESS_NAME_ERROR;
-    if (!isValidCostaRicaLegalId(values.businessIdDocument)) {
+    const missingFields = [...additionalMissingFields];
+    if (!values.businessName.trim()) missingFields.push("nombre del negocio");
+    if (!values.businessIdDocument.trim()) {
+      missingFields.push("documento de identificación del negocio");
+    } else if (!isValidCostaRicaLegalId(values.businessIdDocument)) {
       newErrors.businessIdDocument = COSTA_RICA_LEGAL_ID_ERROR;
     }
 
     setErrors(newErrors as any);
-    return Object.keys(newErrors).length === 0;
+    showMissingFields(missingFields);
+    return missingFields.length === 0 && Object.keys(newErrors).length === 0;
   };
 
   const createSellerBusiness = async () => {
@@ -69,7 +74,10 @@ export default function CreateSellerBusinessFormTab({
         value={values.businessIdDocument}
         onChangeText={(text) => {
           setValues({ ...values, businessIdDocument: text });
-          if (errors.businessIdDocument && isValidCostaRicaLegalId(text)) {
+          if (
+            errors.businessIdDocument &&
+            (!text.trim() || isValidCostaRicaLegalId(text))
+          ) {
             setErrors({ ...errors, businessIdDocument: "" });
           }
         }}

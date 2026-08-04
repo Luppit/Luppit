@@ -40,6 +40,12 @@ import {
     getCurrentProfileResult,
     requestActiveProfileRefresh,
 } from "./active.profile.service";
+import {
+    mapAccountDeletionRequestStatus,
+    type AccountDeletionRequestStatus,
+} from "./account.deletion.response";
+
+export type { AccountDeletionRequestStatus } from "./account.deletion.response";
 
 export type Profile = Row<"profile">;
 export type ProfileEmailSetupStatus = {
@@ -52,15 +58,6 @@ export type SellerBusinessCategorySetupStatus = {
     businessId: string | null;
     categoryCount: number;
     isComplete: boolean;
-};
-export type AccountDeletionRequestStatus = {
-    requestId: string;
-    requestType: "ACCOUNT" | "PROFILE";
-    status: "queued" | "processing" | "completed" | "failed" | "canceled";
-    requestedAt: string;
-    dueAt: string;
-    completedAt: string | null;
-    statusUrl: string;
 };
 export type BuyerProfileStats = {
     purchaseRequestsCount: number;
@@ -162,71 +159,6 @@ function mapProfileEmailSetupStatus(profile: Profile | null): ProfileEmailSetupS
         emailOptIn,
         emailOptInAt,
         isComplete: Boolean(email) && emailOptIn && emailOptInAt !== null,
-    };
-}
-
-function mapAccountDeletionRequestStatus(
-    value: unknown
-): AccountDeletionRequestStatus | null {
-    if (!value || typeof value !== "object") return null;
-
-    const record = value as {
-        requestId?: unknown;
-        request_id?: unknown;
-        requestType?: unknown;
-        request_type?: unknown;
-        status?: unknown;
-        requested_at?: unknown;
-        requestedAt?: unknown;
-        due_at?: unknown;
-        dueAt?: unknown;
-        completed_at?: unknown;
-        completedAt?: unknown;
-        status_url?: unknown;
-        statusUrl?: unknown;
-    };
-    const requestId = record.requestId ?? record.request_id;
-    const requestType = record.requestType ?? record.request_type;
-    const status = record.status;
-    const requestedAt = record.requested_at ?? record.requestedAt;
-    const dueAt = record.due_at ?? record.dueAt;
-    const completedAt = record.completed_at ?? record.completedAt;
-    const statusUrl = record.status_url ?? record.statusUrl;
-
-    if (
-        status !== "queued" &&
-        status !== "processing" &&
-        status !== "completed" &&
-        status !== "failed" &&
-        status !== "canceled"
-    ) {
-        return null;
-    }
-
-    if (
-        typeof requestId !== "string" ||
-        (requestType !== "ACCOUNT" && requestType !== "PROFILE") ||
-        typeof requestedAt !== "string" ||
-        typeof dueAt !== "string" ||
-        typeof statusUrl !== "string" ||
-        !requestId ||
-        !requestedAt ||
-        !dueAt ||
-        !statusUrl
-    ) {
-        return null;
-    }
-
-    return {
-        requestId,
-        requestType,
-        status,
-        requestedAt,
-        dueAt,
-        completedAt: typeof completedAt === "string" && completedAt.length > 0
-            ? completedAt
-            : null,
-        statusUrl,
     };
 }
 

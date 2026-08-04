@@ -27,7 +27,11 @@ export default function Navbar() {
   const s = React.useMemo(() => createNavbarStyles(t), [t]);
   const items = useNavItems();
   const { unreadNotificationCount } = useActiveProfile();
-  const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
+  const {
+    isAccountSetupBlocked,
+    isLoadingAccountSetupStatus,
+    blockReason,
+  } = useAccountSetupGate();
   const shouldRestrictTabs = isLoadingAccountSetupStatus || isAccountSetupBlocked;
   const bottomOffset = Math.max(insets.bottom, Platform.OS === "android" ? 10 : 12);
 
@@ -64,7 +68,10 @@ export default function Navbar() {
             key={it.name}
             item={it}
             active={isActive(String(it.href), pathname)}
-            disabled={shouldRestrictTabs && !isAccountSetupAllowedTabPath(String(it.href))}
+            disabled={
+              shouldRestrictTabs &&
+              !isAccountSetupAllowedTabPath(String(it.href), blockReason)
+            }
             unreadNotificationCount={
               it.name === "SHARED_PROFILE" ? unreadNotificationCount : 0
             }

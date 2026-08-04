@@ -5,6 +5,7 @@ export const TB_PROFILE_NOTIFICATION =
 
 export const COL_PROFILE_NOTIFICATION = {
   created_at: "created_at",
+  dismissed_at: "dismissed_at",
   notification_id: "notification_id",
   profile_id: "profile_id",
   read_at: "read_at",

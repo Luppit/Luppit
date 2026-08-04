@@ -19,7 +19,6 @@ export const COL_PROFILE_ACCOUNT_DELETION_REQUEST = {
   requested_at: "requested_at",
   retain_until: "retain_until",
   status: "status",
-  status_token_hash: "status_token_hash",
   storage_manifest: "storage_manifest",
   subject_hash: "subject_hash",
 } as const satisfies {

@@ -7,6 +7,46 @@ export type AppError = {
 };
 
 const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message: string }> = {
+  signup_disabled: {
+    type: "auth",
+    message: "No encontramos una cuenta activa con ese número.",
+  },
+  "signups not allowed for otp": {
+    type: "auth",
+    message: "No encontramos una cuenta activa con ese número.",
+  },
+  otp_expired: {
+    type: "validation",
+    message: "El código es inválido o venció. Solicita uno nuevo e inténtalo de nuevo.",
+  },
+  otp_disabled: {
+    type: "auth",
+    message: "El inicio de sesión por código no está disponible en este momento.",
+  },
+  phone_provider_disabled: {
+    type: "auth",
+    message: "El inicio de sesión por teléfono no está disponible en este momento.",
+  },
+  sms_send_failed: {
+    type: "network",
+    message: "No pudimos enviar el código por SMS. Inténtalo de nuevo.",
+  },
+  over_sms_send_rate_limit: {
+    type: "validation",
+    message: "Solicitaste demasiados códigos. Espera un momento antes de intentarlo de nuevo.",
+  },
+  over_request_rate_limit: {
+    type: "validation",
+    message: "Realizaste demasiados intentos. Espera un momento antes de intentarlo de nuevo.",
+  },
+  invalid_credentials: {
+    type: "auth",
+    message: "El número de teléfono o el código no son válidos.",
+  },
+  request_timeout: {
+    type: "network",
+    message: "La solicitud tardó demasiado. Verifica tu conexión e inténtalo de nuevo.",
+  },
   transaction_code_expired: {
     type: "validation",
     message: "El código venció. Pídele al comprador que genere uno nuevo.",
@@ -183,6 +223,14 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
   conversation_interaction_blocked: {
     type: "auth",
     message: "La comunicación con este contacto está restringida.",
+  },
+  conversation_not_found: {
+    type: "not_found",
+    message: "Esta conversación ya no está disponible.",
+  },
+  profile_not_in_conversation: {
+    type: "auth",
+    message: "Esta conversación no está disponible para el perfil activo.",
   },
   safety_contact_blocked: {
     type: "auth",

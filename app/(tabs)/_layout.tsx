@@ -3,6 +3,7 @@ import TopNavbar from "@/src/components/navbar/TopNavbar";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import {
   isAccountSetupAllowedTabPath,
+  isProfileEmailSetupComplete,
   useAccountSetupGate,
 } from "@/src/components/navbar/useEmailSetupGate";
 import { RoleProvider } from "@/src/components/role/RoleContext";
@@ -22,7 +23,15 @@ export default function TabsLayout() {
     useState<string | null>(null);
   const [hasLoadedPendingSharedRequest, setHasLoadedPendingSharedRequest] =
     useState(false);
-  const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
+  const {
+    isAccountSetupBlocked,
+    isLoadingAccountSetupStatus,
+    blockReason,
+  } = useAccountSetupGate();
+  const isEmailSetupIncomplete =
+    isReady &&
+    activeProfile != null &&
+    !isProfileEmailSetupComplete(activeProfile.profile);
   const isOffersTabScreen = pathname === "/offers" || pathname === "/ofertas";
   const isFavoritesTabScreen = pathname === "/favorites";
   const isChatsTabScreen = pathname === "/chats";
@@ -33,7 +42,7 @@ export default function TabsLayout() {
     let active = true;
 
     const loadPendingSharedRequest = async () => {
-      if (!isReady) {
+      if (!isReady || isEmailSetupIncomplete) {
         setPendingSharedPurchaseRequestId(null);
         setHasLoadedPendingSharedRequest(true);
         return;
@@ -50,7 +59,7 @@ export default function TabsLayout() {
     return () => {
       active = false;
     };
-  }, [isReady]);
+  }, [isEmailSetupIncomplete, isReady]);
 
   if (state === "loading") return null;
 
@@ -87,7 +96,7 @@ export default function TabsLayout() {
   if (
     !isLoadingAccountSetupStatus &&
     isAccountSetupBlocked &&
-    !isAccountSetupAllowedTabPath(pathname)
+    !isAccountSetupAllowedTabPath(pathname, blockReason)
   ) {
     return <Redirect href="/" />;
   }

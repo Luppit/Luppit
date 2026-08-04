@@ -196,7 +196,6 @@ export type Database = {
           requested_at: string
           retain_until: string
           status: string
-          status_token_hash: string
           storage_manifest: Json
           subject_hash: string
           user_id: string | null
@@ -216,7 +215,6 @@ export type Database = {
           requested_at?: string
           retain_until: string
           status?: string
-          status_token_hash: string
           storage_manifest?: Json
           subject_hash: string
           user_id?: string | null
@@ -236,7 +234,6 @@ export type Database = {
           requested_at?: string
           retain_until?: string
           status?: string
-          status_token_hash?: string
           storage_manifest?: Json
           subject_hash?: string
           user_id?: string | null
@@ -2693,7 +2690,6 @@ export type Database = {
           requested_at: string
           retain_until: string
           status: string
-          status_token_hash: string
           storage_manifest: Json
           subject_hash: string
         }
@@ -2713,7 +2709,6 @@ export type Database = {
           requested_at?: string
           retain_until: string
           status?: string
-          status_token_hash: string
           storage_manifest?: Json
           subject_hash: string
         }
@@ -2733,7 +2728,6 @@ export type Database = {
           requested_at?: string
           retain_until?: string
           status?: string
-          status_token_hash?: string
           storage_manifest?: Json
           subject_hash?: string
         }
@@ -2853,18 +2847,21 @@ export type Database = {
       profile_notification: {
         Row: {
           created_at: string
+          dismissed_at: string | null
           notification_id: string
           profile_id: string
           read_at: string | null
         }
         Insert: {
           created_at?: string
+          dismissed_at?: string | null
           notification_id: string
           profile_id: string
           read_at?: string | null
         }
         Update: {
           created_at?: string
+          dismissed_at?: string | null
           notification_id?: string
           profile_id?: string
           read_at?: string | null
@@ -4134,6 +4131,10 @@ export type Database = {
         Args: { p_invitation_id: string }
         Returns: boolean
       }
+      dismiss_all_profile_notifications: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
       execute_conversation_action: {
         Args: {
           p_action_code: string
@@ -4456,6 +4457,16 @@ export type Database = {
       }
       get_current_legal_acceptance_state: { Args: never; Returns: Json }
       get_current_profile_conversations: {
+        Args: {
+          p_category_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
+      get_current_profile_conversations_before_deleted_label_20260804: {
         Args: {
           p_category_ids?: string[]
           p_end_date?: string
@@ -5054,25 +5065,15 @@ export type Database = {
         Returns: Json
       }
       service_enqueue_account_deletion: {
-        Args: {
-          p_request_channel?: string
-          p_status_token_hash: string
-          p_user_id: string
-        }
+        Args: { p_request_channel: string; p_user_id: string }
         Returns: Json
       }
       service_enqueue_profile_deletion: {
         Args: {
           p_profile_id: string
-          p_request_channel?: string
-          p_status_token_hash: string
+          p_request_channel: string
           p_user_id: string
         }
-        Returns: Json
-      }
-      service_get_account_deletion_status_url: { Args: never; Returns: string }
-      service_get_deletion_status: {
-        Args: { p_status_token_hash: string }
         Returns: Json
       }
       service_prepare_deletion_request: {

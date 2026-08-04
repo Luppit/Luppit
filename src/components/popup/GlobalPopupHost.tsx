@@ -211,6 +211,8 @@ export default function GlobalPopupHost() {
   const summaryActionsHeightRef = useRef(0);
   const summaryScrollViewRef = useRef<ScrollView | null>(null);
   const sheetHeadingRef = useRef<View | null>(null);
+  const pendingOptionActionRef = useRef<(() => void) | null>(null);
+  const isOptionSelectionPendingRef = useRef(false);
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
@@ -240,6 +242,18 @@ export default function GlobalPopupHost() {
 
     return () => clearTimeout(timeout);
   }, [summaryFeedback]);
+
+  useEffect(() => {
+    if (isMounted || !isOptionSelectionPendingRef.current) return;
+
+    const pendingAction = pendingOptionActionRef.current;
+    pendingOptionActionRef.current = null;
+    isOptionSelectionPendingRef.current = false;
+
+    if (pendingAction) {
+      setTimeout(pendingAction, 0);
+    }
+  }, [isMounted]);
 
   useEffect(() => {
     if (
@@ -509,8 +523,11 @@ export default function GlobalPopupHost() {
   );
 
   const handleOptionPress = (option: PopupOption) => {
+    if (isOptionSelectionPendingRef.current) return;
+
+    isOptionSelectionPendingRef.current = true;
+    pendingOptionActionRef.current = option.onPress ?? null;
     closePopup();
-    option.onPress?.();
   };
 
   const handleSortOptionPress = (optionId: string) => {

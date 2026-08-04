@@ -13,6 +13,8 @@ export const RPC_FUNCTIONS = {
   CREATE_CURRENT_USER_PROFILE: "create_current_user_profile",
   DECLINE_CURRENT_USER_BUSINESS_INVITATION:
     "decline_current_user_business_invitation",
+  DISMISS_ALL_PROFILE_NOTIFICATIONS:
+    "dismiss_all_profile_notifications",
   GET_BUYER_HOME_PURCHASE_REQUESTS: "get_buyer_home_purchase_requests",
   GET_BUYER_MARKETPLACE_HUB: "get_buyer_marketplace_hub",
   GET_BUYER_MARKETPLACE_HUB_ITEMS: "get_buyer_marketplace_hub_items",

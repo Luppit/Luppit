@@ -3,14 +3,12 @@ import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
 import {
   getCurrentProfile,
-  getCurrentUserProfileCount,
   registerProfileScopedAbortController,
 } from "./active.profile.service";
 
 const SELLER_OFFER_ASSISTANT_EDGE_FUNCTION = "ai-vendedor-completar";
 const MAX_PROMPT_LENGTH = 4000;
 const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
-const MULTI_PROFILE_AI_UNAVAILABLE = "MULTI_PROFILE_AI_UNAVAILABLE";
 const MAX_IMAGES_PER_REQUEST = 6;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -38,6 +36,7 @@ export type SellerOfferAssistantSummary = {
   precio: number | null;
   moneda: string | null;
   entrega: string | null;
+  retiro: string | null;
   retiroDespuesDeDias: number | null;
   envioMaximoDias: number | null;
   precioEnvio: number | null;
@@ -104,18 +103,51 @@ function normalizeNumber(value: unknown): number | null {
   return null;
 }
 
+function normalizeMethod(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const method = value as Record<string, unknown>;
+  return method.enabled === false ? null : method;
+}
+
 function normalizeSummary(value: unknown): SellerOfferAssistantSummary | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
+  const hasStructuredMethods = Object.prototype.hasOwnProperty.call(
+    record,
+    "metodos_entrega"
+  );
+  const methods =
+    record.metodos_entrega &&
+    typeof record.metodos_entrega === "object" &&
+    !Array.isArray(record.metodos_entrega)
+      ? (record.metodos_entrega as Record<string, unknown>)
+      : null;
+  const delivery = hasStructuredMethods
+    ? normalizeMethod(methods?.delivery)
+    : null;
+  const pickup = hasStructuredMethods
+    ? normalizeMethod(methods?.pickup)
+    : null;
 
   return {
     descripcion: normalizeString(record.descripcion),
     precio: normalizeNumber(record.precio),
     moneda: normalizeString(record.moneda),
-    entrega: normalizeString(record.entrega),
-    retiroDespuesDeDias: normalizeNumber(record.retiro_despues_de_dias),
-    envioMaximoDias: normalizeNumber(record.envio_maximo_dias),
-    precioEnvio: normalizeNumber(record.precio_envio),
+    entrega: hasStructuredMethods
+      ? normalizeString(delivery?.label)
+      : normalizeString(record.entrega),
+    retiro: hasStructuredMethods
+      ? normalizeString(pickup?.label)
+      : normalizeString(record.recoger_en_tienda),
+    retiroDespuesDeDias: hasStructuredMethods
+      ? normalizeNumber(pickup?.retiro_despues_de_dias)
+      : normalizeNumber(record.retiro_despues_de_dias),
+    envioMaximoDias: hasStructuredMethods
+      ? normalizeNumber(delivery?.envio_maximo_dias)
+      : normalizeNumber(record.envio_maximo_dias),
+    precioEnvio: hasStructuredMethods
+      ? normalizeNumber(delivery?.precio_envio)
+      : normalizeNumber(record.precio_envio),
   };
 }
 
@@ -330,23 +362,6 @@ export async function callSellerOfferAssistant(
       requestId: null,
       retryAfterSeconds: null,
       backendMessage: null,
-    };
-  }
-
-  if (getCurrentUserProfileCount() !== 1) {
-    const error: AppError = {
-      type: "validation",
-      code: MULTI_PROFILE_AI_UNAVAILABLE,
-      message:
-        "El asistente no está disponible temporalmente para cuentas con varios perfiles.",
-    };
-    return {
-      ok: false,
-      error,
-      statusCode: null,
-      requestId: null,
-      retryAfterSeconds: null,
-      backendMessage: error.message,
     };
   }
 

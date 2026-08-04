@@ -12,7 +12,11 @@ import {
   COSTA_RICA_PERSONAL_ID_LENGTH,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import {
+  showError,
+  showMissingFields,
+  showSuccess,
+} from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -67,22 +71,20 @@ export default function ProfileFieldEditScreen() {
 
   const normalizedValue = value.trim();
   const error = didSubmit
-    ? field === "name"
-      ? normalizedValue
-        ? ""
-        : "Ingresa tu nombre."
-      : isValidCostaRicaPersonalId(value)
-        ? ""
-        : COSTA_RICA_PERSONAL_ID_ERROR
+    ? field === "id_document" &&
+      normalizedValue.length > 0 &&
+      !isValidCostaRicaPersonalId(value)
+      ? COSTA_RICA_PERSONAL_ID_ERROR
+      : ""
     : "";
-  const canSave = normalizedValue.length > 0 && !isSaving;
 
   const save = async () => {
     setDidSubmit(true);
-    if (
-      !canSave ||
-      (field === "id_document" && !isValidCostaRicaPersonalId(value))
-    ) {
+    if (!normalizedValue) {
+      showMissingFields([config.label.toLowerCase()]);
+      return;
+    }
+    if (field === "id_document" && !isValidCostaRicaPersonalId(value)) {
       return;
     }
 
@@ -142,7 +144,7 @@ export default function ProfileFieldEditScreen() {
             <Button
               title="Guardar cambios"
               loading={isSaving}
-              disabled={!canSave}
+              disabled={isSaving}
               onPress={() => void save()}
             />
           </View>

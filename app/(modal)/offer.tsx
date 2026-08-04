@@ -384,18 +384,20 @@ function OfferSummaryCard({
     summary?.moneda
   );
   const deliveryText = summary?.entrega ?? null;
-  const pickupText = summary?.retiroDespuesDeDias
+  const pickupText = summary?.retiro ?? null;
+  const pickupTimingText = summary?.retiroDespuesDeDias != null
     ? `${summary.retiroDespuesDeDias} día(s)`
     : null;
-  const shippingText = summary?.envioMaximoDias
+  const shippingTimingText = summary?.envioMaximoDias != null
     ? `${summary.envioMaximoDias} día(s)`
     : null;
   const details = [
     { label: "Entrega", value: deliveryText },
-    { label: "Moneda", value: summary?.moneda },
-    { label: "Retiro después de", value: pickupText },
-    { label: "Envío máximo", value: shippingText },
+    { label: "Tiempo máximo de entrega", value: shippingTimingText },
     { label: "Costo de envío", value: formattedShippingPrice },
+    { label: "Retiro", value: pickupText },
+    { label: "Retiro disponible en", value: pickupTimingText },
+    { label: "Moneda", value: summary?.moneda },
   ].filter((item) => hasSummaryValue(item.value));
 
   return (

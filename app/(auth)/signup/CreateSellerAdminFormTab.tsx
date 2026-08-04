@@ -6,6 +6,7 @@ import {
   COSTA_RICA_PERSONAL_ID_LENGTH,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
+import { showMissingFields } from "@/src/utils/useToast";
 import React, { useState } from "react";
 import { View } from "react-native";
 
@@ -21,16 +22,16 @@ export type CreateSellerAdminFormTabProps = {
     phoneNumber: string;
   }) => void;
   onCreate: () => Promise<void>;
+  additionalMissingFields?: string[];
 };
 
-const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
-const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 
 export default function CreateSellerAdminFormTab({
   values,
   setValues,
   onCreate,
+  additionalMissingFields = [],
 }: CreateSellerAdminFormTabProps) {
   const [errors, setErrors] = useState({
     fullName: "",
@@ -42,18 +43,22 @@ export default function CreateSellerAdminFormTab({
 
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
-    if (!values.fullName.trim()) newErrors.fullName = FULL_NAME_ERROR;
-    if (!isValidCostaRicaPersonalId(values.idDocument)) {
+    const missingFields = [...additionalMissingFields];
+    if (!values.fullName.trim()) missingFields.push("nombre completo");
+    if (!values.idDocument.trim()) {
+      missingFields.push("documento de identificación personal");
+    } else if (!isValidCostaRicaPersonalId(values.idDocument)) {
       newErrors.idDocument = COSTA_RICA_PERSONAL_ID_ERROR;
     }
-    if (!values.phoneNumber.trim()) newErrors.phoneNumber = PHONE_NUMBER_ERROR;
-
-    if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
+    if (!values.phoneNumber.trim()) {
+      missingFields.push("teléfono celular");
+    } else if (phoneRegex.test(values.phoneNumber)) {
       newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
     }
 
     setErrors(newErrors as any);
-    return Object.keys(newErrors).length === 0;
+    showMissingFields(missingFields);
+    return missingFields.length === 0 && Object.keys(newErrors).length === 0;
   };
 
   const createSellerAdmin = async () => {
@@ -82,7 +87,10 @@ export default function CreateSellerAdminFormTab({
         value={values.idDocument}
         onChangeText={(text) => {
           setValues({ ...values, idDocument: text });
-          if (errors.idDocument && isValidCostaRicaPersonalId(text)) {
+          if (
+            errors.idDocument &&
+            (!text.trim() || isValidCostaRicaPersonalId(text))
+          ) {
             setErrors({ ...errors, idDocument: "" });
           }
         }}
@@ -98,7 +106,7 @@ export default function CreateSellerAdminFormTab({
         value={values.phoneNumber}
         onChangeText={(text) => {
           setValues({ ...values, phoneNumber: text });
-          if (errors.phoneNumber && phoneRegex.test(text)) {
+          if (errors.phoneNumber && (!text.trim() || !phoneRegex.test(text))) {
             setErrors({ ...errors, phoneNumber: "" });
           }
         }}

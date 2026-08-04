@@ -11,6 +11,7 @@ import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 import { getSession } from "@/src/lib/supabase";
 import { supabase } from "@/src/lib/supabase/client";
+import type { AppError } from "@/src/lib/supabase/errors";
 import {
   closePopup,
   openPopup,
@@ -78,6 +79,10 @@ function isTransactionCodeInputError(code: string | undefined) {
     code === "invalid_transaction_code_format" ||
     code === "otp_required"
   );
+}
+
+function isUnavailableConversationError(error: AppError | null) {
+  return error?.type === "auth" || error?.type === "not_found";
 }
 
 function openConfirmationClientTarget(target: string) {
@@ -296,7 +301,7 @@ export default function ConversationLayout() {
   );
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<AppError | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
@@ -422,7 +427,9 @@ export default function ConversationLayout() {
 
     const result = await getCurrentUserConversationView(conversationId);
     if (!result.ok) {
-      setLoadError(result.error.message);
+      setLoadError(result.error);
+      setConversationView(null);
+      setProfileId(null);
       setIsLoading(false);
       return;
     }
@@ -806,26 +813,49 @@ export default function ConversationLayout() {
             disabled:
               confirmation.blocker != null || hasUnavailableRequiredChoice,
             onPress: () => {
+              const missingInputs = confirmation.inputs.filter((input) => {
+                if (!input.is_required) return false;
+
+                const raw = inputValues[input.payload_key];
+                if (input.kind === "rating") {
+                  return !isRatingPayload(raw) || raw.stars < 1;
+                }
+
+                const value = typeof raw === "string" ? raw.trim() : "";
+                return !value;
+              });
+
+              if (missingInputs.length > 0) {
+                const labels = Array.from(
+                  new Set(missingInputs.map((input) => input.label.trim()))
+                ).filter(Boolean);
+                return {
+                  shouldClose: false,
+                  feedback: {
+                    tone: "warning",
+                    title: "Faltan datos",
+                    message: `Completa: ${labels.join(", ")}.`,
+                    presentation: "toast",
+                  },
+                } satisfies PopupSummaryActionOutcome;
+              }
+
               const invalidInput = confirmation.inputs.find((input) => {
                 const raw = inputValues[input.payload_key];
 
                 if (input.kind === "otp") {
                   const value = typeof raw === "string" ? raw.trim() : "";
-                  if (input.is_required && !value) return true;
                   if (value && value.length !== input.otp_length) return true;
                   return false;
                 }
 
                 if (input.kind === "rating") {
-                  if (!input.is_required) return false;
-                  if (!isRatingPayload(raw)) return true;
-                  return raw.stars < 1;
+                  return false;
                 }
 
                 if (input.kind === "choice") {
                   const value = typeof raw === "string" ? raw.trim() : "";
                   if (input.options.length === 0) return true;
-                  if (input.is_required && !value) return true;
                   if (!value) return false;
                   return !input.options.some(
                     (option) => option.value === value && !option.disabled
@@ -833,7 +863,6 @@ export default function ConversationLayout() {
                 }
 
                 const value = typeof raw === "string" ? raw.trim() : "";
-                if (input.is_required && !value) return true;
                 if (
                   input.kind === "textarea" &&
                   typeof input.component_config?.max_length === "number" &&
@@ -865,7 +894,7 @@ export default function ConversationLayout() {
                           invalidTextLength >
                             invalidInput.component_config.max_length
                         ? `Usa ${invalidInput.component_config.max_length} caracteres o menos.`
-                      : `${invalidInput.label} es obligatorio.`;
+                      : "Revisa el valor ingresado.";
                 if (
                   invalidInput.kind === "otp" ||
                   invalidInput.kind === "rating" ||
@@ -1014,6 +1043,8 @@ export default function ConversationLayout() {
   }
 
   if (!conversationView || !profileId) {
+    const isUnavailable = isUnavailableConversationError(loadError);
+
     return (
       <View
         style={{
@@ -1026,11 +1057,22 @@ export default function ConversationLayout() {
         }}
       >
         <Text variant="body" align="center">
-          {loadError ?? "No se pudo cargar la conversación."}
+          {isUnavailable
+            ? "Esta conversación no está disponible."
+            : loadError?.message ?? "No se pudo cargar la conversación."}
         </Text>
         <Button
-          title="Reintentar"
+          title={isUnavailable ? "Volver" : "Reintentar"}
           onPress={() => {
+            if (isUnavailable) {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)/chats");
+              }
+              return;
+            }
+
             setIsLoading(true);
             void refreshConversation();
           }}
