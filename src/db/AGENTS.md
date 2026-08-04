@@ -17,7 +17,7 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 - Seller discovery scope: `business_category_preference`; buyer request ownership: `purchase_request.profile_id`.
 - Request presentation: lifecycle in `purchase_request_status`, status text/style in `purchase_request_status_ui`, visualizations in `purchase_request_visualization`, favorites in role-specific `purchase_request_favorite`.
 - Locations: `business.location_id -> location.id`; runtime selectors use active Costa Rica district rows and save only district ids.
-- Notifications: `notification`, `notification_type_catalog`, `profile_notification`; unread means `read_at is null`.
+- Notifications: `notification`, `notification_type_catalog`, `profile_notification`; active unread means `dismissed_at is null and read_at is null`, while dismissed rows remain retained history.
 
 ## Home, Favorites, And Listings
 - Buyer home runtime source is `get_buyer_home_purchase_requests`; seller home runtime source is `get_seller_home_purchase_requests`.

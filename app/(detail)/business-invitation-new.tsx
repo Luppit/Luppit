@@ -8,7 +8,11 @@ import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext"
 import { Text } from "@/src/components/Text";
 import { inviteCurrentUserToBusiness } from "@/src/services/active.profile.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import {
+  showError,
+  showMissingFields,
+  showSuccess,
+} from "@/src/utils/useToast";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -16,7 +20,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 const PHONE_REGEX = /^[0-9]{8}$/;
-const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 const INLINE_PHONE_ERROR_CODES = new Set([
   "luppit_login_not_found",
@@ -52,7 +55,8 @@ export default function NewBusinessInvitationScreen() {
   const invite = async () => {
     const phoneNumber = phone.trim();
     if (!phoneNumber) {
-      setPhoneError(PHONE_NUMBER_ERROR);
+      setPhoneError("");
+      showMissingFields(["número de teléfono"]);
       return;
     }
     if (!PHONE_REGEX.test(phoneNumber)) {
@@ -131,7 +135,7 @@ export default function NewBusinessInvitationScreen() {
         title="Enviar invitación"
         icon="send"
         loading={isSaving}
-        disabled={!isOwner || !phone.trim()}
+        disabled={!isOwner}
         onPress={() => void invite()}
       />
 

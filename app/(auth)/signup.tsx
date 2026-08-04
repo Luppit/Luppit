@@ -58,13 +58,6 @@ function SignupEntryStep({
   legalAccepted: boolean;
 }) {
   const createBuyer = async () => {
-    if (!legalAccepted) {
-      showError(
-        "Aceptación requerida",
-        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
-      );
-      return;
-    }
     try {
       await signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber);
       next();
@@ -74,15 +67,12 @@ function SignupEntryStep({
   };
 
   const goToSellerAdminStep = async () => {
-    if (!legalAccepted) {
-      showError(
-        "Aceptación requerida",
-        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
-      );
-      return;
-    }
     next();
   };
+
+  const legalMissingFields = legalAccepted
+    ? []
+    : ["aceptación de los documentos legales"];
 
   const tabs: Tab[] = [
     {
@@ -92,6 +82,7 @@ function SignupEntryStep({
           values={buyerValues}
           setValues={setBuyerValues}
           onCreate={createBuyer}
+          additionalMissingFields={legalMissingFields}
         />
       ),
     },
@@ -102,6 +93,7 @@ function SignupEntryStep({
           values={sellerBusinessValues}
           setValues={setSellerBusinessValues}
           onCreate={goToSellerAdminStep}
+          additionalMissingFields={legalMissingFields}
         />
       ),
     },
@@ -130,13 +122,6 @@ function SellerAdminStep({
   legalAccepted: boolean;
 }) {
   const createSellerAdmin = async () => {
-    if (!legalAccepted) {
-      showError(
-        "Aceptación requerida",
-        "Acepta los Términos y la Política de privacidad para crear tu cuenta."
-      );
-      return;
-    }
     try {
       await signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber);
       next();
@@ -150,6 +135,9 @@ function SellerAdminStep({
       values={sellerAdminValues}
       setValues={setSellerAdminValues}
       onCreate={createSellerAdmin}
+      additionalMissingFields={
+        legalAccepted ? [] : ["aceptación de los documentos legales"]
+      }
     />
   );
 }

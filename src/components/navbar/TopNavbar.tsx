@@ -47,7 +47,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { createTopNavbarStyles } from "./topNavbarStyles";
-import { useAccountSetupGate } from "./useEmailSetupGate";
+import {
+  isProfileEmailSetupComplete,
+  useAccountSetupGate,
+} from "./useEmailSetupGate";
 
 const segmentSvgModules: Record<string, number> = {
   todas: require("../../../assets/segments/todas.svg"),
@@ -135,6 +138,9 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const handledProfileSwitcherOpenRequestIdRef = React.useRef(0);
   const isHomeRoute = pathname === "/" || pathname === "/index";
   const { isAccountSetupBlocked, isLoadingAccountSetupStatus } = useAccountSetupGate();
+  const isEmailSetupIncomplete =
+    activeProfile != null &&
+    !isProfileEmailSetupComplete(activeProfile.profile);
   const shouldBlockHomeControls = isLoadingAccountSetupStatus || isAccountSetupBlocked;
 
   useEffect(() => {
@@ -372,20 +378,30 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
           await switchProfile(profile.profile.id);
         },
       })),
-      actionLabel:
-        pendingInvitationCount > 0
-          ? `Crear perfil · ${pendingInvitationCount} ${pendingInvitationCount === 1 ? "invitación" : "invitaciones"}`
-          : "Crear perfil",
-      onAction: () =>
-        router.push({
-          pathname: "/(detail)/create-profile",
-          params: {
-            title: "Crear perfil",
-            hideMenu: "true",
-          },
-        }),
+      ...(isEmailSetupIncomplete
+        ? {}
+        : {
+            actionLabel:
+              pendingInvitationCount > 0
+                ? `Crear perfil · ${pendingInvitationCount} ${pendingInvitationCount === 1 ? "invitación" : "invitaciones"}`
+                : "Crear perfil",
+            onAction: () =>
+              router.push({
+                pathname: "/(detail)/create-profile",
+                params: {
+                  title: "Crear perfil",
+                  hideMenu: "true",
+                },
+              }),
+          }),
     });
-  }, [activeProfile?.profile.id, pendingInvitationCount, profiles, switchProfile]);
+  }, [
+    activeProfile?.profile.id,
+    isEmailSetupIncomplete,
+    pendingInvitationCount,
+    profiles,
+    switchProfile,
+  ]);
 
   const openProfileSwitcher = useCallback(async () => {
     await refreshProfiles(activeProfile?.profile.id);

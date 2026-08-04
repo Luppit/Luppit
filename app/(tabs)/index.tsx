@@ -9,6 +9,7 @@ import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext"
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
+import { signOut } from "@/src/lib/supabase";
 import {
   BuyerHomeFilters,
   getBuyerHomeFilters,
@@ -786,6 +787,18 @@ function AccountSetupRequiredState({
           }
         />
       </View>
+      {!requiresSellerCategories ? (
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => void signOut()}
+          style={s.stateSignOut}
+        >
+          <Text variant="small" color="textMedium">
+            Cerrar sesión
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -957,6 +970,11 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     stateAction: {
       width: "100%",
+    },
+    stateSignOut: {
+      alignSelf: "center",
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.sm,
     },
   });
 }

@@ -12,7 +12,11 @@ import {
   verifyCurrentProfileEmailSetup,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import {
+  showError,
+  showMissingFields,
+  showSuccess,
+} from "@/src/utils/useToast";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -102,23 +106,11 @@ export default function EmailSetupScreen() {
     normalizedEmail.length > 0 && EMAIL_REGEX.test(normalizedEmail);
   const emailError =
     emailServerError ||
-    (didTryEmailSubmit
-      ? normalizedEmail.length === 0
-        ? "Ingresa un correo."
-        : !isEmailValid
-          ? "Ingresa un correo válido."
-          : ""
+    (didTryEmailSubmit && normalizedEmail.length > 0 && !isEmailValid
+      ? "Ingresa un correo válido."
       : "");
-  const consentError =
-    didTryEmailSubmit && !emailOptIn
-      ? "Debes aceptar recibir correos para continuar."
-      : "";
   const canAttemptSendCode = !isLoading && !isSendingCode && !isVerifying;
-  const canVerifyCode =
-    otpCode.length === OTP_LENGTH &&
-    !isLoading &&
-    !isSendingCode &&
-    !isVerifying;
+  const canAttemptVerifyCode = !isLoading && !isSendingCode && !isVerifying;
   const maskedEmail = useMemo(() => maskEmail(normalizedEmail), [normalizedEmail]);
 
   const styles = useMemo(() => createEmailSetupStyles(t), [t]);
@@ -126,7 +118,11 @@ export default function EmailSetupScreen() {
   const handleSendCode = async () => {
     setDidTryEmailSubmit(true);
     setEmailServerError("");
-    if (!isEmailValid || !emailOptIn) return;
+    const missingFields: string[] = [];
+    if (!normalizedEmail) missingFields.push("correo electrónico");
+    if (!emailOptIn) missingFields.push("aceptación para recibir correos");
+    showMissingFields(missingFields);
+    if (missingFields.length > 0 || !isEmailValid) return;
 
     setIsSendingCode(true);
     const result = await requestCurrentProfileEmailSetupVerification({
@@ -177,7 +173,15 @@ export default function EmailSetupScreen() {
   };
 
   const handleVerifyCode = async () => {
-    if (!canVerifyCode) return;
+    if (!otpCode) {
+      showMissingFields(["código de verificación"]);
+      return;
+    }
+    if (otpCode.length !== OTP_LENGTH) {
+      setOtpError(`Ingresa el código completo de ${OTP_LENGTH} dígitos.`);
+      return;
+    }
+    if (!canAttemptVerifyCode) return;
 
     setIsVerifying(true);
     const result = await verifyCurrentProfileEmailSetup({
@@ -299,17 +303,6 @@ export default function EmailSetupScreen() {
                   </Text>
                 </View>
               </Pressable>
-              {consentError ? (
-                <Text
-                  variant="small"
-                  color="error"
-                  style={styles.consentError}
-                  accessibilityRole="alert"
-                  accessibilityLiveRegion="polite"
-                >
-                  {consentError}
-                </Text>
-              ) : null}
             </GroupedListSection>
 
             <Button
@@ -368,7 +361,7 @@ export default function EmailSetupScreen() {
                 variant="dark"
                 title="Verificar correo"
                 loading={isVerifying}
-                disabled={!canVerifyCode}
+                disabled={!canAttemptVerifyCode}
                 onPress={() => {
                   void handleVerifyCode();
                 }}
@@ -450,10 +443,6 @@ function createEmailSetupStyles(t: Theme) {
     checkboxSelected: {
       borderColor: t.colors.primary,
       backgroundColor: t.colors.primary,
-    },
-    consentError: {
-      paddingHorizontal: t.spacing.md,
-      paddingBottom: t.spacing.md,
     },
     emailDestination: {
       gap: t.spacing.xs,

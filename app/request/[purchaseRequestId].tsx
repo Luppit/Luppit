@@ -1,4 +1,8 @@
 import LoadingState from "@/src/components/loading/LoadingState";
+import {
+  isProfileEmailSetupComplete,
+} from "@/src/components/navbar/useEmailSetupGate";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
 import { getSession } from "@/src/lib/supabase";
 import {
@@ -40,11 +44,16 @@ function toPurchaseRequestParam(purchaseRequest: PurchaseRequest) {
 
 export default function SharedPurchaseRequestResolver() {
   const t = useTheme();
+  const { state: profileState, activeProfile } = useActiveProfile();
   const params = useLocalSearchParams<{
     purchaseRequestId?: string | string[];
   }>();
   const purchaseRequestId = parseStringParam(params.purchaseRequestId);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const requiresEmailSetup =
+    profileState === "ready" &&
+    activeProfile != null &&
+    !isProfileEmailSetupComplete(activeProfile.profile);
 
   useEffect(() => {
     let active = true;
@@ -53,6 +62,13 @@ export default function SharedPurchaseRequestResolver() {
       const id = purchaseRequestId?.trim();
       if (!id) {
         setErrorMessage("No encontramos esta solicitud.");
+        return;
+      }
+
+      if (requiresEmailSetup) {
+        await setPendingSharedPurchaseRequest(id);
+        if (!active) return;
+        router.replace("/");
         return;
       }
 
@@ -126,7 +142,7 @@ export default function SharedPurchaseRequestResolver() {
     return () => {
       active = false;
     };
-  }, [purchaseRequestId]);
+  }, [purchaseRequestId, requiresEmailSetup]);
 
   return (
     <View

@@ -16,6 +16,13 @@ export function showError(message?: string, description?: string) {
   });
 }
 
+export function showMissingFields(fields: string[]) {
+  const missingFields = fields.map((field) => field.trim()).filter(Boolean);
+  if (missingFields.length === 0) return;
+
+  showError("Faltan datos", `Completa: ${missingFields.join(", ")}.`);
+}
+
 export function showInfo(message?: string, description?: string) {
   showToast({
     variant: "info",

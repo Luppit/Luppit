@@ -6,6 +6,7 @@ import {
   COSTA_RICA_PERSONAL_ID_LENGTH,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
+import { showMissingFields } from "@/src/utils/useToast";
 import React, { useState } from "react";
 import { View } from "react-native";
 
@@ -14,10 +15,9 @@ export type CreateUserFormTabProps = {
   setValues: any;
   onCreate: (isSeller: boolean) => Promise<void>;
   isSeller?: boolean;
+  additionalMissingFields?: string[];
 }
 
-const FULL_NAME_ERROR = "El nombre completo es obligatorio.";
-const PHONE_NUMBER_ERROR = "El teléfono celular es obligatorio.";
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
 
 export default function CreateUserFormTab({
@@ -25,6 +25,7 @@ export default function CreateUserFormTab({
   setValues,
   onCreate,
   isSeller = false,
+  additionalMissingFields = [],
 }: CreateUserFormTabProps) {
 
 const [errors, setErrors] = useState({
@@ -37,20 +38,24 @@ const [errors, setErrors] = useState({
 
   const validateFields = () => {
     const newErrors: Record<string, string> = {};
-    if (!values.fullName.trim()) newErrors.fullName = FULL_NAME_ERROR;
-    if (!isValidCostaRicaPersonalId(values.idDocument)) {
+    const missingFields = [...additionalMissingFields];
+    if (!values.fullName.trim()) missingFields.push("nombre completo");
+    if (!values.idDocument.trim()) {
+      missingFields.push("documento de identificación personal");
+    } else if (!isValidCostaRicaPersonalId(values.idDocument)) {
       newErrors.idDocument = COSTA_RICA_PERSONAL_ID_ERROR;
     }
     if (!isSeller) {
-      if (!values.phoneNumber.trim()) newErrors.phoneNumber = PHONE_NUMBER_ERROR;
-
-      if (values.phoneNumber && !!phoneRegex.test(values.phoneNumber)) {
+      if (!values.phoneNumber.trim()) {
+        missingFields.push("teléfono celular");
+      } else if (phoneRegex.test(values.phoneNumber)) {
         newErrors.phoneNumber = PHONE_NUMBER_LENGTH_ERROR;
       }
     }
 
     setErrors(newErrors as any);
-    return Object.keys(newErrors).length === 0;
+    showMissingFields(missingFields);
+    return missingFields.length === 0 && Object.keys(newErrors).length === 0;
   };
 
   const createUser = async () => {
@@ -79,7 +84,10 @@ const [errors, setErrors] = useState({
         value={values.idDocument}
         onChangeText={(text) => {
           setValues({ ...values, idDocument: text });
-          if (errors.idDocument && isValidCostaRicaPersonalId(text)) {
+          if (
+            errors.idDocument &&
+            (!text.trim() || isValidCostaRicaPersonalId(text))
+          ) {
             setErrors({ ...errors, idDocument: "" });
           }
         }}
@@ -96,7 +104,7 @@ const [errors, setErrors] = useState({
           value={values.phoneNumber}
           onChangeText={(text) => {
             setValues({ ...values, phoneNumber: text });
-            if (errors.phoneNumber && phoneRegex.test(text)) {
+            if (errors.phoneNumber && (!text.trim() || !phoneRegex.test(text))) {
               setErrors({ ...errors, phoneNumber: "" });
             }
           }}

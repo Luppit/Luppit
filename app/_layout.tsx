@@ -1,6 +1,7 @@
 import GlobalPopupHost from "@/src/components/popup/GlobalPopupHost";
 import GlobalToastHost from "@/src/components/toast/GlobalToastHost";
 import LegalAcceptanceGate from "@/src/components/legal/LegalAcceptanceGate";
+import EmailSetupNavigationGate from "@/src/components/profile/EmailSetupNavigationGate";
 import {
   ActiveProfileBootstrapGate,
   ActiveProfileProvider,
@@ -59,7 +60,9 @@ function RootLayout() {
       <ActiveProfileProvider>
         <ActiveProfileBootstrapGate>
           <LegalAcceptanceGate>
-            <Slot />
+            <EmailSetupNavigationGate>
+              <Slot />
+            </EmailSetupNavigationGate>
           </LegalAcceptanceGate>
         </ActiveProfileBootstrapGate>
         {!fontsLoaded && null}

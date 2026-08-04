@@ -585,6 +585,17 @@ function openDeletionOtpConfirmation({
         textColorKey: "error",
         iconColorKey: "error",
         onPress: async () => {
+          if (!otpCode) {
+            return {
+              shouldClose: false,
+              feedback: {
+                tone: "warning",
+                title: "Faltan datos",
+                message: "Completa: código de verificación.",
+                presentation: "toast",
+              },
+            };
+          }
           if (otpCode.length !== 6) {
             return {
               shouldClose: false,

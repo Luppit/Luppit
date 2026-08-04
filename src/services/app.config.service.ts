@@ -4,7 +4,6 @@ import { supabase } from "../lib/supabase/client";
 import { AppError, fromSupabaseError } from "../lib/supabase/errors";
 
 export const APP_CONFIG_KEYS = {
-  accountDeletionStatusUrl: "account_deletion_status_url",
   accountDeletionUrl: "account_deletion_url",
   privacyPolicyUrl: "privacy_policy_url",
   supportEmail: "support_email",

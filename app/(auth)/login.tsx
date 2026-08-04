@@ -5,7 +5,7 @@ import {
 } from "@/src/components/inputPhone/InputPhone";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { signInWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase";
-import { showError } from "@/src/utils";
+import { showError, showMissingFields } from "@/src/utils";
 import { router } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -21,13 +21,12 @@ export function Step1({ next, values, setValues }: any) {
   const validateFields = useCallback(() => {
     const newErrors: Record<string, string> = {};
     if (!values.phoneNumber.trim()) {
-      newErrors.phoneNumber = "El teléfono celular es obligatorio.";
-    }
-    if (!!PHONE_REGEX.test(values.phoneNumber)) {
+      showMissingFields(["número de teléfono"]);
+    } else if (PHONE_REGEX.test(values.phoneNumber)) {
       newErrors.phoneNumber = "El teléfono celular debe tener 8 dígitos.";
     }
     setErrors(newErrors as any);
-    return Object.keys(newErrors).length === 0;
+    return values.phoneNumber.trim().length > 0 && Object.keys(newErrors).length === 0;
   }, [values.phoneNumber]);
 
   const sendOtp = useCallback(async () => {
@@ -48,7 +47,7 @@ export function Step1({ next, values, setValues }: any) {
         keyboardType="phone-pad"
         onChangeText={(text) => {
           setValues({ ...values, phoneNumber: text });
-          if (errors.phoneNumber && !PHONE_REGEX.test(text)) {
+          if (errors.phoneNumber && (!text.trim() || !PHONE_REGEX.test(text))) {
             setErrors({ ...errors, phoneNumber: "" });
           }
         }}

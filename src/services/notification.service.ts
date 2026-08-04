@@ -43,6 +43,11 @@ export type MarkCurrentProfileNotificationReadResult = {
   remainingUnreadCount: number;
 };
 
+export type DismissAllCurrentProfileNotificationsResult = {
+  dismissedCount: number;
+  remainingUnreadCount: number;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -108,7 +113,8 @@ export async function getCurrentProfileNotifications(): Promise<
         "notification:notification_id(id,title,message,type_code,event_code,payload,created_at)",
       ].join(",")
     )
-    .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data);
+    .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data)
+    .is(COL_PROFILE_NOTIFICATION.dismissed_at, null);
 
   if (error) return { ok: false, error: fromSupabaseError(error) };
 
@@ -181,6 +187,43 @@ export async function markAllCurrentProfileNotificationsRead(): Promise<
   return { ok: true, data: result.data };
 }
 
+export async function dismissAllCurrentProfileNotifications(): Promise<
+  | { ok: true; data: DismissAllCurrentProfileNotificationsResult }
+  | { ok: false; error: AppError }
+> {
+  const profileResult = await getCurrentProfileId();
+  if (!profileResult.ok) return profileResult;
+
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.DISMISS_ALL_PROFILE_NOTIFICATIONS,
+    { p_profile_id: profileResult.data }
+  );
+
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  if (!isRecord(result.data) || result.data.success !== true) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+
+  const dismissedCount = result.data.dismissed_count;
+  const remainingUnreadCount = result.data.remaining_unread_count;
+  if (
+    typeof dismissedCount !== "number" ||
+    !Number.isFinite(dismissedCount) ||
+    typeof remainingUnreadCount !== "number" ||
+    !Number.isFinite(remainingUnreadCount)
+  ) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
+
+  return {
+    ok: true,
+    data: {
+      dismissedCount: Math.max(0, Math.trunc(dismissedCount)),
+      remainingUnreadCount: Math.max(0, Math.trunc(remainingUnreadCount)),
+    },
+  };
+}
+
 export async function markCurrentProfileNotificationRead(
   notificationId: string
 ): Promise<
@@ -244,6 +287,7 @@ export async function getCurrentProfileUnreadNotificationCount(): Promise<
     .from(TB_PROFILE_NOTIFICATION)
     .select("notification_id", { count: "exact", head: true })
     .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data)
+    .is(COL_PROFILE_NOTIFICATION.dismissed_at, null)
     .is(COL_PROFILE_NOTIFICATION.read_at, null);
 
   if (error) return { ok: false, error: fromSupabaseError(error) };

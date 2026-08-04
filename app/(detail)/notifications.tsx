@@ -5,13 +5,14 @@ import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext"
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
 import {
+  dismissAllCurrentProfileNotifications,
   getCurrentProfileNotifications,
   markCurrentProfileNotificationRead,
   ProfileNotificationListItem,
 } from "@/src/services/notification.service";
 import { openPopup, PopupSummaryAction } from "@/src/services/popup.service";
 import { fontFamilies, Theme, useTheme } from "@/src/themes";
-import { showError } from "@/src/utils/useToast";
+import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
@@ -161,7 +162,8 @@ function getNotificationActions(
 export default function NotificationsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { refreshUnreadNotificationCount } = useActiveProfile();
+  const { applyUnreadNotificationCount, refreshUnreadNotificationCount } =
+    useActiveProfile();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = React.useMemo(
     () => createNotificationsStyles(t, topContentInset),
@@ -255,6 +257,52 @@ export default function NotificationsScreen() {
     [markNotificationRead]
   );
 
+  const openDismissAllConfirmation = React.useCallback(() => {
+    openPopup({
+      type: "summary",
+      title: "Limpiar notificaciones",
+      icon: "trash-2",
+      description:
+        "Las notificaciones actuales dejarán de aparecer. Las nuevas notificaciones seguirán mostrándose normalmente.",
+      actions: [
+        {
+          id: "keep-notifications",
+          label: "Volver",
+          icon: "arrow-left",
+          backgroundColorKey: "backgroudWhite",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+        },
+        {
+          id: "dismiss-all-notifications",
+          label: "Limpiar todas",
+          icon: "trash-2",
+          backgroundColorKey: "backgroudWhite",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: async () => {
+            const result = await dismissAllCurrentProfileNotifications();
+            if (!isMountedRef.current) return true;
+
+            if (!result.ok) {
+              showError(
+                "No se pudieron limpiar tus notificaciones",
+                result.error.message
+              );
+              return false;
+            }
+
+            setNotifications([]);
+            setLoadError(null);
+            applyUnreadNotificationCount(result.data.remainingUnreadCount);
+            showSuccess("Notificaciones limpiadas");
+            return true;
+          },
+        },
+      ],
+    });
+  }, [applyUnreadNotificationCount]);
+
   useFocusEffect(
     React.useCallback(() => {
       void loadNotifications();
@@ -297,6 +345,24 @@ export default function NotificationsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
+      <View style={s.listHeader}>
+        <Text variant="small" color="textMedium">
+          {notifications.length === 1
+            ? "1 notificación"
+            : `${notifications.length} notificaciones`}
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Limpiar todas las notificaciones"
+          hitSlop={8}
+          onPress={openDismissAllConfirmation}
+          style={s.dismissAllAction}
+        >
+          <Text variant="small" color="error">
+            Limpiar todas
+          </Text>
+        </Pressable>
+      </View>
       <GroupedList>
         {notifications.map((notification, index) => (
           <NotificationRow
@@ -381,6 +447,20 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     content: {
       paddingTop: topContentInset + t.spacing.sm,
       paddingBottom: t.spacing.xl,
+      gap: t.spacing.xs,
+    },
+    listHeader: {
+      minHeight: 44,
+      paddingHorizontal: t.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: t.spacing.sm,
+    },
+    dismissAllAction: {
+      minHeight: 44,
+      justifyContent: "center",
+      paddingHorizontal: t.spacing.sm,
     },
     loadingBox: {
       flex: 1,

@@ -9,7 +9,7 @@ import {
 import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { router } from "expo-router";
 import { supabase } from "./client";
-import { fromAppError } from "./errors";
+import { fromAppError, fromSupabaseError } from "./errors";
 
 export type AuthMethod = "sms";
 export type AuthEvent = "SignIn" | "SignUp";
@@ -23,6 +23,10 @@ export type InitialProfileInput = {
 };
 
 export class InitialProfileSetupError extends Error {}
+
+function throwLocalizedSupabaseError(error: unknown): never {
+  throw new Error(fromSupabaseError(error).message);
+}
 
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
@@ -39,7 +43,7 @@ async function sendPhoneOtp(phone: string, event: AuthEvent) {
       shouldCreateUser: shouldCreateUser,
     },
   });
-  if (error) throw error;
+  if (error) throwLocalizedSupabaseError(error);
   return data;
 }
 
@@ -48,7 +52,7 @@ async function isPhoneNumberRegistered(phone: string) {
     RPC_FUNCTIONS.PHONE_NUMBER_IS_REGISTERED,
     { p_phone: phone }
   );
-  if (error) throw error;
+  if (error) throwLocalizedSupabaseError(error);
   return data === true;
 }
 
@@ -64,7 +68,7 @@ async function VerifyPhoneOtpInternal(
       token,
       type: "sms",
     });
-    if (error) throw error;
+    if (error) throwLocalizedSupabaseError(error);
     if (!initialProfile) {
       await requestActiveProfileRefresh();
       return data;
@@ -135,7 +139,7 @@ export async function requestDeletionReauthenticationOtp(phone: string) {
     phone: normalizedPhone,
     options: { shouldCreateUser: false },
   });
-  if (error) throw error;
+  if (error) throwLocalizedSupabaseError(error);
 
   return { phone: normalizedPhone, userId };
 }
@@ -150,7 +154,7 @@ export async function verifyDeletionReauthenticationOtp(
     token: token.trim(),
     type: "sms",
   });
-  if (error) throw error;
+  if (error) throwLocalizedSupabaseError(error);
 
   const verifiedUserId = data.user?.id ?? data.session?.user.id;
   if (!verifiedUserId || verifiedUserId !== expectedUserId) {
@@ -177,7 +181,7 @@ export async function signOutLocally() {
 export async function signOut() {
   abortProfileScopedRequests();
   const { error } = await supabase.auth.signOut();
-  if (error) throw error;
+  if (error) throwLocalizedSupabaseError(error);
   setCurrentProfileSummary(null);
   setCurrentUserProfileCount(0);
   router.replace("/(auth)/auth");

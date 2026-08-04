@@ -32,7 +32,7 @@ Applies to service modules and RPC integration behavior.
 - Seller request open flow uses `get_or_create_seller_purchase_request_conversation`; this RPC owns conversation creation/reuse and visualization side effects.
 
 ## Profile, Account, And Notifications
-- Notification helpers live in `notification.service.ts`; unread state is `profile_notification.read_at`, opening a detail marks only that owned notification through `mark_profile_notification_read`, and shared counts update only from authoritative query/RPC results.
+- Notification helpers live in `notification.service.ts`; active unread state requires both `dismissed_at is null` and `read_at is null`, opening a detail marks only that owned notification through `mark_profile_notification_read`, dismissal retains history, and shared counts update only from authoritative query/RPC results.
 - Current-profile operations resolve through `active.profile.service.ts`; callers must not select a profile by auth user or phone.
 - Profile switching keeps the current auth session, persists the selected owned profile per device, and never sends OTP or signs out.
 - Profile email setup uses `profile.email`, `email_opt_in`, and `email_opt_in_at`; send/verify through email OTP RPCs and avoid a second client-side profile update after verification.
