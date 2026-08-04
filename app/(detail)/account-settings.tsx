@@ -24,6 +24,7 @@ import {
   requestCurrentProfileDeletion,
 } from "@/src/services/profile.service";
 import { Roles } from "@/src/services/role.service";
+import { getSupportEmail } from "@/src/services/support.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
@@ -612,6 +613,7 @@ function openDeletionOtpConfirmation({
             };
           }
 
+          const supportEmailResult = await getSupportEmail();
           const result =
             scope === "ACCOUNT"
               ? await requestCurrentLoginDeletion()
@@ -624,19 +626,20 @@ function openDeletionOtpConfirmation({
             return false;
           }
 
-          try {
-            await Clipboard.setStringAsync(result.data.statusUrl);
-          } catch {
-            // The confirmation popup still offers an explicit copy action.
-          }
-
           if (scope === "ACCOUNT") {
             await signOutLocally();
           } else {
             await refreshProfiles?.();
           }
 
-          setTimeout(() => openDeletionAccepted(result.data), 250);
+          setTimeout(
+            () =>
+              openDeletionAccepted(
+                result.data,
+                supportEmailResult.ok ? supportEmailResult.data : null
+              ),
+            250
+          );
           return true;
         },
       },
@@ -644,20 +647,33 @@ function openDeletionOtpConfirmation({
   });
 }
 
-function openDeletionAccepted(request: AccountDeletionRequestStatus) {
+function openDeletionAccepted(
+  request: AccountDeletionRequestStatus,
+  supportEmail: string | null
+) {
   const dueDate = new Intl.DateTimeFormat("es-CR", {
     dateStyle: "long",
   }).format(new Date(request.dueAt));
   const isFailed = request.status === "failed";
+  const isCompleted = request.status === "completed";
+  const supportInstruction = supportEmail
+    ? `Si necesitás consultar el estado, escribinos a ${supportEmail} e incluí el código de referencia.`
+    : "Si necesitás consultar el estado, contactá a soporte e incluí el código de referencia.";
 
   openPopup({
     type: "summary",
-    title: isFailed ? "Solicitud con incidencia" : "Solicitud recibida",
+    title: isFailed
+      ? "Solicitud con incidencia"
+      : isCompleted
+        ? "Eliminación completada"
+        : "Solicitud recibida",
     icon: isFailed ? "alert-circle" : "shield-check",
     metadata: `Estado: ${deletionStatusLabel(request.status)}`,
     description: isFailed
-      ? "La solicitud quedó registrada, pero necesita revisión de soporte. Guardá la referencia y el enlace de estado; no lo compartás."
-      : "Tu solicitud quedó registrada y se procesará automáticamente. No tenés que hacer nada más. Guardá el enlace de estado en un lugar seguro y no lo compartás.",
+      ? `La solicitud quedó registrada, pero necesita revisión de soporte. ${supportInstruction}`
+      : isCompleted
+        ? `La eliminación se completó. Guardá el código de referencia como comprobante. ${supportInstruction}`
+        : `Tu solicitud quedó registrada y se procesará automáticamente. ${supportInstruction}`,
     dismissOnBackdropPress: false,
     rows: [
       { label: "Código de referencia", value: request.requestId },
@@ -665,18 +681,18 @@ function openDeletionAccepted(request: AccountDeletionRequestStatus) {
     ],
     actions: [
       {
-        id: "copy-deletion-status",
-        label: "Copiar enlace",
+        id: "copy-deletion-reference",
+        label: "Copiar referencia",
         icon: "copy",
         showPendingState: false,
         onPress: async () => {
           try {
-            await Clipboard.setStringAsync(request.statusUrl);
+            await Clipboard.setStringAsync(request.requestId);
             return {
               shouldClose: false,
               feedback: {
                 tone: "success",
-                title: "Enlace copiado",
+                title: "Referencia copiada",
                 message: "Guardado en tu portapapeles.",
                 presentation: "toast",
               },
@@ -686,7 +702,7 @@ function openDeletionAccepted(request: AccountDeletionRequestStatus) {
               shouldClose: false,
               feedback: {
                 tone: "error",
-                title: "No se pudo copiar el enlace",
+                title: "No se pudo copiar la referencia",
                 message: "Intentá nuevamente.",
                 presentation: "toast",
               },
