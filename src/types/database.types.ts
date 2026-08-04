@@ -2126,6 +2126,7 @@ export type Database = {
           approval_reference: string | null
           approved_at: string | null
           approved_by: string | null
+          content_sha256: string | null
           created_at: string
           document_code: string
           effective_date: string | null
@@ -2138,6 +2139,7 @@ export type Database = {
           approval_reference?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          content_sha256?: string | null
           created_at?: string
           document_code: string
           effective_date?: string | null
@@ -2150,6 +2152,7 @@ export type Database = {
           approval_reference?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          content_sha256?: string | null
           created_at?: string
           document_code?: string
           effective_date?: string | null
@@ -4633,6 +4636,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_public_site_config: { Args: never; Returns: Json }
       get_purchase_request_favorites: {
         Args: {
           p_category_ids?: string[]
@@ -5066,6 +5070,7 @@ export type Database = {
         }
         Returns: Json
       }
+      service_get_account_deletion_status_url: { Args: never; Returns: string }
       service_get_deletion_status: {
         Args: { p_status_token_hash: string }
         Returns: Json
