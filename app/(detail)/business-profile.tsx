@@ -5,6 +5,10 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import ProfilePicture, {
+  getProfilePictureSource,
+  hasProfilePicture,
+} from "@/src/components/profile/ProfilePicture";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { formatLocationLabel } from "@/src/services/location.service";
@@ -57,6 +61,7 @@ export default function BusinessProfileScreen() {
   );
 
   const business = overview?.business ?? null;
+  const businessPicture = getProfilePictureSource(business);
   const selectedCategories = business?.categoryPreferences ?? [];
   const categoryLabel = getCategoryCountLabel(selectedCategories.length);
   const locationLabel = formatLocationLabel(business?.location);
@@ -103,9 +108,13 @@ export default function BusinessProfileScreen() {
       contentContainerStyle={s.content}
     >
       <View style={s.hero}>
-        <View style={s.heroIcon}>
-          <Icon name="house" size={24} color={t.colors.primary} />
-        </View>
+        <ProfilePicture
+          kind="business"
+          name={business.name}
+          imagePath={businessPicture.imagePath}
+          imageUrl={businessPicture.imageUrl}
+          size={72}
+        />
         <View style={s.heroText}>
           <Text variant="title" maxLines={2}>
             {business.name || "Negocio sin nombre"}
@@ -157,6 +166,21 @@ export default function BusinessProfileScreen() {
 
       {canManageBusiness ? (
         <GroupedListSection title="Administración">
+          <GroupedListRow
+            icon="house"
+            label="Foto del negocio"
+            description={
+              hasProfilePicture(business)
+                ? "Cambia la imagen que representa tu negocio."
+                : "Agrega una imagen que represente tu negocio."
+            }
+            onPress={() =>
+              router.push({
+                pathname: "/(modal)/profile-picture-edit",
+                params: { title: "Foto del negocio" },
+              })
+            }
+          />
           <GroupedListRow
             icon="tag"
             label="Categorías de venta"
@@ -228,14 +252,6 @@ function createBusinessProfileStyles(t: Theme, topContentInset = 0) {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
-    },
-    heroIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: "rgba(131,163,30,0.14)",
-      alignItems: "center",
-      justifyContent: "center",
     },
     heroText: {
       flex: 1,

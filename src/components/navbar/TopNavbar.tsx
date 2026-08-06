@@ -2,6 +2,7 @@ import { TextField } from "@/src/components/inputField/InputField";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { getProfilePictureSource } from "@/src/components/profile/ProfilePicture";
 import { getCurrentUserBusinessInvitations } from "@/src/services/active.profile.service";
 import RoleGate from "@/src/components/role/RoleGate";
 import { Text } from "@/src/components/Text";
@@ -365,19 +366,28 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const showProfileSwitcher = useCallback(() => {
     openPopup({
       type: "profileSwitcher",
-      profiles: profiles.map((profile) => ({
-        id: profile.profile.id,
-        title: profile.profile.name,
-        subtitle:
-          profile.role === "seller"
-            ? profile.businessName || "Vendedor"
-            : "Comprador",
-        unreadNotificationCount: profile.unreadCount,
-        isActive: profile.profile.id === activeProfile?.profile.id,
-        onPress: async () => {
-          await switchProfile(profile.profile.id);
-        },
-      })),
+      profiles: profiles.map((profile) => {
+        const picture =
+          profile.role === "buyer"
+            ? getProfilePictureSource(profile)
+            : { imagePath: null, imageUrl: null };
+
+        return {
+          id: profile.profile.id,
+          title: profile.profile.name,
+          subtitle:
+            profile.role === "seller"
+              ? profile.businessName || "Vendedor"
+              : "Comprador",
+          imagePath: picture.imagePath,
+          imageUrl: picture.imageUrl,
+          unreadNotificationCount: profile.unreadCount,
+          isActive: profile.profile.id === activeProfile?.profile.id,
+          onPress: async () => {
+            await switchProfile(profile.profile.id);
+          },
+        };
+      }),
       ...(isEmailSetupIncomplete
         ? {}
         : {

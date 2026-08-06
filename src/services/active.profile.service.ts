@@ -2,6 +2,7 @@ import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { Row } from "@/src/db/types";
 import { supabase } from "@/src/lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "@/src/lib/supabase/errors";
+import { STORAGE_BUCKETS } from "@/src/lib/supabase/storage";
 import { createKVStorage } from "@/src/store/factory";
 import {
   COSTA_RICA_LEGAL_ID_ERROR,
@@ -9,6 +10,7 @@ import {
   isValidCostaRicaLegalId,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
+import { parseProfileImageStorageReference } from "./profile-image.helpers";
 
 export type ActiveProfileSetupStatus =
   | "missing_role"
@@ -26,6 +28,8 @@ export type ActiveProfileSummary = {
   businessId: string | null;
   businessName: string | null;
   membershipRole: "owner" | "member" | null;
+  profileImagePath: string | null;
+  profileImageUrl: string | null;
   unreadCount: number;
 };
 
@@ -123,6 +127,21 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
     row.membership_role === "owner" || row.membership_role === "member"
       ? row.membership_role
       : null;
+  const profileImagePath =
+    typeof row.profile_image_path === "string" && row.profile_image_path.trim()
+      ? row.profile_image_path.trim()
+      : null;
+  const profileImageObjectPath = profileImagePath
+    ? parseProfileImageStorageReference(
+        profileImagePath,
+        STORAGE_BUCKETS.profileImages
+      )
+    : null;
+  const profileImageUrl = profileImageObjectPath
+    ? supabase.storage
+        .from(STORAGE_BUCKETS.profileImages)
+        .getPublicUrl(profileImageObjectPath).data.publicUrl || null
+    : null;
 
   return {
     profile: {
@@ -137,12 +156,15 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
       email_opt_in_at:
         typeof row.email_opt_in_at === "string" ? row.email_opt_in_at : null,
       is_default: row.is_default === true,
+      image_path: profileImagePath,
     } as ActiveProfile,
     setupStatus,
     role,
     businessId: typeof row.business_id === "string" ? row.business_id : null,
     businessName: typeof row.business_name === "string" ? row.business_name : null,
     membershipRole,
+    profileImagePath,
+    profileImageUrl,
     unreadCount: parseCount(row.unread_count),
   };
 }

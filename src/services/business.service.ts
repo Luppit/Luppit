@@ -5,6 +5,7 @@ import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { resolveProfileImageUrl } from "./profile-image.service";
 
 export type Business = Row<"business">;
 
@@ -41,6 +42,8 @@ export type BuyerVisibleBusinessOverview = {
     name: string | null;
     documentLabel: string | null;
     createdAt: string;
+    imagePath: string | null;
+    imageUrl: string | null;
     rating: number | null;
     numRatings: number;
     location: BuyerBusinessLocation | null;
@@ -118,6 +121,11 @@ function parseBuyerBusinessOverview(
           ? business.document_label
           : null,
       createdAt,
+      imagePath:
+        typeof business?.image_path === "string" && business.image_path.trim()
+          ? business.image_path.trim()
+          : null,
+      imageUrl: null,
       rating: parsedRating,
       numRatings: parsedNumRatings ?? 0,
       location:
@@ -228,7 +236,16 @@ async function getCurrentBuyerVisibleBusinessOverview(
   const parsed = parseBuyerBusinessOverview(data);
   if (!parsed) return { ok: false, error: fromAppError("not_found") };
 
-  return { ok: true, data: parsed };
+  return {
+    ok: true,
+    data: {
+      ...parsed,
+      business: {
+        ...parsed.business,
+        imageUrl: await resolveProfileImageUrl(parsed.business.imagePath),
+      },
+    },
+  };
 }
 
 export async function getBusinessById(

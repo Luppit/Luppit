@@ -5,6 +5,9 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import ProfilePicture, {
+  getProfilePictureSource,
+} from "@/src/components/profile/ProfilePicture";
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
@@ -69,6 +72,7 @@ function BuyerProfileContent() {
   );
 
   const phone = overview?.profile.phone?.trim() || "";
+  const buyerPicture = getProfilePictureSource(overview);
   const rating = overview?.stats.rating;
   const ratingLabel =
     typeof rating === "number" && overview?.stats.numRatings
@@ -104,15 +108,26 @@ function BuyerProfileContent() {
         <LoadingState label="Cargando perfil..." variant="inline" style={s.loadingBox} />
       ) : (
         <>
-          <View style={s.phoneCard}>
-            <View style={s.iconBadge}>
-              <Icon name="lock" size={21} color={t.colors.textDark} />
-            </View>
-            <View style={s.phoneText}>
-              <Text color="stateAnulated">Número telefónico</Text>
-              <Text variant="subtitle" maxLines={1} style={s.flexText}>
-                {phone || "Sin número registrado"}
+          <View style={s.buyerIdentityCard}>
+            <ProfilePicture
+              kind="buyer"
+              name={overview?.profile.name}
+              imagePath={buyerPicture.imagePath}
+              imageUrl={buyerPicture.imageUrl}
+              size={72}
+            />
+            <View style={s.buyerIdentityText}>
+              <Text variant="subtitle" maxLines={2} style={s.flexText}>
+                {overview?.profile.name?.trim() || "Perfil de comprador"}
               </Text>
+              <View style={s.buyerPhoneText}>
+                <Text variant="small" color="stateAnulated">
+                  Número telefónico
+                </Text>
+                <Text maxLines={1} style={s.flexText}>
+                  {phone || "Sin número registrado"}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -482,6 +497,22 @@ function createProfileStyles(t: Theme) {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm + t.spacing.xs,
+    },
+    buyerIdentityCard: {
+      minHeight: 104,
+      ...cardSurface,
+      padding: t.spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+    },
+    buyerIdentityText: {
+      flex: 1,
+      minWidth: 0,
+      gap: t.spacing.xs,
+    },
+    buyerPhoneText: {
+      gap: 2,
     },
     phoneText: {
       flex: 1,

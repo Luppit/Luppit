@@ -4,6 +4,7 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { hasProfilePicture } from "@/src/components/profile/ProfilePicture";
 import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import {
   requestDeletionReauthenticationOtp,
@@ -120,6 +121,7 @@ function BuyerAccountSettingsContent() {
     <AccountSettingsContent
       role={Roles.BUYER}
       profile={overview?.profile}
+      hasProfileImage={hasProfilePicture(overview)}
     />
   );
 }
@@ -164,6 +166,7 @@ function SellerAccountSettingsContent() {
     <AccountSettingsContent
       role={Roles.SELLER}
       profile={overview?.profile}
+      hasProfileImage={false}
     />
   );
 }
@@ -171,9 +174,11 @@ function SellerAccountSettingsContent() {
 function AccountSettingsContent({
   role,
   profile,
+  hasProfileImage,
 }: {
   role: Roles;
   profile?: Profile | null;
+  hasProfileImage: boolean;
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -194,6 +199,19 @@ function AccountSettingsContent({
       contentContainerStyle={s.content}
     >
       <GroupedListSection title="Cuenta">
+        {!isSeller ? (
+          <GroupedListRow
+            icon="user"
+            label="Foto de perfil"
+            value={hasProfileImage ? "Agregada" : "Sin foto"}
+            onPress={() =>
+              router.push({
+                pathname: "/(modal)/profile-picture-edit",
+                params: { title: "Foto de perfil" },
+              })
+            }
+          />
+        ) : null}
         <GroupedListRow
           icon="smartphone"
           label="Número telefónico"

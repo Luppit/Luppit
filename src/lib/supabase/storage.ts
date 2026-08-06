@@ -3,12 +3,17 @@ import { supabasePublicUrl } from "./client";
 export const STORAGE_BUCKETS = {
   conversations: "conversations",
   offers: "offers",
+  profileImages: "profile-images",
 } as const;
 
 export type StorageBucket =
   (typeof STORAGE_BUCKETS)[keyof typeof STORAGE_BUCKETS];
 
 export const STORAGE_URI_PREFIX = "storage://";
+
+export function createStorageImagePath(bucket: StorageBucket, path: string) {
+  return `${STORAGE_URI_PREFIX}${bucket}/${path}`;
+}
 
 export function parseStorageImagePath(
   imagePath: string,

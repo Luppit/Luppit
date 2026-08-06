@@ -245,6 +245,7 @@ export type Database = {
           created_at: string
           id: string
           id_document: string | null
+          image_path: string | null
           location_id: string | null
           name: string | null
           privacy_purge_after: string | null
@@ -253,6 +254,7 @@ export type Database = {
           created_at?: string
           id?: string
           id_document?: string | null
+          image_path?: string | null
           location_id?: string | null
           name?: string | null
           privacy_purge_after?: string | null
@@ -261,6 +263,7 @@ export type Database = {
           created_at?: string
           id?: string
           id_document?: string | null
+          image_path?: string | null
           location_id?: string | null
           name?: string | null
           privacy_purge_after?: string | null
@@ -2642,6 +2645,7 @@ export type Database = {
           email_opt_in_at: string | null
           id: string
           id_document: string
+          image_path: string | null
           is_default: boolean
           name: string
           phone: string | null
@@ -2654,6 +2658,7 @@ export type Database = {
           email_opt_in_at?: string | null
           id?: string
           id_document: string
+          image_path?: string | null
           is_default?: boolean
           name: string
           phone?: string | null
@@ -2666,6 +2671,7 @@ export type Database = {
           email_opt_in_at?: string | null
           id?: string
           id_document?: string
+          image_path?: string | null
           is_default?: boolean
           name?: string
           phone?: string | null
@@ -3832,6 +3838,7 @@ export type Database = {
           email_opt_in_at: string | null
           id: string
           id_document: string
+          image_path: string | null
           is_default: boolean
           name: string
           phone: string | null
@@ -4030,6 +4037,7 @@ export type Database = {
           email_opt_in_at: string | null
           id: string
           id_document: string
+          image_path: string | null
           is_default: boolean
           name: string
           phone: string | null
@@ -4062,6 +4070,7 @@ export type Database = {
           email_opt_in_at: string | null
           id: string
           id_document: string
+          image_path: string | null
           is_default: boolean
           name: string
           phone: string | null
@@ -4580,6 +4589,7 @@ export type Database = {
           membership_role: string
           name: string
           phone: string
+          profile_image_path: string
           role: string
           setup_status: string
           unread_count: number
@@ -5080,6 +5090,10 @@ export type Database = {
         Args: { p_request_id: string; p_request_type: string }
         Returns: Json
       }
+      service_prepare_deletion_request_before_profile_images: {
+        Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
       service_prepare_purchase_request_privacy_cleanup: {
         Args: { p_purchase_request_id: string }
         Returns: Json
@@ -5111,6 +5125,14 @@ export type Database = {
       }
       set_current_business_location: {
         Args: { p_location_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      set_current_business_profile_image: {
+        Args: { p_image_path: string; p_owner_profile_id: string }
+        Returns: Json
+      }
+      set_current_buyer_profile_image: {
+        Args: { p_image_path: string; p_profile_id: string }
         Returns: Json
       }
       submit_conversation_rating: {

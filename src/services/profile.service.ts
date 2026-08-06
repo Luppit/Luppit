@@ -44,6 +44,7 @@ import {
     mapAccountDeletionRequestStatus,
     type AccountDeletionRequestStatus,
 } from "./account.deletion.response";
+import { resolveProfileImageUrl } from "./profile-image.service";
 
 export type { AccountDeletionRequestStatus } from "./account.deletion.response";
 
@@ -88,6 +89,7 @@ export type HomePresetOption = HomePresetSummary & {
 export type BuyerHomePresetOption = HomePresetOption;
 export type BuyerProfileOverview = {
     profile: Profile;
+    profileImageUrl: string | null;
     stats: BuyerProfileStats;
     buyerHomePreset: BuyerHomePresetSummary | null;
 };
@@ -113,6 +115,8 @@ export type SellerBusinessOverview = {
     name: string | null;
     idDocument: string | null;
     createdAt: string;
+    imagePath: string | null;
+    imageUrl: string | null;
     rating: number | null;
     numRatings: number;
     location: SellerBusinessLocation | null;
@@ -613,6 +617,9 @@ export async function getCurrentBuyerProfileOverview(): Promise<
         ok: true,
         data: {
             profile: profileResult.data,
+            profileImageUrl: await resolveProfileImageUrl(
+                profileResult.data.image_path ?? null
+            ),
             stats: statsResult.data,
             buyerHomePreset: presetResult.data,
         },
@@ -650,6 +657,11 @@ async function getSellerBusinessOverview(profileId: string): Promise<
     if (!businessResult.data) {
         return { ok: true, data: null };
     }
+
+    const business = businessResult.data as typeof businessResult.data & {
+        image_path?: string | null;
+    };
+    const businessImagePath = business.image_path ?? null;
 
     const ratingResult = await supabase
         .from(TB_BUSINESS_RATING_SUMMARY)
@@ -721,6 +733,8 @@ async function getSellerBusinessOverview(profileId: string): Promise<
             name: businessResult.data.name,
             idDocument: businessResult.data.id_document,
             createdAt: businessResult.data.created_at,
+            imagePath: businessImagePath,
+            imageUrl: await resolveProfileImageUrl(businessImagePath),
             rating:
                 typeof ratingResult.data?.rating === "number"
                     ? ratingResult.data.rating

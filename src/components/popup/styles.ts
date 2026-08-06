@@ -138,8 +138,6 @@ export type GlobalPopupStyles = {
   profileSwitcherSection: ViewStyle;
   profileSwitcherRow: ViewStyle;
   profileSwitcherRowActive: ViewStyle;
-  profileSwitcherAvatar: ViewStyle;
-  profileSwitcherInitials: TextStyle;
   profileSwitcherContent: ViewStyle;
   profileSwitcherTitleRow: ViewStyle;
   profileSwitcherTitle: TextStyle;
@@ -779,20 +777,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       paddingHorizontal: t.spacing.md,
     },
     profileSwitcherRowActive: {},
-    profileSwitcherAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
-      backgroundColor: t.colors.backgroudWhite,
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-    },
-    profileSwitcherInitials: {
-      color: t.colors.textDark,
-    },
     profileSwitcherContent: {
       flex: 1,
       minWidth: 0,

@@ -70,6 +70,8 @@ export const RPC_FUNCTIONS = {
   SET_CURRENT_BUSINESS_CATEGORY_PREFERENCES:
     "set_current_business_category_preferences",
   SET_CURRENT_BUSINESS_LOCATION: "set_current_business_location",
+  SET_CURRENT_BUYER_PROFILE_IMAGE: "set_current_buyer_profile_image",
+  SET_CURRENT_BUSINESS_PROFILE_IMAGE: "set_current_business_profile_image",
   UPDATE_SELLER_OFFER_FULFILLMENT_FROM_CONVERSATION:
     "update_seller_offer_fulfillment_from_conversation",
   UNBLOCK_SAFETY_BLOCK: "unblock_safety_block",
