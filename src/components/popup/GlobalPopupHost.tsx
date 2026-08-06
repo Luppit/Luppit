@@ -4,6 +4,7 @@ import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
+import ProfilePicture from "@/src/components/profile/ProfilePicture";
 import SuccessPopupContent from "@/src/components/popup/SuccessPopupContent";
 import SuccessScreenConfetti from "@/src/components/popup/SuccessScreenConfetti";
 import StatusChip from "@/src/components/statusChip/StatusChip";
@@ -63,15 +64,6 @@ function formatDateValue(date: Date): string {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-function getInitials(name: string) {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
-  return initials || "?";
 }
 
 function formatUnreadNotificationCount(count?: number) {
@@ -1292,11 +1284,14 @@ export default function GlobalPopupHost() {
                               onPress={() => handleProfileSwitcherPress(index)}
                               accessibilityRole="button"
                             >
-                              <View style={s.profileSwitcherAvatar}>
-                                <Text variant="body" maxLines={1} style={s.profileSwitcherInitials}>
-                                  {getInitials(profile.title)}
-                                </Text>
-                              </View>
+                              <ProfilePicture
+                                kind="buyer"
+                                name={profile.title}
+                                imagePath={profile.imagePath}
+                                imageUrl={profile.imageUrl}
+                                size={48}
+                                accessible={false}
+                              />
 
                               <View style={s.profileSwitcherContent}>
                                 <View style={s.profileSwitcherTitleRow}>

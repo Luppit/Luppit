@@ -4,6 +4,9 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import ProfilePicture, {
+  getProfilePictureSource,
+} from "@/src/components/profile/ProfilePicture";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
@@ -109,6 +112,7 @@ export default function SellerBusinessScreen() {
   }
 
   const { business, categories, ratingTags, reviews } = overview;
+  const businessPicture = getProfilePictureSource(business);
   const locationLabel = formatLocationLabel(business.location);
   const ratingLabel =
     business.rating != null && business.numRatings > 0
@@ -123,9 +127,13 @@ export default function SellerBusinessScreen() {
       contentContainerStyle={s.content}
     >
       <View style={s.hero}>
-        <View style={s.heroIcon}>
-          <Icon name="house" size={24} color={t.colors.primary} />
-        </View>
+        <ProfilePicture
+          kind="business"
+          name={business.name}
+          imagePath={businessPicture.imagePath}
+          imageUrl={businessPicture.imageUrl}
+          size={72}
+        />
         <View style={s.heroText}>
           <Text variant="title" maxLines={2}>
             {business.name || "Negocio sin nombre"}
@@ -342,14 +350,6 @@ function createSellerBusinessStyles(t: Theme, topContentInset = 0) {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
-    },
-    heroIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: "rgba(131,163,30,0.14)",
-      alignItems: "center",
-      justifyContent: "center",
     },
     heroText: {
       flex: 1,

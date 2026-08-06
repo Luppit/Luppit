@@ -9,4 +9,5 @@ export const COL_BUSINESS = {
   id_document: "id_document",
   location_id: "location_id",
   privacy_purge_after: "privacy_purge_after",
+  image_path: "image_path",
 } as const satisfies { [K in keyof Row<"business"> & string]: K };

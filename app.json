@@ -43,6 +43,14 @@
       "expo-font",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permite que Luppit acceda a tus fotos para elegir una foto de perfil o del negocio.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",

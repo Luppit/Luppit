@@ -196,6 +196,8 @@ export type PopupProfileSwitcherItem = {
   id: string;
   title: string;
   subtitle?: string;
+  imagePath?: string | null;
+  imageUrl?: string | null;
   unreadNotificationCount?: number;
   isActive?: boolean;
   onPress?: () => void | Promise<void>;

@@ -17,6 +17,7 @@ export default function ModalLayout() {
     "/business-location-edit",
     "/email-setup",
     "/profile-field-edit",
+    "/profile-picture-edit",
   ].some((route) => pathname.includes(route));
 
   return (
