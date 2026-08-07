@@ -91,7 +91,7 @@ export default function NavbarItem({
   if (disabled) return content;
 
   return (
-    <Link href={item.href} asChild prefetch>
+    <Link href={item.href} asChild>
       {content}
     </Link>
   );

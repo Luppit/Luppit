@@ -52,6 +52,9 @@ export function isEmailSetupAllowedAppPath(path: string) {
   const normalizedPath = normalizeTabPath(path);
   return (
     normalizedPath === "/" ||
+    normalizedPath === "/auth" ||
+    normalizedPath === "/login" ||
+    normalizedPath === "/signup" ||
     normalizedPath === "/email-setup" ||
     normalizedPath === "/legal-document" ||
     normalizedPath.startsWith("/request/")

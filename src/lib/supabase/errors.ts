@@ -216,6 +216,28 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     message:
       "No pudimos revisar el contenido en este momento. Inténtalo nuevamente.",
   },
+  profile_image_not_allowed: {
+    type: "validation",
+    message:
+      "No podemos usar esta foto porque podría incumplir las normas de seguridad.",
+  },
+  profile_image_manage_forbidden: {
+    type: "auth",
+    message: "No tienes permiso para cambiar esta foto.",
+  },
+  profile_image_not_found: {
+    type: "not_found",
+    message: "La foto pendiente ya no está disponible. Inténtalo nuevamente.",
+  },
+  profile_image_update_failed: {
+    type: "unknown",
+    message: "No pudimos actualizar la foto. Inténtalo nuevamente.",
+  },
+  profile_image_function_not_deployed: {
+    type: "network",
+    message:
+      "El servicio para actualizar fotos todavía no está disponible. Inténtalo más tarde.",
+  },
   image_processing_failed: {
     type: "network",
     message: "No pudimos procesar la imagen. Inténtalo nuevamente.",

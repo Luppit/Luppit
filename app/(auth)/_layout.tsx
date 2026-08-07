@@ -8,7 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function AuthLayout() {
   const { state } = useActiveProfile();
 
-  if (state === "ready") return <Redirect href="/" />;
+  if (state === "ready") return <Redirect href="/(tabs)" />;
   if (state === "no_profile" || state === "setup_required") {
     return (
       <Redirect

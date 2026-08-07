@@ -4,6 +4,7 @@ export const STORAGE_BUCKETS = {
   conversations: "conversations",
   offers: "offers",
   profileImages: "profile-images",
+  profileImageStaging: "profile-image-staging",
 } as const;
 
 export type StorageBucket =

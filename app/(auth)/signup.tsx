@@ -4,7 +4,6 @@ import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import {
-  InitialProfileSetupError,
   signUpWithPhoneOtp,
   verifyPhoneOtp,
 } from "@/src/lib/supabase/auth";
@@ -143,14 +142,12 @@ function SellerAdminStep({
 }
 
 function VerifyStep({
-  next,
   userType,
   buyerValues,
   sellerBusinessValues,
   sellerAdminValues,
   legalAccepted,
 }: {
-  next: () => void;
   userType: UserType;
   buyerValues: BuyerFormValues;
   sellerBusinessValues: SellerBusinessValues;
@@ -185,15 +182,9 @@ function VerifyStep({
       code,
       initialProfile,
     )
-      .then(() => {
-        next();
-        return true;
-      })
+      .then(() => true)
       .catch((err) => {
         showError(err.message);
-        if (err instanceof InitialProfileSetupError) {
-          router.replace("/");
-        }
         return false;
       });
   };
@@ -276,9 +267,8 @@ export default function Signup() {
           title: "Verificación de código",
           description: "Ingresa el código enviado a tu teléfono",
           isNextStepShown: false,
-          render: (api) => (
+          render: () => (
             <VerifyStep
-              {...api}
               userType={userType}
               buyerValues={buyerValues}
               sellerBusinessValues={sellerBusinessValues}
@@ -312,9 +302,8 @@ export default function Signup() {
         title: "Verificación de código",
         description: "Ingresa el código enviado a tu teléfono",
         isNextStepShown: false,
-        render: (api) => (
+        render: () => (
           <VerifyStep
-            {...api}
             userType={userType}
             buyerValues={buyerValues}
             sellerBusinessValues={sellerBusinessValues}
@@ -338,7 +327,6 @@ export default function Signup() {
       <Stepper
         steps={steps}
         ref={stepperRef}
-        onFinish={() => router.replace("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
       <View style={styles.footer}>

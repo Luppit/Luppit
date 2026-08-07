@@ -6,16 +6,14 @@ import {
   fromAppError,
   fromSupabaseError,
 } from "../lib/supabase/errors";
-import {
-  STORAGE_BUCKETS,
-} from "../lib/supabase/storage";
+import { STORAGE_BUCKETS } from "../lib/supabase/storage";
 import {
   getCurrentProfileSummary,
   requestActiveProfileRefresh,
 } from "./active.profile.service";
 import {
-  createProfileImageObjectPath,
-  createProfileImageStorageReference,
+  createProfileImageStagingPath,
+  getProfileImageFunctionErrorCode,
   isExpectedProfileImageObjectPath,
   parseProfileImageStorageReference,
   validateProfileImage,
@@ -44,6 +42,11 @@ type ResolvedProfileImageTarget = ProfileImageTarget & {
 type SetProfileImageResponse = {
   entityId: string;
   imagePath: string | null;
+  previousImagePath: string | null;
+};
+
+type ModeratedProfileImageResponse = {
+  imagePath: string;
   previousImagePath: string | null;
 };
 
@@ -76,6 +79,46 @@ function createUuid() {
 
 function toNullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function hasJsonResponse(
+  value: unknown
+): value is { json: () => Promise<unknown>; clone?: () => unknown } {
+  return Boolean(value) && typeof (value as { json?: unknown }).json === "function";
+}
+
+async function mapProfileImageFunctionError(error: unknown): Promise<AppError> {
+  const context = toRecord(error)?.context;
+  let payload: Record<string, unknown> | null = null;
+
+  if (hasJsonResponse(context)) {
+    try {
+      const response =
+        typeof context.clone === "function" ? context.clone() : context;
+      payload = toRecord(
+        await (hasJsonResponse(response) ? response : context).json()
+      );
+    } catch {
+      payload = null;
+    }
+  }
+
+  const errorCode =
+    getProfileImageFunctionErrorCode(payload) ??
+    getProfileImageFunctionErrorCode(error);
+  return errorCode
+    ? fromSupabaseError({
+        error_code: errorCode,
+        code: errorCode,
+        message: errorCode,
+      })
+    : fromSupabaseError(error);
 }
 
 function parseSetProfileImageResponse(
@@ -213,10 +256,39 @@ function getOwnedObjectPath(
   return objectPath;
 }
 
+function parseModeratedProfileImageResponse(
+  value: unknown,
+  target: ResolvedProfileImageTarget
+): ModeratedProfileImageResponse | null {
+  const row = toRecord(value);
+  const imagePath = toNullableString(row?.imagePath);
+  const previousImagePath = toNullableString(row?.previousImagePath);
+  if (
+    row?.ok !== true ||
+    !imagePath ||
+    !getOwnedObjectPath(imagePath, target)
+  ) {
+    return null;
+  }
+
+  return { imagePath, previousImagePath };
+}
+
 async function removeStorageObject(path: string) {
   try {
     const result = await supabase.storage
       .from(STORAGE_BUCKETS.profileImages)
+      .remove([path]);
+    return !result.error;
+  } catch {
+    return false;
+  }
+}
+
+async function removeStagingObject(path: string) {
+  try {
+    const result = await supabase.storage
+      .from(STORAGE_BUCKETS.profileImageStaging)
       .remove([path]);
     return !result.error;
   } catch {
@@ -283,22 +355,18 @@ export async function saveCurrentProfileImage(
   );
   if (!validation.ok) return validation;
 
-  const objectPath = createProfileImageObjectPath(
+  const pendingImagePath = createProfileImageStagingPath(
+    target.activeProfileId,
     target.kind,
     target.entityId,
     validation.data.extension,
     createUuid()
   );
-  const imagePath = createProfileImageStorageReference(
-    STORAGE_BUCKETS.profileImages,
-    objectPath
-  );
-  if (!imagePath) return { ok: false, error: fromAppError("validation") };
   let uploadResult;
   try {
     uploadResult = await supabase.storage
-      .from(STORAGE_BUCKETS.profileImages)
-      .upload(objectPath, body, {
+      .from(STORAGE_BUCKETS.profileImageStaging)
+      .upload(pendingImagePath, body, {
         contentType: validation.data.contentType,
         upsert: false,
       });
@@ -309,19 +377,39 @@ export async function saveCurrentProfileImage(
     return { ok: false, error: fromSupabaseError(uploadResult.error) };
   }
 
-  const metadataResult = await setProfileImageMetadata(target, imagePath);
-  if (!metadataResult.ok || metadataResult.data.imagePath !== imagePath) {
-    await removeStorageObject(objectPath);
-    return metadataResult.ok
-      ? { ok: false, error: fromAppError("validation") }
-      : metadataResult;
+  let functionResult;
+  try {
+    functionResult = await supabase.functions.invoke(
+      "set-moderated-profile-image",
+      {
+        body: {
+          profileId: target.activeProfileId,
+          targetKind: target.kind,
+          targetId: target.entityId,
+          pendingImagePath,
+        },
+      }
+    );
+  } catch {
+    await removeStagingObject(pendingImagePath);
+    return { ok: false, error: fromAppError("network") };
   }
 
-  const previousImagePath =
-    metadataResult.data.previousImagePath ?? target.imagePath;
-  if (previousImagePath && previousImagePath !== imagePath) {
-    const previousObjectPath = getOwnedObjectPath(previousImagePath, target);
-    if (previousObjectPath) await removeStorageObject(previousObjectPath);
+  if (functionResult.error) {
+    await removeStagingObject(pendingImagePath);
+    return {
+      ok: false,
+      error: await mapProfileImageFunctionError(functionResult.error),
+    };
+  }
+
+  const moderated = parseModeratedProfileImageResponse(
+    functionResult.data,
+    target
+  );
+  if (!moderated) {
+    await removeStagingObject(pendingImagePath);
+    return { ok: false, error: fromAppError("validation") };
   }
 
   await refreshActiveProfile(target.activeProfileId);
@@ -330,8 +418,8 @@ export async function saveCurrentProfileImage(
     data: {
       kind: target.kind,
       entityId: target.entityId,
-      imagePath,
-      imageUrl: await resolveProfileImageUrl(imagePath),
+      imagePath: moderated.imagePath,
+      imageUrl: await resolveProfileImageUrl(moderated.imagePath),
       canManage: true,
     },
   };

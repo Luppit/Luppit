@@ -61,6 +61,8 @@ async function VerifyPhoneOtpInternal(
   token: string,
   initialProfile?: InitialProfileInput
 ) {
+  let didVerifySession = false;
+  let preferredProfileId: string | null = null;
   if (initialProfile) setInitialProfileBootstrapPending(true);
   try {
     const { data, error } = await supabase.auth.verifyOtp({
@@ -69,6 +71,7 @@ async function VerifyPhoneOtpInternal(
       type: "sms",
     });
     if (error) throwLocalizedSupabaseError(error);
+    didVerifySession = true;
     if (!initialProfile) {
       await requestActiveProfileRefresh();
       return data;
@@ -97,13 +100,17 @@ async function VerifyPhoneOtpInternal(
       businessIdDocument: initialProfile.businessIdDocument,
     });
     if (!profileResult.ok) {
-      await requestActiveProfileRefresh();
       throw new InitialProfileSetupError(profileResult.error.message);
     }
-    await requestActiveProfileRefresh(profileResult.data.id);
+    preferredProfileId = profileResult.data.id;
     return data;
   } finally {
-    if (initialProfile) setInitialProfileBootstrapPending(false);
+    if (initialProfile) {
+      setInitialProfileBootstrapPending(false);
+      if (didVerifySession) {
+        await requestActiveProfileRefresh(preferredProfileId);
+      }
+    }
   }
 }
 

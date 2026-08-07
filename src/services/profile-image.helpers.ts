@@ -33,6 +33,24 @@ type ProfileImageValidationResult =
   | { ok: true; data: ValidatedProfileImage }
   | { ok: false; error: AppError };
 
+export function getProfileImageFunctionErrorCode(value: unknown) {
+  if (!value || typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  const candidate =
+    typeof record.error_code === "string"
+      ? record.error_code
+      : typeof record.code === "string"
+        ? record.code
+        : null;
+  const normalized = candidate?.trim();
+  if (!normalized) return null;
+
+  return normalized.toUpperCase() === "NOT_FOUND"
+    ? "profile_image_function_not_deployed"
+    : normalized;
+}
+
 const INVALID_IMAGE_ERROR: AppError = {
   type: "validation",
   code: "invalid_profile_image",
@@ -165,6 +183,30 @@ export function createProfileImageObjectPath(
 ) {
   const prefix = kind === "buyer_profile" ? "buyers" : "businesses";
   return `${prefix}/${entityId}/${objectId}.${extension}`;
+}
+
+export function createProfileImageStagingPath(
+  profileId: string,
+  kind: ProfileImageKind,
+  entityId: string,
+  extension: ProfileImageExtension,
+  objectId: string
+) {
+  return `pending/${profileId}/${kind}/${entityId}/${objectId}.${extension}`;
+}
+
+export function isExpectedProfileImageStagingPath(
+  path: string,
+  profileId: string,
+  kind: ProfileImageKind,
+  entityId: string
+) {
+  const escapedProfileId = profileId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedEntityId = entityId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `^pending/${escapedProfileId}/${kind}/${escapedEntityId}/${UUID_PATTERN}\\.(?:jpg|jpeg|png|webp)$`,
+    "i"
+  ).test(path);
 }
 
 export function isExpectedProfileImageObjectPath(
