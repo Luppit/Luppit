@@ -2850,6 +2850,63 @@ export type Database = {
           },
         ]
       }
+      profile_image_moderation_event: {
+        Row: {
+          actor_profile_id: string
+          categories: Json
+          content_sha256: string | null
+          created_at: string
+          id: string
+          model: string | null
+          outcome: string
+          provider: string
+          provider_request_id: string | null
+          target_id: string
+          target_kind: string
+        }
+        Insert: {
+          actor_profile_id: string
+          categories?: Json
+          content_sha256?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          outcome: string
+          provider?: string
+          provider_request_id?: string | null
+          target_id: string
+          target_kind: string
+        }
+        Update: {
+          actor_profile_id?: string
+          categories?: Json
+          content_sha256?: string | null
+          created_at?: string
+          id?: string
+          model?: string | null
+          outcome?: string
+          provider?: string
+          provider_request_id?: string | null
+          target_id?: string
+          target_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_image_moderation_event_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_image_moderation_event_actor_profile_id_fkey"
+            columns: ["actor_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_notification: {
         Row: {
           created_at: string
@@ -4153,6 +4210,21 @@ export type Database = {
         }
         Returns: Json
       }
+      finalize_profile_image_moderation: {
+        Args: {
+          p_categories?: Json
+          p_content_sha256?: string
+          p_image_path: string
+          p_model: string
+          p_outcome: string
+          p_profile_id: string
+          p_provider_request_id?: string
+          p_target_id: string
+          p_target_kind: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       get_active_legal_document: { Args: { p_code: string }; Returns: Json }
       get_buyer_home_purchase_requests: {
         Args: {
@@ -4811,6 +4883,16 @@ export type Database = {
         Args: { p_phone: string }
         Returns: boolean
       }
+      prepare_profile_image_moderation: {
+        Args: {
+          p_pending_image_path: string
+          p_profile_id: string
+          p_target_id: string
+          p_target_kind: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       process_expired_conversation_deadlines: { Args: never; Returns: Json }
       publish_purchase_request: {
         Args: {
@@ -5074,6 +5156,10 @@ export type Database = {
         Args: { p_purchase_request_id: string }
         Returns: Json
       }
+      service_confirm_waitlist_subscription: {
+        Args: { p_client_hash: string; p_confirmation_token_hash: string }
+        Returns: Json
+      }
       service_enqueue_account_deletion: {
         Args: { p_request_channel: string; p_user_id: string }
         Returns: Json
@@ -5086,6 +5172,10 @@ export type Database = {
         }
         Returns: Json
       }
+      service_mark_waitlist_confirmation_sent: {
+        Args: { p_confirmation_token_hash: string }
+        Returns: boolean
+      }
       service_prepare_deletion_request: {
         Args: { p_request_id: string; p_request_type: string }
         Returns: Json
@@ -5097,6 +5187,26 @@ export type Database = {
       service_prepare_purchase_request_privacy_cleanup: {
         Args: { p_purchase_request_id: string }
         Returns: Json
+      }
+      service_prepare_waitlist_subscription: {
+        Args: {
+          p_client_hash: string
+          p_confirmation_token_hash: string
+          p_consent_version: string
+          p_email: string
+          p_privacy_policy_sha256: string
+          p_privacy_policy_version: string
+          p_source: string
+        }
+        Returns: Json
+      }
+      service_release_waitlist_confirmation: {
+        Args: { p_confirmation_token_hash: string }
+        Returns: boolean
+      }
+      service_remove_waitlist_subscription: {
+        Args: { p_email: string }
+        Returns: boolean
       }
       service_replay_deletion_ledger: {
         Args: { p_entries: Json }

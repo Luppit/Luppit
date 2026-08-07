@@ -794,7 +794,7 @@ function AccountSetupRequiredState({
           onPress={() => void signOut()}
           style={s.stateSignOut}
         >
-          <Text variant="small" color="textMedium">
+          <Text variant="body" color="error">
             Cerrar sesión
           </Text>
         </Pressable>

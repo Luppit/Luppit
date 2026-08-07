@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 type ProfileRole = "buyer" | "seller";
+type SellerLinkMode = "business" | "invitation";
 
 function formatInvitationDate(value: string) {
   return new Date(value).toLocaleDateString("es-CR", {
@@ -57,9 +58,8 @@ export default function CreateProfileScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ setup?: string }>();
-  const { state, profiles, activeProfile, refreshProfiles } = useActiveProfile();
+  const { state, activeProfile, refreshProfiles } = useActiveProfile();
   const isRepair = params.setup === "true" && state === "setup_required";
-  const hasProfiles = profiles.length > 0;
   const requiresBusinessRepair =
     isRepair && activeProfile?.setupStatus === "missing_business";
   const s = useMemo(
@@ -82,6 +82,8 @@ export default function CreateProfileScreen() {
   );
   const [businessName, setBusinessName] = useState("");
   const [businessIdDocument, setBusinessIdDocument] = useState("");
+  const [sellerLinkMode, setSellerLinkMode] =
+    useState<SellerLinkMode | null>(null);
   const [invitationId, setInvitationId] = useState<string | null>(null);
   const [invitations, setInvitations] = useState<CurrentUserBusinessInvitation[]>(
     []
@@ -102,6 +104,9 @@ export default function CreateProfileScreen() {
       return;
     }
     setInvitations(result.data);
+    setInvitationId((current) =>
+      result.data.some((invitation) => invitation.id === current) ? current : null
+    );
     setIsLoadingInvitations(false);
   }, []);
 
@@ -109,15 +114,10 @@ export default function CreateProfileScreen() {
     void loadInvitations();
   }, [loadInvitations]);
 
-  useEffect(() => {
-    if (params.setup === "true" && state === "ready") {
-      router.replace("/");
-    }
-  }, [params.setup, state]);
-
-  const sellerNeedsInvitation = role === "seller" && hasProfiles && !isRepair;
   const sellerCreatesBusiness =
-    role === "seller" && !invitationId && !sellerNeedsInvitation;
+    role === "seller" && sellerLinkMode === "business";
+  const sellerUsesInvitation =
+    role === "seller" && sellerLinkMode === "invitation";
   const selectedInvitation =
     invitations.find((invitation) => invitation.id === invitationId) ?? null;
   const idDocumentError =
@@ -159,7 +159,7 @@ export default function CreateProfileScreen() {
         return;
       }
       showProfileReady();
-      router.replace("/");
+      router.replace("/(tabs)");
       return;
     }
 
@@ -169,7 +169,10 @@ export default function CreateProfileScreen() {
     if (!isRepair && !idDocument.trim()) {
       missingFields.push("identificación personal");
     }
-    if (sellerNeedsInvitation && !invitationId) {
+    if (role === "seller" && !sellerLinkMode) {
+      missingFields.push("vinculación del negocio");
+    }
+    if (sellerUsesInvitation && !invitationId) {
       missingFields.push("invitación de negocio");
     }
     if (sellerCreatesBusiness && !businessName.trim()) {
@@ -192,21 +195,25 @@ export default function CreateProfileScreen() {
     }
 
     setIsSaving(true);
+    const sellerLinkInput =
+      role !== "seller"
+        ? {}
+        : sellerCreatesBusiness
+          ? { businessName, businessIdDocument }
+          : sellerUsesInvitation
+            ? { invitationId }
+            : {};
     const result =
       isRepair && activeProfile
         ? await completeCurrentUserProfileSetup(activeProfile.profile.id, {
             role,
-            businessName,
-            businessIdDocument,
-            invitationId,
+            ...sellerLinkInput,
           })
         : await createCurrentUserProfile({
             name,
             idDocument,
             role,
-            businessName,
-            businessIdDocument,
-            invitationId,
+            ...sellerLinkInput,
           });
     if (!result.ok) {
       setIsSaving(false);
@@ -226,7 +233,7 @@ export default function CreateProfileScreen() {
     }
     setCreatedProfileId(null);
     showProfileReady();
-    router.replace("/");
+    router.replace("/(tabs)");
   };
 
   const declineInvitation = async (invitation: CurrentUserBusinessInvitation) => {
@@ -304,67 +311,6 @@ export default function CreateProfileScreen() {
           </FormSection>
         ) : null}
 
-        {isLoadingInvitations ? (
-          <GroupedListSection title="Invitaciones pendientes">
-            <LoadingState
-              label="Revisando invitaciones..."
-              variant="inline"
-              style={s.invitationLoading}
-            />
-          </GroupedListSection>
-        ) : hasInvitationLoadError ? (
-          <GroupedListSection title="Invitaciones pendientes">
-            <GroupedListRow
-              icon="alert-circle"
-              label="No pudimos revisar tus invitaciones"
-              description="Toca para intentarlo nuevamente."
-              showSeparator={false}
-              onPress={() => void loadInvitations()}
-            />
-          </GroupedListSection>
-        ) : invitations.length > 0 ? (
-          <GroupedListSection title="Invitaciones pendientes">
-            {invitations.map((invitation, index) => {
-              const selected = invitation.id === invitationId;
-              const inviter = invitation.inviterProfileName.trim();
-              return (
-                <GroupedListRow
-                  key={invitation.id}
-                  icon="handshake"
-                  label={
-                    inviter
-                      ? `${inviter} te invitó a ${invitation.businessName}`
-                      : `Te invitaron a ${invitation.businessName}`
-                  }
-                  description={`Crea un perfil vendedor como miembro · Vence el ${formatInvitationDate(invitation.expiresAt)}.`}
-                  descriptionMaxLines={3}
-                  showChevron={false}
-                  showSeparator={
-                    index < invitations.length - 1 || Boolean(selectedInvitation)
-                  }
-                  rightAccessory={
-                    <SelectionIndicator selected={selected} styles={s} />
-                  }
-                  onPress={() => {
-                    setRole("seller");
-                    setInvitationId(invitation.id);
-                  }}
-                />
-              );
-            })}
-            {selectedInvitation ? (
-              <GroupedListRow
-                icon="x-circle"
-                label="Rechazar esta invitación"
-                destructive
-                showChevron={false}
-                showSeparator={false}
-                onPress={() => openDeclineInvitation(selectedInvitation)}
-              />
-            ) : null}
-          </GroupedListSection>
-        ) : null}
-
         {!requiresBusinessRepair && (!isRepair || activeProfile?.role == null) ? (
           <GroupedListSection title="Tipo de perfil">
             <GroupedListRow
@@ -377,40 +323,146 @@ export default function CreateProfileScreen() {
               }
               onPress={() => {
                 setRole("buyer");
+                setSellerLinkMode(null);
                 setInvitationId(null);
               }}
             />
             <GroupedListRow
               icon="handshake"
               label="Vendedor"
-              description={
-                sellerNeedsInvitation
-                  ? "Necesitas una invitación vigente para crear otro perfil vendedor."
-                  : "Para vender desde un negocio."
-              }
+              description="Para vender desde un negocio propio o mediante una invitación."
               descriptionMaxLines={3}
               showChevron={false}
               showSeparator={false}
               rightAccessory={
                 <SelectionIndicator selected={role === "seller"} styles={s} />
               }
-              onPress={() => setRole("seller")}
+              onPress={() => {
+                if (role !== "seller") {
+                  setSellerLinkMode(null);
+                  setInvitationId(null);
+                }
+                setRole("seller");
+              }}
             />
           </GroupedListSection>
         ) : null}
 
-        {sellerNeedsInvitation &&
-        !isLoadingInvitations &&
-        !hasInvitationLoadError &&
-        invitations.length === 0 ? (
-          <GroupedListSection title="Invitación de negocio">
+        {role === "seller" ? (
+          <GroupedListSection title="Vinculación del negocio">
             <GroupedListRow
-              icon="info"
-              label="Necesitas una invitación"
-              description="La persona propietaria del negocio debe invitar el número con el que inicias sesión en Luppit."
+              icon="circle-plus"
+              label="Crear un negocio"
+              description="Este perfil será propietario del nuevo negocio."
               descriptionMaxLines={3}
-              showSeparator={false}
+              showChevron={false}
+              showSeparator
+              rightAccessory={
+                <SelectionIndicator
+                  selected={sellerLinkMode === "business"}
+                  styles={s}
+                />
+              }
+              onPress={() => {
+                setSellerLinkMode("business");
+                setInvitationId(null);
+              }}
             />
+
+            <GroupedListRow
+              icon="handshake"
+              label="Usar una invitación"
+              description="Únete como miembro de un negocio que te invitó."
+              descriptionMaxLines={3}
+              showChevron={false}
+              showSeparator={sellerUsesInvitation}
+              rightAccessory={
+                <SelectionIndicator
+                  selected={sellerUsesInvitation}
+                  styles={s}
+                />
+              }
+              onPress={() => {
+                setSellerLinkMode("invitation");
+                if (!sellerUsesInvitation) setInvitationId(null);
+              }}
+            />
+
+            {sellerUsesInvitation && isLoadingInvitations ? (
+              <LoadingState
+                label="Revisando invitaciones..."
+                variant="inline"
+                style={s.invitationLoading}
+              />
+            ) : sellerUsesInvitation && hasInvitationLoadError ? (
+              <GroupedListRow
+                icon="alert-circle"
+                label="No pudimos revisar tus invitaciones"
+                description="Toca aquí para intentarlo nuevamente."
+                descriptionMaxLines={3}
+                showSeparator={false}
+                onPress={() => void loadInvitations()}
+              />
+            ) : sellerUsesInvitation && invitations.length === 0 ? (
+              <>
+                <GroupedListRow
+                  icon="info"
+                  label="No tienes invitaciones pendientes"
+                  description="Pide a la persona propietaria del negocio que te invite con este número."
+                  descriptionMaxLines={3}
+                  showChevron={false}
+                  showSeparator={false}
+                />
+                <View style={s.invitationRetryAction}>
+                  <Button
+                    title="Revisar invitaciones"
+                    variant="white"
+                    icon="search"
+                    onPress={() => void loadInvitations()}
+                  />
+                </View>
+              </>
+            ) : sellerUsesInvitation ? (
+              invitations.map((invitation, index) => {
+                const selected = invitation.id === invitationId;
+                const inviter = invitation.inviterProfileName.trim();
+                return (
+                  <GroupedListRow
+                    key={invitation.id}
+                    icon="handshake"
+                    label={
+                      inviter
+                        ? `${inviter} te invitó a ${invitation.businessName}`
+                        : `Te invitaron a ${invitation.businessName}`
+                    }
+                    description={`Unirte como miembro · Vence el ${formatInvitationDate(invitation.expiresAt)}.`}
+                    descriptionMaxLines={3}
+                    showChevron={false}
+                    showSeparator={
+                      index < invitations.length - 1 || Boolean(selectedInvitation)
+                    }
+                    rightAccessory={
+                      <SelectionIndicator selected={selected} styles={s} />
+                    }
+                    onPress={() => {
+                      setSellerLinkMode("invitation");
+                      setInvitationId(invitation.id);
+                    }}
+                  />
+                );
+              })
+            ) : null}
+
+            {selectedInvitation ? (
+              <GroupedListRow
+                icon="x-circle"
+                label="Rechazar esta invitación"
+                destructive
+                showChevron={false}
+                showSeparator={false}
+                onPress={() => openDeclineInvitation(selectedInvitation)}
+              />
+            ) : null}
           </GroupedListSection>
         ) : null}
 
@@ -537,6 +589,10 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
     },
     invitationLoading: {
       minHeight: 74,
+    },
+    invitationRetryAction: {
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.md,
     },
     selectionIndicator: {
       width: 24,

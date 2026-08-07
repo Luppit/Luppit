@@ -145,6 +145,10 @@ export default function ProfilePicture({
   );
   const [isImageLoading, setIsImageLoading] = useState(Boolean(resolvedUrl));
   const [hasImageError, setHasImageError] = useState(false);
+  const imageSource = useMemo(
+    () => (resolvedUrl ? { uri: resolvedUrl } : null),
+    [resolvedUrl]
+  );
   const isBuyer = kind === "buyer";
   const radius = isBuyer ? size / 2 : Math.round(size * 0.29);
   const hasLoadError = hasResolutionError || hasImageError;
@@ -204,11 +208,13 @@ export default function ProfilePicture({
         )}
       </View>
 
-      {resolvedUrl && !hasImageError ? (
+      {imageSource && !hasImageError ? (
         <Image
-          source={{ uri: resolvedUrl }}
+          key={resolvedUrl}
+          source={imageSource}
           resizeMode="cover"
           onLoadStart={() => setIsImageLoading(true)}
+          onLoad={() => setIsImageLoading(false)}
           onLoadEnd={() => setIsImageLoading(false)}
           onError={() => {
             setHasImageError(true);

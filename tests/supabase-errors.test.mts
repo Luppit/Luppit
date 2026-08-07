@@ -35,3 +35,15 @@ test("does not expose an unknown provider message", () => {
   assert.equal(error.message, "Ocurrió un error, intenta de nuevo.");
   assert.equal(error.message.includes("provider"), false);
 });
+
+test("localizes an undeployed profile-image function", () => {
+  const error = fromSupabaseError({
+    code: "profile_image_function_not_deployed",
+  });
+
+  assert.equal(error.type, "network");
+  assert.equal(
+    error.message,
+    "El servicio para actualizar fotos todavía no está disponible. Inténtalo más tarde."
+  );
+});

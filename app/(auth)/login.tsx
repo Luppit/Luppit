@@ -59,13 +59,10 @@ export function Step1({ next, values, setValues }: any) {
   );
 }
 
-export function Step2({ next, back, values }: any) {
+export function Step2({ values }: any) {
   const onVerify = async (code: string) => {
     return await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
-      .then(async () => {
-        next();
-        return true;
-      })
+      .then(() => true)
       .catch((err) => {
         showError(err.message);
         return false;
@@ -114,7 +111,7 @@ export default function Login() {
         title: "Verificación de código",
         description: "Ingresa el código enviado a tu teléfono",
         isNextStepShown: false,
-        render: (api) => <Step2 {...api} values={values} />,
+        render: () => <Step2 values={values} />,
       },
     ],
     [values]
@@ -125,7 +122,6 @@ export default function Login() {
       <Stepper
         steps={steps}
         ref={stepperRef}
-        onFinish={() => router.replace("/(tabs)")}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
     </View>

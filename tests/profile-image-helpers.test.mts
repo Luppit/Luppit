@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createProfileImageObjectPath,
+  createProfileImageStagingPath,
   createProfileImageStorageReference,
   detectProfileImageMimeType,
+  getProfileImageFunctionErrorCode,
   isExpectedProfileImageObjectPath,
+  isExpectedProfileImageStagingPath,
   isProfileImageObjectPath,
   MAX_PROFILE_IMAGE_BYTES,
   parseProfileImageStorageReference,
@@ -18,6 +21,20 @@ const pngBytes = new Uint8Array([
 const webpBytes = new Uint8Array([
   0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
 ]);
+
+test("maps the hosted missing-function response to a release-specific error", () => {
+  assert.equal(
+    getProfileImageFunctionErrorCode({
+      code: "NOT_FOUND",
+      message: "Requested function was not found",
+    }),
+    "profile_image_function_not_deployed"
+  );
+  assert.equal(
+    getProfileImageFunctionErrorCode({ error_code: "profile_image_not_allowed" }),
+    "profile_image_not_allowed"
+  );
+});
 
 test("detects supported profile image formats from their bytes", () => {
   assert.equal(detectProfileImageMimeType(jpegBytes), "image/jpeg");
@@ -119,6 +136,42 @@ test("creates and recognizes owner-scoped immutable object paths", () => {
     false
   );
   assert.equal(isProfileImageObjectPath("businesses/not-a-uuid/file.webp"), false);
+});
+
+test("creates and recognizes profile-scoped staging paths", () => {
+  const profileId = "20000000-0000-4000-8000-000000000001";
+  const businessId = "30000000-0000-4000-8000-000000000001";
+  const objectId = "40000000-0000-4000-8000-000000000001";
+  const path = createProfileImageStagingPath(
+    profileId,
+    "business",
+    businessId,
+    "webp",
+    objectId
+  );
+
+  assert.equal(
+    path,
+    `pending/${profileId}/business/${businessId}/${objectId}.webp`
+  );
+  assert.equal(
+    isExpectedProfileImageStagingPath(
+      path,
+      profileId,
+      "business",
+      businessId
+    ),
+    true
+  );
+  assert.equal(
+    isExpectedProfileImageStagingPath(
+      path,
+      "20000000-0000-4000-8000-000000000002",
+      "business",
+      businessId
+    ),
+    false
+  );
 });
 
 test("maps only canonical profile-image storage references", () => {

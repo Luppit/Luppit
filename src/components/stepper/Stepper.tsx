@@ -48,7 +48,7 @@ export type StepperRef = {
 export type StepperProps = {
   steps: Step[];
   initialStep?: number;
-  onFinish: () => void;
+  onFinish?: () => void;
   onBackAtFirstStep?: () => void;
   style?: StyleProp<ViewStyle>;
 };
