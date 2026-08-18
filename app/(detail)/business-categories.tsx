@@ -190,7 +190,7 @@ export default function BusinessCategoriesScreen() {
     if (!isBusinessOwner) {
       showError(
         "Acceso restringido",
-        "Solo la persona propietaria puede cambiar las categorías del negocio."
+        "Solo el administrador principal puede cambiar las categorías del negocio."
       );
       return;
     }
@@ -263,8 +263,8 @@ export default function BusinessCategoriesScreen() {
           <GroupedListSection title="Categorías de venta">
             <GroupedListRow
               icon="lock"
-              label="Solo para propietarios"
-              description="Tu perfil puede consultar las categorías, pero solo la persona propietaria puede cambiarlas."
+              label="Solo para el administrador principal"
+              description="Tu perfil puede consultar las categorías, pero solo el administrador principal puede cambiarlas."
               descriptionMaxLines={3}
               showSeparator={false}
             />

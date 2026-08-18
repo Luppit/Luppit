@@ -15,6 +15,7 @@ export default function ModalLayout() {
   const isOfferModal = pathname.includes("/offer");
   const usesDetailTopBar = [
     "/business-location-edit",
+    "/business-name-edit",
     "/email-setup",
     "/profile-field-edit",
     "/profile-picture-edit",

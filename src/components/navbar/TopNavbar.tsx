@@ -364,6 +364,9 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   ]);
 
   const showProfileSwitcher = useCallback(() => {
+    const hasBuyerProfile = profiles.some((profile) => profile.role === "buyer");
+    const addProfileLabel = hasBuyerProfile ? "Agregar negocio" : "Crear perfil";
+
     openPopup({
       type: "profileSwitcher",
       profiles: profiles.map((profile) => {
@@ -393,13 +396,13 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
         : {
             actionLabel:
               pendingInvitationCount > 0
-                ? `Crear perfil · ${pendingInvitationCount} ${pendingInvitationCount === 1 ? "invitación" : "invitaciones"}`
-                : "Crear perfil",
+                ? `${addProfileLabel} · ${pendingInvitationCount} ${pendingInvitationCount === 1 ? "invitación" : "invitaciones"}`
+                : addProfileLabel,
             onAction: () =>
               router.push({
                 pathname: "/(detail)/create-profile",
                 params: {
-                  title: "Crear perfil",
+                  title: addProfileLabel,
                   hideMenu: "true",
                 },
               }),

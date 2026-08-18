@@ -27,6 +27,10 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "auth",
     message: "El inicio de sesión por teléfono no está disponible en este momento.",
   },
+  manual_business_verification_disabled: {
+    type: "network",
+    message: "La creación de negocios no está disponible en este momento.",
+  },
   sms_send_failed: {
     type: "network",
     message: "No pudimos enviar el código por SMS. Inténtalo de nuevo.",
@@ -271,6 +275,11 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     message:
       "Este es tu último perfil. Para eliminarlo debes eliminar la cuenta completa.",
   },
+  buyer_profile_requires_account_deletion: {
+    type: "validation",
+    message:
+      "Tu perfil comprador conserva tu identidad e historial. Para eliminarlo debes eliminar la cuenta completa.",
+  },
   account_deletion_pending: {
     type: "auth",
     message:
@@ -306,7 +315,11 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
   },
   business_owner_required: {
     type: "auth",
-    message: "Solo la persona propietaria puede cambiar la información del negocio.",
+    message: "Solo el administrador principal puede cambiar la información del negocio.",
+  },
+  business_commercial_name_invalid: {
+    type: "validation",
+    message: "Ingresa un nombre comercial válido de hasta 120 caracteres.",
   },
   phone_required: {
     type: "validation",
@@ -334,7 +347,7 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
   },
   business_owner_cannot_be_removed: {
     type: "validation",
-    message: "La persona propietaria no puede quitarse del equipo.",
+    message: "El administrador principal no puede quitarse del equipo.",
   },
   business_member_has_conversation_history: {
     type: "validation",

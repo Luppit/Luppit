@@ -34,7 +34,8 @@ export type ProfileNotificationListItem = {
 
 export type ProfileNotificationNavigation =
   | { kind: "conversation"; conversationId: string }
-  | { kind: "purchaseRequest"; purchaseRequestId: string };
+  | { kind: "purchaseRequest"; purchaseRequestId: string }
+  | { kind: "businessVerification" };
 
 export type MarkCurrentProfileNotificationReadResult = {
   notificationId: string;
@@ -62,8 +63,14 @@ function parseNotificationNavigation(
   if (!isRecord(payload) || !isRecord(payload.navigation)) return null;
 
   const pathname = getNonEmptyString(payload.navigation.pathname);
+  if (!pathname) return null;
+
+  if (pathname === "/(detail)/business-verification") {
+    return { kind: "businessVerification" };
+  }
+
   const params = isRecord(payload.navigation.params) ? payload.navigation.params : null;
-  if (!pathname || !params) return null;
+  if (!params) return null;
 
   if (pathname === "/(conversation)/offer") {
     const conversationId = getNonEmptyString(params.conversationId);

@@ -19,12 +19,18 @@ error boundary so render failures are reported as unhandled.
   Sentry account.
 
 Tracing, profiling, replay, screenshots, view hierarchy, breadcrumbs, request
-data, user identity, and arbitrary extra context are disabled. Handled API,
-authentication, validation, and expected network failures are not captured by
-the client. Server-side data scrubbing and **Prevent Storing of IP Addresses**
-must remain enabled in the Sentry project. Advanced data-scrubbing rules remove
-the native SDK's installation and device identifiers. Automatic Sentry session
-tracking stays disabled, and the native user scope is explicitly cleared.
+data, user identity, device context, tags, and arbitrary extra context are
+disabled or removed before transmission. Handled API, authentication,
+validation, and expected network failures are not captured by the client.
+Automatic Sentry session tracking stays disabled, and the native user scope is
+explicitly cleared.
+
+Code-side filtering does not control IP addresses inferred by Sentry at
+ingestion. Before a production build is submitted, both **Server-side data
+scrubbing** and **Prevent Storing of IP Addresses** must be verified in the
+`luppit/react-native` project. Advanced data-scrubbing rules must remove native
+installation and device identifiers as defense in depth. Do not describe these
+dashboard controls as enabled until the production project has been inspected.
 
 ## Alert workflow
 
@@ -38,4 +44,5 @@ Use temporary local-only crash triggers in an internal preview build to verify
 an unhandled JavaScript error, a React render failure, and a native crash on
 Android and iOS. Remove the triggers before the final source diff. Confirm that
 the resulting stack frames are source-mapped and that raw events contain no
-user, request, or extra data.
+user, request, extra, device identifier, installation identifier, or IP data.
+Record the verification date and the reviewer in the legal council package.

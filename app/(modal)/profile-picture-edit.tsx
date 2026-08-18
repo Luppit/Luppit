@@ -281,8 +281,8 @@ export default function ProfilePictureEditScreen() {
         <GroupedListSection title="Foto del negocio">
           <GroupedListRow
             icon="lock"
-            label="Solo para propietarios"
-            description="Tu perfil puede ver la foto, pero solo la persona propietaria puede cambiarla."
+            label="Solo para el administrador principal"
+            description="Tu perfil puede ver la foto, pero solo el administrador principal puede cambiarla."
             descriptionMaxLines={3}
             showSeparator={false}
           />

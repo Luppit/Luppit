@@ -544,6 +544,30 @@ export async function updateCurrentBusinessLocation(
     };
 }
 
+export async function updateCurrentBusinessCommercialName(
+    name: string
+): Promise<{ ok: true; data: { name: string } } | { ok: false; error: AppError }> {
+    const profileResult = await getCurrentAuthenticatedProfile();
+    if (!profileResult.ok) return profileResult;
+
+    const normalizedName = name.trim().replace(/\s+/g, " ");
+    if (!normalizedName || normalizedName.length > 120) {
+        return { ok: false, error: fromAppError("validation") };
+    }
+
+    const result = await supabase.rpc(
+        RPC_FUNCTIONS.UPDATE_CURRENT_BUSINESS_COMMERCIAL_NAME,
+        {
+            p_profile_id: profileResult.data.id,
+            p_name: normalizedName,
+        } as never
+    );
+    if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+
+    void requestActiveProfileRefresh(profileResult.data.id);
+    return { ok: true, data: { name: normalizedName } };
+}
+
 async function getBuyerProfileStats(profileId: string): Promise<
     { ok: true; data: BuyerProfileStats } | { ok: false; error: AppError }
 > {
@@ -849,12 +873,14 @@ export async function updateCurrentProfileField(
         };
     }
 
-    const { data, error } = await supabase
-        .from(TB_PROFILE)
-        .update({ [field]: normalizedValue })
-        .eq(COL_PROFILE.id, profileResult.data.id)
-        .select("*")
-        .single();
+    const { data, error } = await supabase.rpc(
+        RPC_FUNCTIONS.UPDATE_CURRENT_PROFILE_IDENTITY_FIELD,
+        {
+            p_profile_id: profileResult.data.id,
+            p_field: field,
+            p_value: normalizedValue,
+        } as never
+    );
 
     if (error) return { ok: false, error: fromSupabaseError(error) };
     void requestActiveProfileRefresh(profileResult.data.id);

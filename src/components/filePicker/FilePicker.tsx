@@ -123,7 +123,7 @@ export default function FilePicker({
               <Text variant="small" style={s.highlightText}>
                 Presiona aquí
               </Text>{" "}
-              para agregar imágenes.
+              para agregar {mode === "files" ? "archivos" : "imágenes"}.
             </Text>
           </Pressable>
         ) : (

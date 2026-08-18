@@ -5,7 +5,8 @@ import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import {
   signUpWithPhoneOtp,
-  verifyPhoneOtp,
+  verifyBuyerPhoneOtp,
+  verifySellerPhoneOtp,
 } from "@/src/lib/supabase/auth";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { borders, colors, spacing } from "@/src/themes";
@@ -13,27 +14,12 @@ import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import CreateSellerAdminFormTab from "./signup/CreateSellerAdminFormTab";
-import CreateSellerBusinessFormTab from "./signup/CreateSellerBusinessFormTab";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
 
 type UserType = "buyer" | "seller";
 
-type BuyerFormValues = {
-  fullName: string;
-  idDocument: string;
-  phoneNumber: string;
-};
-
-type SellerBusinessValues = {
-  businessName: string;
-  businessIdDocument: string;
-};
-
-type SellerAdminValues = {
-  fullName: string;
-  idDocument: string;
+type SignupFormValues = {
   phoneNumber: string;
 };
 
@@ -41,32 +27,24 @@ function SignupEntryStep({
   next,
   userType,
   setUserType,
-  buyerValues,
-  setBuyerValues,
-  sellerBusinessValues,
-  setSellerBusinessValues,
+  values,
+  setValues,
   legalAccepted,
 }: {
   next: () => void;
   userType: UserType;
   setUserType: (userType: UserType) => void;
-  buyerValues: BuyerFormValues;
-  setBuyerValues: (values: BuyerFormValues) => void;
-  sellerBusinessValues: SellerBusinessValues;
-  setSellerBusinessValues: (values: SellerBusinessValues) => void;
+  values: SignupFormValues;
+  setValues: (values: SignupFormValues) => void;
   legalAccepted: boolean;
 }) {
-  const createBuyer = async () => {
+  const sendCode = async () => {
     try {
-      await signUpWithPhoneOtp(defaultCountryCode + buyerValues.phoneNumber);
+      await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
       next();
     } catch (err: any) {
       showError(err.message);
     }
-  };
-
-  const goToSellerAdminStep = async () => {
-    next();
   };
 
   const legalMissingFields = legalAccepted
@@ -78,9 +56,9 @@ function SignupEntryStep({
       title: "Comprador",
       content: (
         <CreateUserFormTab
-          values={buyerValues}
-          setValues={setBuyerValues}
-          onCreate={createBuyer}
+          values={values}
+          setValues={setValues}
+          onCreate={sendCode}
           additionalMissingFields={legalMissingFields}
         />
       ),
@@ -88,10 +66,10 @@ function SignupEntryStep({
     {
       title: "Vendedor",
       content: (
-        <CreateSellerBusinessFormTab
-          values={sellerBusinessValues}
-          setValues={setSellerBusinessValues}
-          onCreate={goToSellerAdminStep}
+        <CreateUserFormTab
+          values={values}
+          setValues={setValues}
+          onCreate={sendCode}
           additionalMissingFields={legalMissingFields}
         />
       ),
@@ -109,80 +87,45 @@ function SignupEntryStep({
   );
 }
 
-function SellerAdminStep({
-  next,
-  sellerAdminValues,
-  setSellerAdminValues,
-  legalAccepted,
-}: {
-  next: () => void;
-  sellerAdminValues: SellerAdminValues;
-  setSellerAdminValues: (values: SellerAdminValues) => void;
-  legalAccepted: boolean;
-}) {
-  const createSellerAdmin = async () => {
-    try {
-      await signUpWithPhoneOtp(defaultCountryCode + sellerAdminValues.phoneNumber);
-      next();
-    } catch (err: any) {
-      showError(err.message);
-    }
-  };
-
-  return (
-    <CreateSellerAdminFormTab
-      values={sellerAdminValues}
-      setValues={setSellerAdminValues}
-      onCreate={createSellerAdmin}
-      additionalMissingFields={
-        legalAccepted ? [] : ["aceptación de los documentos legales"]
-      }
-    />
-  );
-}
-
 function VerifyStep({
   userType,
-  buyerValues,
-  sellerBusinessValues,
-  sellerAdminValues,
+  values,
   legalAccepted,
 }: {
   userType: UserType;
-  buyerValues: BuyerFormValues;
-  sellerBusinessValues: SellerBusinessValues;
-  sellerAdminValues: SellerAdminValues;
+  values: SignupFormValues;
   legalAccepted: boolean;
 }) {
   const isSeller = userType === "seller";
 
-  const phoneNumber = isSeller
-    ? sellerAdminValues.phoneNumber
-    : buyerValues.phoneNumber;
-
-  const fullName = isSeller ? sellerAdminValues.fullName : buyerValues.fullName;
-  const idDocument = isSeller
-    ? sellerAdminValues.idDocument
-    : buyerValues.idDocument;
+  const phoneNumber = values.phoneNumber;
 
   const onVerify = async (code: string) => {
-    const initialProfile = {
-      name: fullName,
-      idDocument,
-      role: isSeller ? ("seller" as const) : ("buyer" as const),
-      businessName: isSeller ? sellerBusinessValues.businessName : null,
-      businessIdDocument: isSeller
-        ? sellerBusinessValues.businessIdDocument
-        : null,
-      legalAccepted,
-    };
+    if (!isSeller) {
+      return await verifyBuyerPhoneOtp(
+        defaultCountryCode + phoneNumber,
+        code,
+        legalAccepted,
+      )
+        .then(() => {
+          router.replace("/(auth)/identity-verification");
+          return true;
+        })
+        .catch((err) => {
+          showError(err.message);
+          return false;
+        });
+    }
 
-    return await verifyPhoneOtp(
+    return await verifySellerPhoneOtp(
       defaultCountryCode + phoneNumber,
       code,
-      initialProfile,
+      legalAccepted,
     )
-      .then(() => true)
+      .then(() => {
+        router.replace("/(auth)/identity-verification");
+        return true;
+      })
       .catch((err) => {
         showError(err.message);
         return false;
@@ -208,78 +151,11 @@ export default function Signup() {
   const [userType, setUserType] = useState<UserType>("buyer");
   const [legalAccepted, setLegalAccepted] = useState(false);
 
-  const [buyerValues, setBuyerValues] = useState<BuyerFormValues>({
-    fullName: "",
-    idDocument: "",
+  const [values, setValues] = useState<SignupFormValues>({
     phoneNumber: "",
   });
 
-  const [sellerBusinessValues, setSellerBusinessValues] =
-    useState<SellerBusinessValues>({
-      businessName: "",
-      businessIdDocument: "",
-    });
-
-  const [sellerAdminValues, setSellerAdminValues] = useState<SellerAdminValues>(
-    {
-      fullName: "",
-      idDocument: "",
-      phoneNumber: "",
-    },
-  );
-
   const steps: Step[] = useMemo(() => {
-    if (userType === "seller") {
-      return [
-        {
-          title: "Crear una cuenta",
-          description: "Información personal",
-          isNextStepShown: true,
-          render: (api) => (
-            <SignupEntryStep
-              {...api}
-              userType={userType}
-              setUserType={setUserType}
-              buyerValues={buyerValues}
-              setBuyerValues={setBuyerValues}
-              sellerBusinessValues={sellerBusinessValues}
-              setSellerBusinessValues={setSellerBusinessValues}
-              legalAccepted={legalAccepted}
-            />
-          ),
-        },
-        {
-          title: "Administrador(a)",
-          description: `Agrega la información de la persona administradora de ${
-            sellerBusinessValues.businessName.trim() || "negocio"
-          }.`,
-          isNextStepShown: true,
-          render: (api) => (
-            <SellerAdminStep
-              {...api}
-              sellerAdminValues={sellerAdminValues}
-              setSellerAdminValues={setSellerAdminValues}
-              legalAccepted={legalAccepted}
-            />
-          ),
-        },
-        {
-          title: "Verificación de código",
-          description: "Ingresa el código enviado a tu teléfono",
-          isNextStepShown: false,
-          render: () => (
-            <VerifyStep
-              userType={userType}
-              buyerValues={buyerValues}
-              sellerBusinessValues={sellerBusinessValues}
-              sellerAdminValues={sellerAdminValues}
-              legalAccepted={legalAccepted}
-            />
-          ),
-        },
-      ];
-    }
-
     return [
       {
         title: "Crear una cuenta",
@@ -290,10 +166,8 @@ export default function Signup() {
             {...api}
             userType={userType}
             setUserType={setUserType}
-            buyerValues={buyerValues}
-            setBuyerValues={setBuyerValues}
-            sellerBusinessValues={sellerBusinessValues}
-            setSellerBusinessValues={setSellerBusinessValues}
+            values={values}
+            setValues={setValues}
             legalAccepted={legalAccepted}
           />
         ),
@@ -305,19 +179,15 @@ export default function Signup() {
         render: () => (
           <VerifyStep
             userType={userType}
-            buyerValues={buyerValues}
-            sellerBusinessValues={sellerBusinessValues}
-            sellerAdminValues={sellerAdminValues}
+            values={values}
             legalAccepted={legalAccepted}
           />
         ),
       },
     ];
   }, [
-    buyerValues,
     legalAccepted,
-    sellerAdminValues,
-    sellerBusinessValues,
+    values,
     userType,
     setUserType,
   ]);

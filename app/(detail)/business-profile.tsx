@@ -126,7 +126,20 @@ export default function BusinessProfileScreen() {
       </View>
 
       <GroupedListSection title="Datos generales">
-        <GroupedListRow icon="house" label="Nombre comercial" value={business.name || "Sin nombre"} />
+        <GroupedListRow
+          icon="house"
+          label="Nombre comercial"
+          value={business.name || "Sin nombre"}
+          onPress={canManageBusiness
+            ? () => router.push({
+                pathname: "/(modal)/business-name-edit",
+                params: {
+                  title: "Nombre comercial",
+                  value: business.name ?? "",
+                },
+              })
+            : undefined}
+        />
         <GroupedListRow
           icon="file-text"
           label="Documento de identificación"

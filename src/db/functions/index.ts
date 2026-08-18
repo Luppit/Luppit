@@ -2,6 +2,10 @@ import { FunctionName } from "../types";
 
 export const RPC_FUNCTIONS = {
   ACCEPT_CURRENT_LEGAL_DOCUMENTS: "accept_current_legal_documents",
+  BEGIN_CURRENT_USER_BUYER_ONBOARDING:
+    "begin_current_user_buyer_onboarding",
+  BEGIN_CURRENT_USER_SELLER_ONBOARDING:
+    "begin_current_user_seller_onboarding",
   ADD_BUYER_PURCHASE_REQUEST_FAVORITE:
     "add_buyer_purchase_request_favorite",
   ADD_SELLER_PURCHASE_REQUEST_FAVORITE:
@@ -11,6 +15,12 @@ export const RPC_FUNCTIONS = {
   COMPLETE_CURRENT_USER_PROFILE_SETUP:
     "complete_current_user_profile_setup",
   CREATE_CURRENT_USER_PROFILE: "create_current_user_profile",
+  CREATE_CURRENT_USER_BUYER_PROFILE_FROM_VERIFIED_IDENTITY:
+    "create_current_user_buyer_profile_from_verified_identity",
+  CREATE_CURRENT_USER_SELLER_PROFILE_FROM_VERIFIED_IDENTITY:
+    "create_current_user_seller_profile_from_verified_identity",
+  GET_CURRENT_BUSINESS_VERIFICATION:
+    "get_current_business_verification",
   DECLINE_CURRENT_USER_BUSINESS_INVITATION:
     "decline_current_user_business_invitation",
   DISMISS_ALL_PROFILE_NOTIFICATIONS:
@@ -29,6 +39,7 @@ export const RPC_FUNCTIONS = {
   GET_CONVERSATION_TIMELINE: "get_conversation_timeline",
   GET_CONVERSATION_VIEW: "get_conversation_view",
   GET_CURRENT_BUSINESS_TEAM: "get_current_business_team",
+  GET_CURRENT_ACCOUNT_ONBOARDING: "get_current_account_onboarding",
   GET_CURRENT_BUYER_PURCHASE_REQUEST_CANCELLATION_ELIGIBILITY:
     "get_current_buyer_purchase_request_cancellation_eligibility",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
@@ -72,6 +83,10 @@ export const RPC_FUNCTIONS = {
   SET_CURRENT_BUSINESS_LOCATION: "set_current_business_location",
   SET_CURRENT_BUYER_PROFILE_IMAGE: "set_current_buyer_profile_image",
   SET_CURRENT_BUSINESS_PROFILE_IMAGE: "set_current_business_profile_image",
+  UPDATE_CURRENT_PROFILE_IDENTITY_FIELD:
+    "update_current_profile_identity_field",
+  UPDATE_CURRENT_BUSINESS_COMMERCIAL_NAME:
+    "update_current_business_commercial_name",
   UPDATE_SELLER_OFFER_FULFILLMENT_FROM_CONVERSATION:
     "update_seller_offer_fulfillment_from_conversation",
   UNBLOCK_SAFETY_BLOCK: "unblock_safety_block",

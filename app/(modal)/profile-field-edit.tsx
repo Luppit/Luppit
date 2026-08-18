@@ -2,6 +2,7 @@ import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import {
   ProfileEditableField,
   updateCurrentProfileField,
@@ -18,7 +19,7 @@ import {
   showSuccess,
 } from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
   ScrollView,
@@ -55,6 +56,7 @@ function isEditableField(value: unknown): value is ProfileEditableField {
 }
 
 export default function ProfileFieldEditScreen() {
+  const { activeProfile } = useActiveProfile();
   const t = useTheme();
   const s = useMemo(() => createProfileFieldEditStyles(t), [t]);
   const params = useLocalSearchParams<{
@@ -68,6 +70,13 @@ export default function ProfileFieldEditScreen() {
   const [value, setValue] = useState(initialValue ?? "");
   const [didSubmit, setDidSubmit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const isVerifiedIdentity = activeProfile?.identityStatus === "VERIFIED";
+
+  useEffect(() => {
+    if (isVerifiedIdentity) router.back();
+  }, [isVerifiedIdentity]);
+
+  if (isVerifiedIdentity) return null;
 
   const normalizedValue = value.trim();
   const error = didSubmit

@@ -41,6 +41,8 @@ Sentry.init({
     event.user = undefined;
     event.request = undefined;
     event.extra = undefined;
+    event.contexts = undefined;
+    event.tags = undefined;
 
     return event;
   },

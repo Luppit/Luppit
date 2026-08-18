@@ -137,7 +137,7 @@ export default function BusinessLocationEditScreen() {
     if (!isBusinessOwner) {
       showError(
         "Acceso restringido",
-        "Solo la persona propietaria puede cambiar la ubicación del negocio."
+        "Solo el administrador principal puede cambiar la ubicación del negocio."
       );
       return;
     }
@@ -167,8 +167,8 @@ export default function BusinessLocationEditScreen() {
           <GroupedListSection title="Ubicación del negocio">
             <GroupedListRow
               icon="lock"
-              label="Solo para propietarios"
-              description="Tu perfil puede consultar la ubicación, pero solo la persona propietaria puede cambiarla."
+              label="Solo para el administrador principal"
+              description="Tu perfil puede consultar la ubicación, pero solo el administrador principal puede cambiarla."
               descriptionMaxLines={3}
               showSeparator={false}
             />

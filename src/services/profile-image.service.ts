@@ -53,7 +53,7 @@ type ModeratedProfileImageResponse = {
 const MANAGE_FORBIDDEN_ERROR: AppError = {
   type: "auth",
   code: "profile_image_manage_forbidden",
-  message: "Solo el propietario del negocio puede cambiar esta foto.",
+  message: "Solo el administrador principal puede cambiar esta foto.",
 };
 
 const RETRYABLE_REMOVE_ERROR: AppError = {

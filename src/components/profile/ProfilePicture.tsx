@@ -2,10 +2,16 @@ import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 import { resolveProfileImageUrl } from "@/src/services/profile-image.service";
 import { useTheme } from "@/src/themes";
-import React, { useEffect, useMemo, useState } from "react";
+import { Image } from "expo-image";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
-  Image,
   StyleProp,
   StyleSheet,
   View,
@@ -29,6 +35,13 @@ type ProfilePictureProps = {
 export type ProfilePictureSource = {
   imagePath: string | null;
   imageUrl: string | null;
+};
+
+type ProfilePictureImageStatus = "loading" | "loaded" | "error";
+
+type ProfilePictureImageState = {
+  url: string;
+  status: ProfilePictureImageStatus;
 };
 
 function toOptionalString(value: unknown) {
@@ -143,12 +156,22 @@ export default function ProfilePicture({
     imagePath,
     imageUrl
   );
-  const [isImageLoading, setIsImageLoading] = useState(Boolean(resolvedUrl));
-  const [hasImageError, setHasImageError] = useState(false);
+  const [imageState, setImageState] = useState<ProfilePictureImageState | null>(
+    null
+  );
+  const resolvedUrlRef = useRef(resolvedUrl);
+  resolvedUrlRef.current = resolvedUrl;
   const imageSource = useMemo(
     () => (resolvedUrl ? { uri: resolvedUrl } : null),
     [resolvedUrl]
   );
+  const imageStatus = resolvedUrl
+    ? imageState?.url === resolvedUrl
+      ? imageState.status
+      : "loading"
+    : null;
+  const isImageLoading = imageStatus === "loading";
+  const hasImageError = imageStatus === "error";
   const isBuyer = kind === "buyer";
   const radius = isBuyer ? size / 2 : Math.round(size * 0.29);
   const hasLoadError = hasResolutionError || hasImageError;
@@ -170,10 +193,19 @@ export default function ProfilePicture({
     [isBuyer, radius, size, t.colors.border, t.colors.primaryLight]
   );
 
-  useEffect(() => {
-    setHasImageError(false);
-    setIsImageLoading(Boolean(resolvedUrl));
-  }, [resolvedUrl]);
+  const updateImageStatus = useCallback(
+    (status: ProfilePictureImageStatus) => {
+      if (!resolvedUrl) return;
+
+      setImageState((current) => {
+        if (resolvedUrlRef.current !== resolvedUrl) return current;
+        return current?.url === resolvedUrl && current.status === status
+          ? current
+          : { url: resolvedUrl, status };
+      });
+    },
+    [resolvedUrl]
+  );
 
   useEffect(() => {
     onLoadErrorChange?.(hasLoadError);
@@ -212,14 +244,12 @@ export default function ProfilePicture({
         <Image
           key={resolvedUrl}
           source={imageSource}
-          resizeMode="cover"
-          onLoadStart={() => setIsImageLoading(true)}
-          onLoad={() => setIsImageLoading(false)}
-          onLoadEnd={() => setIsImageLoading(false)}
-          onError={() => {
-            setHasImageError(true);
-            setIsImageLoading(false);
-          }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          onLoadStart={() => updateImageStatus("loading")}
+          onLoad={() => updateImageStatus("loaded")}
+          onDisplay={() => updateImageStatus("loaded")}
+          onError={() => updateImageStatus("error")}
           style={[styles.image, { borderRadius: radius }]}
           accessible={false}
         />

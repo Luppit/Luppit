@@ -14,6 +14,8 @@ import { clearBuyerHomeFilters } from "@/src/services/buyer.home.filters.service
 import { closePopup } from "@/src/services/popup.service";
 import { clearSellerHomeFilters } from "@/src/services/seller.home.filters.service";
 import { getCurrentProfileUnreadNotificationCount } from "@/src/services/notification.service";
+import { getCurrentAccountOnboarding } from "@/src/services/identity-verification.service";
+import { getNoProfileAccountState } from "@/src/services/identity-verification.helpers";
 import {
   ALL_SEGMENTS_SVG_NAME,
   setSelectedSegmentSvgName,
@@ -35,6 +37,8 @@ export type ActiveProfileState =
   | "loading"
   | "signed_out"
   | "no_profile"
+  | "identity_required"
+  | "business_verification_required"
   | "setup_required"
   | "ready";
 
@@ -64,6 +68,9 @@ const ActiveProfileContext = createContext<ActiveProfileContextValue>({
 
 function getStateForProfile(profile: ActiveProfileSummary | null): ActiveProfileState {
   if (!profile) return "no_profile";
+  if (profile.setupStatus === "business_verification_required") {
+    return "business_verification_required";
+  }
   return profile.setupStatus === "ready" ? "ready" : "setup_required";
 }
 
@@ -159,11 +166,17 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
         const nextProfiles = profileResult.data;
         setCurrentUserProfileCount(nextProfiles.length);
         if (nextProfiles.length === 0) {
+          const onboardingResult = await getCurrentAccountOnboarding();
+          if (refreshSequence !== refreshSequenceRef.current) return false;
+          if (!onboardingResult.ok) {
+            setShouldRetryRefresh(true);
+            return false;
+          }
           setProfiles([]);
           activeProfileRef.current = null;
           setActiveProfile(null);
           setCurrentProfileSummary(null);
-          setState("no_profile");
+          setState(getNoProfileAccountState(onboardingResult.data));
           return preferredProfileId == null;
         }
 
@@ -313,7 +326,10 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
   }, [refreshProfiles, shouldRetryRefresh]);
 
   useEffect(() => {
-    if (state !== "ready" || !activeProfile?.profile.id) return;
+    if (
+      (state !== "ready" && state !== "business_verification_required") ||
+      !activeProfile?.profile.id
+    ) return;
 
     const intervalId = setInterval(() => {
       if (AppState.currentState === "active") {

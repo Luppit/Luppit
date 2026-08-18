@@ -7,6 +7,7 @@ export const COL_BUSINESS = {
   created_at: "created_at",
   name: "name",
   id_document: "id_document",
+  legal_name: "legal_name",
   location_id: "location_id",
   privacy_purge_after: "privacy_purge_after",
   image_path: "image_path",

@@ -246,6 +246,7 @@ export type Database = {
           id: string
           id_document: string | null
           image_path: string | null
+          legal_name: string | null
           location_id: string | null
           name: string | null
           privacy_purge_after: string | null
@@ -255,6 +256,7 @@ export type Database = {
           id?: string
           id_document?: string | null
           image_path?: string | null
+          legal_name?: string | null
           location_id?: string | null
           name?: string | null
           privacy_purge_after?: string | null
@@ -264,6 +266,7 @@ export type Database = {
           id?: string
           id_document?: string | null
           image_path?: string | null
+          legal_name?: string | null
           location_id?: string | null
           name?: string | null
           privacy_purge_after?: string | null
@@ -2644,7 +2647,7 @@ export type Database = {
           email_opt_in: boolean
           email_opt_in_at: string | null
           id: string
-          id_document: string
+          id_document: string | null
           image_path: string | null
           is_default: boolean
           name: string
@@ -2657,7 +2660,7 @@ export type Database = {
           email_opt_in?: boolean
           email_opt_in_at?: string | null
           id?: string
-          id_document: string
+          id_document?: string | null
           image_path?: string | null
           is_default?: boolean
           name: string
@@ -2670,7 +2673,7 @@ export type Database = {
           email_opt_in?: boolean
           email_opt_in_at?: string | null
           id?: string
-          id_document?: string
+          id_document?: string | null
           image_path?: string | null
           is_default?: boolean
           name?: string
@@ -3894,7 +3897,7 @@ export type Database = {
           email_opt_in: boolean
           email_opt_in_at: string | null
           id: string
-          id_document: string
+          id_document: string | null
           image_path: string | null
           is_default: boolean
           name: string
@@ -3912,12 +3915,28 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      add_seller_favorite_before_business_verification: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       add_seller_favorite_impl_20260727: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
       add_seller_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
+      assert_current_seller_marketplace_access: {
+        Args: { p_profile_id: string }
+        Returns: boolean
+      }
+      begin_current_user_buyer_onboarding: {
+        Args: { p_source?: string }
+        Returns: Json
+      }
+      begin_current_user_seller_onboarding: {
+        Args: { p_invitation_id?: string; p_source?: string }
         Returns: Json
       }
       block_conversation_counterpart: {
@@ -4093,7 +4112,7 @@ export type Database = {
           email_opt_in: boolean
           email_opt_in_at: string | null
           id: string
-          id_document: string
+          id_document: string | null
           image_path: string | null
           is_default: boolean
           name: string
@@ -4107,9 +4126,63 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_profile_setup_before_business_verification: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_invitation_id?: string
+          p_profile_id: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      consume_business_verification_email_delivery_request: {
+        Args: { p_request_id: string }
+        Returns: Json
+      }
       consume_otp_email_delivery_request: {
         Args: { p_purpose: string; p_request_id: string }
         Returns: Json
+      }
+      create_current_user_buyer_profile_from_verified_identity: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_current_user_profile: {
         Args: {
@@ -4126,7 +4199,116 @@ export type Database = {
           email_opt_in: boolean
           email_opt_in_at: string | null
           id: string
-          id_document: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_current_user_profile_before_didit_identity: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_id_document: string
+          p_invitation_id?: string
+          p_name: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_current_user_profile_before_manual_business_verification: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_id_document: string
+          p_invitation_id?: string
+          p_name: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_current_user_profile_before_one_buyer_identity: {
+        Args: {
+          p_business_id_document?: string
+          p_business_name?: string
+          p_id_document: string
+          p_invitation_id?: string
+          p_name: string
+          p_role: string
+        }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_current_user_seller_profile_from_verified_identity: {
+        Args: { p_invitation_id?: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
           image_path: string | null
           is_default: boolean
           name: string
@@ -4518,6 +4700,7 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_current_account_onboarding: { Args: never; Returns: Json }
       get_current_business_invitations: {
         Args: { p_owner_profile_id: string }
         Returns: {
@@ -4530,6 +4713,10 @@ export type Database = {
       }
       get_current_business_team: {
         Args: { p_owner_profile_id: string }
+        Returns: Json
+      }
+      get_current_business_verification: {
+        Args: { p_profile_id: string }
         Returns: Json
       }
       get_current_buyer_purchase_request_cancellation_eligibility: {
@@ -4651,12 +4838,15 @@ export type Database = {
         Returns: {
           business_id: string
           business_name: string
+          business_verification_safe_message: string
+          business_verification_status: string
           created_at: string
           email: string
           email_opt_in: boolean
           email_opt_in_at: string
           id: string
           id_document: string
+          identity_status: string
           is_default: boolean
           membership_role: string
           name: string
@@ -4688,6 +4878,26 @@ export type Database = {
           route: string
           sort_order: number
         }[]
+      }
+      get_or_create_seller_conversation_before_business_verification: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          privacy_purge_after: string | null
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_or_create_seller_conversation_impl_20260727: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
@@ -4937,6 +5147,10 @@ export type Database = {
         Args: { p_membership_id: string; p_owner_profile_id: string }
         Returns: Json
       }
+      remove_seller_favorite_before_business_verification: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       remove_seller_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
@@ -5140,8 +5354,24 @@ export type Database = {
         Args: { p_email: string; p_profile_id: string }
         Returns: Json
       }
+      service_attach_identity_provider_session: {
+        Args: {
+          p_attempt_id: string
+          p_environment: string
+          p_provider_session_id: string
+          p_provider_status: string
+          p_user_id: string
+          p_workflow_id: string
+          p_workflow_version: number
+        }
+        Returns: Json
+      }
       service_claim_deletion_request: {
         Args: { p_request_id?: string; p_request_type?: string }
+        Returns: Json
+      }
+      service_claim_identity_verification_attempt: {
+        Args: { p_attempt_id?: string }
         Returns: Json
       }
       service_claim_purchase_request_privacy_cleanup: {
@@ -5172,6 +5402,29 @@ export type Database = {
         }
         Returns: Json
       }
+      service_enqueue_profile_deletion_before_one_buyer_identity: {
+        Args: {
+          p_profile_id: string
+          p_request_channel: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      service_finalize_identity_verification_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_document_country?: string
+          p_document_type?: string
+          p_identity_status: string
+          p_provider_status: string
+          p_verified_name?: string
+        }
+        Returns: Json
+      }
+      service_mark_identity_portrait_imported: {
+        Args: { p_attempt_id: string }
+        Returns: undefined
+      }
       service_mark_waitlist_confirmation_sent: {
         Args: { p_confirmation_token_hash: string }
         Returns: boolean
@@ -5180,8 +5433,20 @@ export type Database = {
         Args: { p_request_id: string; p_request_type: string }
         Returns: Json
       }
+      service_prepare_deletion_request_before_didit_identity: {
+        Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
       service_prepare_deletion_request_before_profile_images: {
         Args: { p_request_id: string; p_request_type: string }
+        Returns: Json
+      }
+      service_prepare_identity_verification_attempt: {
+        Args: {
+          p_notice_version: string
+          p_public_portrait_accepted: boolean
+          p_user_id: string
+        }
         Returns: Json
       }
       service_prepare_purchase_request_privacy_cleanup: {
@@ -5197,6 +5462,18 @@ export type Database = {
           p_privacy_policy_sha256: string
           p_privacy_policy_version: string
           p_source: string
+        }
+        Returns: Json
+      }
+      service_record_identity_verification_event: {
+        Args: {
+          p_environment: string
+          p_event_id: string
+          p_payload_sha256: string
+          p_provider_session_id: string
+          p_provider_status: string
+          p_webhook_type: string
+          p_workflow_id: string
         }
         Returns: Json
       }
@@ -5221,11 +5498,41 @@ export type Database = {
         }
         Returns: Json
       }
+      service_reschedule_identity_verification_attempt: {
+        Args: {
+          p_attempt_id: string
+          p_error_code: string
+          p_retryable: boolean
+        }
+        Returns: Json
+      }
       service_reschedule_purchase_request_privacy_cleanup: {
         Args: {
           p_error_code: string
           p_purchase_request_id: string
           p_retryable?: boolean
+        }
+        Returns: Json
+      }
+      service_review_business_verification: {
+        Args: {
+          p_application_id: string
+          p_canonical_legal_id?: string
+          p_canonical_legal_name?: string
+          p_decision: string
+          p_expected_version: number
+          p_internal_reason_code?: string
+          p_reviewer_reference: string
+          p_safe_message?: string
+        }
+        Returns: Json
+      }
+      service_submit_business_verification: {
+        Args: {
+          p_evidence: Json
+          p_profile_id: string
+          p_rnp_number: string
+          p_user_id: string
         }
         Returns: Json
       }
@@ -5295,6 +5602,32 @@ export type Database = {
       unblock_safety_block: {
         Args: { p_block_id: string; p_profile_id: string }
         Returns: Json
+      }
+      update_current_business_commercial_name: {
+        Args: { p_name: string; p_profile_id: string }
+        Returns: Json
+      }
+      update_current_profile_identity_field: {
+        Args: { p_field: string; p_profile_id: string; p_value: string }
+        Returns: {
+          created_at: string
+          email: string | null
+          email_opt_in: boolean
+          email_opt_in_at: string | null
+          id: string
+          id_document: string | null
+          image_path: string | null
+          is_default: boolean
+          name: string
+          phone: string | null
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profile"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_seller_offer_fulfillment_from_conversation: {
         Args: {

@@ -5,6 +5,7 @@ export const STORAGE_BUCKETS = {
   offers: "offers",
   profileImages: "profile-images",
   profileImageStaging: "profile-image-staging",
+  businessVerificationEvidence: "business-verification-evidence",
 } as const;
 
 export type StorageBucket =

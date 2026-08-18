@@ -21,6 +21,27 @@ export default function EmailSetupNavigationGate({
 
   const isInitialProfileSetupRoute =
     pathname === "/create-profile" && params.setup === "true";
+  const isBusinessVerificationAllowedRoute =
+    pathname === "/business-verification" ||
+    pathname === "/email-setup" ||
+    pathname === "/legal-document" ||
+    pathname === "/faq" ||
+    pathname === "/notifications" ||
+    pathname === "/account-settings";
+
+  if (
+    state === "business_verification_required" &&
+    !isBusinessVerificationAllowedRoute
+  ) {
+    return (
+      <Redirect
+        href={{
+          pathname: "/(detail)/business-verification",
+          params: { title: "Verificar negocio", hideMenu: "true" },
+        }}
+      />
+    );
+  }
 
   if (
     requiresEmailSetup &&

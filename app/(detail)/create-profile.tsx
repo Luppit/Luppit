@@ -10,20 +10,22 @@ import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext"
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
-  completeCurrentUserProfileSetup,
   createCurrentUserProfile,
   CurrentUserBusinessInvitation,
   declineCurrentUserBusinessInvitation,
   getCurrentUserBusinessInvitations,
 } from "@/src/services/active.profile.service";
+import {
+  beginCurrentUserBuyerOnboarding,
+  beginCurrentUserSellerOnboarding,
+  createCurrentUserBuyerProfileFromVerifiedIdentity,
+} from "@/src/services/identity-verification.service";
+import { getBuyerProfileCreationMode } from "@/src/services/identity-verification.helpers";
 import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
 import {
-  COSTA_RICA_LEGAL_ID_ERROR,
-  COSTA_RICA_LEGAL_ID_LENGTH,
   COSTA_RICA_PERSONAL_ID_ERROR,
   COSTA_RICA_PERSONAL_ID_LENGTH,
-  isValidCostaRicaLegalId,
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
 import {
@@ -58,7 +60,7 @@ export default function CreateProfileScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ setup?: string }>();
-  const { state, activeProfile, refreshProfiles } = useActiveProfile();
+  const { state, activeProfile, profiles, refreshProfiles } = useActiveProfile();
   const isRepair = params.setup === "true" && state === "setup_required";
   const requiresBusinessRepair =
     isRepair && activeProfile?.setupStatus === "missing_business";
@@ -71,6 +73,13 @@ export default function CreateProfileScreen() {
       ),
     [insets.bottom, insets.top, t]
   );
+  const hasBuyerProfile = profiles.some((profile) => profile.role === "buyer");
+  const accountIdentityStatus =
+    activeProfile?.identityStatus ?? profiles[0]?.identityStatus ?? "NOT_STARTED";
+  const buyerCreationMode = getBuyerProfileCreationMode(
+    hasBuyerProfile,
+    accountIdentityStatus,
+  );
   const [name, setName] = useState(
     isRepair ? activeProfile?.profile.name ?? "" : ""
   );
@@ -78,10 +87,10 @@ export default function CreateProfileScreen() {
     isRepair ? activeProfile?.profile.id_document ?? "" : ""
   );
   const [role, setRole] = useState<ProfileRole>(
-    activeProfile?.role === "seller" || requiresBusinessRepair ? "seller" : "buyer"
+    activeProfile?.role === "seller" || requiresBusinessRepair || hasBuyerProfile
+      ? "seller"
+      : "buyer"
   );
-  const [businessName, setBusinessName] = useState("");
-  const [businessIdDocument, setBusinessIdDocument] = useState("");
   const [sellerLinkMode, setSellerLinkMode] =
     useState<SellerLinkMode | null>(null);
   const [invitationId, setInvitationId] = useState<string | null>(null);
@@ -114,25 +123,29 @@ export default function CreateProfileScreen() {
     void loadInvitations();
   }, [loadInvitations]);
 
-  const sellerCreatesBusiness =
-    role === "seller" && sellerLinkMode === "business";
+  useEffect(() => {
+    if (!isRepair && buyerCreationMode === "unavailable") {
+      setRole("seller");
+    }
+  }, [buyerCreationMode, isRepair]);
+
   const sellerUsesInvitation =
     role === "seller" && sellerLinkMode === "invitation";
   const selectedInvitation =
     invitations.find((invitation) => invitation.id === invitationId) ?? null;
+  const usesVerifiedBuyerIdentity =
+    !isRepair && role === "buyer" && buyerCreationMode === "verified";
+  const requiresBuyerIdentityVerification =
+    !isRepair && role === "buyer" && buyerCreationMode === "identity_required";
+  const usesManagedBuyerIdentity =
+    usesVerifiedBuyerIdentity || requiresBuyerIdentityVerification;
   const idDocumentError =
     didSubmit &&
     !isRepair &&
+    !usesManagedBuyerIdentity &&
     idDocument.trim().length > 0 &&
     !isValidCostaRicaPersonalId(idDocument)
       ? COSTA_RICA_PERSONAL_ID_ERROR
-      : "";
-  const businessIdDocumentError =
-    didSubmit &&
-    sellerCreatesBusiness &&
-    businessIdDocument.trim().length > 0 &&
-    !isValidCostaRicaLegalId(businessIdDocument)
-      ? COSTA_RICA_LEGAL_ID_ERROR
       : "";
 
   const showProfileReady = () => {
@@ -165,8 +178,20 @@ export default function CreateProfileScreen() {
 
     setDidSubmit(true);
     const missingFields: string[] = [];
-    if (!isRepair && !name.trim()) missingFields.push("nombre");
-    if (!isRepair && !idDocument.trim()) {
+    if (
+      role === "buyer" &&
+      !isRepair &&
+      !usesManagedBuyerIdentity &&
+      !name.trim()
+    ) {
+      missingFields.push("nombre");
+    }
+    if (
+      role === "buyer" &&
+      !isRepair &&
+      !usesManagedBuyerIdentity &&
+      !idDocument.trim()
+    ) {
       missingFields.push("identificación personal");
     }
     if (role === "seller" && !sellerLinkMode) {
@@ -175,46 +200,51 @@ export default function CreateProfileScreen() {
     if (sellerUsesInvitation && !invitationId) {
       missingFields.push("invitación de negocio");
     }
-    if (sellerCreatesBusiness && !businessName.trim()) {
-      missingFields.push("nombre del negocio");
-    }
-    if (sellerCreatesBusiness && !businessIdDocument.trim()) {
-      missingFields.push("identificación del negocio");
-    }
     showMissingFields(missingFields);
     if (missingFields.length > 0) return;
 
-    if (!isRepair && !isValidCostaRicaPersonalId(idDocument)) {
+    if (
+      !isRepair &&
+      role === "buyer" &&
+      !usesManagedBuyerIdentity &&
+      !isValidCostaRicaPersonalId(idDocument)
+    ) {
       return;
     }
-    if (
-      sellerCreatesBusiness &&
-      !isValidCostaRicaLegalId(businessIdDocument)
-    ) {
+    if (requiresBuyerIdentityVerification) {
+      setIsSaving(true);
+      const onboarding = await beginCurrentUserBuyerOnboarding();
+      setIsSaving(false);
+      if (!onboarding.ok) {
+        showError("No se pudo iniciar la verificación", onboarding.error.message);
+        return;
+      }
+      router.push("/(auth)/identity-verification");
       return;
     }
 
     setIsSaving(true);
-    const sellerLinkInput =
-      role !== "seller"
-        ? {}
-        : sellerCreatesBusiness
-          ? { businessName, businessIdDocument }
-          : sellerUsesInvitation
-            ? { invitationId }
-            : {};
-    const result =
-      isRepair && activeProfile
-        ? await completeCurrentUserProfileSetup(activeProfile.profile.id, {
-            role,
-            ...sellerLinkInput,
-          })
-        : await createCurrentUserProfile({
-            name,
-            idDocument,
-            role,
-            ...sellerLinkInput,
-          });
+    if (role === "seller") {
+      const onboarding = await beginCurrentUserSellerOnboarding(
+        sellerUsesInvitation ? invitationId : null,
+      );
+      setIsSaving(false);
+      if (!onboarding.ok) {
+        showError("No se pudo iniciar la verificación", onboarding.error.message);
+        return;
+      }
+      if (onboarding.data.profileId) {
+        const activated = await refreshProfiles(onboarding.data.profileId);
+        if (activated) router.replace("/(tabs)");
+        return;
+      }
+      router.push("/(auth)/identity-verification");
+      return;
+    }
+
+    const result = usesVerifiedBuyerIdentity
+      ? await createCurrentUserBuyerProfileFromVerifiedIdentity()
+      : await createCurrentUserProfile({ name, idDocument, role });
     if (!result.ok) {
       setIsSaving(false);
       showError("No se pudo guardar el perfil", result.error.message);
@@ -255,7 +285,7 @@ export default function CreateProfileScreen() {
       type: "summary",
       title: "Rechazar invitación",
       icon: "x-circle",
-      description: `Esta invitación dejará de estar disponible y no te unirás a ${invitation.businessName}. La persona propietaria podrá invitarte de nuevo después.`,
+      description: `Esta invitación dejará de estar disponible y no te unirás a ${invitation.businessName}. El administrador principal podrá invitarte de nuevo después.`,
       actions: [
         {
           id: "keep-invitation",
@@ -284,34 +314,9 @@ export default function CreateProfileScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {!isRepair ? (
-          <FormSection
-            title="Datos del perfil"
-            helper="Usará el mismo número y la misma sesión."
-            styles={s}
-          >
-            <TextField
-              label="Nombre"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              baseContainerStyle={s.inputContainer}
-            />
-            <TextField
-              label="Identificación"
-              value={idDocument}
-              onChangeText={setIdDocument}
-              hasError={Boolean(idDocumentError)}
-              error={idDocumentError}
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={COSTA_RICA_PERSONAL_ID_LENGTH}
-              baseContainerStyle={s.inputContainer}
-            />
-          </FormSection>
-        ) : null}
-
-        {!requiresBusinessRepair && (!isRepair || activeProfile?.role == null) ? (
+        {!requiresBusinessRepair &&
+        buyerCreationMode !== "unavailable" &&
+        (!isRepair || activeProfile?.role == null) ? (
           <GroupedListSection title="Tipo de perfil">
             <GroupedListRow
               icon="user"
@@ -348,12 +353,58 @@ export default function CreateProfileScreen() {
           </GroupedListSection>
         ) : null}
 
+        {!isRepair && role === "buyer" && usesManagedBuyerIdentity ? (
+          <GroupedListSection title="Datos del perfil">
+            <GroupedListRow
+              icon="shield-check"
+              label={
+                usesVerifiedBuyerIdentity
+                  ? "Identidad verificada"
+                  : "Verificación de identidad"
+              }
+              description={
+                usesVerifiedBuyerIdentity
+                  ? "Activaremos tu perfil comprador con tus datos verificados."
+                  : "Verifica tu identidad para activar tu perfil comprador."
+              }
+              descriptionMaxLines={3}
+              showChevron={false}
+              showSeparator={false}
+            />
+          </GroupedListSection>
+        ) : !isRepair && role === "buyer" ? (
+          <FormSection
+            title="Datos del perfil"
+            helper="Usará el mismo número y la misma sesión."
+            styles={s}
+          >
+            <TextField
+              label="Nombre"
+              value={name}
+              onChangeText={setName}
+              autoCapitalize="words"
+              baseContainerStyle={s.inputContainer}
+            />
+            <TextField
+              label="Identificación"
+              value={idDocument}
+              onChangeText={setIdDocument}
+              hasError={Boolean(idDocumentError)}
+              error={idDocumentError}
+              keyboardType="number-pad"
+              inputMode="numeric"
+              maxLength={COSTA_RICA_PERSONAL_ID_LENGTH}
+              baseContainerStyle={s.inputContainer}
+            />
+          </FormSection>
+        ) : null}
+
         {role === "seller" ? (
           <GroupedListSection title="Vinculación del negocio">
             <GroupedListRow
               icon="circle-plus"
               label="Crear un negocio"
-              description="Este perfil será propietario del nuevo negocio."
+              description="Creá un perfil para solicitar la verificación del negocio."
               descriptionMaxLines={3}
               showChevron={false}
               showSeparator
@@ -408,7 +459,7 @@ export default function CreateProfileScreen() {
                 <GroupedListRow
                   icon="info"
                   label="No tienes invitaciones pendientes"
-                  description="Pide a la persona propietaria del negocio que te invite con este número."
+                  description="Pedile al administrador principal que te invite con este número."
                   descriptionMaxLines={3}
                   showChevron={false}
                   showSeparator={false}
@@ -466,32 +517,6 @@ export default function CreateProfileScreen() {
           </GroupedListSection>
         ) : null}
 
-        {sellerCreatesBusiness ? (
-          <FormSection
-            title="Datos del negocio"
-            helper="Este perfil será propietario del negocio."
-            styles={s}
-          >
-            <TextField
-              label="Nombre del negocio"
-              value={businessName}
-              onChangeText={setBusinessName}
-              baseContainerStyle={s.inputContainer}
-            />
-            <TextField
-              label="Identificación del negocio"
-              value={businessIdDocument}
-              onChangeText={setBusinessIdDocument}
-              hasError={Boolean(businessIdDocumentError)}
-              error={businessIdDocumentError}
-              keyboardType="number-pad"
-              inputMode="numeric"
-              maxLength={COSTA_RICA_LEGAL_ID_LENGTH}
-              baseContainerStyle={s.inputContainer}
-            />
-          </FormSection>
-        ) : null}
-
         <Button
           title={
             createdProfileId
@@ -500,6 +525,10 @@ export default function CreateProfileScreen() {
                 ? "Aceptar y completar perfil"
                 : selectedInvitation
                   ? "Aceptar y crear perfil"
+              : requiresBuyerIdentityVerification
+                ? "Verificar identidad"
+              : usesVerifiedBuyerIdentity
+                ? "Activar comprador"
               : isRepair
                 ? "Completar perfil"
                 : "Crear y activar"

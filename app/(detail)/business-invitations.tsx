@@ -212,7 +212,7 @@ export default function BusinessTeamScreen() {
           <GroupedListRow
             icon="info"
             label="Administración no disponible"
-            description="Solo la persona propietaria puede administrar miembros e invitaciones."
+            description="Solo el administrador principal puede administrar miembros e invitaciones."
             descriptionColor="textMedium"
             showSeparator={false}
           />
@@ -263,14 +263,14 @@ export default function BusinessTeamScreen() {
             icon="user"
             label={member.name}
             description={
-              member.membershipRole === "owner" ? "Persona propietaria" : "Miembro"
+              member.membershipRole === "owner" ? "Administrador principal" : "Miembro"
             }
             showSeparator={index < members.length - 1}
             showChevron={member.membershipRole === "member"}
             accessibilityLabel={
               member.membershipRole === "member"
                 ? `${member.name}. Miembro. Toca para administrar su acceso.`
-                : `${member.name}. Persona propietaria.`
+                : `${member.name}. Administrador principal.`
             }
             onPress={
               member.membershipRole === "member"
