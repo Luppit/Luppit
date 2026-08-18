@@ -7,6 +7,10 @@ import {
   setCurrentUserProfileCount,
 } from "@/src/services/active.profile.service";
 import { RPC_FUNCTIONS } from "@/src/db/functions";
+import {
+  beginCurrentUserBuyerOnboarding,
+  beginCurrentUserSellerOnboarding,
+} from "@/src/services/identity-verification.service";
 import { router } from "expo-router";
 import { supabase } from "./client";
 import { fromAppError, fromSupabaseError } from "./errors";
@@ -59,7 +63,8 @@ async function isPhoneNumberRegistered(phone: string) {
 async function VerifyPhoneOtpInternal(
   phone: string,
   token: string,
-  initialProfile?: InitialProfileInput
+  initialProfile?: InitialProfileInput,
+  suppressProfileRefresh = false
 ) {
   let didVerifySession = false;
   let preferredProfileId: string | null = null;
@@ -73,7 +78,7 @@ async function VerifyPhoneOtpInternal(
     if (error) throwLocalizedSupabaseError(error);
     didVerifySession = true;
     if (!initialProfile) {
-      await requestActiveProfileRefresh();
+      if (!suppressProfileRefresh) await requestActiveProfileRefresh();
       return data;
     }
     if (!initialProfile.legalAccepted) {
@@ -132,6 +137,60 @@ export async function verifyPhoneOtp(
     token,
     initialProfile
   );
+}
+
+export async function verifyBuyerPhoneOtp(
+  phone: string,
+  token: string,
+  legalAccepted: boolean
+) {
+  if (!legalAccepted) {
+    throw new InitialProfileSetupError(
+      "Debes aceptar los documentos legales para crear tu cuenta."
+    );
+  }
+
+  let didStoreOnboarding = false;
+  setInitialProfileBootstrapPending(true);
+  try {
+    const data = await VerifyPhoneOtpInternal(phone, token, undefined, true);
+    const onboarding = await beginCurrentUserBuyerOnboarding();
+    if (!onboarding.ok) {
+      throw new InitialProfileSetupError(onboarding.error.message);
+    }
+    didStoreOnboarding = true;
+    return data;
+  } finally {
+    setInitialProfileBootstrapPending(false);
+    if (didStoreOnboarding) await requestActiveProfileRefresh();
+  }
+}
+
+export async function verifySellerPhoneOtp(
+  phone: string,
+  token: string,
+  legalAccepted: boolean
+) {
+  if (!legalAccepted) {
+    throw new InitialProfileSetupError(
+      "Debes aceptar los documentos legales para crear tu cuenta."
+    );
+  }
+
+  let didStoreOnboarding = false;
+  setInitialProfileBootstrapPending(true);
+  try {
+    const data = await VerifyPhoneOtpInternal(phone, token, undefined, true);
+    const onboarding = await beginCurrentUserSellerOnboarding();
+    if (!onboarding.ok) {
+      throw new InitialProfileSetupError(onboarding.error.message);
+    }
+    didStoreOnboarding = true;
+    return data;
+  } finally {
+    setInitialProfileBootstrapPending(false);
+    if (didStoreOnboarding) await requestActiveProfileRefresh();
+  }
 }
 
 export async function requestDeletionReauthenticationOtp(phone: string) {

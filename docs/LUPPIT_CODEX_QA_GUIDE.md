@@ -509,7 +509,6 @@ Important boundaries to test:
 - Server-side work may finish after the client Stop control aborts its fetch.
 - A manual retry receives a new invocation identity; ambiguous network loss must be checked for committed server state.
 - Draft rows are durable, but the chat UI currently does not restore an existing draft after route unmount/app restart.
-- The current client blocks the assistant when the Auth account owns anything other than exactly one profile, even though the broader active-profile model supports multiple profiles.
 
 Success oracle: one and only one request exists for the draft; draft/request ownership matches the active buyer profile; draft is `published`; the request category/contract is the reviewed one; visibility is correct for matching and nonmatching sellers.
 
@@ -1088,25 +1087,24 @@ These are not instructions to accept a defect. Codex should compare intended con
 1. **The currently inspected worktree is not a release.** It contains uncommitted profile-picture work and an `app.json` permission change. Native `ios/`/`android/` folders are ignored and can be stale. José must commit/push a reproducible test SHA first.
 2. **Expo 54 dependency compatibility currently fails.** The inspected lockfile contains four native versions outside Expo 54's compatibility map. Fix them in a reviewed commit or explicitly waive them with successful build evidence; testers must not silently auto-fix.
 3. **Buyer assistant attachment conflict.** `app/(chat)/AGENTS.md` says text-only, but the current layout exposes the shared attachment behavior and supplies `maxImages={3}`; the Edge Function supports images. Decide whether to hide it or treat images as product behavior.
-4. **Multi-profile buyer conflict.** The architecture supports multiple active profiles, but the request-assistant client currently requires the Auth user to own exactly one profile.
-5. **Prompt-length mismatch.** The shared composer may allow 8,000 characters while the Edge Function rejects over 4,000.
-6. **Draft restoration gap.** Draft data survives server-side, but the buyer chat does not hydrate it after route unmount/app restart.
-7. **Stop/retry ambiguity.** Client abort does not guarantee Edge cancellation; manual retry uses a fresh request identity.
-8. **Current home implementation versus older guidance.** The live screen uses marketplace-hub RPCs, while some scoped guidance names older home request RPCs.
-9. **Buyer hub signature drift.** Client has a fallback when a sort parameter is absent; confirm deployed RPC signature and generated types.
-10. **Seller Create placeholder.** If database navigation exposes the seller Create route, the current screen may only show placeholder content.
-11. **Currency catalog drift.** A later migration renames a legacy currency code while older seed content may retain it. Query the target environment.
-12. **In-app notifications only.** No `expo-notifications` dependency or native push registration/entitlement is present. Do not test OS push as an implemented feature.
-13. **Custom-scheme links only.** `luppit://request/<id>` exists; Universal Links/Android App Links and install fallback are not configured.
-14. **Build identity conflict.** Local debug, EAS, and production use `com.luppit.app`, so signer conflict/replacement can erase local session state.
-15. **Camera/microphone prompts indicate stale native generation.** Current app configuration intends photo-library access, not camera/microphone.
-16. **Static database baseline is historical.** The README's reported 813/27 pass count predates later migrations; run the target SHA.
-17. **Message and offer-update retries are not invocation-idempotent.** A response lost after commit followed by a retry can create duplicate message/update artifacts. Lifecycle actions are usually protected by status checks, but do not generalize that protection to sends/updates.
-18. **Same-rater concurrent rating race.** Sequential duplicates are stable, but two simultaneous submissions can both pass the existence check and the current upsert may overwrite rating content.
-19. **Offer-photo rule is client-only and can be falsely satisfied.** The UI intends one real product photo, but the Edge/RPC permits an empty image array, and local success counting may unlock publish after a policy-rejected image.
-20. **Seller request-open RPC does not enforce discovery visibility.** It checks actor/request/safety prerequisites but not category matching or seller-home status visibility; direct access requires a product/security decision.
-21. **Seller shared request link likely fails before its seller branch.** The route directly selects a buyer-owned request while current RLS allows only the owning Auth user, so a seller may see not found and never call conversation creation.
-22. **Seller unsent drafts are not restored.** Component-local transcript/draft/photo count disappear on remount, and another unsent draft/pending images may remain.
+4. **Prompt-length mismatch.** The shared composer may allow 8,000 characters while the Edge Function rejects over 4,000.
+5. **Draft restoration gap.** Draft data survives server-side, but the buyer chat does not hydrate it after route unmount/app restart.
+6. **Stop/retry ambiguity.** Client abort does not guarantee Edge cancellation; manual retry uses a fresh request identity.
+7. **Current home implementation versus older guidance.** The live screen uses marketplace-hub RPCs, while some scoped guidance names older home request RPCs.
+8. **Buyer hub signature drift.** Client has a fallback when a sort parameter is absent; confirm deployed RPC signature and generated types.
+9. **Seller Create placeholder.** If database navigation exposes the seller Create route, the current screen may only show placeholder content.
+10. **Currency catalog drift.** A later migration renames a legacy currency code while older seed content may retain it. Query the target environment.
+11. **In-app notifications only.** No `expo-notifications` dependency or native push registration/entitlement is present. Do not test OS push as an implemented feature.
+12. **Custom-scheme links only.** `luppit://request/<id>` exists; Universal Links/Android App Links and install fallback are not configured.
+13. **Build identity conflict.** Local debug, EAS, and production use `com.luppit.app`, so signer conflict/replacement can erase local session state.
+14. **Camera/microphone prompts indicate stale native generation.** Current app configuration intends photo-library access, not camera/microphone.
+15. **Static database baseline is historical.** The README's reported 813/27 pass count predates later migrations; run the target SHA.
+16. **Message and offer-update retries are not invocation-idempotent.** A response lost after commit followed by a retry can create duplicate message/update artifacts. Lifecycle actions are usually protected by status checks, but do not generalize that protection to sends/updates.
+17. **Same-rater concurrent rating race.** Sequential duplicates are stable, but two simultaneous submissions can both pass the existence check and the current upsert may overwrite rating content.
+18. **Offer-photo rule is client-only and can be falsely satisfied.** The UI intends one real product photo, but the Edge/RPC permits an empty image array, and local success counting may unlock publish after a policy-rejected image.
+19. **Seller request-open RPC does not enforce discovery visibility.** It checks actor/request/safety prerequisites but not category matching or seller-home status visibility; direct access requires a product/security decision.
+20. **Seller shared request link likely fails before its seller branch.** The route directly selects a buyer-owned request while current RLS allows only the owning Auth user, so a seller may see not found and never call conversation creation.
+21. **Seller unsent drafts are not restored.** Component-local transcript/draft/photo count disappear on remount, and another unsent draft/pending images may remain.
 
 ---
 

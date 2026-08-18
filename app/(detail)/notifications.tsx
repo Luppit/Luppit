@@ -156,6 +156,24 @@ function getNotificationActions(
     ];
   }
 
+  if (notification.navigation?.kind === "businessVerification") {
+    return [
+      {
+        id: "open-business-verification",
+        label: "Ver verificación",
+        icon: "shield-check",
+        backgroundColorKey: "primary",
+        textColorKey: "backgroudWhite",
+        iconColorKey: "backgroudWhite",
+        onPress: () =>
+          router.push({
+            pathname: "/(detail)/business-verification",
+            params: { title: "Verificar negocio", hideMenu: "true" },
+          }),
+      },
+    ];
+  }
+
   return [];
 }
 

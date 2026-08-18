@@ -758,7 +758,7 @@ function AccountSetupRequiredState({
       )}
       <Text align="center" variant="body">
         {isMemberWaitingForCategories
-          ? "El negocio necesita al menos una categoría de venta. Pídele a la persona propietaria que la configure para recibir oportunidades."
+          ? "El negocio necesita al menos una categoría de venta. Pedile al administrador principal que la configure para recibir oportunidades."
           : requiresSellerCategories
           ? "Necesitas configurar al menos una categoría de venta para que Luppit pueda mostrarte oportunidades relevantes."
           : "Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar."}
@@ -768,7 +768,7 @@ function AccountSetupRequiredState({
           variant="dark"
           title={
             isMemberWaitingForCategories
-              ? "Pendiente del propietario"
+              ? "Pendiente del administrador principal"
               : requiresSellerCategories
                 ? "Configurar categorías"
                 : "Completar configuración"

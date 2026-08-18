@@ -99,7 +99,7 @@ export default function NewBusinessInvitationScreen() {
         </Text>
         <Text variant="body" color="textMedium">
           Usa el número con el que inicia sesión en Luppit. La invitación
-          aparecerá en Crear perfil, no por SMS, y vencerá en 7 días. Al
+          aparecerá al agregar un negocio, no por SMS, y vencerá en 7 días. Al
           aceptarla, su perfil vendedor se unirá a tu negocio como miembro.
         </Text>
       </View>

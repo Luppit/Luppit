@@ -127,6 +127,9 @@ function BuyerAccountSettingsContent() {
 }
 
 function SellerAccountSettingsContent() {
+  const { state: profileState, activeProfile } = useActiveProfile();
+  const isBusinessVerificationRequired =
+    profileState === "business_verification_required";
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
@@ -138,6 +141,11 @@ function SellerAccountSettingsContent() {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadOverview = useCallback(async () => {
+    if (isBusinessVerificationRequired) {
+      setOverview(null);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     const result = await getCurrentSellerProfileOverview();
     if (!result.ok) {
@@ -149,7 +157,7 @@ function SellerAccountSettingsContent() {
 
     setOverview(result.data);
     setIsLoading(false);
-  }, []);
+  }, [isBusinessVerificationRequired]);
 
   useFocusEffect(
     useCallback(() => {
@@ -165,7 +173,9 @@ function SellerAccountSettingsContent() {
   return (
     <AccountSettingsContent
       role={Roles.SELLER}
-      profile={overview?.profile}
+      profile={isBusinessVerificationRequired
+        ? activeProfile?.profile
+        : overview?.profile}
       hasProfileImage={false}
     />
   );
@@ -189,8 +199,16 @@ function AccountSettingsContent({
   );
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
   const isSeller = role === Roles.SELLER;
-  const { activeProfile, profiles, refreshProfiles } = useActiveProfile();
+  const {
+    state: profileState,
+    activeProfile,
+    profiles,
+    refreshProfiles,
+  } = useActiveProfile();
+  const isBusinessVerificationRequired =
+    profileState === "business_verification_required";
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
+  const isVerifiedIdentity = activeProfile?.identityStatus === "VERIFIED";
   const phone = profile?.phone?.trim() || "";
 
   return (
@@ -220,7 +238,9 @@ function AccountSettingsContent({
         <GroupedListRow
           icon="user"
           label="Nombre"
-          onPress={() =>
+          value={isVerifiedIdentity ? profile?.name ?? "" : undefined}
+          showChevron={!isVerifiedIdentity}
+          onPress={isVerifiedIdentity ? undefined : () =>
             router.push({
               pathname: "/(modal)/profile-field-edit",
               params: {
@@ -231,20 +251,22 @@ function AccountSettingsContent({
             })
           }
         />
-        <GroupedListRow
-          icon="file-text"
-          label="Documento de identificación"
-          onPress={() =>
-            router.push({
-              pathname: "/(modal)/profile-field-edit",
-              params: {
-                title: "Editar documento",
-                field: "id_document",
-                value: profile?.id_document ?? "",
-              },
-            })
-          }
-        />
+        {!isVerifiedIdentity ? (
+          <GroupedListRow
+            icon="file-text"
+            label="Documento de identificación"
+            onPress={() =>
+              router.push({
+                pathname: "/(modal)/profile-field-edit",
+                params: {
+                  title: "Editar documento",
+                  field: "id_document",
+                  value: profile?.id_document ?? "",
+                },
+              })
+            }
+          />
+        ) : null}
         <GroupedListRow
           icon="mail-warning"
           label="Correo"
@@ -258,7 +280,7 @@ function AccountSettingsContent({
         />
       </GroupedListSection>
 
-      {isSeller ? (
+      {isSeller && !isBusinessVerificationRequired ? (
         <GroupedListSection title="Negocio">
           <GroupedListRow
             icon="house"
@@ -344,36 +366,40 @@ function AccountSettingsContent({
       </GroupedListSection>
 
       <GroupedListSection title="Seguridad">
-        <GroupedListRow
-          icon="ban"
-          label="Cuentas bloqueadas"
-          onPress={() =>
-            router.push({
-              pathname: "/(detail)/blocked-accounts",
-              params: { title: "Cuentas bloqueadas", hideMenu: "true" },
-            })
-          }
-        />
+        {!isBusinessVerificationRequired ? (
+          <GroupedListRow
+            icon="ban"
+            label="Cuentas bloqueadas"
+            onPress={() =>
+              router.push({
+                pathname: "/(detail)/blocked-accounts",
+                params: { title: "Cuentas bloqueadas", hideMenu: "true" },
+              })
+            }
+          />
+        ) : null}
         <GroupedListRow
           icon="log-out"
           label="Cerrar sesión"
           destructive
           onPress={openSignOutConfirmation}
         />
-        <GroupedListRow
-          icon="user"
-          label="Eliminar este perfil"
-          destructive
-          onPress={() =>
-            profiles.length > 1
-              ? openProfileDeletionConfirmation({
-                  phone,
-                  isBusinessOwner,
-                  refreshProfiles,
-                })
-              : openLastProfileDeletionExplanation()
-          }
-        />
+        {isSeller ? (
+          <GroupedListRow
+            icon="user"
+            label="Eliminar este perfil"
+            destructive
+            onPress={() =>
+              profiles.length > 1
+                ? openProfileDeletionConfirmation({
+                    phone,
+                    isBusinessOwner,
+                    refreshProfiles,
+                  })
+                : openLastProfileDeletionExplanation()
+            }
+          />
+        ) : null}
         <GroupedListRow
           icon="trash-2"
           label="Eliminar cuenta"

@@ -65,6 +65,21 @@ export default function TabsLayout() {
 
   if (state === "signed_out") return <Redirect href="/(auth)/auth" />;
 
+  if (state === "identity_required") {
+    return <Redirect href="/(auth)/identity-verification" />;
+  }
+
+  if (state === "business_verification_required") {
+    return (
+      <Redirect
+        href={{
+          pathname: "/(detail)/business-verification",
+          params: { title: "Verificar negocio", hideMenu: "true" },
+        }}
+      />
+    );
+  }
+
   if (state === "no_profile" || state === "setup_required") {
     return (
       <Redirect

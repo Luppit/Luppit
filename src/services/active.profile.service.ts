@@ -11,11 +11,19 @@ import {
   isValidCostaRicaPersonalId,
 } from "@/src/utils/costaRicaIdDocument";
 import { parseProfileImageStorageReference } from "./profile-image.helpers";
+import type { IdentityStatus } from "./identity-verification.service";
 
 export type ActiveProfileSetupStatus =
   | "missing_role"
   | "missing_business"
+  | "business_verification_required"
   | "ready";
+
+export type BusinessVerificationStatus =
+  | "PENDING"
+  | "NEEDS_ACTION"
+  | "APPROVED"
+  | "REJECTED";
 
 export type ActiveProfile = Row<"profile"> & {
   is_default: boolean;
@@ -30,6 +38,9 @@ export type ActiveProfileSummary = {
   membershipRole: "owner" | "member" | null;
   profileImagePath: string | null;
   profileImageUrl: string | null;
+  identityStatus: IdentityStatus;
+  businessVerificationStatus: BusinessVerificationStatus | null;
+  businessVerificationSafeMessage: string | null;
   unreadCount: number;
 };
 
@@ -114,11 +125,15 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
   if (typeof row.id !== "string" || typeof row.user_id !== "string") return null;
-  if (typeof row.name !== "string" || typeof row.id_document !== "string") return null;
+  if (
+    typeof row.name !== "string" ||
+    (row.id_document !== null && typeof row.id_document !== "string")
+  ) return null;
 
   const setupStatus =
     row.setup_status === "missing_role" ||
     row.setup_status === "missing_business" ||
+    row.setup_status === "business_verification_required" ||
     row.setup_status === "ready"
       ? row.setup_status
       : "missing_role";
@@ -142,6 +157,23 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
         .from(STORAGE_BUCKETS.profileImages)
         .getPublicUrl(profileImageObjectPath).data.publicUrl || null
     : null;
+  const identityStatus =
+    row.identity_status === "NOT_STARTED" ||
+    row.identity_status === "IN_PROGRESS" ||
+    row.identity_status === "ACTION_REQUIRED" ||
+    row.identity_status === "IN_REVIEW" ||
+    row.identity_status === "VERIFIED" ||
+    row.identity_status === "INELIGIBLE" ||
+    row.identity_status === "LEGACY_EXEMPT"
+      ? row.identity_status
+      : "LEGACY_EXEMPT";
+  const businessVerificationStatus =
+    row.business_verification_status === "PENDING" ||
+    row.business_verification_status === "NEEDS_ACTION" ||
+    row.business_verification_status === "APPROVED" ||
+    row.business_verification_status === "REJECTED"
+      ? row.business_verification_status
+      : null;
 
   return {
     profile: {
@@ -165,6 +197,12 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
     membershipRole,
     profileImagePath,
     profileImageUrl,
+    identityStatus,
+    businessVerificationStatus,
+    businessVerificationSafeMessage:
+      typeof row.business_verification_safe_message === "string"
+        ? row.business_verification_safe_message
+        : null,
     unreadCount: parseCount(row.unread_count),
   };
 }

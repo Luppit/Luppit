@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Business Verification"
+  short_description: "Generate safe SQL for business review decisions"
+  default_prompt: "Use $review-business-verification to generate the SQL for a pending business application decision."
