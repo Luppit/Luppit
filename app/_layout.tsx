@@ -2,6 +2,7 @@ import GlobalPopupHost from "@/src/components/popup/GlobalPopupHost";
 import GlobalToastHost from "@/src/components/toast/GlobalToastHost";
 import LegalAcceptanceGate from "@/src/components/legal/LegalAcceptanceGate";
 import EmailSetupNavigationGate from "@/src/components/profile/EmailSetupNavigationGate";
+import { PushNotificationProvider } from "@/src/components/notifications/PushNotificationProvider";
 import {
   ActiveProfileBootstrapGate,
   ActiveProfileProvider,
@@ -60,16 +61,18 @@ function RootLayout() {
   return (
     <ThemeProvider>
       <ActiveProfileProvider>
-        <ActiveProfileBootstrapGate>
-          <LegalAcceptanceGate>
-            <EmailSetupNavigationGate>
-              <Slot />
-            </EmailSetupNavigationGate>
-          </LegalAcceptanceGate>
-        </ActiveProfileBootstrapGate>
-        {!fontsLoaded && null}
-        <GlobalPopupHost />
-        <GlobalToastHost />
+        <PushNotificationProvider>
+          <ActiveProfileBootstrapGate>
+            <LegalAcceptanceGate>
+              <EmailSetupNavigationGate>
+                <Slot />
+              </EmailSetupNavigationGate>
+            </LegalAcceptanceGate>
+          </ActiveProfileBootstrapGate>
+          {!fontsLoaded && null}
+          <GlobalPopupHost />
+          <GlobalToastHost />
+        </PushNotificationProvider>
       </ActiveProfileProvider>
     </ThemeProvider>
   );

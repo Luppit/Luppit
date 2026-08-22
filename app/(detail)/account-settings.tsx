@@ -4,6 +4,7 @@ import {
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { hasProfilePicture } from "@/src/components/profile/ProfilePicture";
 import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import {
@@ -198,6 +199,11 @@ function AccountSettingsContent({
     [t, topContentInset]
   );
   const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const buildProfile =
+    process.env.EXPO_PUBLIC_BUILD_PROFILE ??
+    process.env.EXPO_PUBLIC_ENV ??
+    (__DEV__ ? "development" : "production");
+  const buildProfileLabel = getBuildProfileLabel(buildProfile);
   const isSeller = role === Roles.SELLER;
   const {
     state: profileState,
@@ -210,6 +216,16 @@ function AccountSettingsContent({
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
   const isVerifiedIdentity = activeProfile?.identityStatus === "VERIFIED";
   const phone = profile?.phone?.trim() || "";
+  const {
+    permissionStatus: pushPermissionStatus,
+    enablePushNotifications,
+    openPushNotificationSettings,
+  } = usePushNotifications();
+  const pushPermissionLabel = pushPermissionStatus === "granted"
+    ? "Activadas"
+    : pushPermissionStatus === "denied"
+    ? "Desactivadas"
+    : "Sin configurar";
 
   return (
     <ScrollView
@@ -324,6 +340,21 @@ function AccountSettingsContent({
           }
         />
         <GroupedListRow
+          icon="bell"
+          label="Notificaciones push"
+          value={pushPermissionLabel}
+          onPress={() => {
+            if (
+              pushPermissionStatus === "denied" ||
+              pushPermissionStatus === "unavailable"
+            ) {
+              void openPushNotificationSettings();
+            } else {
+              void enablePushNotifications();
+            }
+          }}
+        />
+        <GroupedListRow
           icon="help-circle"
           label="Ayuda"
           onPress={() =>
@@ -360,7 +391,7 @@ function AccountSettingsContent({
         <GroupedListRow
           icon="info"
           label="Versión"
-          value={appVersion}
+          value={`${appVersion} · ${buildProfileLabel}`}
           showSeparator={false}
         />
       </GroupedListSection>
@@ -410,6 +441,21 @@ function AccountSettingsContent({
       </GroupedListSection>
     </ScrollView>
   );
+}
+
+function getBuildProfileLabel(buildProfile: string) {
+  switch (buildProfile.toLowerCase()) {
+    case "dev":
+    case "development":
+      return "Desarrollo";
+    case "preview":
+      return "Preview";
+    case "prod":
+    case "production":
+      return "Producción";
+    default:
+      return buildProfile;
+  }
 }
 
 function openLegalDocument(code: string, title: string) {

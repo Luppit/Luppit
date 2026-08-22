@@ -5139,6 +5139,16 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: undefined
       }
+      register_current_push_device: {
+        Args: {
+          p_app_version?: string
+          p_build_number?: string
+          p_expo_push_token: string
+          p_platform: string
+          p_previous_expo_push_token?: string
+        }
+        Returns: Json
+      }
       remove_buyer_purchase_request_favorite: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
@@ -5378,6 +5388,11 @@ export type Database = {
         Args: { p_purchase_request_id?: string }
         Returns: Json
       }
+      service_claim_push_deliveries: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
+      service_claim_push_receipts: { Args: { p_limit?: number }; Returns: Json }
       service_complete_deletion_request: {
         Args: { p_request_id: string; p_request_type: string }
         Returns: Json
@@ -5477,6 +5492,24 @@ export type Database = {
         }
         Returns: Json
       }
+      service_record_push_receipt: {
+        Args: {
+          p_delivery_id: string
+          p_error_code?: string
+          p_retryable?: boolean
+          p_status: string
+        }
+        Returns: boolean
+      }
+      service_record_push_ticket: {
+        Args: {
+          p_delivery_id: string
+          p_error_code?: string
+          p_retryable?: boolean
+          p_ticket_id: string
+        }
+        Returns: boolean
+      }
       service_release_waitlist_confirmation: {
         Args: { p_confirmation_token_hash: string }
         Returns: boolean
@@ -5513,6 +5546,10 @@ export type Database = {
           p_retryable?: boolean
         }
         Returns: Json
+      }
+      service_reschedule_push_receipt: {
+        Args: { p_delivery_id: string; p_error_code?: string }
+        Returns: boolean
       }
       service_review_business_verification: {
         Args: {
@@ -5602,6 +5639,10 @@ export type Database = {
       unblock_safety_block: {
         Args: { p_block_id: string; p_profile_id: string }
         Returns: Json
+      }
+      unregister_current_push_device: {
+        Args: { p_expo_push_token: string }
+        Returns: boolean
       }
       update_current_business_commercial_name: {
         Args: { p_name: string; p_profile_id: string }

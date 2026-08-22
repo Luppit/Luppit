@@ -75,6 +75,7 @@ export const RPC_FUNCTIONS = {
   REMOVE_CURRENT_BUSINESS_MEMBER: "remove_current_business_member",
   REMOVE_SELLER_PURCHASE_REQUEST_FAVORITE:
     "remove_seller_purchase_request_favorite",
+  REGISTER_CURRENT_PUSH_DEVICE: "register_current_push_device",
   REVOKE_CURRENT_USER_BUSINESS_INVITATION:
     "revoke_current_user_business_invitation",
   SEND_EMAIL_VERIFICATION_OTP: "send_email_verification_otp",
@@ -89,6 +90,7 @@ export const RPC_FUNCTIONS = {
     "update_current_business_commercial_name",
   UPDATE_SELLER_OFFER_FULFILLMENT_FROM_CONVERSATION:
     "update_seller_offer_fulfillment_from_conversation",
+  UNREGISTER_CURRENT_PUSH_DEVICE: "unregister_current_push_device",
   UNBLOCK_SAFETY_BLOCK: "unblock_safety_block",
   VERIFY_EMAIL_VERIFICATION_OTP: "verify_email_verification_otp",
 } as const satisfies Record<string, FunctionName>;

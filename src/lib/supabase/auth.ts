@@ -14,6 +14,7 @@ import {
 import { router } from "expo-router";
 import { supabase } from "./client";
 import { fromAppError, fromSupabaseError } from "./errors";
+import { unregisterCurrentPushDevice } from "@/src/services/push-notification.service";
 
 export type AuthMethod = "sms";
 export type AuthEvent = "SignIn" | "SignUp";
@@ -238,6 +239,11 @@ export async function getSession() {
 
 export async function signOutLocally() {
   abortProfileScopedRequests();
+  try {
+    await unregisterCurrentPushDevice();
+  } catch {
+    // Signing out must still succeed if the device is offline.
+  }
   await supabase.auth.signOut({ scope: "local" });
   setCurrentProfileSummary(null);
   setCurrentUserProfileCount(0);
@@ -246,6 +252,11 @@ export async function signOutLocally() {
 
 export async function signOut() {
   abortProfileScopedRequests();
+  try {
+    await unregisterCurrentPushDevice();
+  } catch {
+    // Signing out must still succeed if the device is offline.
+  }
   const { error } = await supabase.auth.signOut();
   if (error) throwLocalizedSupabaseError(error);
   setCurrentProfileSummary(null);
