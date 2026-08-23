@@ -67,6 +67,8 @@ export type SellerPurchaseOfferFilters = {
   selectedConversationStatusCodes?: string[];
 };
 
+export type SellerOfferLifecycleScope = "active" | "history" | "all";
+
 export type BuyerPurchaseOfferFilters = {
   searchValue?: string;
   startDate?: string;
@@ -397,7 +399,8 @@ export async function getCurrentBuyerPurchaseRequestOffers(
 
 export async function getCurrentSellerPurchaseOffers(
   filters?: SellerPurchaseOfferFilters,
-  sortCode = "newly_listed"
+  sortCode = "newly_listed",
+  lifecycleScope: SellerOfferLifecycleScope = "active"
 ): Promise<
   { ok: true; data: SellerPurchaseOfferCardData[] } | { ok: false; error: AppError }
 > {
@@ -429,6 +432,7 @@ export async function getCurrentSellerPurchaseOffers(
         filters.selectedConversationStatusCodes.length > 0
           ? filters.selectedConversationStatusCodes
           : null,
+      p_lifecycle_scope: lifecycleScope,
     } as never
   );
 
@@ -604,10 +608,19 @@ export async function getCurrentSellerPurchaseOffers(
     } as SellerPurchaseOfferCardData;
   });
 
-  return {
-    ok: true,
-    data: await fillSellerOfferContextFromConversations(profile.data.id, parsed),
-  };
+  const hydratedRows = await fillSellerOfferContextFromConversations(
+    profile.data.id,
+    parsed
+  );
+  const scopedRows = hydratedRows.filter((row) =>
+    lifecycleScope === "all"
+      ? true
+      : lifecycleScope === "history"
+        ? row.conversation_is_terminal === true
+        : row.conversation_is_terminal !== true
+  );
+
+  return { ok: true, data: scopedRows };
 }
 
 export async function getPurchaseOfferById(

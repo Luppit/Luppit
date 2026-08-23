@@ -47,3 +47,15 @@ test("localizes an undeployed profile-image function", () => {
     "El servicio para actualizar fotos todavía no está disponible. Inténtalo más tarde."
   );
 });
+
+test("localizes a verification cancellation race", () => {
+  const error = fromSupabaseError({
+    code: "identity_verification_not_cancelable",
+  });
+
+  assert.equal(error.type, "validation");
+  assert.equal(
+    error.message,
+    "La verificación ya está en revisión o finalizó, por lo que no se puede cancelar.",
+  );
+});

@@ -111,6 +111,7 @@ function AssistantThinkingBlock() {
 
 function UserMessageBlock({ message }: { message: ChatMessage }) {
   const t = useTheme();
+  const { retryMessage, isSendingMessage } = useChatSession();
 
   return (
     <View
@@ -150,7 +151,12 @@ function UserMessageBlock({ message }: { message: ChatMessage }) {
           </View>
         ) : null}
       </View>
-      <MessageUtilities text={message.text} align="right" />
+      <MessageUtilities
+        text={message.text}
+        align="right"
+        onRetry={message.failedRequests ? () => void retryMessage(message.id) : undefined}
+        retryDisabled={isSendingMessage}
+      />
     </View>
   );
 }

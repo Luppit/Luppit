@@ -112,6 +112,7 @@ function ChatLayoutContent() {
           >
             <InputChat
               clearOnSendStart
+              sendOnReturn={false}
               autoFocus={messages.length === 0}
               disabled={!canCompose}
               busy={isSendingMessage}

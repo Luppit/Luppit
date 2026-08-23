@@ -1,5 +1,7 @@
 import { Text } from "@/src/components/Text";
+import { Icon } from "@/src/components/Icon";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
+import { lucideIcons, type LucideIconName } from "@/src/icons/lucide";
 import { ConversationViewSlot } from "@/src/services/conversation.service";
 import { Theme, useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
@@ -55,11 +57,17 @@ export default function ConversationStatusSlotCard({ slot }: Props) {
   const deadlineBoxUri = useMemo(() => Asset.fromModule(deadlineBoxAsset).uri, []);
   const formattedDate = formatDeadlineDate(slot.due_at, slot.formatted_due_at);
   const deadlineCaption = getDeadlineCaption(slot);
+  const statusIcon =
+    slot.icon && slot.icon in lucideIcons ? (slot.icon as LucideIconName) : null;
 
   return (
     <View style={s.card}>
       <View style={s.header}>
-        {!assetFailed ? (
+        {statusIcon ? (
+          <View style={s.iconBadge}>
+            <Icon name={statusIcon} size={22} color={t.colors.primary} />
+          </View>
+        ) : !assetFailed ? (
           <SvgUri
             uri={deadlineBoxUri}
             width={34}
@@ -131,7 +139,16 @@ function createStyles(t: Theme) {
       gap: t.spacing.sm,
     },
     headerCopy: {
+      flex: 1,
       flexShrink: 1,
+    },
+    iconBadge: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.backgroudWhite,
     },
     eyebrow: {
       fontFamily: t.typography.subtitle.fontFamily,

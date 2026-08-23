@@ -20,6 +20,7 @@ function onboarding(
     requiresIdentityVerification,
     canStart: false,
     canRetry: false,
+    canCancel: false,
     safeMessage: null,
     profileId: null,
   };

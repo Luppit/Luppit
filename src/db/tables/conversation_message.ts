@@ -11,6 +11,8 @@ export const COL_CONVERSATION_MESSAGE = {
   text: "text",
   message_kind: "message_kind",
   image_path: "image_path",
+  message_group_id: "message_group_id",
+  message_group_index: "message_group_index",
   visible_to_role_id: "visible_to_role_id",
   buyer_open_state: "buyer_open_state",
   seller_open_state: "seller_open_state",

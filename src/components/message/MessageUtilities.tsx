@@ -10,11 +10,15 @@ const COPY_FEEDBACK_DURATION_MS = 1500;
 type MessageUtilitiesProps = {
   text: string | null | undefined;
   align?: "left" | "right";
+  onRetry?: () => void;
+  retryDisabled?: boolean;
 };
 
 export default function MessageUtilities({
   text,
   align = "left",
+  onRetry,
+  retryDisabled = false,
 }: MessageUtilitiesProps) {
   const t = useTheme();
   const [isCopied, setIsCopied] = useState(false);
@@ -109,6 +113,24 @@ export default function MessageUtilities({
           strokeWidth={1.8}
         />
       </Pressable>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Reintentar mensaje"
+          accessibilityHint="Vuelve a enviar este mensaje sin duplicar la solicitud"
+          disabled={retryDisabled}
+          hitSlop={4}
+          onPress={onRetry}
+          style={utilityButtonStyle}
+        >
+          <Icon
+            name="send"
+            size={20}
+            color={t.colors.error}
+            strokeWidth={1.8}
+          />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

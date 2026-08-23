@@ -33,6 +33,7 @@ export type InputChatProps = {
   clearOnSend?: boolean;
   clearOnSendStart?: boolean;
   showImagePreview?: boolean;
+  sendOnReturn?: boolean;
   onSend: (payload: {
     text: string;
     images: ChatImage[];
@@ -53,6 +54,7 @@ export default function InputChat({
   clearOnSend = true,
   clearOnSendStart = false,
   showImagePreview = true,
+  sendOnReturn = true,
   onSend,
   onStop,
   onPickImages,
@@ -255,10 +257,10 @@ export default function InputChat({
               accessibilityLabel="Mensaje"
               autoFocus={autoFocus}
               multiline={true}
-              returnKeyType="send"
+              returnKeyType={sendOnReturn ? "send" : "default"}
               scrollEnabled
               textAlignVertical="top"
-              onKeyPress={handleKeyPress}
+              onKeyPress={sendOnReturn ? handleKeyPress : undefined}
             />
           </View>
 

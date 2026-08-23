@@ -119,8 +119,26 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
     setCurrentUserProfileCount(0);
   }, []);
 
+  const applyProfileChangeBoundary = useCallback(
+    (nextProfile: ActiveProfileSummary, navigateHome: boolean) => {
+      abortProfileScopedRequests();
+      clearBuyerHomeFilters();
+      clearSellerHomeFilters();
+      setSelectedSegmentSvgName(ALL_SEGMENTS_SVG_NAME);
+      closePopup();
+      activeProfileRef.current = nextProfile;
+      setActiveProfile(nextProfile);
+      setCurrentProfileSummary(nextProfile);
+      setState(getStateForProfile(nextProfile));
+      setRevision((value) => value + 1);
+      if (navigateHome) router.replace("/");
+    },
+    []
+  );
+
   const refreshProfiles = useCallback(
     async (preferredProfileId?: string | null) => {
+      const previousProfileId = activeProfileRef.current?.profile.id ?? null;
       const refreshSequence = ++refreshSequenceRef.current;
       unreadRefreshSequenceRef.current += 1;
       activeRefreshCountRef.current += 1;
@@ -201,10 +219,17 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
         }
         if (refreshSequence !== refreshSequenceRef.current) return false;
         setProfiles(nextProfiles);
-        activeProfileRef.current = nextActiveProfile;
-        setActiveProfile(nextActiveProfile);
-        setCurrentProfileSummary(nextActiveProfile);
-        setState(getStateForProfile(nextActiveProfile));
+        if (
+          previousProfileId &&
+          previousProfileId !== nextActiveProfile.profile.id
+        ) {
+          applyProfileChangeBoundary(nextActiveProfile, true);
+        } else {
+          activeProfileRef.current = nextActiveProfile;
+          setActiveProfile(nextActiveProfile);
+          setCurrentProfileSummary(nextActiveProfile);
+          setState(getStateForProfile(nextActiveProfile));
+        }
         return (
           preferredProfileId == null ||
           nextActiveProfile.profile.id === preferredProfileId
@@ -216,7 +241,7 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
         );
       }
     },
-    [clearMemory]
+    [applyProfileChangeBoundary, clearMemory]
   );
 
   const applyUnreadNotificationCount = useCallback((count: number) => {
@@ -270,26 +295,16 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
 
       refreshSequenceRef.current += 1;
       unreadRefreshSequenceRef.current += 1;
-      abortProfileScopedRequests();
       try {
         await persistActiveProfileId(userId, selectedProfile.profile.id);
       } catch {
         // Keep switching in-memory even when device storage is unavailable.
       }
-      clearBuyerHomeFilters();
-      clearSellerHomeFilters();
-      setSelectedSegmentSvgName(ALL_SEGMENTS_SVG_NAME);
-      closePopup();
-      activeProfileRef.current = selectedProfile;
-      setActiveProfile(selectedProfile);
-      setCurrentProfileSummary(selectedProfile);
-      setState(getStateForProfile(selectedProfile));
-      setRevision((value) => value + 1);
+      applyProfileChangeBoundary(selectedProfile, true);
       void refreshUnreadNotificationCount();
-      router.replace("/");
       return true;
     },
-    [profiles, refreshUnreadNotificationCount]
+    [applyProfileChangeBoundary, profiles, refreshUnreadNotificationCount]
   );
 
   useEffect(() => {

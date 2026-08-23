@@ -678,6 +678,22 @@ function OfferAssistantScreen({
       }
 
       setPendingRetry(null);
+      if (input.uiAction === "RESTORE") {
+        setMessages(
+          result.messages.map((message) => ({
+            id: message.id,
+            sender: message.role === "user" ? "user" : "assistant",
+            text: message.content,
+            images: message.imageUrls.map((uri) => ({ uri })),
+          }))
+        );
+        setSuccessfulOfferPhotoCount(
+          result.messages.reduce(
+            (count, message) => count + message.imageUrls.length,
+            0
+          )
+        );
+      }
       if (result.offerDraftId) setOfferDraftId(result.offerDraftId);
       if (result.status) setStatus(result.status);
       const isContinueAction = input.uiAction === "CONTINUE";
@@ -772,6 +788,16 @@ function OfferAssistantScreen({
     },
     [applyAssistantResult]
   );
+
+  useEffect(() => {
+    if (!conversationId) return;
+    void executeAssistantRequest({
+      prompt: "",
+      conversationId,
+      uiAction: "RESTORE",
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-restore"),
+    });
+  }, [conversationId, executeAssistantRequest]);
 
   const handleSend = useCallback(
     async ({ text, images }: { text: string; images: ChatImage[] }) => {
@@ -884,6 +910,49 @@ function OfferAssistantScreen({
     await executeAssistantRequest(pendingRetry.input, pendingRetry.successfulImageCount);
   }, [executeAssistantRequest, pendingRetry]);
 
+  const handleDiscard = useCallback(() => {
+    if (!offerDraftId || isBusy || status === "sent") return;
+    openPopup({
+      type: "summary",
+      title: "Descartar borrador",
+      description:
+        "Se eliminará este borrador de la sesión. Esta acción no envía ninguna oferta al comprador.",
+      actions: [
+        {
+          id: "keep-draft",
+          label: "Conservar",
+          icon: "arrow-left",
+          backgroundColorKey: "backgroudWhite",
+          textColorKey: "textDark",
+          iconColorKey: "textDark",
+        },
+        {
+          id: "discard-draft",
+          label: "Descartar",
+          icon: "trash-2",
+          backgroundColorKey: "error",
+          textColorKey: "backgroudWhite",
+          iconColorKey: "backgroudWhite",
+          onPress: () => {
+            void (async () => {
+              const result = await callSellerOfferAssistant({
+                prompt: "",
+                offerDraftId,
+                uiAction: "DISCARD",
+                identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
+              });
+              if (!result.ok) {
+                showError("No se pudo descartar", result.error.message);
+                return;
+              }
+              router.back();
+            })();
+          },
+        },
+      ],
+    });
+  }, [isBusy, offerDraftId, status]);
+
   if (!conversationId) {
     return (
       <View
@@ -945,6 +1014,25 @@ function OfferAssistantScreen({
             }}
           >
             <Text variant="body">Reintentar último mensaje</Text>
+          </Pressable>
+        ) : null}
+
+        {offerDraftId && status !== "sent" ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Descartar borrador de oferta"
+            disabled={isBusy}
+            onPress={handleDiscard}
+            style={{
+              alignSelf: "center",
+              paddingHorizontal: t.spacing.md,
+              paddingVertical: t.spacing.sm,
+              opacity: isBusy ? 0.5 : 1,
+            }}
+          >
+            <Text variant="small" style={{ color: t.colors.error }}>
+              Descartar borrador
+            </Text>
           </Pressable>
         ) : null}
 
