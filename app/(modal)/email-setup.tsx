@@ -249,7 +249,8 @@ export default function EmailSetupScreen() {
                 <TextField
                   accessibilityLabel="Correo electrónico"
                   accessibilityHint={
-                    emailError || "Ingresa la dirección que quieres verificar"
+                    emailError ||
+                    "Ingresa la dirección que quieres verificar. Cada perfil debe usar un correo diferente."
                   }
                   value={email}
                   onChangeText={(value) => {
@@ -271,6 +272,9 @@ export default function EmailSetupScreen() {
                   error={emailError}
                   baseContainerStyle={styles.inputContainer}
                 />
+                <Text variant="small" color="textMedium">
+                  Cada perfil debe usar un correo diferente.
+                </Text>
               </View>
             </GroupedListSection>
 

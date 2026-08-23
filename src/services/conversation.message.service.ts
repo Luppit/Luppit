@@ -14,6 +14,8 @@ import { getCurrentProfileResult } from "./active.profile.service";
 export type ConversationMessage = Row<"conversation_message"> & {
   image_path?: string | null;
   image_url?: string | null;
+  message_group_id?: string | null;
+  message_group_index?: number | null;
 };
 
 export type ConversationMessageImage = {
@@ -27,9 +29,11 @@ type SendConversationMessageInput = {
   conversationId: string;
   text?: string;
   images?: ConversationMessageImage[];
+  messageGroupId?: string;
 };
 
 const MAX_CONVERSATION_IMAGE_BYTES = 4_000_000;
+const MAX_CONVERSATION_IMAGES = 10;
 const ALLOWED_CONVERSATION_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/jpg",
@@ -49,7 +53,7 @@ const CONVERSATION_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   webp: "image/webp",
 };
 
-function createUuid() {
+export function createConversationMessageGroupId() {
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (token) => {
     const random = Math.floor(Math.random() * 16);
     const value = token === "x" ? random : (random & 0x3) | 0x8;
@@ -70,11 +74,17 @@ function getFileExtension(file: ConversationMessageImage, fallback = "jpg") {
   return fallback;
 }
 
-async function uploadConversationImage(
-  conversationId: string,
-  profileId: string,
+type PreparedConversationImage = {
+  body: ArrayBuffer;
+  extension: string;
+  contentType: string;
+};
+
+async function prepareConversationImage(
   file: ConversationMessageImage,
-): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
+): Promise<
+  { ok: true; data: PreparedConversationImage } | { ok: false; error: AppError }
+> {
   const extension = getFileExtension(file);
   const mime = file.mime?.toLowerCase() ?? null;
   if (
@@ -92,8 +102,20 @@ async function uploadConversationImage(
     };
   }
 
-  const response = await fetch(file.uri);
-  const body = await response.arrayBuffer();
+  let body: ArrayBuffer;
+  try {
+    const response = await fetch(file.uri);
+    body = await response.arrayBuffer();
+  } catch {
+    return {
+      ok: false,
+      error: {
+        type: "validation",
+        code: "conversation_image_unreadable",
+        message: "No se pudo leer una de las imágenes seleccionadas.",
+      },
+    };
+  }
   if (body.byteLength > MAX_CONVERSATION_IMAGE_BYTES) {
     return {
       ok: false,
@@ -105,13 +127,28 @@ async function uploadConversationImage(
     };
   }
 
+  return {
+    ok: true,
+    data: {
+      body,
+      extension,
+      contentType: mime ?? CONVERSATION_IMAGE_MIME_BY_EXTENSION[extension],
+    },
+  };
+}
+
+async function uploadConversationImage(
+  conversationId: string,
+  profileId: string,
+  file: PreparedConversationImage,
+): Promise<{ ok: true; data: string } | { ok: false; error: AppError }> {
   const filePath =
-    `pending/${profileId}/${conversationId}/${createUuid()}.${extension}`;
+    `pending/${profileId}/${conversationId}/${createConversationMessageGroupId()}.${file.extension}`;
 
   const { error } = await supabase.storage
     .from(STORAGE_BUCKETS.conversations)
-    .upload(filePath, body, {
-      contentType: mime ?? CONVERSATION_IMAGE_MIME_BY_EXTENSION[extension],
+    .upload(filePath, file.body, {
+      contentType: file.contentType,
       upsert: false,
     });
 
@@ -198,10 +235,16 @@ export async function createConversationTextMessage(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  return sendModeratedConversationMessage(conversationId, profile.data.id, {
+  const result = await sendModeratedConversationMessage(conversationId, profile.data.id, {
+    messageGroupId: createConversationMessageGroupId(),
     text: text.trim(),
-    pendingImagePath: null,
+    pendingImagePaths: [],
   });
+  if (!result.ok) return result;
+  const message = result.data[0];
+  return message
+    ? { ok: true, data: message }
+    : { ok: false, error: fromAppError("unknown") };
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -244,27 +287,29 @@ async function sendModeratedConversationMessage(
   conversationId: string,
   profileId: string,
   message: {
+    messageGroupId: string;
     text: string | null;
-    pendingImagePath: string | null;
+    pendingImagePaths: string[];
   }
-): Promise<{ ok: true; data: ConversationMessage } | { ok: false; error: AppError }> {
+): Promise<{ ok: true; data: ConversationMessage[] } | { ok: false; error: AppError }> {
   const functionResult = await supabase.functions.invoke(
     "send-moderated-conversation-message",
     {
       body: {
         conversationId,
         profileId,
+        messageGroupId: message.messageGroupId,
         text: message.text,
-        pendingImagePath: message.pendingImagePath,
+        pendingImagePaths: message.pendingImagePaths,
       },
     }
   );
 
   if (functionResult.error) {
-    if (message.pendingImagePath) {
+    if (message.pendingImagePaths.length > 0) {
       await supabase.storage
         .from(STORAGE_BUCKETS.conversations)
-        .remove([message.pendingImagePath]);
+        .remove(message.pendingImagePaths);
     }
     return {
       ok: false,
@@ -273,11 +318,15 @@ async function sendModeratedConversationMessage(
   }
 
   const response = toRecord(functionResult.data);
-  const createdMessage = response?.message;
-  if (!createdMessage || typeof createdMessage !== "object") {
+  const createdMessages = Array.isArray(response?.messages)
+    ? response.messages
+    : response?.message && typeof response.message === "object"
+      ? [response.message]
+      : [];
+  if (createdMessages.length === 0) {
     return { ok: false, error: fromAppError("unknown") };
   }
-  return { ok: true, data: createdMessage as ConversationMessage };
+  return { ok: true, data: createdMessages as ConversationMessage[] };
 }
 
 export async function createConversationMessages(
@@ -287,7 +336,11 @@ export async function createConversationMessages(
   const text = input.text?.trim() ?? "";
   const images = input.images ?? [];
 
-  if (!conversationId || (!text && images.length === 0)) {
+  if (
+    !conversationId ||
+    (!text && images.length === 0) ||
+    images.length > MAX_CONVERSATION_IMAGES
+  ) {
     return { ok: false, error: fromAppError("validation") };
   }
 
@@ -298,35 +351,40 @@ export async function createConversationMessages(
   if (profile?.ok === false) return { ok: false, error: profile.error };
   if (!profile) return { ok: false, error: fromAppError("not_found") };
 
-  const created: ConversationMessage[] = [];
+  const messageGroupId = input.messageGroupId ?? createConversationMessageGroupId();
+  const pendingImagePaths: string[] = [];
+  const preparedImages: PreparedConversationImage[] = [];
 
-  if (text) {
-    const textMessage = await sendModeratedConversationMessage(
-      conversationId,
-      profile.data.id,
-      { text, pendingImagePath: null }
-    );
-    if (!textMessage.ok) return textMessage;
-    created.push(textMessage.data);
+  for (const image of images) {
+    const prepared = await prepareConversationImage(image);
+    if (!prepared.ok) return prepared;
+    preparedImages.push(prepared.data);
   }
 
-  for (let i = 0; i < images.length; i += 1) {
+  for (let i = 0; i < preparedImages.length; i += 1) {
     const uploaded = await uploadConversationImage(
       conversationId,
       profile.data.id,
-      images[i]
+      preparedImages[i]
     );
-    if (!uploaded.ok) return uploaded;
-
-    const imageMessage = await sendModeratedConversationMessage(
-      conversationId,
-      profile.data.id,
-      { text: null, pendingImagePath: uploaded.data }
-    );
-    if (!imageMessage.ok) return imageMessage;
-    created.push(imageMessage.data);
+    if (!uploaded.ok) {
+      if (pendingImagePaths.length > 0) {
+        await supabase.storage
+          .from(STORAGE_BUCKETS.conversations)
+          .remove(pendingImagePaths);
+      }
+      return uploaded;
+    }
+    pendingImagePaths.push(uploaded.data);
   }
 
-  const createdWithUrls = await withSignedImageUrls(created);
+  const created = await sendModeratedConversationMessage(
+    conversationId,
+    profile.data.id,
+    { messageGroupId, text: text || null, pendingImagePaths }
+  );
+  if (!created.ok) return created;
+
+  const createdWithUrls = await withSignedImageUrls(created.data);
   return { ok: true, data: createdWithUrls };
 }

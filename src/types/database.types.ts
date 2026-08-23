@@ -49,6 +49,54 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_assistant_request_replay: {
+        Row: {
+          assistant_scope: string
+          client_request_id: string
+          created_at: string
+          profile_id: string
+          request_hash: string
+          response_body: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          assistant_scope: string
+          client_request_id: string
+          created_at?: string
+          profile_id: string
+          request_hash: string
+          response_body?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          assistant_scope?: string
+          client_request_id?: string
+          created_at?: string
+          profile_id?: string
+          request_hash?: string
+          response_body?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_assistant_request_replay_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_assistant_request_replay_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_usage_event: {
         Row: {
           billable_input_tokens: number | null
@@ -943,6 +991,8 @@ export type Database = {
           created_at: string
           id: string
           image_path: string | null
+          message_group_id: string | null
+          message_group_index: number | null
           message_kind: string | null
           seller_open_state: string | null
           seller_opened_at: string | null
@@ -957,6 +1007,8 @@ export type Database = {
           created_at?: string
           id?: string
           image_path?: string | null
+          message_group_id?: string | null
+          message_group_index?: number | null
           message_kind?: string | null
           seller_open_state?: string | null
           seller_opened_at?: string | null
@@ -971,6 +1023,8 @@ export type Database = {
           created_at?: string
           id?: string
           image_path?: string | null
+          message_group_id?: string | null
+          message_group_index?: number | null
           message_kind?: string | null
           seller_open_state?: string | null
           seller_opened_at?: string | null
@@ -4084,6 +4138,7 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      cancel_current_identity_onboarding: { Args: never; Returns: Json }
       check_ai_completar_rate_limit: {
         Args: {
           p_bucket?: string
@@ -4601,6 +4656,8 @@ export type Database = {
               created_at: string
               id: string
               image_path: string | null
+              message_group_id: string | null
+              message_group_index: number | null
               message_kind: string | null
               seller_open_state: string | null
               seller_opened_at: string | null
@@ -4624,6 +4681,8 @@ export type Database = {
               created_at: string
               id: string
               image_path: string | null
+              message_group_id: string | null
+              message_group_index: number | null
               message_kind: string | null
               seller_open_state: string | null
               seller_opened_at: string | null
@@ -4677,6 +4736,10 @@ export type Database = {
         }[]
       }
       get_conversation_ui_slots: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_ui_slots_before_pickup_clarity: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
@@ -4759,6 +4822,39 @@ export type Database = {
         Returns: Json
       }
       get_current_seller_purchase_offers: {
+        Args: {
+          p_category_ids?: string[]
+          p_conversation_status_codes?: string[]
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_lifecycle_scope?: string
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          conversation_id: string
+          conversation_is_terminal: boolean
+          conversation_status_code: string
+          conversation_status_label: string
+          conversation_status_sort_order: number
+          conversation_status_style_code: string
+          created_at: string
+          currency_id: string
+          description: string
+          id: string
+          offer_currency_code: string
+          price: number
+          purchase_request_id: string
+          request_category_id: string
+          request_category_name: string
+          request_profile_name: string
+          request_title: string
+        }[]
+      }
+      get_current_seller_purchase_offers_before_completed_history: {
         Args: {
           p_category_ids?: string[]
           p_conversation_status_codes?: string[]
@@ -5039,6 +5135,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_seller_visible_buyer_profile: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       insert_moderated_conversation_message: {
         Args: {
           p_categories?: Json
@@ -5059,6 +5159,8 @@ export type Database = {
           created_at: string
           id: string
           image_path: string | null
+          message_group_id: string | null
+          message_group_index: number | null
           message_kind: string | null
           seller_open_state: string | null
           seller_opened_at: string | null
@@ -5072,6 +5174,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      insert_moderated_conversation_message_group: {
+        Args: {
+          p_conversation_id: string
+          p_message_group_id: string
+          p_messages: Json
+          p_profile_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       invite_current_user_to_business: {
         Args: { p_owner_profile_id: string; p_phone: string }
@@ -5317,6 +5429,8 @@ export type Database = {
               created_at: string
               id: string
               image_path: string | null
+              message_group_id: string | null
+              message_group_index: number | null
               message_kind: string | null
               seller_open_state: string | null
               seller_opened_at: string | null
@@ -5346,6 +5460,8 @@ export type Database = {
               created_at: string
               id: string
               image_path: string | null
+              message_group_id: string | null
+              message_group_index: number | null
               message_kind: string | null
               seller_open_state: string | null
               seller_opened_at: string | null

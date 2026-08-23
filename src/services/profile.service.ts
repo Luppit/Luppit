@@ -143,7 +143,7 @@ function mapProfileEmailVerificationError(error: unknown): AppError {
         return {
             type: "validation",
             code: "email_already_in_use",
-            message: "Este correo ya está en uso.",
+            message: "Este correo ya está asociado a otro perfil. Cada perfil debe usar un correo diferente.",
         };
     }
 

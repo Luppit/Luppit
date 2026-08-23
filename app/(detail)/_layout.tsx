@@ -1,6 +1,6 @@
 import DetailTopBar from "./detail-top-bar";
 import { useTheme } from "@/src/themes";
-import { Slot, useGlobalSearchParams, usePathname } from "expo-router";
+import { Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import React from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +18,7 @@ const DEFAULT_DETAIL_TITLES: Record<string, string> = {
   "/business-verification": "Verificar negocio",
   "/business-profile": "Negocio",
   "/buyer-home-group": "Tus solicitudes",
+  "/buyer-profile": "Perfil del comprador",
   "/category-info": "Información de categoría",
   "/create-profile": "Crear perfil",
   "/faq": "Ayuda",
@@ -82,7 +83,7 @@ export default function DetailLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
       <View style={{ flex: 1, paddingHorizontal: t.spacing.md }}>
-        <Slot />
+        <Stack screenOptions={{ headerShown: false }} />
       </View>
       {marketplaceSectionOwnsTopBar ? null : (
         <DetailTopBar

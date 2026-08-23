@@ -13,6 +13,7 @@ export type AccountOnboarding = {
   requiresIdentityVerification: boolean;
   canStart: boolean;
   canRetry: boolean;
+  canCancel: boolean;
   safeMessage: string | null;
   profileId: string | null;
 };

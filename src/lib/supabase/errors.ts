@@ -266,6 +266,11 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "auth",
     message: "Acepta los documentos legales vigentes para continuar.",
   },
+  identity_verification_not_cancelable: {
+    type: "validation",
+    message:
+      "La verificación ya está en revisión o finalizó, por lo que no se puede cancelar.",
+  },
   fresh_authentication_required: {
     type: "auth",
     message: "Verifica nuevamente tu teléfono para continuar.",

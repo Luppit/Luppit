@@ -1,6 +1,7 @@
 import { openPopup } from "@/src/services/popup.service";
 import { MarketplaceHubRole } from "@/src/services/purchase.request.service";
 import { Share } from "react-native";
+import { buildPurchaseRequestUrl } from "@/src/utils/purchaseRequestLink";
 
 type PurchaseRequestMenuItem = {
   id: string;
@@ -58,11 +59,13 @@ export function openPurchaseRequestCardMenu({
         icon: "share-2",
         textColorKey: "textDark",
         iconColorKey: "textDark",
-        onPress: () =>
+        onPress: () => {
+          const url = buildPurchaseRequestUrl(item.id);
           void Share.share({
-            message: `${item.title?.trim() || "Solicitud en Luppit"}\nluppit://request/${item.id}`,
-            url: `luppit://request/${item.id}`,
-          }),
+            message: `${item.title?.trim() || "Solicitud en Luppit"}\n${url}`,
+            url,
+          });
+        },
       },
     ],
   });

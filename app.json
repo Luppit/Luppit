@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.luppit.app",
+      "associatedDomains": ["applinks:luppit.com"],
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Luppit necesita acceder al servidor de desarrollo local durante las pruebas.",
         "NSCameraUsageDescription": "Luppit usa la cámara para escanear tu documento y verificar tu identidad.",
@@ -161,6 +162,20 @@
     },
     "android": {
       "package": "com.luppit.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "luppit.com",
+              "pathPrefix": "/request/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#F9FAFB",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

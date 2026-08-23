@@ -15,9 +15,18 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 export type SellerOfferAssistantUiAction =
   | "SHOW_SUMMARY"
   | "CONTINUE"
-  | "PUBLISH";
+  | "PUBLISH"
+  | "RESTORE"
+  | "DISCARD";
 
-export type SellerOfferAssistantStatus = "draft" | "ready" | "sent";
+export type SellerOfferAssistantStatus = "draft" | "ready" | "sent" | "cancelled";
+
+export type SellerOfferAssistantMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  imageUrls: string[];
+};
 
 export type SellerOfferAssistantInteractionType =
   | "OFFER_BUILD"
@@ -54,6 +63,7 @@ export type SellerOfferAssistantSuccess = {
   interactionType: SellerOfferAssistantInteractionType | null;
   controlAction: SellerOfferAssistantControlAction | null;
   requestId: string | null;
+  messages: SellerOfferAssistantMessage[];
 };
 
 export type SellerOfferAssistantFailure = {
@@ -226,6 +236,37 @@ function toSuccessPayload(
   payload: Record<string, unknown>,
   requestId: string | null
 ): SellerOfferAssistantSuccess {
+  const signedUrls = new Map<string, string>();
+  if (Array.isArray(payload.message_images)) {
+    payload.message_images.forEach((entry) => {
+      if (!entry || typeof entry !== "object") return;
+      const record = entry as Record<string, unknown>;
+      const ref = normalizeString(record.storage_ref);
+      const url = normalizeString(record.signed_url);
+      if (ref && url) signedUrls.set(ref, url);
+    });
+  }
+  const messages: SellerOfferAssistantMessage[] = Array.isArray(payload.messages)
+    ? payload.messages.flatMap((entry, index) => {
+        if (!entry || typeof entry !== "object") return [];
+        const record = entry as Record<string, unknown>;
+        const role = normalizeString(record.role);
+        const content = normalizeString(record.content);
+        if ((role !== "user" && role !== "assistant") || !content) return [];
+        const metadata = record.metadata && typeof record.metadata === "object"
+          ? record.metadata as Record<string, unknown>
+          : {};
+        const imageUrls = normalizeStringArray(metadata.image_refs)
+          .map((ref) => signedUrls.get(ref))
+          .filter((url): url is string => Boolean(url));
+        return [{
+          id: normalizeString(record.id) ?? `restored-${index}`,
+          role,
+          content,
+          imageUrls,
+        }];
+      })
+    : [];
   return {
     ok: true,
     offerDraftId: normalizeString(payload.offer_draft_id),
@@ -242,6 +283,7 @@ function toSuccessPayload(
       (normalizeString(payload.accion_control) as SellerOfferAssistantControlAction | null) ??
       null,
     requestId,
+    messages,
   };
 }
 

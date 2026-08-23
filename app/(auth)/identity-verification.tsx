@@ -6,9 +6,11 @@ import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   AccountOnboarding,
+  cancelCurrentIdentityOnboarding,
   getCurrentAccountOnboarding,
   startCurrentUserIdentityVerification,
 } from "@/src/services/identity-verification.service";
+import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { router } from "expo-router";
@@ -32,6 +34,7 @@ export default function IdentityVerificationScreen() {
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasCompletedCapture, setHasCompletedCapture] = useState(false);
   const mountedRef = useRef(true);
@@ -144,6 +147,75 @@ export default function IdentityVerificationScreen() {
     }
   };
 
+  const cancelVerification = async () => {
+    setIsCancelling(true);
+    try {
+      const result = await cancelCurrentIdentityOnboarding();
+      if (!result.ok) {
+        showError(
+          "No pudimos cancelar la verificación",
+          result.error.message,
+        );
+        return false;
+      }
+
+      const refreshed = await refreshProfiles();
+      if (!refreshed) {
+        showError(
+          "Verificación cancelada",
+          "Actualiza la app para volver a elegir tu perfil.",
+        );
+        return true;
+      }
+
+      if (profiles.length > 0) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace({
+          pathname: "/(detail)/create-profile",
+          params: {
+            setup: "true",
+            title: "Crear perfil",
+            hideMenu: "true",
+          },
+        });
+      }
+      return true;
+    } finally {
+      if (mountedRef.current) setIsCancelling(false);
+    }
+  };
+
+  const openCancelConfirmation = () => {
+    const returnDescription = profiles.length > 0
+      ? "Volverás a la app con tus perfiles actuales."
+      : "Volverás a elegir qué tipo de perfil quieres crear.";
+    openPopup({
+      type: "summary",
+      title: "Cancelar verificación",
+      icon: "x-circle",
+      description:
+        "Se eliminará el avance incompleto de esta verificación en Luppit. " +
+        "Podrás empezar de nuevo más adelante. Tu cuenta telefónica y tus perfiles existentes se conservarán. " +
+        returnDescription,
+      actions: [
+        {
+          id: "keep-identity-verification",
+          label: "Continuar verificación",
+          icon: "arrow-left",
+        },
+        {
+          id: "cancel-identity-verification",
+          label: "Cancelar verificación",
+          icon: "x-circle",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: cancelVerification,
+        },
+      ],
+    });
+  };
+
   if (isLoading || !onboarding) {
     return <LoadingState label="Consultando tu verificación..." />;
   }
@@ -179,7 +251,10 @@ export default function IdentityVerificationScreen() {
         : "Verificar mi identidad"}
       variant="dark"
       loading={isStarting}
-      disabled={isStarting || (status === "NOT_STARTED" && !consentAccepted)}
+      disabled={
+        isStarting || isCancelling ||
+        (status === "NOT_STARTED" && !consentAccepted)
+      }
       onPress={() => void startVerification()}
     />
   );
@@ -235,8 +310,18 @@ export default function IdentityVerificationScreen() {
             title="Actualizar estado"
             variant="white"
             loading={isRefreshing}
-            disabled={isStarting}
+            disabled={isStarting || isCancelling}
             onPress={() => void loadStatus(true)}
+          />
+        ) : null}
+
+        {onboarding.canCancel ? (
+          <Button
+            title="Cancelar verificación"
+            variant="white"
+            loading={isCancelling}
+            disabled={isStarting || isRefreshing}
+            onPress={openCancelConfirmation}
           />
         ) : null}
 
@@ -244,7 +329,7 @@ export default function IdentityVerificationScreen() {
           <Button
             title="Volver a la app"
             variant="white"
-            disabled={isStarting}
+            disabled={isStarting || isCancelling}
             onPress={() => router.replace("/(tabs)")}
           />
         ) : null}

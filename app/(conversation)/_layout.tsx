@@ -20,6 +20,7 @@ import {
 } from "@/src/services/popup.service";
 import {
   ConversationMessage,
+  createConversationMessageGroupId,
   createConversationMessages,
 } from "@/src/services/conversation.message.service";
 import {
@@ -374,7 +375,7 @@ export default function ConversationLayout() {
   }, []);
 
   const buildOptimisticMessages = useCallback(
-    (text: string, images: { uri: string }[]) => {
+    (text: string, images: { uri: string }[], messageGroupId: string) => {
       if (!conversationId || !profileId) return [];
 
       const now = Date.now();
@@ -395,6 +396,8 @@ export default function ConversationLayout() {
           buyer_opened_at: null,
           seller_open_state: null,
           seller_opened_at: null,
+          message_group_id: messageGroupId,
+          message_group_index: nextMessages.length,
           created_at: new Date(now).toISOString(),
         });
       }
@@ -413,6 +416,8 @@ export default function ConversationLayout() {
           buyer_opened_at: null,
           seller_open_state: null,
           seller_opened_at: null,
+          message_group_id: messageGroupId,
+          message_group_index: nextMessages.length,
           created_at: new Date(now + nextMessages.length).toISOString(),
         });
       });
@@ -1312,7 +1317,12 @@ export default function ConversationLayout() {
                   clearOnSendStart
                   placeholder="Escribe un mensaje"
                   onSend={({ text, images }) => {
-                    const outgoingMessages = buildOptimisticMessages(text, images);
+                    const messageGroupId = createConversationMessageGroupId();
+                    const outgoingMessages = buildOptimisticMessages(
+                      text,
+                      images,
+                      messageGroupId
+                    );
                     if (outgoingMessages.length === 0) return;
 
                     const outgoingMessageIds = outgoingMessages.map(
@@ -1329,6 +1339,7 @@ export default function ConversationLayout() {
                           conversationId,
                           text,
                           images,
+                          messageGroupId,
                         });
 
                         if (!created.ok) {

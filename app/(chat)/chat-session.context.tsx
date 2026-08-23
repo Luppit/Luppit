@@ -1,5 +1,7 @@
 import {
   callPurchaseRequestAssistant,
+  createPurchaseRequestAssistantRequestIdentity,
+  PurchaseRequestAssistantRequest,
   PurchaseRequestAssistantCategorySuggestion,
   PurchaseRequestAssistantStatus,
   PurchaseRequestAssistantSummary,
@@ -25,6 +27,7 @@ export type ChatMessage = {
   sender: "user" | "assistant";
   text: string;
   images?: ChatImage[];
+  failedRequests?: PurchaseRequestAssistantRequest[];
 };
 
 type ChatSessionContextValue = {
@@ -47,6 +50,7 @@ type ChatSessionContextValue = {
   showComposer: boolean;
   canCompose: boolean;
   sendMessage: (payload: { text: string; images: ChatImage[] }) => Promise<void>;
+  retryMessage: (messageId: string) => Promise<void>;
   stopAssistant: () => void;
   continueClarifying: () => Promise<void>;
   publishDraft: () => Promise<void>;
@@ -72,6 +76,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   showComposer: true,
   canCompose: true,
   sendMessage: async () => {},
+  retryMessage: async () => {},
   stopAssistant: () => {},
   continueClarifying: async () => {},
   publishDraft: async () => {},
@@ -130,6 +135,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isExecutingControl, setIsExecutingControl] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
+  const requestSequenceRef = useRef(0);
   const shownSuccessRequestIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -234,82 +240,65 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     []
   );
 
-  const sendMessage = useCallback(
-    async ({ text, images }: { text: string; images: ChatImage[] }) => {
-      const trimmed = text.trim();
-      if (
-        (!trimmed && images.length === 0) ||
-        isSendingMessage ||
-        isExecutingControl ||
-        status === "published"
-      ) {
-        return;
-      }
+  const executeMessageRequests = useCallback(
+    async (messageId: string, requests: PurchaseRequestAssistantRequest[]) => {
+      if (activeRequestRef.current) return;
 
-      setMessages((prev) => [
-        ...prev,
-        { id: createMessageId("user"), sender: "user", text: trimmed, images },
-      ]);
-
+      const requestSequence = ++requestSequenceRef.current;
       const requestController = new AbortController();
       activeRequestRef.current = requestController;
       setIsSendingMessage(true);
       try {
-        if (
-          images.length === 0 &&
-          status === "ready" &&
-          uiState !== "review" &&
-          pendingAction === "ASK_SHOW_SUMMARY" &&
-          shouldOpenSummaryFromReply(trimmed)
-        ) {
-          const summaryResult = await callPurchaseRequestAssistant({
-            prompt: "",
-            draft_id: draftId,
-            ui_action: "SHOW_SUMMARY",
+        for (let index = 0; index < requests.length; index += 1) {
+          const input = requests[index];
+          const result = await callPurchaseRequestAssistant({
+            ...input,
             signal: requestController.signal,
           });
           if (
             requestController.signal.aborted ||
             activeRequestRef.current !== requestController
           ) {
+            if (requestSequenceRef.current === requestSequence) {
+              setMessages((current) =>
+                current.map((message) =>
+                  message.id === messageId
+                    ? { ...message, failedRequests: requests.slice(index) }
+                    : message
+                )
+              );
+            }
             return;
           }
-          await syncAssistantState(summaryResult);
-          return;
-        }
 
-        if (uiState === "review" && draftId) {
-          const continueResult = await callPurchaseRequestAssistant({
-            prompt: "",
-            draft_id: draftId,
-            ui_action: "CONTINUE",
-            signal: requestController.signal,
+          await syncAssistantState(result, {
+            appendAssistantMessage: input.ui_action !== "CONTINUE",
           });
-
-          if (
-            requestController.signal.aborted ||
-            activeRequestRef.current !== requestController
-          ) {
+          if (!result.ok) {
+            if (
+              result.error.code !== "PROFILE_SCOPED_REQUEST_ABORTED" &&
+              requestSequenceRef.current === requestSequence
+            ) {
+              setMessages((current) =>
+                current.map((message) =>
+                  message.id === messageId
+                    ? { ...message, failedRequests: requests.slice(index) }
+                    : message
+                )
+              );
+            }
             return;
           }
-
-          await syncAssistantState(continueResult, { appendAssistantMessage: false });
-          if (!continueResult.ok) return;
         }
-
-        const result = await callPurchaseRequestAssistant({
-          prompt: trimmed || imageOnlyPrompt,
-          draft_id: draftId,
-          images,
-          signal: requestController.signal,
-        });
-        if (
-          requestController.signal.aborted ||
-          activeRequestRef.current !== requestController
-        ) {
-          return;
+        if (requestSequenceRef.current === requestSequence) {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === messageId
+                ? { ...message, failedRequests: undefined }
+                : message
+            )
+          );
         }
-        await syncAssistantState(result);
       } finally {
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
@@ -317,13 +306,80 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         }
       }
     },
+    [syncAssistantState]
+  );
+
+  const retryMessage = useCallback(
+    async (messageId: string) => {
+      if (activeRequestRef.current || isSendingMessage || isExecutingControl) return;
+      const message = messages.find((candidate) => candidate.id === messageId);
+      if (!message?.failedRequests?.length) return;
+      await executeMessageRequests(messageId, message.failedRequests);
+    },
+    [executeMessageRequests, isExecutingControl, isSendingMessage, messages]
+  );
+
+  const sendMessage = useCallback(
+    async ({ text, images }: { text: string; images: ChatImage[] }) => {
+      const trimmed = text.trim();
+      if (
+        (!trimmed && images.length === 0) ||
+        activeRequestRef.current ||
+        isSendingMessage ||
+        isExecutingControl ||
+        status === "published"
+      ) {
+        return;
+      }
+
+      const messageId = createMessageId("user");
+      setMessages((prev) => [
+        ...prev,
+        { id: messageId, sender: "user", text: trimmed, images },
+      ]);
+
+      const requests: PurchaseRequestAssistantRequest[] = [];
+      if (
+        images.length === 0 &&
+        status === "ready" &&
+        uiState !== "review" &&
+        pendingAction === "ASK_SHOW_SUMMARY" &&
+        shouldOpenSummaryFromReply(trimmed)
+      ) {
+        requests.push({
+          prompt: "",
+          draft_id: draftId,
+          ui_action: "SHOW_SUMMARY",
+          ...createPurchaseRequestAssistantRequestIdentity("SHOW_SUMMARY"),
+        });
+        await executeMessageRequests(messageId, requests);
+        return;
+      }
+
+      if (uiState === "review" && draftId) {
+        requests.push({
+          prompt: "",
+          draft_id: draftId,
+          ui_action: "CONTINUE",
+          ...createPurchaseRequestAssistantRequestIdentity("CONTINUE"),
+        });
+      }
+
+      requests.push({
+        prompt: trimmed || imageOnlyPrompt,
+        draft_id: draftId,
+        images,
+        ...createPurchaseRequestAssistantRequestIdentity("message"),
+      });
+      await executeMessageRequests(messageId, requests);
+    },
     [
       draftId,
+      executeMessageRequests,
       isExecutingControl,
       isSendingMessage,
       pendingAction,
       status,
-      syncAssistantState,
       uiState,
     ]
   );
@@ -395,6 +451,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         !isExecutingControl &&
         status !== "published",
       sendMessage,
+      retryMessage,
       stopAssistant,
       continueClarifying,
       publishDraft,
@@ -413,6 +470,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       purchaseRequestId,
       requiredFields,
       sendMessage,
+      retryMessage,
       stopAssistant,
       status,
       summary,

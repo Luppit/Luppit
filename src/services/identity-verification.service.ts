@@ -55,6 +55,9 @@ function parseAccountOnboarding(value: unknown): AccountOnboarding | null {
     : null;
   const identityStatus = parseIdentityStatus(value.identity_status);
   const profileId = value.profile_id === null ? null : nullableString(value.profile_id);
+  const canCancel = typeof value.can_cancel === "boolean"
+    ? value.can_cancel
+    : false;
   if (
     !identityStatus ||
     typeof value.requires_identity_verification !== "boolean" ||
@@ -71,6 +74,7 @@ function parseAccountOnboarding(value: unknown): AccountOnboarding | null {
     requiresIdentityVerification: value.requires_identity_verification,
     canStart: value.can_start,
     canRetry: value.can_retry,
+    canCancel,
     safeMessage: nullableString(value.safe_message),
     profileId,
   };
@@ -135,6 +139,17 @@ export async function getCurrentAccountOnboarding(): Promise<
 > {
   const result = await supabase.rpc(
     RPC_FUNCTIONS.GET_CURRENT_ACCOUNT_ONBOARDING,
+  );
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  const onboarding = parseAccountOnboarding(result.data);
+  return onboarding ? { ok: true, data: onboarding } : invalidResponse();
+}
+
+export async function cancelCurrentIdentityOnboarding(): Promise<
+  ServiceResult<AccountOnboarding>
+> {
+  const result = await supabase.rpc(
+    RPC_FUNCTIONS.CANCEL_CURRENT_IDENTITY_ONBOARDING,
   );
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
   const onboarding = parseAccountOnboarding(result.data);

@@ -11,6 +11,7 @@ import {
 } from "@/src/services/purchase.request.service";
 import { useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
+import { buildPurchaseRequestUrl } from "@/src/utils/purchaseRequestLink";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, Share, View } from "react-native";
@@ -165,7 +166,7 @@ export default function DetailTopBar({
     }
 
     const requestTitle = title?.trim() || "Solicitud en Luppit";
-    const url = `luppit://request/${purchaseRequestId}`;
+    const url = buildPurchaseRequestUrl(purchaseRequestId);
 
     try {
       await Share.share({

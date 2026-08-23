@@ -11,6 +11,8 @@ import {
 import { getCurrentProfileConversationById } from "@/src/services/conversation.service";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "@/src/themes";
+import { shouldGroupConversationImages } from "@/src/utils/conversationMessageGroup";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
@@ -28,8 +30,6 @@ type ConversationRenderItem =
       messages: ConversationMessage[];
       images: ConversationImagePreview[];
     };
-
-const imageGroupWindowMs = 2 * 60 * 1000;
 
 const getMessageImageUri = (message: ConversationMessage) =>
   (message.image_url as string | null | undefined) ??
@@ -55,23 +55,6 @@ async function getCounterpartDisplayNameByConversationId(conversationId: string)
   if (!result.ok) return null;
   return normalizeDisplayName(result.data.display_name);
 }
-
-const shouldGroupImageMessages = (
-  previousMessage: ConversationMessage,
-  nextMessage: ConversationMessage
-) => {
-  if (nextMessage.sender_profile_id !== previousMessage.sender_profile_id) {
-    return false;
-  }
-
-  const previousTime = new Date(previousMessage.created_at).getTime();
-  const nextTime = new Date(nextMessage.created_at).getTime();
-  if (!Number.isFinite(previousTime) || !Number.isFinite(nextTime)) {
-    return false;
-  }
-
-  return Math.abs(nextTime - previousTime) <= imageGroupWindowMs;
-};
 
 export default function ConversationChatScreen() {
   const t = useTheme();
@@ -144,7 +127,7 @@ export default function ConversationChatScreen() {
         const previousMessage = groupedMessages[groupedMessages.length - 1];
         if (
           !isImageOnlyMessage(nextMessage) ||
-          !shouldGroupImageMessages(previousMessage, nextMessage)
+          !shouldGroupConversationImages(previousMessage, nextMessage)
         ) {
           break;
         }
@@ -370,6 +353,19 @@ export default function ConversationChatScreen() {
     return "Contacto";
   }, [conversationView.role_code, counterpartDisplayName]);
 
+  const openCounterpartProfile = useCallback(() => {
+    const isBuyer = conversationView.role_code.toUpperCase().includes("BUYER");
+    router.push({
+      pathname: isBuyer
+        ? "/(detail)/seller-business"
+        : "/(detail)/buyer-profile",
+      params: {
+        conversationId,
+        title: isBuyer ? "Negocio" : "Perfil del comprador",
+      },
+    });
+  }, [conversationId, conversationView.role_code]);
+
   const renderImageTile = (
     image: ConversationImagePreview,
     images: ConversationImagePreview[],
@@ -541,9 +537,16 @@ export default function ConversationChatScreen() {
               paddingHorizontal: t.spacing.xs,
             }}
           >
-            <Text variant="small" color="textMedium">
-              {senderName}
-            </Text>
+            <Pressable
+              onPress={openCounterpartProfile}
+              accessibilityRole="link"
+              accessibilityLabel={`Ver perfil de ${senderName}`}
+              hitSlop={8}
+            >
+              <Text variant="small" color="textMedium">
+                {senderName}
+              </Text>
+            </Pressable>
             <Text variant="small" color="stateAnulated">
               {formatTime(message.created_at)}
             </Text>

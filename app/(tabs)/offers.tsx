@@ -10,6 +10,7 @@ import { Text } from "@/src/components/Text";
 import { Icon } from "@/src/components/Icon";
 import {
   getCurrentSellerPurchaseOffers,
+  SellerOfferLifecycleScope,
   SellerPurchaseOfferCardData,
 } from "@/src/services/purchase.offer.service";
 import { getConversationByPurchaseOfferId } from "@/src/services/conversation.service";
@@ -139,6 +140,8 @@ function SellerOffersContent() {
     EMPTY_SELLER_OFFER_FILTERS
   );
   const [selectedSortId, setSelectedSortId] = React.useState(DEFAULT_SELLER_OFFER_SORT_ID);
+  const [lifecycleScope, setLifecycleScope] =
+    React.useState<SellerOfferLifecycleScope>("active");
   const isMountedRef = React.useRef(true);
 
   React.useEffect(() => {
@@ -183,16 +186,21 @@ function SellerOffersContent() {
   const loadFilterOptions = React.useCallback(async () => {
     const result = await getCurrentSellerPurchaseOffers(
       EMPTY_SELLER_OFFER_FILTERS,
-      DEFAULT_SELLER_OFFER_SORT_ID
+      DEFAULT_SELLER_OFFER_SORT_ID,
+      lifecycleScope
     );
     if (!isMountedRef.current || !result.ok) return;
     setFilterOptionsSource(result.data);
-  }, []);
+  }, [lifecycleScope]);
 
   const loadOffers = React.useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
-    const result = await getCurrentSellerPurchaseOffers(filters, selectedSortId);
+    const result = await getCurrentSellerPurchaseOffers(
+      filters,
+      selectedSortId,
+      lifecycleScope
+    );
     if (!isMountedRef.current) return;
 
     if (result.ok) {
@@ -204,7 +212,7 @@ function SellerOffersContent() {
     }
 
     setIsLoading(false);
-  }, [filters, selectedSortId]);
+  }, [filters, lifecycleScope, selectedSortId]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -402,14 +410,18 @@ function SellerOffersContent() {
                 ? "No se pudieron cargar tus ofertas"
                 : hasActiveFilters
                   ? "No hay ofertas con estos filtros"
-                  : "Aún no has enviado ofertas"
+                  : lifecycleScope === "history"
+                    ? "Aún no hay historial"
+                    : "Aún no has enviado ofertas"
             }
             description={
               loadError
                 ? loadError
                 : hasActiveFilters
                   ? "Prueba otro estado, cambia la búsqueda o limpia los filtros."
-                  : "Tus ofertas aparecerán aquí cuando respondas una solicitud."
+                  : lifecycleScope === "history"
+                    ? "Las ofertas y compras terminadas aparecerán aquí."
+                    : "Tus ofertas aparecerán aquí cuando respondas una solicitud."
             }
             actionLabel={loadError ? "Reintentar" : hasActiveFilters ? "Limpiar filtros" : null}
             actionIcon={loadError ? undefined : hasActiveFilters ? "x" : undefined}
@@ -484,33 +496,52 @@ function SellerOffersContent() {
   })();
 
   const toolbar = (
-    <View style={s.toolbar}>
-      <Pressable
-        style={s.searchTrigger}
-        onPress={openSearchPopup}
-        accessibilityRole="button"
-        accessibilityLabel={
-          hasActiveFilters
-            ? `Buscar y filtrar ofertas. ${activeFilterCount} filtros activos`
-            : "Buscar y filtrar ofertas"
-        }
-      >
-        <Icon name="sliders-horizontal" size={20} color={t.colors.stateAnulated} />
-        <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
-          {hasActiveFilters
-            ? `Filtros activos (${activeFilterCount})`
-            : "Buscar y filtrar"}
-        </Text>
-      </Pressable>
+    <View style={s.toolbarStack}>
+      <View style={s.scopeRow}>
+        <LuppitChip
+          label="Ofertas"
+          selected={lifecycleScope === "active"}
+          onPress={() => setLifecycleScope("active")}
+          accessibilityLabel="Mostrar ofertas sin completar"
+          style={s.scopeChip}
+        />
+        <LuppitChip
+          label="Historial"
+          selected={lifecycleScope === "history"}
+          onPress={() => setLifecycleScope("history")}
+          accessibilityLabel="Mostrar historial de ofertas y compras"
+          style={s.scopeChip}
+        />
+      </View>
 
-      <Pressable
-        style={s.sortButton}
-        onPress={openSortPopup}
-        accessibilityRole="button"
-        accessibilityLabel="Ordenar ofertas"
-      >
-        <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
-      </Pressable>
+      <View style={s.toolbar}>
+        <Pressable
+          style={s.searchTrigger}
+          onPress={openSearchPopup}
+          accessibilityRole="button"
+          accessibilityLabel={
+            hasActiveFilters
+              ? `Buscar y filtrar ofertas. ${activeFilterCount} filtros activos`
+              : "Buscar y filtrar ofertas"
+          }
+        >
+          <Icon name="sliders-horizontal" size={20} color={t.colors.stateAnulated} />
+          <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+            {hasActiveFilters
+              ? `Filtros activos (${activeFilterCount})`
+              : "Buscar y filtrar"}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={s.sortButton}
+          onPress={openSortPopup}
+          accessibilityRole="button"
+          accessibilityLabel="Ordenar ofertas"
+        >
+          <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -574,8 +605,8 @@ function OffersTopBar({
 
 function createOffersScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = false) {
   const topOffset = topInset + t.spacing.md;
-  const topBarVisibleHeight = hasTopBarAccessory ? 128 : 72;
-  const topBarHeight = topOffset + (hasTopBarAccessory ? 128 : 72);
+  const topBarVisibleHeight = hasTopBarAccessory ? 184 : 72;
+  const topBarHeight = topOffset + (hasTopBarAccessory ? 184 : 72);
 
   return StyleSheet.create({
     screen: {
@@ -625,7 +656,7 @@ function createOffersScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = f
       flex: 1,
     },
     topBarAccessory: {
-      height: 48,
+      height: 104,
       marginTop: t.spacing.sm,
     },
     content: {
@@ -642,6 +673,16 @@ function createOffersScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = f
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
+    },
+    toolbarStack: {
+      gap: t.spacing.sm,
+    },
+    scopeRow: {
+      flexDirection: "row",
+      gap: t.spacing.sm,
+    },
+    scopeChip: {
+      flex: 1,
     },
     searchTrigger: {
       flex: 1,

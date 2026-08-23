@@ -184,12 +184,16 @@ export default function BusinessVerificationScreen() {
 
           <View style={s.surface}>
             <TextField
-              label="Número de certificación RNP"
+              label="Número de certificación RNP (SICOP)"
               value={rnpNumber}
               onChangeText={setRnpNumber}
               autoCapitalize="characters"
+              accessibilityHint="RNP significa Registro Nacional de Proveedores en SICOP. Ingresa el número que aparece en tu certificación vigente"
               editable={!isSubmitting}
             />
+            <Text variant="small" color="textMedium">
+              RNP significa Registro Nacional de Proveedores en SICOP. Escribí el número que aparece en tu certificación vigente y adjuntá esa certificación como respaldo. Si no sabés cuál corresponde, contactá a soporte antes de enviar.
+            </Text>
             <FilePicker
               label="Documentos de respaldo"
               mode="files"

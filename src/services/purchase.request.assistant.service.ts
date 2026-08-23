@@ -84,7 +84,7 @@ export type PurchaseRequestAssistantResult =
   | PurchaseRequestAssistantSuccess
   | PurchaseRequestAssistantFailure;
 
-type PurchaseRequestAssistantRequest = {
+export type PurchaseRequestAssistantRequest = {
   prompt: string;
   draft_id?: string | null;
   ui_action?: PurchaseRequestAssistantUiAction | null;
@@ -230,11 +230,11 @@ function buildFunctionUrl() {
   return `${baseUrl.replace(/\/+$/, "")}/functions/v1/${PURCHASE_REQUEST_ASSISTANT_EDGE_FUNCTION}`;
 }
 
-function createRequestIdentity(prefix: string) {
+export function createPurchaseRequestAssistantRequestIdentity(prefix: string) {
   const suffix = `${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
   return {
-    clientRequestId: `${prefix}-${suffix}`,
-    idempotencyKey: `${prefix}-idempotency-${suffix}`,
+    client_request_id: `${prefix}-${suffix}`,
+    idempotency_key: `${prefix}-idempotency-${suffix}`,
   };
 }
 
@@ -338,9 +338,9 @@ export async function callPurchaseRequestAssistant(
     };
   }
 
-  const identity = createRequestIdentity(input.ui_action ?? "message");
-  const clientRequestId = input.client_request_id ?? identity.clientRequestId;
-  const idempotencyKey = input.idempotency_key ?? identity.idempotencyKey;
+  const identity = createPurchaseRequestAssistantRequestIdentity(input.ui_action ?? "message");
+  const clientRequestId = input.client_request_id ?? identity.client_request_id;
+  const idempotencyKey = input.idempotency_key ?? identity.idempotency_key;
   const hasImages = (input.images ?? []).length > 0;
   const requestController = new AbortController();
   const abortFromCaller = () => requestController.abort();

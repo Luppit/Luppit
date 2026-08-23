@@ -12,6 +12,8 @@ export const RPC_FUNCTIONS = {
     "add_seller_purchase_request_favorite",
   CANCEL_CURRENT_BUYER_PURCHASE_REQUEST:
     "cancel_current_buyer_purchase_request",
+  CANCEL_CURRENT_IDENTITY_ONBOARDING:
+    "cancel_current_identity_onboarding",
   COMPLETE_CURRENT_USER_PROFILE_SETUP:
     "complete_current_user_profile_setup",
   CREATE_CURRENT_USER_PROFILE: "create_current_user_profile",
@@ -60,6 +62,8 @@ export const RPC_FUNCTIONS = {
     "get_purchase_request_visualization_count",
   GET_SELLER_HOME_FILTER_OPTIONS: "get_seller_home_filter_options",
   GET_SELLER_HOME_PURCHASE_REQUESTS: "get_seller_home_purchase_requests",
+  GET_SELLER_VISIBLE_BUYER_PROFILE:
+    "get_seller_visible_buyer_profile" as FunctionName,
   GET_SELLER_MARKETPLACE_HUB: "get_seller_marketplace_hub",
   GET_SELLER_MARKETPLACE_HUB_ITEMS: "get_seller_marketplace_hub_items",
   GET_SELLER_OFFER_EDIT_PAYLOAD_V2: "get_seller_offer_edit_payload_v2",
