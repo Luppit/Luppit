@@ -40,7 +40,11 @@ import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useTo
 import { MODAL_TOP_BAR_HEIGHT } from "./modal-top-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import {
+  useFocusEffect,
+  useNavigation,
+  usePreventRemove,
+} from "@react-navigation/native";
 import {
   AccessibilityInfo,
   Animated,
@@ -598,6 +602,7 @@ function OfferAssistantScreen({
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const scrollRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [offerDraftId, setOfferDraftId] = useState<string | null>(null);
@@ -610,6 +615,7 @@ function OfferAssistantScreen({
   const [isBusy, setIsBusy] = useState(false);
   const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
   const [pendingRetry, setPendingRetry] = useState<PendingAssistantRetry | null>(null);
+  const [allowExit, setAllowExit] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
   const shownSuccessOfferIdRef = useRef<string | null>(null);
 
@@ -910,48 +916,62 @@ function OfferAssistantScreen({
     await executeAssistantRequest(pendingRetry.input, pendingRetry.successfulImageCount);
   }, [executeAssistantRequest, pendingRetry]);
 
-  const handleDiscard = useCallback(() => {
-    if (!offerDraftId || isBusy || status === "sent") return;
-    openPopup({
-      type: "summary",
-      title: "Descartar borrador",
-      description:
-        "Se eliminará este borrador de la sesión. Esta acción no envía ninguna oferta al comprador.",
-      actions: [
-        {
-          id: "keep-draft",
-          label: "Conservar",
-          icon: "arrow-left",
-          backgroundColorKey: "backgroudWhite",
-          textColorKey: "textDark",
-          iconColorKey: "textDark",
-        },
-        {
-          id: "discard-draft",
-          label: "Descartar",
-          icon: "trash-2",
-          backgroundColorKey: "error",
-          textColorKey: "backgroudWhite",
-          iconColorKey: "backgroudWhite",
-          onPress: () => {
-            void (async () => {
-              const result = await callSellerOfferAssistant({
-                prompt: "",
-                offerDraftId,
-                uiAction: "DISCARD",
-                identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
-              });
-              if (!result.ok) {
-                showError("No se pudo descartar", result.error.message);
-                return;
-              }
-              router.back();
-            })();
+  usePreventRemove(
+    Boolean(offerDraftId) && status !== "sent" && !allowExit,
+    ({ data }) => {
+      if (!offerDraftId) return;
+
+      const closeAfterConfirmation = () => {
+        setAllowExit(true);
+        setTimeout(() => navigation.dispatch(data.action), 0);
+      };
+
+      const discardDraft = async () => {
+        const result = await callSellerOfferAssistant({
+          prompt: "",
+          offerDraftId,
+          uiAction: "DISCARD",
+          identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
+        });
+        if (!result.ok) {
+          showError("No se pudo descartar", result.error.message);
+          return false;
+        }
+
+        closeAfterConfirmation();
+        return true;
+      };
+
+      Keyboard.dismiss();
+      openPopup({
+        type: "summary",
+        title: "¿Salir de la oferta?",
+        description:
+          "Puedes salir y continuar después, o descartar este borrador.",
+        dismissOnBackdropPress: false,
+        actions: [
+          {
+            id: "exit-offer",
+            label: "Salir",
+            backgroundColorKey: "backgroudWhite",
+            textColorKey: "textDark",
+            iconColorKey: "textDark",
+            onPress: closeAfterConfirmation,
           },
-        },
-      ],
-    });
-  }, [isBusy, offerDraftId, status]);
+          {
+            id: "discard-draft",
+            label: "Descartar",
+            backgroundColorKey: "error",
+            textColorKey: "backgroudWhite",
+            iconColorKey: "backgroudWhite",
+            disabled: isBusy,
+            showPendingState: true,
+            onPress: discardDraft,
+          },
+        ],
+      });
+    }
+  );
 
   if (!conversationId) {
     return (
@@ -1014,25 +1034,6 @@ function OfferAssistantScreen({
             }}
           >
             <Text variant="body">Reintentar último mensaje</Text>
-          </Pressable>
-        ) : null}
-
-        {offerDraftId && status !== "sent" ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Descartar borrador de oferta"
-            disabled={isBusy}
-            onPress={handleDiscard}
-            style={{
-              alignSelf: "center",
-              paddingHorizontal: t.spacing.md,
-              paddingVertical: t.spacing.sm,
-              opacity: isBusy ? 0.5 : 1,
-            }}
-          >
-            <Text variant="small" style={{ color: t.colors.error }}>
-              Descartar borrador
-            </Text>
           </Pressable>
         ) : null}
 

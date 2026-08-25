@@ -1,5 +1,8 @@
 import { Icon } from "@/src/components/Icon";
-import { GroupedList } from "@/src/components/groupedList/GroupedList";
+import {
+  GroupedListRow,
+  GroupedListSection,
+} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
@@ -96,7 +99,6 @@ function getNotificationTone(t: Theme, typeCode: string) {
     return {
       icon: "alert-circle" as const,
       color: t.colors.error,
-      backgroundColor: "rgba(165, 33, 0, 0.10)",
     };
   }
 
@@ -104,14 +106,12 @@ function getNotificationTone(t: Theme, typeCode: string) {
     return {
       icon: "file-pen-line" as const,
       color: t.colors.secondary,
-      backgroundColor: "rgba(202, 115, 48, 0.12)",
     };
   }
 
   return {
     icon: "info" as const,
     color: t.colors.info,
-    backgroundColor: "rgba(119, 190, 240, 0.14)",
   };
 }
 
@@ -336,7 +336,7 @@ export default function NotificationsScreen() {
     return (
       <View style={s.centerState}>
         <StandaloneListEmptyState
-          icon="bell"
+          icon="alert-circle"
           title="No pudimos cargar tus notificaciones"
           description="Inténtalo nuevamente."
           actionLabel="Reintentar"
@@ -363,25 +363,13 @@ export default function NotificationsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <View style={s.listHeader}>
-        <Text variant="small" color="textMedium">
-          {notifications.length === 1
+      <GroupedListSection
+        title={
+          notifications.length === 1
             ? "1 notificación"
-            : `${notifications.length} notificaciones`}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Limpiar todas las notificaciones"
-          hitSlop={8}
-          onPress={openDismissAllConfirmation}
-          style={s.dismissAllAction}
-        >
-          <Text variant="small" color="error">
-            Limpiar todas
-          </Text>
-        </Pressable>
-      </View>
-      <GroupedList>
+            : `${notifications.length} notificaciones`
+        }
+      >
         {notifications.map((notification, index) => (
           <NotificationRow
             key={notification.notificationId}
@@ -390,7 +378,19 @@ export default function NotificationsScreen() {
             onPress={() => openNotificationDetail(notification)}
           />
         ))}
-      </GroupedList>
+      </GroupedListSection>
+
+      <GroupedListSection title="Administrar">
+        <GroupedListRow
+          icon="trash-2"
+          label="Limpiar notificaciones"
+          description="Oculta las notificaciones actuales de este perfil."
+          destructive
+          showSeparator={false}
+          onPress={openDismissAllConfirmation}
+          accessibilityLabel="Limpiar todas las notificaciones"
+        />
+      </GroupedListSection>
     </ScrollView>
   );
 }
@@ -424,7 +424,7 @@ function NotificationRow({
         {isUnread ? <View style={s.unreadDot} /> : null}
       </View>
       <View
-        style={[s.iconBadge, { backgroundColor: tone.backgroundColor }]}
+        style={s.iconBadge}
         accessibilityElementsHidden
         importantForAccessibility="no"
       >
@@ -463,22 +463,9 @@ function NotificationRow({
 function createNotificationsStyles(t: Theme, topContentInset = 0) {
   return StyleSheet.create({
     content: {
-      paddingTop: topContentInset + t.spacing.sm,
+      paddingTop: topContentInset + t.spacing.md,
       paddingBottom: t.spacing.xl,
-      gap: t.spacing.xs,
-    },
-    listHeader: {
-      minHeight: 44,
-      paddingHorizontal: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: t.spacing.sm,
-    },
-    dismissAllAction: {
-      minHeight: 44,
-      justifyContent: "center",
-      paddingHorizontal: t.spacing.sm,
+      gap: t.spacing.lg,
     },
     loadingBox: {
       flex: 1,
@@ -489,7 +476,7 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     },
     row: {
       position: "relative",
-      minHeight: 76,
+      minHeight: 88,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
@@ -512,6 +499,7 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       borderRadius: 18,
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: t.colors.background,
     },
     rowBody: {
       flex: 1,

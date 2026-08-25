@@ -10,6 +10,7 @@ Applies to shared popup rendering in this folder.
 - Profile switcher is a `GlobalPopupHost` variant, not a custom overlay. Keep shared bottom-sheet shell, drag indicator, backdrop, spacing, separators, and the shared `Activo` status chip.
 - Saved-profile notification rows show a red dot only when unread count is greater than zero; otherwise show `Sin notificaciones pendientes`.
 - When the keyboard is visible, keep popup actions fixed and give the popup body a bounded, scrollable height. Do not dismiss the keyboard from a sheet-level `onTouchStart`; use the scroll view dismissal mode so scrolling and focused inputs continue to work.
+- Keep side-by-side action labels short so they stay on one line. Prefer concise verbs such as `Volver`, `Cancelar`, `Guardar`, or `Eliminar`; do not repeat the popup title or object name in each button.
 
 ## Helper Variant
 - Helper content is a `GlobalPopupHost` `helper` variant, not a separate modal style.

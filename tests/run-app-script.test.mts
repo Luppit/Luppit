@@ -16,18 +16,14 @@ test("LAN development server targets the installed dev client and skips Sentry u
   assert.equal(plan.env.SENTRY_DISABLE_AUTO_UPLOAD, "true");
 });
 
-test("tunnel development server explicitly uses Expo tunnel mode", () => {
-  const plan = createLaunchPlan("dev-tunnel");
+test("simulator builds and opens the local iOS app without EAS or Sentry upload", () => {
+  const plan = createLaunchPlan("simulator");
 
-  assert.deepEqual(plan.args, [
-    "expo",
-    "start",
-    "--dev-client",
-    "--tunnel",
-    "--clear",
-  ]);
+  assert.equal(plan.command, "npx");
+  assert.deepEqual(plan.args, ["expo", "run:ios"]);
   assert.equal(plan.env.EXPO_PUBLIC_BUILD_PROFILE, "development");
-  assert.match(plan.description, /DevTools cannot attach/);
+  assert.equal(plan.env.SENTRY_DISABLE_AUTO_UPLOAD, "true");
+  assert.match(plan.sentry, /no EAS build/i);
 });
 
 test("reinstall opens existing EAS builds without creating a build", () => {

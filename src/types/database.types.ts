@@ -4782,6 +4782,18 @@ export type Database = {
         Args: { p_profile_id: string }
         Returns: Json
       }
+      get_current_buyer_finalized_purchase_requests: {
+        Args: {
+          p_end_date?: string
+          p_page?: number
+          p_page_size?: number
+          p_profile_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: Json
+      }
       get_current_buyer_purchase_request_cancellation_eligibility: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json

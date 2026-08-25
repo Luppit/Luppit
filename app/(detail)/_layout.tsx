@@ -20,6 +20,7 @@ const DEFAULT_DETAIL_TITLES: Record<string, string> = {
   "/buyer-home-group": "Tus solicitudes",
   "/buyer-profile": "Perfil del comprador",
   "/category-info": "Información de categoría",
+  "/completed-requests": "Solicitudes finalizadas",
   "/create-profile": "Crear perfil",
   "/faq": "Ayuda",
   "/home-preset": "Configurar inicio",
@@ -83,7 +84,12 @@ export default function DetailLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
       <View style={{ flex: 1, paddingHorizontal: t.spacing.md }}>
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: t.colors.background },
+          }}
+        />
       </View>
       {marketplaceSectionOwnsTopBar ? null : (
         <DetailTopBar

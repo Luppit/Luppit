@@ -44,6 +44,8 @@ export const RPC_FUNCTIONS = {
   GET_CURRENT_ACCOUNT_ONBOARDING: "get_current_account_onboarding",
   GET_CURRENT_BUYER_PURCHASE_REQUEST_CANCELLATION_ELIGIBILITY:
     "get_current_buyer_purchase_request_cancellation_eligibility",
+  GET_CURRENT_BUYER_FINALIZED_PURCHASE_REQUESTS:
+    "get_current_buyer_finalized_purchase_requests",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
   GET_CURRENT_LEGAL_ACCEPTANCE_STATE:
     "get_current_legal_acceptance_state",

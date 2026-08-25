@@ -7,8 +7,9 @@ import { createInterface } from "node:readline/promises";
 const MODE_ALIASES = {
   dev: "dev",
   start: "dev",
-  tunnel: "dev-tunnel",
-  "dev-tunnel": "dev-tunnel",
+  sim: "simulator",
+  simulator: "simulator",
+  "ios-simulator": "simulator",
   reinstall: "reinstall",
   reuse: "reinstall",
   development: "development",
@@ -69,29 +70,41 @@ export function createLaunchPlan(modeInput, platformInput) {
     throw new Error(`Unknown mode: ${modeInput}`);
   }
 
-  if (mode === "dev" || mode === "dev-tunnel") {
+  if (mode === "dev") {
     if (platformInput) {
       throw new Error("The development server does not need a platform.");
     }
 
-    const useTunnel = mode === "dev-tunnel";
     return {
-      mode: useTunnel
-        ? "Development server (tunnel)"
-        : "Development server (LAN)",
-      description: useTunnel
-        ? "Reliable app connection through Expo/ngrok. React Native DevTools cannot attach through this tunnel."
-        : "Fast local connection with React Native DevTools; the Mac and device must be reachable on the same network.",
+      mode: "Development server (LAN)",
+      description:
+        "Daily iPhone workflow with React Native DevTools; the Mac and device must be reachable on the same network.",
       command: "npx",
       args: [
         "expo",
         "start",
         "--dev-client",
-        ...(useTunnel ? ["--tunnel"] : ["--lan"]),
+        "--lan",
         "--clear",
       ],
       env: PROFILE_ENV.development,
       sentry: "Artifact upload is off; this command does not create a native build.",
+    };
+  }
+
+  if (mode === "simulator") {
+    if (platformInput) {
+      throw new Error("The iOS Simulator does not need a platform.");
+    }
+
+    return {
+      mode: "iOS Simulator",
+      description:
+        "Builds and installs the local Debug app using Xcode's incremental cache, starts Metro, and opens Luppit in the simulator.",
+      command: "npx",
+      args: ["expo", "run:ios"],
+      env: PROFILE_ENV.development,
+      sentry: "Artifact upload is disabled; no EAS build is created.",
     };
   }
 
@@ -178,7 +191,7 @@ Interactive:
 
 Direct:
   npm run app -- dev
-  npm run app -- dev-tunnel
+  npm run app -- simulator
   npm run app -- reinstall
   npm run app -- development <ios|ios-simulator|android>
   npm run app -- preview <ios|ios-simulator|android>
@@ -209,14 +222,14 @@ async function getInteractiveSelection() {
   try {
     const mode = await promptChoice(readline, "What do you want to do?", [
       {
-        value: "dev-tunnel",
-        label: "Start development server — Tunnel (recommended on your network)",
-        description: "Reliable connection through Expo/ngrok; React Native DevTools is unavailable.",
+        value: "dev",
+        label: "Start development server — iPhone LAN + debugger (daily choice)",
+        description: "Starts Metro for the installed iPhone development build.",
       },
       {
-        value: "dev",
-        label: "Start development server — LAN + debugger",
-        description: "Required for React Native DevTools; Mac and phone must connect directly.",
+        value: "simulator",
+        label: "Start app in iOS Simulator",
+        description: "Builds locally, installs, starts Metro, and opens Luppit for Codex/style work.",
       },
       {
         value: "reinstall",
@@ -240,7 +253,7 @@ async function getInteractiveSelection() {
       },
     ]);
 
-    if (mode === "dev" || mode === "dev-tunnel" || mode === "reinstall") {
+    if (mode === "dev" || mode === "simulator" || mode === "reinstall") {
       return { mode };
     }
 

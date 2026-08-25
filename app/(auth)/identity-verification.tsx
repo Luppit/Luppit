@@ -10,6 +10,7 @@ import {
   getCurrentAccountOnboarding,
   startCurrentUserIdentityVerification,
 } from "@/src/services/identity-verification.service";
+import { signOutLocally } from "@/src/lib/supabase/auth";
 import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
@@ -159,26 +160,14 @@ export default function IdentityVerificationScreen() {
         return false;
       }
 
-      const refreshed = await refreshProfiles();
-      if (!refreshed) {
+      try {
+        await signOutLocally();
+      } catch {
         showError(
           "Verificación cancelada",
-          "Actualiza la app para volver a elegir tu perfil.",
+          "No pudimos volver a la pantalla de acceso. Inténtalo nuevamente.",
         );
-        return true;
-      }
-
-      if (profiles.length > 0) {
-        router.replace("/(tabs)");
-      } else {
-        router.replace({
-          pathname: "/(detail)/create-profile",
-          params: {
-            setup: "true",
-            title: "Crear perfil",
-            hideMenu: "true",
-          },
-        });
+        return false;
       }
       return true;
     } finally {
@@ -187,9 +176,6 @@ export default function IdentityVerificationScreen() {
   };
 
   const openCancelConfirmation = () => {
-    const returnDescription = profiles.length > 0
-      ? "Volverás a la app con tus perfiles actuales."
-      : "Volverás a elegir qué tipo de perfil quieres crear.";
     openPopup({
       type: "summary",
       title: "Cancelar verificación",
@@ -197,16 +183,16 @@ export default function IdentityVerificationScreen() {
       description:
         "Se eliminará el avance incompleto de esta verificación en Luppit. " +
         "Podrás empezar de nuevo más adelante. Tu cuenta telefónica y tus perfiles existentes se conservarán. " +
-        returnDescription,
+        "Volverás a la pantalla de acceso.",
       actions: [
         {
           id: "keep-identity-verification",
-          label: "Continuar verificación",
+          label: "Volver",
           icon: "arrow-left",
         },
         {
           id: "cancel-identity-verification",
-          label: "Cancelar verificación",
+          label: "Cancelar",
           icon: "x-circle",
           textColorKey: "error",
           iconColorKey: "error",

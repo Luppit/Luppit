@@ -11,7 +11,10 @@ import {
 import { getCurrentProfileConversationById } from "@/src/services/conversation.service";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "@/src/themes";
-import { shouldGroupConversationImages } from "@/src/utils/conversationMessageGroup";
+import {
+  buildConversationMessageRenderGroups,
+  getConversationMessageLogicalKey,
+} from "@/src/utils/conversationMessageGroup";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Modal, Pressable, ScrollView, View } from "react-native";
@@ -26,8 +29,8 @@ type ConversationImagePreview = {
 type ConversationRenderItem =
   | { type: "message"; message: ConversationMessage }
   | {
-      type: "imageGroup";
-      messages: ConversationMessage[];
+      type: "messageGroup";
+      message: ConversationMessage;
       images: ConversationImagePreview[];
     };
 
@@ -35,12 +38,6 @@ const getMessageImageUri = (message: ConversationMessage) =>
   (message.image_url as string | null | undefined) ??
   ((message as any).imageUrl as string | null | undefined) ??
   null;
-
-const isImageOnlyMessage = (message: ConversationMessage) => {
-  const messageKind = (message.message_kind ?? "").toUpperCase();
-  const imageUri = getMessageImageUri(message);
-  return Boolean(imageUri) && messageKind === "IMAGE" && !message.text?.trim();
-};
 
 function normalizeDisplayName(value: string | null | undefined) {
   const name = value?.trim() ?? "";
@@ -91,68 +88,34 @@ export default function ConversationChatScreen() {
     [conversationView.slots]
   );
   const visibleMessages = useMemo(() => {
-    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
 
     return [...messages, ...optimisticMessages]
       .filter((message) => {
-        if (seenIds.has(message.id)) return false;
-        seenIds.add(message.id);
+        const key = getConversationMessageLogicalKey(message);
+        if (seenKeys.has(key)) return false;
+        seenKeys.add(key);
         return true;
-      })
-      .sort(
-        (first, second) =>
-          new Date(first.created_at).getTime() - new Date(second.created_at).getTime()
-      );
+      });
   }, [messages, optimisticMessages]);
 
   const renderItems = useMemo<ConversationRenderItem[]>(() => {
-    const items: ConversationRenderItem[] = [];
-
-    for (let i = 0; i < visibleMessages.length; i += 1) {
-      const message = visibleMessages[i];
-
-      if (!isImageOnlyMessage(message)) {
-        items.push({ type: "message", message });
-        continue;
+    return buildConversationMessageRenderGroups(visibleMessages).map((group) => {
+      if (group.type === "message") {
+        return { type: "message", message: group.messages[0] };
       }
-
-      const groupedMessages = [message];
-      const groupedImages: ConversationImagePreview[] = [
-        { id: message.id, uri: getMessageImageUri(message) ?? "" },
-      ];
-
-      let nextIndex = i + 1;
-      while (nextIndex < visibleMessages.length) {
-        const nextMessage = visibleMessages[nextIndex];
-        const previousMessage = groupedMessages[groupedMessages.length - 1];
-        if (
-          !isImageOnlyMessage(nextMessage) ||
-          !shouldGroupConversationImages(previousMessage, nextMessage)
-        ) {
-          break;
-        }
-
-        groupedMessages.push(nextMessage);
-        groupedImages.push({
-          id: nextMessage.id,
-          uri: getMessageImageUri(nextMessage) ?? "",
-        });
-        nextIndex += 1;
-      }
-
-      if (groupedMessages.length > 1) {
-        items.push({
-          type: "imageGroup",
-          messages: groupedMessages,
-          images: groupedImages,
-        });
-        i = nextIndex - 1;
-      } else {
-        items.push({ type: "message", message });
-      }
-    }
-
-    return items;
+      const message =
+        group.messages.find((candidate) => candidate.text?.trim()) ??
+        group.messages[0];
+      return {
+        type: "messageGroup",
+        message,
+        images: group.messages.flatMap((candidate) => {
+          const uri = getMessageImageUri(candidate);
+          return uri ? [{ id: candidate.id, uri }] : [];
+        }),
+      };
+    });
   }, [visibleMessages]);
   const activePreviewImage = previewImages[previewIndex] ?? null;
   const scrollToBottom = useCallback((animated = false) => {
@@ -567,6 +530,11 @@ export default function ConversationChatScreen() {
             gap: t.spacing.xs,
           }}
         >
+          {message.text ? (
+            <Text variant="body" color="textDark">
+              {message.text}
+            </Text>
+          ) : null}
           {imageGroup && imageGroup.length > 1 ? (
             renderImageBundle(imageGroup)
           ) : isImageMessage && imageUri ? (
@@ -591,11 +559,6 @@ export default function ConversationChatScreen() {
                 }}
               />
             </Pressable>
-          ) : null}
-          {message.text ? (
-            <Text variant="body" color="textDark">
-              {message.text}
-            </Text>
           ) : null}
         </View>
         <MessageUtilities
@@ -632,8 +595,8 @@ export default function ConversationChatScreen() {
         ) : null}
 
         {renderItems.map((item) =>
-          item.type === "imageGroup"
-            ? renderConversationMessage(item.messages[0], item.images)
+          item.type === "messageGroup"
+            ? renderConversationMessage(item.message, item.images)
             : renderConversationMessage(item.message)
         )}
 

@@ -1262,6 +1262,66 @@ export async function getCurrentBuyerMarketplaceHub(
   };
 }
 
+export async function getCurrentBuyerFinalizedPurchaseRequests(
+  filters?: BuyerHomeFilters,
+  sortCode: string = DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
+  page?: number,
+  pageSize?: number
+): Promise<
+  { ok: true; data: MarketplaceHubItemsPage } | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+
+  const normalizedPage = parsePositiveInteger(page, 1);
+  const normalizedPageSize = parsePositiveInteger(pageSize, 20);
+  const normalizedSortCode =
+    sortCode.trim() || DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE;
+  if (!profile) {
+    return {
+      ok: true,
+      data: extractMarketplaceHubItemsPage(
+        null,
+        normalizedPage,
+        normalizedPageSize,
+        "buyer",
+        normalizedSortCode
+      ),
+    };
+  }
+
+  const rpcResult = await supabase.rpc(
+    RPC_FUNCTIONS.GET_CURRENT_BUYER_FINALIZED_PURCHASE_REQUESTS,
+    {
+      p_profile_id: profile.data.id,
+      p_search_text: filters?.searchValue?.trim() || null,
+      p_start_date: filters?.startDate?.trim() || null,
+      p_end_date: filters?.endDate?.trim() || null,
+      p_page: normalizedPage,
+      p_page_size: normalizedPageSize,
+      p_sort_code: normalizedSortCode,
+    } as never
+  );
+
+  if (rpcResult.error) {
+    return { ok: false, error: fromSupabaseError(rpcResult.error) };
+  }
+
+  return {
+    ok: true,
+    data: extractMarketplaceHubItemsPage(
+      rpcResult.data,
+      normalizedPage,
+      normalizedPageSize,
+      "buyer",
+      normalizedSortCode
+    ),
+  };
+}
+
 export async function getCurrentSellerMarketplaceHubItems(
   filters?: SellerHomeFilters,
   segmentSvgName?: string,

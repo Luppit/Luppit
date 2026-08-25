@@ -10,8 +10,8 @@ npm run app
 
 The launcher explains and runs one of these modes:
 
-- **Development server — Tunnel**: the reliable daily workflow when the phone cannot reach the Mac over Wi-Fi. Development traffic is routed through Expo/ngrok, but React Native DevTools cannot currently attach through this tunnel.
-- **Development server — LAN + debugger**: the faster daily workflow when the Mac and phone can reach each other on the same local network. Use this mode when you need React Native DevTools.
+- **Development server — iPhone LAN + debugger**: the daily iPhone workflow. The Mac and phone must be on the same local network, and this mode supports React Native DevTools.
+- **iOS Simulator**: builds and installs the local Debug app using Xcode's incremental cache, starts Metro, and opens Luppit in the simulator. Use this for Codex and style work; it does not consume an EAS build.
 - **Reinstall existing development build**: opens the EAS build history. Select the latest successful Development build, click **Install**, and scan its QR code; this does not create another build.
 - **Development build**: creates a new installable development client with EAS. Use it after changing `app.json`, adding/updating a native dependency, or upgrading Expo.
 - **Preview build**: creates a standalone internal build for realistic testing or sharing. It does not need Metro.
@@ -23,7 +23,7 @@ Direct non-interactive forms are also available:
 
 ```bash
 npm run app -- dev
-npm run app -- dev-tunnel
+npm run app -- simulator
 npm run app -- reinstall
 npm run app -- development ios
 npm run app -- preview ios

@@ -158,6 +158,16 @@ function BuyerProfileContent() {
 
           <GroupedList>
             <GroupedListRow
+              icon="check"
+              label="Solicitudes finalizadas"
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/completed-requests",
+                  params: { title: "Solicitudes finalizadas", hideMenu: "true" },
+                })
+              }
+            />
+            <GroupedListRow
               icon="bell"
               label="Notificaciones"
               accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationCount)}
@@ -293,6 +303,16 @@ function SellerProfileContent() {
           <BusinessSummaryCard business={business} />
 
           <GroupedList>
+            <GroupedListRow
+              icon="check"
+              label="Solicitudes finalizadas"
+              onPress={() =>
+                router.push({
+                  pathname: "/(detail)/completed-requests",
+                  params: { title: "Solicitudes finalizadas", hideMenu: "true" },
+                })
+              }
+            />
             <GroupedListRow
               icon="bell"
               label="Notificaciones"
