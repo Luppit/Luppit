@@ -16,6 +16,9 @@ const MODE_ALIASES = {
   preview: "preview",
   prod: "production",
   production: "production",
+  release: "release",
+  ship: "release",
+  submit: "release",
 };
 
 const PLATFORM_ALIASES = {
@@ -129,41 +132,50 @@ export function createLaunchPlan(modeInput, platformInput) {
     throw new Error(`Choose a platform for the ${mode} build.`);
   }
 
-  if (mode === "production" && platform === "ios-simulator") {
+  const buildMode = mode === "release" ? "production" : mode;
+
+  if (buildMode === "production" && platform === "ios-simulator") {
     throw new Error("Production builds cannot target the iOS Simulator.");
   }
 
-  if (platform === "all" && mode !== "production") {
+  if (platform === "all" && buildMode !== "production") {
     throw new Error(`The ${mode} build requires one target platform at a time.`);
   }
 
   const profile = platform === "ios-simulator"
-    ? `${mode}-simulator`
-    : mode;
+    ? `${buildMode}-simulator`
+    : buildMode;
   const easPlatform = platform === "ios-simulator" ? "ios" : platform;
-  const profileLabel = mode[0].toUpperCase() + mode.slice(1);
+  const profileLabel = buildMode[0].toUpperCase() + buildMode.slice(1);
+  const args = [
+    "--yes",
+    "eas-cli@latest",
+    "build",
+    "--profile",
+    profile,
+    "--platform",
+    easPlatform,
+  ];
+
+  if (mode === "release") {
+    args.push("--auto-submit-with-profile=production");
+  }
 
   return {
-    mode: `${profileLabel} build`,
-    description: getBuildDescription(mode),
+    mode: mode === "release"
+      ? "Production build + store submission"
+      : `${profileLabel} build`,
+    description: getBuildDescription(mode, platform),
     command: "npx",
-    args: [
-      "--yes",
-      "eas-cli@latest",
-      "build",
-      "--profile",
-      profile,
-      "--platform",
-      easPlatform,
-    ],
-    env: PROFILE_ENV[mode],
-    sentry: mode === "production"
+    args,
+    env: PROFILE_ENV[buildMode],
+    sentry: buildMode === "production"
       ? "Artifact upload is best-effort and cannot fail the build."
       : "Artifact upload is disabled for this build profile.",
   };
 }
 
-function getBuildDescription(mode) {
+function getBuildDescription(mode, platform) {
   switch (mode) {
     case "development":
       return "Install this after native configuration or native dependencies change.";
@@ -171,6 +183,14 @@ function getBuildDescription(mode) {
       return "Standalone internal build for testing or sharing; Metro is not required.";
     case "production":
       return "Store/TestFlight build for release.";
+    case "release":
+      if (platform === "ios") {
+        return "Creates a production .ipa and submits it to TestFlight for internal testing.";
+      }
+      if (platform === "android") {
+        return "Creates a production .aab and submits it to Google Play internal testing.";
+      }
+      return "Creates both production store binaries and submits them to TestFlight and Google Play internal testing.";
     default:
       throw new Error(`Unsupported build mode: ${mode}`);
   }
@@ -196,6 +216,7 @@ Direct:
   npm run app -- development <ios|ios-simulator|android>
   npm run app -- preview <ios|ios-simulator|android>
   npm run app -- production <ios|android|all>
+  npm run app -- release <ios|android|all>
 
 Add --dry-run to print the selected command without running it.
 `);
@@ -249,7 +270,12 @@ async function getInteractiveSelection() {
       {
         value: "production",
         label: "Create a production build",
-        description: "Store/TestFlight release build.",
+        description: "Create a signed .ipa or .aab without uploading it to a store.",
+      },
+      {
+        value: "release",
+        label: "Build and submit for store testing",
+        description: "Send iOS to TestFlight or Android to Google Play internal testing.",
       },
     ]);
 
@@ -257,14 +283,28 @@ async function getInteractiveSelection() {
       return { mode };
     }
 
-    const platformOptions = mode === "production"
+    const platformOptions = mode === "production" || mode === "release"
       ? [
-          EAS_PLATFORM_OPTIONS[0],
-          EAS_PLATFORM_OPTIONS[2],
+          {
+            value: "ios",
+            label: "iOS (.ipa)",
+            description: mode === "release"
+              ? "Build and submit to TestFlight internal testing."
+              : "Create the signed App Store/TestFlight archive.",
+          },
+          {
+            value: "android",
+            label: "Android (.aab)",
+            description: mode === "release"
+              ? "Build and submit to Google Play internal testing."
+              : "Create the signed Google Play app bundle.",
+          },
           {
             value: "all",
             label: "iOS and Android",
-            description: "Queue both production builds.",
+            description: mode === "release"
+              ? "Build and submit both store binaries for internal testing."
+              : "Queue both production builds.",
           },
         ]
       : EAS_PLATFORM_OPTIONS;

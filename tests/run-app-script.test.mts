@@ -56,13 +56,50 @@ test("production build keeps Sentry best-effort", () => {
 
   assert.ok(plan.args.includes("production"));
   assert.equal(plan.args.at(-1), "all");
+  assert.equal(plan.args.some((arg) => arg.includes("auto-submit")), false);
   assert.equal(plan.env.SENTRY_ALLOW_FAILURE, "true");
   assert.equal(plan.env.SENTRY_DISABLE_AUTO_UPLOAD, undefined);
+});
+
+test("iOS release creates a production build and submits it to TestFlight", () => {
+  const plan = createLaunchPlan("release", "ios");
+
+  assert.deepEqual(plan.args.slice(-5), [
+    "--profile",
+    "production",
+    "--platform",
+    "ios",
+    "--auto-submit-with-profile=production",
+  ]);
+  assert.match(plan.description, /\.ipa.*TestFlight/i);
+  assert.equal(plan.env.EXPO_PUBLIC_BUILD_PROFILE, "production");
+  assert.equal(plan.env.SENTRY_ALLOW_FAILURE, "true");
+});
+
+test("Android submit alias creates a production build and submits it to internal testing", () => {
+  const plan = createLaunchPlan("submit", "android");
+
+  assert.deepEqual(plan.args.slice(-5), [
+    "--profile",
+    "production",
+    "--platform",
+    "android",
+    "--auto-submit-with-profile=production",
+  ]);
+  assert.match(plan.description, /\.aab.*Google Play internal testing/i);
+  assert.equal(plan.env.EXPO_PUBLIC_BUILD_PROFILE, "production");
 });
 
 test("production build rejects the iOS simulator", () => {
   assert.throws(
     () => createLaunchPlan("production", "ios-simulator"),
+    /cannot target the iOS Simulator/,
+  );
+});
+
+test("release build rejects the iOS simulator", () => {
+  assert.throws(
+    () => createLaunchPlan("release", "ios-simulator"),
     /cannot target the iOS Simulator/,
   );
 });
