@@ -46,3 +46,23 @@ app-example
 
 # separate Edge Functions repository
 /ai-edge-functions/
+
+# generated design and UX audit output
+/design-qa.md
+/design-qa-artifacts/
+/ux-audit-*/
+
+# local agent tooling and release working documents
+/.agents/
+/GETTING_STARTED.md
+/docs/LUPPIT_CODEX_QA_GUIDE.md
+/docs/LUPPIT_MVP_ACCEPTANCE_TEST_TRACKER.md
+
+# retired and generated image assets
+/assets/images/android-icon-background.png
+/assets/images/no_offers_request.svg
+/assets/images/partial-react-logo.png
+/assets/images/react-logo.png
+/assets/images/react-logo@2x.png
+/assets/images/react-logo@3x.png
+/assets/images/splash-icon.png

@@ -37,3 +37,26 @@ yarn-error.*
 # unrelated local workspaces
 ai-edge-functions/
 app-example/
+
+# repository-only documentation and tooling
+docs/
+.agents/
+.vscode/
+AGENTS.md
+**/AGENTS.md
+README.md
+GETTING_STARTED.md
+
+# generated design and UX audit output
+design-qa.md
+design-qa-artifacts/
+ux-audit-*/
+
+# retired and generated image assets
+assets/images/android-icon-background.png
+assets/images/no_offers_request.svg
+assets/images/partial-react-logo.png
+assets/images/react-logo.png
+assets/images/react-logo@2x.png
+assets/images/react-logo@3x.png
+assets/images/splash-icon.png
