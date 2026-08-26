@@ -44,6 +44,7 @@ export function Step1({ next, values, setValues }: any) {
       <InputPhone
         value={values.phoneNumber}
         label="Número de teléfono"
+        labelColor="textMedium"
         keyboardType="phone-pad"
         onChangeText={(text) => {
           setValues({ ...values, phoneNumber: text });

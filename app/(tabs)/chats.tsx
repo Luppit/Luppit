@@ -2,8 +2,12 @@ import { Icon } from "@/src/components/Icon";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
+import ProfilePicture, {
+  type ProfilePictureKind,
+} from "@/src/components/profile/ProfilePicture";
 import RoleGate from "@/src/components/role/RoleGate";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
+import { ROUNDED_SURFACE_RADIUS } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   ConversationListFilters,
@@ -16,7 +20,7 @@ import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, Pressable, SectionList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMPTY_CHAT_FILTERS: ConversationListFilters = {
@@ -39,11 +43,6 @@ function hasChatFilters(filters: ConversationListFilters) {
       filters.endDate ||
       filters.selectedCategoryIds.length > 0
   );
-}
-
-function getInitial(value: string) {
-  const trimmed = value.trim();
-  return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
 }
 
 function startOfDay(date: Date) {
@@ -109,6 +108,36 @@ function getSelectedCategoryLabels(
   }));
 }
 
+type ConversationSection = {
+  key: "unread" | "all";
+  title: string | null;
+  data: ConversationListItem[];
+};
+
+function getConversationSections(items: ConversationListItem[]): ConversationSection[] {
+  const unreadItems = items.filter((item) => item.has_unopened);
+  const remainingItems = items.filter((item) => !item.has_unopened);
+  const sections: ConversationSection[] = [];
+
+  if (unreadItems.length > 0) {
+    sections.push({
+      key: "unread",
+      title: `Sin leer · ${unreadItems.length}`,
+      data: unreadItems,
+    });
+  }
+
+  if (remainingItems.length > 0) {
+    sections.push({
+      key: "all",
+      title: unreadItems.length > 0 ? "Recientes" : null,
+      data: remainingItems,
+    });
+  }
+
+  return sections;
+}
+
 export default function ChatsScreen() {
   const t = useTheme();
   const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
@@ -122,14 +151,18 @@ export default function ChatsScreen() {
             <LoadingState label="Cargando contenido..." />
           </>
         }
-        buyer={<ChatsContent />}
-        seller={<ChatsContent />}
+        buyer={<ChatsContent counterpartKind="business" />}
+        seller={<ChatsContent counterpartKind="buyer" />}
       />
     </View>
   );
 }
 
-function ChatsContent() {
+function ChatsContent({
+  counterpartKind,
+}: {
+  counterpartKind: ProfilePictureKind;
+}) {
   const t = useTheme();
   const s = React.useMemo(() => createChatsScreenStyles(t, 0, true), [t]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -199,9 +232,10 @@ function ChatsContent() {
     );
   }, [filterOptionsSource]);
 
-  const visibleConversations = React.useMemo(
-    () => conversations,
-    [conversations]
+  const visibleConversations = React.useMemo(() => conversations, [conversations]);
+  const conversationSections = React.useMemo(
+    () => getConversationSections(visibleConversations),
+    [visibleConversations]
   );
   const hasActiveFilters = React.useMemo(() => hasChatFilters(filters), [filters]);
   const selectedCategoryLabels = React.useMemo(
@@ -318,82 +352,99 @@ function ChatsContent() {
     }
 
     return (
-      <ScrollView
+      <SectionList
+        sections={conversationSections}
+        keyExtractor={(item) => item.conversation_id}
+        stickySectionHeadersEnabled={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={s.chatList}
-      >
-        {hasActiveFilters ? (
-          <View style={s.activeChipsRow}>
-            {filters.searchValue ? (
+        ListHeaderComponent={
+          hasActiveFilters ? (
+            <View style={s.activeChipsRow}>
+              {filters.searchValue ? (
+                <LuppitChip
+                  icon="search"
+                  label={`Buscar: ${filters.searchValue}`}
+                  onRemove={removeSearchFilter}
+                  removeAccessibilityLabel="Quitar búsqueda"
+                />
+              ) : null}
+
+              {filters.startDate ? (
+                <LuppitChip
+                  icon="sliders-horizontal"
+                  label={`Desde ${formatFilterDate(filters.startDate)}`}
+                  onRemove={removeStartDateFilter}
+                  removeAccessibilityLabel="Quitar fecha inicial"
+                />
+              ) : null}
+
+              {filters.endDate ? (
+                <LuppitChip
+                  icon="sliders-horizontal"
+                  label={`Hasta ${formatFilterDate(filters.endDate)}`}
+                  onRemove={removeEndDateFilter}
+                  removeAccessibilityLabel="Quitar fecha final"
+                />
+              ) : null}
+
+              {selectedCategoryLabels.map((category) => (
+                <LuppitChip
+                  key={category.id}
+                  icon="tag"
+                  label={category.label}
+                  onRemove={() => removeCategoryFilter(category.id)}
+                  removeAccessibilityLabel={`Quitar categoría ${category.label}`}
+                />
+              ))}
+
               <LuppitChip
-                icon="search"
-                label={`Buscar: ${filters.searchValue}`}
-                onRemove={removeSearchFilter}
-                removeAccessibilityLabel="Quitar búsqueda"
+                label="Limpiar"
+                onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
+                accessibilityLabel="Limpiar filtros"
               />
-            ) : null}
-
-            {filters.startDate ? (
-              <LuppitChip
-                icon="sliders-horizontal"
-                label={`Desde ${formatFilterDate(filters.startDate)}`}
-                onRemove={removeStartDateFilter}
-                removeAccessibilityLabel="Quitar fecha inicial"
-              />
-            ) : null}
-
-            {filters.endDate ? (
-              <LuppitChip
-                icon="sliders-horizontal"
-                label={`Hasta ${formatFilterDate(filters.endDate)}`}
-                onRemove={removeEndDateFilter}
-                removeAccessibilityLabel="Quitar fecha final"
-              />
-            ) : null}
-
-            {selectedCategoryLabels.map((category) => (
-              <LuppitChip
-                key={category.id}
-                icon="tag"
-                label={category.label}
-                onRemove={() => removeCategoryFilter(category.id)}
-                removeAccessibilityLabel={`Quitar categoría ${category.label}`}
-              />
-            ))}
-
-            <LuppitChip
-              label="Limpiar"
-              onPress={() => setFilters(EMPTY_CHAT_FILTERS)}
-              accessibilityLabel="Limpiar filtros"
-            />
-          </View>
-        ) : null}
-
-        {visibleConversations.map((item, index) => (
+            </View>
+          ) : null
+        }
+        renderSectionHeader={({ section }) =>
+          section.title ? (
+            <View accessible accessibilityRole="header" style={s.sectionHeader}>
+              <Text variant="small" color="textMedium" style={s.sectionTitle}>
+                {section.title}
+              </Text>
+            </View>
+          ) : null
+        }
+        renderItem={({ item, index, section }) => (
           <ChatListRow
-            key={item.conversation_id}
             item={item}
-            showSeparator={index < visibleConversations.length - 1}
+            counterpartKind={counterpartKind}
+            isFirst={index === 0}
+            isLast={index === section.data.length - 1}
+            showSeparator={index < section.data.length - 1}
             onPress={() => openConversation(item)}
           />
-        ))}
-      </ScrollView>
+        )}
+      />
     );
   })();
 
   const toolbar = (
-      <View style={s.toolbar}>
-        <Pressable
-          style={s.searchTrigger}
-          onPress={openSearchPopup}
-          accessibilityRole="button"
-        >
-          <Icon name="search" size={20} color={t.colors.stateAnulated} />
-          <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
-            {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
-          </Text>
-        </Pressable>
-      </View>
+    <View style={s.toolbar}>
+      <Pressable
+        style={s.searchTrigger}
+        onPress={openSearchPopup}
+        accessibilityRole="button"
+        accessibilityLabel={
+          hasActiveFilters ? "Editar filtros aplicados" : "Buscar y filtrar chats"
+        }
+      >
+        <Icon name="search" size={20} color={t.colors.stateAnulated} />
+        <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+          {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
+        </Text>
+      </Pressable>
+    </View>
   );
 
   return (
@@ -408,47 +459,101 @@ function ChatsContent() {
 
 function ChatListRow({
   item,
+  counterpartKind,
+  isFirst,
+  isLast,
   showSeparator,
   onPress,
 }: {
   item: ConversationListItem;
+  counterpartKind: ProfilePictureKind;
+  isFirst: boolean;
+  isLast: boolean;
   showSeparator: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
   const preview = getMessagePreview(item);
-  const title = item.display_name || "Conversación";
-  const contextLabel = item.request_title?.trim() || item.request_category_name?.trim() || "";
+  const counterpartName = item.display_name || "Contacto";
+  const requestTitle =
+    item.request_title?.trim() || item.request_category_name?.trim() || "Conversación";
+  const statusLabel = item.status_label?.trim() || "";
+  const timeLabel = formatLastMessageTime(item.last_message_at);
+  const accessibilityLabel = [
+    item.has_unopened
+      ? item.unopened_count === 1
+        ? "1 mensaje sin leer"
+        : `${item.unopened_count} mensajes sin leer`
+      : null,
+    requestTitle,
+    `Con ${counterpartName}`,
+    statusLabel ? `Estado: ${statusLabel}` : null,
+    preview,
+    timeLabel,
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   return (
     <Pressable
-      style={({ pressed }) => [s.chatRow, pressed && s.chatRowPressed]}
+      style={({ pressed }) => [
+        s.chatRow,
+        isFirst ? s.chatRowFirst : null,
+        isLast ? s.chatRowLast : null,
+        pressed ? s.chatRowPressed : null,
+      ]}
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint="Abre la conversación"
     >
-      <View style={s.avatar}>
-        <Text variant="subtitle" style={s.avatarText}>
-          {getInitial(title)}
-        </Text>
-        {item.has_unopened ? <View style={s.unreadMarker} /> : null}
+      <View style={s.avatarShell}>
+        <ProfilePicture
+          kind={counterpartKind}
+          name={counterpartName}
+          imagePath={item.counterpart_image_path}
+          size={52}
+          accessible={false}
+        />
+        {item.has_unopened ? (
+          <View style={s.unreadBadge}>
+            <Text variant="small" style={s.unreadBadgeText}>
+              {item.unopened_count > 99 ? "99+" : item.unopened_count}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={s.chatBody}>
-        <Text
-          variant="body"
-          maxLines={1}
-          style={[s.chatName, item.has_unopened ? s.chatNameUnread : null]}
-        >
-          {title}
-        </Text>
-        {contextLabel ? (
-          <Text variant="body" color="textMedium" maxLines={1} style={s.chatContext}>
-            {contextLabel}
+        <View style={s.chatTitleRow}>
+          <Text
+            variant="body"
+            maxLines={2}
+            style={[s.chatRequestTitle, item.has_unopened ? s.chatRequestTitleUnread : null]}
+          >
+            {requestTitle}
           </Text>
+          <Text variant="small" color="stateAnulated" maxLines={1} style={s.chatTime}>
+            {timeLabel}
+          </Text>
+        </View>
+        <Text variant="small" color="textMedium" maxLines={1}>
+          {counterpartName}
+        </Text>
+
+        {statusLabel ? (
+          <View style={s.chatStatusRow}>
+            <Text variant="small" color="stateAnulated" maxLines={1}>
+              Estado
+            </Text>
+            <Text variant="small" color="textMedium" maxLines={1} style={s.chatStatus}>
+              {statusLabel}
+            </Text>
+          </View>
         ) : null}
         <Text
-          variant="body"
+          variant="small"
           color="stateAnulated"
           maxLines={1}
           style={[s.chatPreview, item.has_unopened ? s.chatPreviewUnread : null]}
@@ -457,12 +562,6 @@ function ChatListRow({
         </Text>
       </View>
 
-      <View style={s.chatMeta}>
-        <Text variant="body" color="stateAnulated" maxLines={1} style={s.chatTime}>
-          {formatLastMessageTime(item.last_message_at)}
-        </Text>
-        <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
-      </View>
       {showSeparator ? <View style={s.chatRowSeparator} /> : null}
     </Pressable>
   );
@@ -500,11 +599,23 @@ function ChatsTopBar({
       contentStyle={s.topBarContent}
     >
       <View style={s.topBarTitleRow}>
-        <Pressable onPress={goBack} hitSlop={12} style={s.topBarSide}>
+        <Pressable
+          onPress={goBack}
+          hitSlop={12}
+          style={s.topBarSide}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+        >
           <Icon name="arrow-left" size={28} color={t.colors.textDark} />
         </Pressable>
 
-        <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
+        <Text
+          accessibilityRole="header"
+          variant="subtitle"
+          align="center"
+          maxLines={1}
+          style={s.topBarTitle}
+        >
           {title}
         </Text>
 
@@ -604,86 +715,118 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       flexDirection: "row",
       flexWrap: "wrap",
       gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
+      paddingBottom: t.spacing.sm,
     },
     chatList: {
-      gap: 0,
       paddingTop: topBarVisibleHeight + t.spacing.md,
       paddingBottom: 112,
     },
+    sectionHeader: {
+      paddingHorizontal: t.spacing.lg,
+      paddingTop: t.spacing.lg,
+      paddingBottom: t.spacing.sm,
+      backgroundColor: t.colors.background,
+    },
+    sectionTitle: {
+      fontFamily: t.typography.subtitle.fontFamily,
+    },
     chatRow: {
       position: "relative",
-      minHeight: 112,
+      minHeight: 116,
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: t.spacing.md,
-      paddingLeft: t.spacing.lg,
-      paddingRight: t.spacing.md,
+      marginHorizontal: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.md,
+      backgroundColor: t.colors.backgroudWhite,
+    },
+    chatRowFirst: {
+      borderTopLeftRadius: ROUNDED_SURFACE_RADIUS,
+      borderTopRightRadius: ROUNDED_SURFACE_RADIUS,
+    },
+    chatRowLast: {
+      borderBottomLeftRadius: ROUNDED_SURFACE_RADIUS,
+      borderBottomRightRadius: ROUNDED_SURFACE_RADIUS,
     },
     chatRowPressed: {
-      opacity: 0.72,
+      backgroundColor: t.colors.primaryLight,
     },
-    avatar: {
+    avatarShell: {
       width: 52,
       height: 52,
-      borderRadius: 26,
+      position: "relative",
+      marginTop: t.spacing.xs,
+    },
+    unreadBadge: {
+      position: "absolute",
+      right: -5,
+      bottom: -4,
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      paddingHorizontal: 4,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t.colors.primaryLight,
-      position: "relative",
-    },
-    unreadMarker: {
-      position: "absolute",
-      top: 2,
-      right: 2,
-      width: 9,
-      height: 9,
-      borderRadius: 5,
       backgroundColor: t.colors.primary,
       borderWidth: 2,
       borderColor: t.colors.background,
     },
-    avatarText: {
-      color: t.colors.primary,
+    unreadBadgeText: {
+      color: t.colors.backgroudWhite,
+      fontSize: 10,
+      lineHeight: 12,
     },
     chatBody: {
       flex: 1,
       minWidth: 0,
       gap: t.spacing.xs,
     },
-    chatName: {
+    chatTitleRow: {
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.sm,
+    },
+    chatRequestTitle: {
+      flex: 1,
+      minWidth: 0,
       color: t.colors.textDark,
     },
-    chatNameUnread: {
-      color: t.colors.textDark,
+    chatRequestTitleUnread: {
+      fontFamily: t.typography.subtitle.fontFamily,
+    },
+    chatStatus: {
+      flex: 1,
+      minWidth: 0,
+    },
+    chatStatusRow: {
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.xs,
     },
     chatPreview: {
+      minWidth: 0,
       flexShrink: 1,
-    },
-    chatContext: {
-      flexShrink: 1,
-      lineHeight: t.typography.body.lineHeight,
     },
     chatPreviewUnread: {
       color: t.colors.textMedium,
     },
-    chatMeta: {
-      minWidth: 66,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      gap: t.spacing.xs,
-    },
     chatTime: {
+      maxWidth: 72,
       flexShrink: 1,
+      textAlign: "right",
+      paddingTop: 2,
     },
     chatRowSeparator: {
       position: "absolute",
-      left: t.spacing.lg + 52 + t.spacing.md,
+      left: t.spacing.md + 52 + t.spacing.md,
       right: t.spacing.md,
       bottom: 0,
       height: StyleSheet.hairlineWidth,
-      backgroundColor: "rgba(0,0,0,0.08)",
+      backgroundColor: t.colors.border,
     },
   });
 }

@@ -1,6 +1,6 @@
 import { spacing } from "@/src/themes";
 import { Theme } from "@/src/themes/ThemeProvider";
-import { ViewStyle } from "react-native";
+import { TextStyle, ViewStyle } from "react-native";
 
 export type StepperStyles = {
   header: {
@@ -8,6 +8,7 @@ export type StepperStyles = {
     icon: ViewStyle;
     content : ViewStyle;
     contentInfo : ViewStyle;
+    description: TextStyle;
   };
   base: {
     parent: ViewStyle;
@@ -27,7 +28,7 @@ export function createStepperStyles(t: Theme): StepperStyles {
       container: {
         flex: 1,
         flexDirection: "column",
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: spacing.lg,
         width: '100%'
       },
       icon: {
@@ -39,6 +40,9 @@ export function createStepperStyles(t: Theme): StepperStyles {
       contentInfo: {
         flex: 1,
         flexDirection: "column",
+      },
+      description: {
+        opacity: 0.65,
       }
     },
     base: {

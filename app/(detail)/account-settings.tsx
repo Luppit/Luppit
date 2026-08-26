@@ -9,7 +9,6 @@ import { hasProfilePicture } from "@/src/components/profile/ProfilePicture";
 import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import {
   requestDeletionReauthenticationOtp,
-  signOut,
   signOutLocally,
   verifyDeletionReauthenticationOtp,
 } from "@/src/lib/supabase";
@@ -30,6 +29,7 @@ import { getSupportEmail } from "@/src/services/support.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
+import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import Constants from "expo-constants";
 import * as Clipboard from "expo-clipboard";
@@ -462,45 +462,6 @@ function openLegalDocument(code: string, title: string) {
   router.push({
     pathname: "/(detail)/legal-document",
     params: { code, title, hideMenu: "true" },
-  });
-}
-
-function openSignOutConfirmation() {
-  openPopup({
-    type: "summary",
-    title: "Cerrar sesión",
-    icon: "log-out",
-    description: "Saldrás de esta cuenta en este dispositivo.",
-    actions: [
-      {
-        id: "stay-signed-in",
-        label: "Volver",
-        icon: "arrow-left",
-        backgroundColorKey: "backgroudWhite",
-        textColorKey: "textDark",
-        iconColorKey: "textDark",
-      },
-      {
-        id: "confirm-sign-out",
-        label: "Cerrar sesión",
-        icon: "log-out",
-        backgroundColorKey: "backgroudWhite",
-        textColorKey: "error",
-        iconColorKey: "error",
-        onPress: async () => {
-          try {
-            await signOut();
-            return true;
-          } catch (error) {
-            showError(
-              "No se pudo cerrar sesión",
-              error instanceof Error ? error.message : undefined
-            );
-            return false;
-          }
-        },
-      },
-    ],
   });
 }
 

@@ -50,6 +50,7 @@ export function createInputPhoneStyles(t: Theme): InputPhoneStyles {
       },
       countryCodeText: {
         ...t.typography.body,
+        opacity: 0.65,
       },
     },
   };

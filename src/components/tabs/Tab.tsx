@@ -1,6 +1,7 @@
 import { useTheme } from "@/src/themes";
 import { useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
+import GlassSurface from "../glass/GlassSurface";
 import { Text } from "../Text";
 import { createTabsStyles } from "./styles";
 
@@ -31,20 +32,35 @@ export function Tabs({ tabs, currentIndex, onTabChange }: TabsProps) {
 
   return (
     <View>
-      <View style={s.base.container}>
+      <GlassSurface
+        variant="control"
+        style={s.base.container}
+        contentStyle={s.base.content}
+      >
         {tabs.map((tab, index) => (
           <Pressable
-            style={{
-              ...s.header.tabsContainer,
-              ...(index === selectedIndex ? s.header.tabsContainerActive : {}),
-            }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: index === selectedIndex }}
+            style={({ pressed }) => [
+              s.header.tabsContainer,
+              index === selectedIndex ? s.header.tabsContainerActive : null,
+              pressed ? s.header.tabsContainerPressed : null,
+            ]}
             key={index}
             onPress={() => handleChange(index)}
           >
-            <Text>{tab.title}</Text>
+            <Text
+              style={
+                index === selectedIndex
+                  ? s.header.tabLabelActive
+                  : s.header.tabLabelInactive
+              }
+            >
+              {tab.title}
+            </Text>
           </Pressable>
         ))}
-      </View>
+      </GlassSurface>
       <View style={s.content.container}>{tabs[selectedIndex].content}</View>
     </View>
   );

@@ -30,11 +30,10 @@ function ChatLayoutContent() {
   const {
     title,
     sendMessage,
-    stopAssistant,
     messages,
+    uiState,
     showComposer,
     canCompose,
-    isSendingMessage,
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -115,11 +114,13 @@ function ChatLayoutContent() {
               sendOnReturn={false}
               autoFocus={messages.length === 0}
               disabled={!canCompose}
-              busy={isSendingMessage}
-              onStop={stopAssistant}
-              maxImages={3}
+              placeholder={
+                uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
+              }
+              showAttachmentButton={false}
+              maxImages={0}
               onSend={({ text, images }) => {
-                return sendMessage({ text, images });
+                void sendMessage({ text, images });
               }}
             />
           </View>

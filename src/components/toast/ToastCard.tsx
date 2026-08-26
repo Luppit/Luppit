@@ -38,7 +38,6 @@ export default function ToastCard({
     <GlassSurface
       variant="surface"
       blur={reduceTransparency ? false : "surface"}
-      highlight={!reduceTransparency}
       style={[
         styles.surface,
         reduceTransparency ? { backgroundColor: t.colors.backgroudWhite } : null,

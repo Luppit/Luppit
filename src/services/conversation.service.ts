@@ -167,6 +167,7 @@ export type ConversationListItem = {
   purchase_request_id: string | null;
   purchase_offer_id: string | null;
   display_name: string;
+  counterpart_image_path: string | null;
   business_name: string | null;
   request_title: string | null;
   request_category_id: string | null;
@@ -593,6 +594,7 @@ function parseConversationListItem(raw: unknown): ConversationListItem | null {
     purchase_offer_id:
       typeof value.purchase_offer_id === "string" ? value.purchase_offer_id : null,
     display_name: displayName,
+    counterpart_image_path: toOptionalText(value.counterpart_image_path),
     business_name:
       typeof value.business_name === "string" ? value.business_name : null,
     request_title:

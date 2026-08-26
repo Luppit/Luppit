@@ -2,18 +2,24 @@ import {
   useChatSession,
 } from "./chat-session.context";
 import type { ChatMessage } from "./chat-session.context";
-import Button from "@/src/components/button/Button";
-import { Icon } from "@/src/components/Icon";
+import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
+import AssistantReviewCard from "@/src/components/assistant/AssistantReviewCard";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
 import { Asset } from "expo-asset";
 import React, { useEffect, useRef } from "react";
-import { Animated, Image, ScrollView, View } from "react-native";
+import { Image, ScrollView, View } from "react-native";
 import { SvgUri } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
+
+const REQUEST_PROCESSING_STEPS = [
+  "Identificando el producto",
+  "Organizando los detalles",
+  "Preparando el resumen",
+] as const;
 
 function AssistantTextBlock({ text }: { text: string }) {
   const t = useTheme();
@@ -28,83 +34,6 @@ function AssistantTextBlock({ text }: { text: string }) {
     >
       <Text variant="body">{text}</Text>
       <MessageUtilities text={text} />
-    </View>
-  );
-}
-
-function AssistantThinkingBlock() {
-  const t = useTheme();
-  const dotOpacities = useRef([
-    new Animated.Value(0.35),
-    new Animated.Value(0.35),
-    new Animated.Value(0.35),
-  ]).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.stagger(
-        140,
-        dotOpacities.map((opacity) =>
-          Animated.sequence([
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: 360,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.35,
-              duration: 360,
-              useNativeDriver: true,
-            }),
-          ])
-        )
-      )
-    );
-
-    animation.start();
-    return () => animation.stop();
-  }, [dotOpacities]);
-
-  return (
-    <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLiveRegion="polite"
-      accessibilityLabel="Pensando"
-      style={{
-        maxWidth: "96%",
-        alignSelf: "flex-start",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: t.spacing.xs,
-        paddingVertical: t.spacing.xs,
-      }}
-    >
-      <Text variant="body" color="stateAnulated">
-        Pensando
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-        {dotOpacities.map((opacity, index) => (
-          <Animated.View
-            key={index}
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: t.colors.stateAnulated,
-              opacity,
-              transform: [
-                {
-                  translateY: opacity.interpolate({
-                    inputRange: [0.35, 1],
-                    outputRange: [1, -2],
-                  }),
-                },
-              ],
-            }}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -186,38 +115,6 @@ function humanizeAttributeLabel(value: string) {
     .replace(/^./, (char) => char.toUpperCase());
 }
 
-function SummaryDetailPill({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-}) {
-  const t = useTheme();
-  const displayValue = String(value);
-
-  return (
-    <View
-      style={{
-        flexGrow: 1,
-        flexBasis: "47%",
-        borderRadius: 16,
-        backgroundColor: t.colors.background,
-        paddingHorizontal: t.spacing.sm,
-        paddingVertical: t.spacing.sm,
-        gap: 2,
-      }}
-    >
-      <Text variant="small" color="stateAnulated">
-        {label}
-      </Text>
-      <Text variant="body" maxLines={2}>
-        {displayValue}
-      </Text>
-    </View>
-  );
-}
-
 function PublishRequestCard({
   summary,
   description,
@@ -235,7 +132,6 @@ function PublishRequestCard({
   onPublish: () => void;
   onContinue: () => void;
 }) {
-  const t = useTheme();
   const attributeDetails = Object.entries(summary?.atributos ?? {})
     .map(([label, value]) => ({
       label: humanizeAttributeLabel(label),
@@ -254,90 +150,23 @@ function PublishRequestCard({
   ].filter((item) => hasSummaryValue(item.value));
 
   return (
-    <View
-      style={{
-        alignSelf: "stretch",
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: t.colors.border,
-        backgroundColor: t.colors.backgroudWhite,
-        padding: t.spacing.md,
-        gap: t.spacing.md,
-        shadowColor: t.colors.shadow,
-        shadowOpacity: 0.08,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 12,
-        elevation: 2,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: t.spacing.sm,
-        }}
-      >
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: t.colors.primaryLight,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name="sparkles" size={22} color={t.colors.primary} />
-        </View>
-
-        <View style={{ flex: 1, gap: t.spacing.xs }}>
-          <Text variant="subtitle">Solicitud lista</Text>
-          <Text variant="small" color="textMedium">
-            Revisa el producto, la categoría y los detalles antes de publicar.
-          </Text>
-        </View>
-      </View>
-
-      <View style={{ gap: t.spacing.sm }}>
-        <Text variant="small" color="stateAnulated">
-          Resumen de la solicitud
-        </Text>
-        <Text variant="subtitle">{summary?.titulo ?? "Solicitud"}</Text>
-        {description ? (
-          <Text variant="body">{description}</Text>
-        ) : null}
-      </View>
-
-      {details.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-          {details.map((item) => (
-            <SummaryDetailPill
-              key={item.label}
-              label={item.label}
-              value={item.value}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      <View style={{ gap: t.spacing.sm }}>
-        <Button
-          title="Publicar solicitud"
-          icon="check"
-          variant="dark"
-          disabled={disabled}
-          loading={loading}
-          onPress={onPublish}
-        />
-        <Button
-          title="Seguir ajustando"
-          icon="sliders-horizontal"
-          variant="white"
-          disabled={continueDisabled}
-          onPress={onContinue}
-        />
-      </View>
-    </View>
+    <AssistantReviewCard
+      completionTitle="Solicitud lista"
+      completionDescription="Revisa los detalles antes de publicar."
+      title={summary?.titulo ?? "Solicitud"}
+      description={description}
+      rows={details.map((item) => ({
+        label: item.label,
+        value: String(item.value),
+      }))}
+      primaryLabel="Publicar solicitud"
+      primaryDisabled={disabled}
+      primaryLoading={loading}
+      onPrimaryPress={onPublish}
+      secondaryLabel="Seguir ajustando"
+      secondaryDisabled={continueDisabled}
+      onSecondaryPress={onContinue}
+    />
   );
 }
 
@@ -391,14 +220,22 @@ export default function ChatScreen() {
     uiState,
     canPublish,
     isSendingMessage,
+    isGeneratingSummary,
     isExecutingControl,
     continueClarifying,
     summary,
     summaryText,
     publishDraft,
     status,
+    stopAssistant,
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl;
+
+  useEffect(() => {
+    if (uiState === "review") {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [uiState]);
 
   return (
     <ScrollView
@@ -406,7 +243,11 @@ export default function ChatScreen() {
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       onContentSizeChange={() => {
-        scrollRef.current?.scrollToEnd({ animated: true });
+        if (uiState === "review") {
+          scrollRef.current?.scrollTo({ y: 0, animated: false });
+        } else {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }
       }}
       contentContainerStyle={{
         paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT + t.spacing.lg,
@@ -418,15 +259,28 @@ export default function ChatScreen() {
     >
       {messages.length === 0 && !isAssistantBusy ? <EmptyRequestAssistantState /> : null}
 
-      {messages.map((message) => (
-        message.sender === "user" ? (
-          <UserMessageBlock key={message.id} message={message} />
-        ) : (
-          <AssistantTextBlock key={message.id} text={message.text} />
+      {uiState === "review" ? (
+        <Text variant="body">
+          Listo. Revisa que todo esté correcto antes de publicar.
+        </Text>
+      ) : (
+        messages.map((message) =>
+          message.sender === "user" ? (
+            <UserMessageBlock key={message.id} message={message} />
+          ) : (
+            <AssistantTextBlock key={message.id} text={message.text} />
+          )
         )
-      ))}
+      )}
 
-      {isAssistantBusy ? <AssistantThinkingBlock /> : null}
+      {isSendingMessage ? (
+        <AssistantProcessingProgress
+          title="Preparando tu solicitud"
+          steps={REQUEST_PROCESSING_STEPS}
+          variant={isGeneratingSummary ? "steps" : "thinking"}
+          onStop={stopAssistant}
+        />
+      ) : null}
 
       {uiState === "review" ? (
         <>
