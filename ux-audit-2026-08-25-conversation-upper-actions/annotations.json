@@ -1,0 +1,42 @@
+[
+  {
+    "image": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/03-buyer-delayed-cancel-action.png",
+    "out": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/03-buyer-delayed-cancel-action-annotated.png",
+    "marks": [
+      { "id": "P-01", "sev": 0, "x": 0.065, "y": 0.105, "w": 0.87, "h": 0.115 },
+      { "id": "F-01", "sev": 3, "x": 0.255, "y": 0.232, "w": 0.49, "h": 0.064 },
+      { "id": "F-02", "sev": 2, "x": 0.095, "y": 0.653, "w": 0.81, "h": 0.19 },
+      { "id": "F-03", "sev": 3, "x": 0.115, "y": 0.151, "w": 0.085, "h": 0.05 },
+      { "id": "F-03", "sev": 3, "x": 0.795, "y": 0.151, "w": 0.085, "h": 0.05 }
+    ]
+  },
+  {
+    "image": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/04-cancel-confirmation.png",
+    "out": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/04-cancel-confirmation-annotated.png",
+    "marks": [
+      { "id": "P-02", "sev": 0, "x": 0.07, "y": 0.71, "w": 0.86, "h": 0.235 }
+    ]
+  },
+  {
+    "image": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/05-buyer-completed-rating-bottom.png",
+    "out": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/05-buyer-completed-rating-bottom-annotated.png",
+    "marks": [
+      { "id": "P-03", "sev": 0, "x": 0.065, "y": 0.105, "w": 0.87, "h": 0.115 },
+      { "id": "P-03", "sev": 0, "x": 0.095, "y": 0.905, "w": 0.81, "h": 0.045 }
+    ]
+  },
+  {
+    "image": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/06-seller-rejected.png",
+    "out": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/06-seller-rejected-annotated.png",
+    "marks": [
+      { "id": "P-04", "sev": 0, "x": 0.065, "y": 0.105, "w": 0.87, "h": 0.115 }
+    ]
+  },
+  {
+    "image": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/07-seller-completed-rating-bottom.png",
+    "out": "/Users/josedanielcr/Development/Luppit/ux-audit-2026-08-25-conversation-upper-actions/assets/07-seller-completed-rating-bottom-annotated.png",
+    "marks": [
+      { "id": "P-04", "sev": 0, "x": 0.095, "y": 0.905, "w": 0.81, "h": 0.045 }
+    ]
+  }
+]

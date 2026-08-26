@@ -202,7 +202,7 @@ export default function DetailTopBar({
         },
         {
           id: "confirm-cancel-request",
-          label: "Cancelar solicitud",
+          label: "Cancelar",
           icon: "trash-2",
           backgroundColorKey: "backgroudWhite",
           textColorKey: "error",

@@ -80,10 +80,16 @@ export default function DetailLayout() {
     hideMenuParam === "true" || pathname !== "/purchase-request" || !purchaseRequestId;
   const marketplaceSectionOwnsTopBar =
     pathname === "/marketplace-hub-section" && roleParam === "seller";
+  const completedRequestsOwnsTopBar = pathname === "/completed-requests";
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.background }}>
-      <View style={{ flex: 1, paddingHorizontal: t.spacing.md }}>
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: completedRequestsOwnsTopBar ? 0 : t.spacing.md,
+        }}
+      >
         <Stack
           screenOptions={{
             headerShown: false,
@@ -91,7 +97,7 @@ export default function DetailLayout() {
           }}
         />
       </View>
-      {marketplaceSectionOwnsTopBar ? null : (
+      {marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar ? null : (
         <DetailTopBar
           title={title}
           hideMenu={hideMenu}

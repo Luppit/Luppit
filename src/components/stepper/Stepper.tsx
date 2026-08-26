@@ -1,4 +1,4 @@
-import { colors, useTheme } from "@/src/themes";
+import { useTheme } from "@/src/themes";
 import React, {
   useCallback,
   forwardRef,
@@ -139,10 +139,14 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
                   ></ProgressCircle>
                   <View style={s.header.contentInfo}>
                     <Text variant="subtitle">{current.title}</Text>
-                    <Text variant="small" color="stateAnulated">
+                    <Text
+                      variant="small"
+                      color="textMedium"
+                      style={s.header.description}
+                    >
                       <Text
                         variant="small"
-                        color="stateAnulated"
+                        color="textMedium"
                       >
                         Siguiente paso:{" "}
                       </Text>
@@ -197,7 +201,7 @@ function ProgressCircle({
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke={colors.primaryLight}
+          stroke={t.colors.border}
           strokeWidth={stroke}
           fill="none"
         />
@@ -205,7 +209,7 @@ function ProgressCircle({
           cx={cx}
           cy={cy}
           r={r}
-          stroke={colors.primary}
+          stroke={t.colors.primary}
           strokeWidth={stroke}
           fill="none"
           strokeDasharray={`${dash}, ${circumference}`}

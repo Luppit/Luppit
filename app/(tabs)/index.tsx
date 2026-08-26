@@ -9,7 +9,6 @@ import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext"
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
-import { signOut } from "@/src/lib/supabase";
 import {
   BuyerHomeFilters,
   getBuyerHomeFilters,
@@ -44,6 +43,7 @@ import {
 } from "@/src/services/segment.service";
 import { type Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
+import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
@@ -791,7 +791,7 @@ function AccountSetupRequiredState({
         <Pressable
           accessibilityRole="button"
           hitSlop={8}
-          onPress={() => void signOut()}
+          onPress={openSignOutConfirmation}
           style={s.stateSignOut}
         >
           <Text variant="body" color="error">

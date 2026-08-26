@@ -11,7 +11,6 @@ import ProfilePicture, {
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
-import { signOut } from "@/src/lib/supabase";
 import {
   BuyerProfileOverview,
   SellerProfileOverview,
@@ -19,6 +18,7 @@ import {
   getCurrentSellerProfileOverview,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
+import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -195,7 +195,7 @@ function BuyerProfileContent() {
               destructive
               showChevron={false}
               showSeparator={false}
-              onPress={signOut}
+              onPress={openSignOutConfirmation}
             />
           </GroupedList>
         </>
@@ -341,7 +341,7 @@ function SellerProfileContent() {
               destructive
               showChevron={false}
               showSeparator={false}
-              onPress={signOut}
+              onPress={openSignOutConfirmation}
             />
           </GroupedList>
         </>

@@ -30,6 +30,7 @@ function SignupEntryStep({
   values,
   setValues,
   legalAccepted,
+  onToggleLegal,
 }: {
   next: () => void;
   userType: UserType;
@@ -37,6 +38,7 @@ function SignupEntryStep({
   values: SignupFormValues;
   setValues: (values: SignupFormValues) => void;
   legalAccepted: boolean;
+  onToggleLegal: () => void;
 }) {
   const sendCode = async () => {
     try {
@@ -60,6 +62,12 @@ function SignupEntryStep({
           setValues={setValues}
           onCreate={sendCode}
           additionalMissingFields={legalMissingFields}
+          supportingContent={(
+            <LegalAcceptance
+              accepted={legalAccepted}
+              onToggle={onToggleLegal}
+            />
+          )}
         />
       ),
     },
@@ -71,6 +79,12 @@ function SignupEntryStep({
           setValues={setValues}
           onCreate={sendCode}
           additionalMissingFields={legalMissingFields}
+          supportingContent={(
+            <LegalAcceptance
+              accepted={legalAccepted}
+              onToggle={onToggleLegal}
+            />
+          )}
         />
       ),
     },
@@ -83,6 +97,71 @@ function SignupEntryStep({
         currentIndex={userType === "seller" ? 1 : 0}
         onTabChange={(index) => setUserType(index === 1 ? "seller" : "buyer")}
       />
+    </View>
+  );
+}
+
+function LegalAcceptance({
+  accepted,
+  onToggle,
+}: {
+  accepted: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <View style={styles.legalAcceptance}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: accepted }}
+        hitSlop={8}
+        style={styles.acceptanceRow}
+        onPress={onToggle}
+      >
+        <View
+          style={[
+            styles.checkbox,
+            accepted ? styles.checkboxSelected : null,
+          ]}
+        >
+          {accepted ? (
+            <Icon name="check" size={15} color={colors.backgroudWhite} />
+          ) : null}
+        </View>
+        <Text variant="small" style={styles.acceptanceLabel}>
+          He leído y acepto los documentos legales.
+        </Text>
+      </Pressable>
+      <View style={styles.legalLinks}>
+        <Link
+          href={{
+            pathname: "/(detail)/legal-document",
+            params: {
+              code: LEGAL_DOCUMENT_CODES.termsConditions,
+              title: "Términos y condiciones",
+              hideMenu: "true",
+            },
+          }}
+        >
+          <Text variant="small" style={styles.legalLink}>
+            Términos y condiciones
+          </Text>
+        </Link>
+        <Text variant="small">y</Text>
+        <Link
+          href={{
+            pathname: "/(detail)/legal-document",
+            params: {
+              code: LEGAL_DOCUMENT_CODES.privacyPolicy,
+              title: "Política de privacidad",
+              hideMenu: "true",
+            },
+          }}
+        >
+          <Text variant="small" style={styles.legalLink}>
+            Política de privacidad
+          </Text>
+        </Link>
+      </View>
     </View>
   );
 }
@@ -169,6 +248,7 @@ export default function Signup() {
             values={values}
             setValues={setValues}
             legalAccepted={legalAccepted}
+            onToggleLegal={() => setLegalAccepted((value) => !value)}
           />
         ),
       },
@@ -199,59 +279,6 @@ export default function Signup() {
         ref={stepperRef}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
-      <View style={styles.footer}>
-        <Pressable
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: legalAccepted }}
-          style={styles.acceptanceRow}
-          onPress={() => setLegalAccepted((value) => !value)}
-        >
-          <View
-            style={[
-              styles.checkbox,
-              legalAccepted ? styles.checkboxSelected : null,
-            ]}
-          >
-            {legalAccepted ? (
-              <Icon name="check" size={15} color={colors.backgroudWhite} />
-            ) : null}
-          </View>
-          <Text variant="small" style={styles.acceptanceLabel}>
-            He leído y acepto los documentos legales.
-          </Text>
-        </Pressable>
-        <View style={styles.legalLinks}>
-          <Link
-            href={{
-              pathname: "/(detail)/legal-document",
-              params: {
-                code: LEGAL_DOCUMENT_CODES.termsConditions,
-                title: "Términos y condiciones",
-                hideMenu: "true",
-              },
-            }}
-          >
-            <Text variant="small" style={styles.legalLink}>
-              Términos y condiciones
-            </Text>
-          </Link>
-          <Text variant="small">y</Text>
-          <Link
-            href={{
-              pathname: "/(detail)/legal-document",
-              params: {
-                code: LEGAL_DOCUMENT_CODES.privacyPolicy,
-                title: "Política de privacidad",
-                hideMenu: "true",
-              },
-            }}
-          >
-            <Text variant="small" style={styles.legalLink}>
-              Política de privacidad
-            </Text>
-          </Link>
-        </View>
-      </View>
     </View>
   );
 }
@@ -261,14 +288,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.md,
-    alignItems: "center",
-    gap: spacing.xs,
+  legalAcceptance: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xl,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.md,
   },
   acceptanceRow: {
     minHeight: 32,
@@ -277,17 +301,17 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   checkbox: {
-    width: 22,
-    height: 22,
+    width: 24,
+    height: 24,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.textDark,
     borderRadius: borders.sm,
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
+    borderColor: colors.textDark,
+    backgroundColor: colors.textDark,
   },
   acceptanceLabel: {
     color: colors.textDark,
@@ -295,7 +319,7 @@ const styles = StyleSheet.create({
   legalLinks: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     gap: spacing.xs,
   },
   legalLink: {

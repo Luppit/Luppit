@@ -87,7 +87,6 @@ export default function MarketplaceCardFrame({
     <GlassSurface
       variant="surface"
       blur={false}
-      highlight
       style={s.glassSurface}
       clipStyle={s.glassClip}
       contentStyle={[s.cardContent, s.glassContent]}

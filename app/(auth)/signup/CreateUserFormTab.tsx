@@ -1,7 +1,7 @@
 import Button from "@/src/components/button/Button";
 import { InputPhone } from "@/src/components/inputPhone/InputPhone";
 import { showMissingFields } from "@/src/utils/useToast";
-import React, { useState } from "react";
+import React, { useState, type ReactNode } from "react";
 import { View } from "react-native";
 
 export type CreateUserFormTabProps = {
@@ -9,6 +9,7 @@ export type CreateUserFormTabProps = {
   setValues: any;
   onCreate: () => Promise<void>;
   additionalMissingFields?: string[];
+  supportingContent?: ReactNode;
 }
 
 const PHONE_NUMBER_LENGTH_ERROR = "El teléfono celular debe tener 8 dígitos.";
@@ -18,6 +19,7 @@ export default function CreateUserFormTab({
   setValues,
   onCreate,
   additionalMissingFields = [],
+  supportingContent,
 }: CreateUserFormTabProps) {
 
 const [errors, setErrors] = useState({
@@ -49,6 +51,7 @@ const [errors, setErrors] = useState({
     <View>
       <InputPhone
         label="Teléfono celular"
+        labelColor="textMedium"
         id="phoneNumberBuyer"
         value={values.phoneNumber}
         onChangeText={(text) => {
@@ -60,6 +63,7 @@ const [errors, setErrors] = useState({
         hasError={!!errors.phoneNumber}
         error={errors.phoneNumber}
       />
+      {supportingContent}
       <Button
         variant="dark"
         onPress={() => createUser()}

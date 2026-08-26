@@ -1,12 +1,14 @@
 import { Icon } from "@/src/components/Icon";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
-import RoleGate from "@/src/components/role/RoleGate";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
 import { getConversationByPurchaseOfferId } from "@/src/services/conversation.service";
 import { openPopup } from "@/src/services/popup.service";
+import { Roles } from "@/src/services/role.service";
 import {
   getCurrentSellerPurchaseOffers,
   SellerPurchaseOfferCardData,
@@ -30,9 +32,11 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PAGE_SIZE = 20;
+const COMPLETED_TOP_BAR_TITLE_HEIGHT = 72;
+const COMPLETED_TOP_BAR_ACCESSORY_HEIGHT = 128;
 const SELLER_SORT_OPTIONS = [
   { id: "newly_listed", label: "Más recientes" },
   { id: "offer_created_oldest", label: "Más antiguas" },
@@ -126,12 +130,64 @@ async function openSellerConversation(offer: SellerPurchaseOfferCardData) {
 }
 
 export default function CompletedRequestsScreen() {
-  return (
-    <RoleGate
-      loading={<LoadingState label="Cargando historial..." />}
-      buyer={<BuyerCompletedRequests />}
-      seller={<SellerCompletedRequests />}
-    />
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const s = React.useMemo(() => createStyles(t), [t]);
+  const { state, activeProfile, revision } = useActiveProfile();
+
+  if (state === "loading") {
+    return (
+      <View style={s.screen}>
+        <View
+          style={[
+            s.stateContent,
+            {
+              paddingTop:
+                insets.top +
+                t.spacing.md +
+                COMPLETED_TOP_BAR_TITLE_HEIGHT +
+                t.spacing.md,
+            },
+          ]}
+        >
+          <LoadingState label="Cargando historial..." />
+        </View>
+        <CompletedRequestsTopBar title="Solicitudes finalizadas" />
+      </View>
+    );
+  }
+
+  if (state !== "ready" || !activeProfile?.role) {
+    return (
+      <View style={s.screen}>
+        <View
+          style={[
+            s.stateContent,
+            {
+              paddingTop:
+                insets.top +
+                t.spacing.md +
+                COMPLETED_TOP_BAR_TITLE_HEIGHT +
+                t.spacing.md,
+            },
+          ]}
+        >
+          <StandaloneListEmptyState
+            icon="alert-circle"
+            title="No pudimos cargar el historial"
+            description="No encontramos un perfil activo válido. Vuelve a intentarlo desde Perfil."
+          />
+        </View>
+        <CompletedRequestsTopBar title="Solicitudes finalizadas" />
+      </View>
+    );
+  }
+
+  const screenKey = `${activeProfile.profile.id}:${revision}`;
+  return activeProfile.role === Roles.SELLER ? (
+    <SellerCompletedRequests key={screenKey} />
+  ) : (
+    <BuyerCompletedRequests key={screenKey} />
   );
 }
 
@@ -181,43 +237,54 @@ function BuyerCompletedRequests() {
         endDate: filters.endDate,
         selectedChipIds: [],
       };
-      const pageResult = await getCurrentBuyerFinalizedPurchaseRequests(
-        buyerFilters,
-        sortCode,
-        nextPage,
-        PAGE_SIZE
-      );
-
-      if (generation !== generationRef.current) return;
-
-      if (pageResult.ok) {
-        setSortConfig(pageResult.data.sort);
-        setItems((current) =>
-          replace
-            ? pageResult.data.items
-            : Array.from(
-                new Map(
-                  [...current, ...pageResult.data.items].map((item) => [
-                    item.purchase_request_id,
-                    item,
-                  ])
-                ).values()
-              )
+      try {
+        const pageResult = await getCurrentBuyerFinalizedPurchaseRequests(
+          buyerFilters,
+          sortCode,
+          nextPage,
+          PAGE_SIZE
         );
-        setPage(pageResult.data.page);
-        setHasMore(pageResult.data.has_more);
-        setTotal(pageResult.data.total);
-      } else {
+
+        if (generation !== generationRef.current) return;
+
+        if (pageResult.ok) {
+          setSortConfig(pageResult.data.sort);
+          setItems((current) =>
+            replace
+              ? pageResult.data.items
+              : Array.from(
+                  new Map(
+                    [...current, ...pageResult.data.items].map((item) => [
+                      item.purchase_request_id,
+                      item,
+                    ])
+                  ).values()
+                )
+          );
+          setPage(pageResult.data.page);
+          setHasMore(pageResult.data.has_more);
+          setTotal(pageResult.data.total);
+        } else {
+          if (replace) {
+            setItems([]);
+            setTotal(0);
+          }
+          setError(pageResult.error.message);
+        }
+      } catch {
+        if (generation !== generationRef.current) return;
         if (replace) {
           setItems([]);
           setTotal(0);
         }
-        setError(pageResult.error.message);
+        setError("Ocurrió un error inesperado al cargar el historial.");
+      } finally {
+        if (generation === generationRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+          setIsLoadingMore(false);
+        }
       }
-
-      setIsLoading(false);
-      setIsRefreshing(false);
-      setIsLoadingMore(false);
     },
     [filters, sortCode]
   );
@@ -329,10 +396,15 @@ function SellerCompletedRequests() {
   const [error, setError] = React.useState<string | null>(null);
   const generationRef = React.useRef(0);
   const offersRef = React.useRef<SellerPurchaseOfferCardData[]>([]);
+  const filterOptionsRef = React.useRef<SellerPurchaseOfferCardData[]>([]);
 
   React.useEffect(() => {
     offersRef.current = offers;
   }, [offers]);
+
+  React.useEffect(() => {
+    filterOptionsRef.current = filterOptions;
+  }, [filterOptions]);
 
   const load = React.useCallback(async () => {
     const generation = generationRef.current + 1;
@@ -349,22 +421,32 @@ function SellerCompletedRequests() {
       selectedCurrencyIds: filters.selectedCurrencyIds,
       selectedConversationStatusCodes: [],
     };
-    const [result, optionResult] = await Promise.all([
-      getCurrentSellerPurchaseOffers(sellerFilters, sortCode, "history"),
-      getCurrentSellerPurchaseOffers({}, DEFAULT_SELLER_SORT, "history"),
-    ]);
+    try {
+      const result = await getCurrentSellerPurchaseOffers(
+        sellerFilters,
+        sortCode,
+        "history"
+      );
 
-    if (generation !== generationRef.current) return;
+      if (generation !== generationRef.current) return;
 
-    if (optionResult.ok) setFilterOptions(optionResult.data);
-    if (result.ok) {
-      setOffers(result.data);
-    } else {
+      if (result.ok) {
+        setOffers(result.data);
+        if (filterOptionsRef.current.length === 0) setFilterOptions(result.data);
+      } else {
+        setOffers([]);
+        setError(result.error.message);
+      }
+    } catch {
+      if (generation !== generationRef.current) return;
       setOffers([]);
-      setError(result.error.message);
+      setError("Ocurrió un error inesperado al cargar el historial.");
+    } finally {
+      if (generation === generationRef.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
-    setIsLoading(false);
-    setIsRefreshing(false);
   }, [filters, sortCode]);
 
   useFocusEffect(
@@ -535,55 +617,62 @@ function CompletedListLayout<T>({
   styles: s,
 }: CompletedListLayoutProps<T>) {
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const hasCriteria = activeFilterCount > 0 || hasCustomSort;
+  const toolbar = (
+    <View style={s.toolbar}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          activeFilterCount > 0
+            ? `Buscar y filtrar. ${activeFilterCount} filtros activos`
+            : "Buscar y filtrar"
+        }
+        onPress={onOpenFilters}
+        style={s.searchTrigger}
+      >
+        <Icon name="search" size={20} color={t.colors.stateAnulated} />
+        <Text variant="body" color="stateAnulated" style={s.searchText}>
+          {activeFilterCount > 0 ? "Filtros aplicados" : "Buscar"}
+        </Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Ordenar solicitudes finalizadas"
+        onPress={onOpenSort}
+        style={s.sortButton}
+      >
+        <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+      </Pressable>
+    </View>
+  );
 
   return (
-    <FlatList
-      data={data}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      showsVerticalScrollIndicator={false}
-      refreshing={isRefreshing}
-      onRefresh={onRefresh}
-      onEndReached={() => {
-        if (hasMore && !isLoadingMore) onLoadMore();
-      }}
-      onEndReachedThreshold={0.4}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-      contentContainerStyle={s.listContent}
-      ListHeaderComponent={
-        <View style={s.headerContent}>
-          <Text variant="body" color="textMedium">
-            Aquí encuentras únicamente solicitudes finalizadas.
-          </Text>
-          <View style={s.toolbar}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                activeFilterCount > 0
-                  ? `Buscar y filtrar. ${activeFilterCount} filtros activos`
-                  : "Buscar y filtrar"
-              }
-              onPress={onOpenFilters}
-              style={s.searchTrigger}
-            >
-              <Icon name="sliders-horizontal" size={20} color={t.colors.stateAnulated} />
-              <Text variant="body" color="stateAnulated" style={s.searchText}>
-                {activeFilterCount > 0
-                  ? `Filtros activos (${activeFilterCount})`
-                  : "Buscar y filtrar"}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Ordenar solicitudes finalizadas"
-              onPress={onOpenSort}
-              style={s.sortButton}
-            >
-              <Icon name="arrow-up-down" size={23} color={t.colors.textDark} />
-            </Pressable>
-          </View>
+    <View style={s.screen}>
+      <FlatList
+        data={data}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        refreshing={isRefreshing}
+        onRefresh={onRefresh}
+        onEndReached={() => {
+          if (hasMore && !isLoadingMore) onLoadMore();
+        }}
+        onEndReachedThreshold={0.4}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        contentContainerStyle={[
+          s.listContent,
+          {
+            paddingTop:
+              insets.top +
+              t.spacing.md +
+              COMPLETED_TOP_BAR_ACCESSORY_HEIGHT +
+              t.spacing.md,
+          },
+        ]}
+        ListHeaderComponent={
           <View style={s.summaryRow}>
             <Text variant="small" color="textMedium">
               {resultCount} {resultCount === 1 ? "resultado" : "resultados"}
@@ -596,63 +685,128 @@ function CompletedListLayout<T>({
               </Pressable>
             ) : null}
           </View>
-        </View>
-      }
-      ListEmptyComponent={
-        <View style={s.emptyState}>
-          {isLoading ? (
-            <LoadingState label="Cargando historial..." />
-          ) : (
-            <StandaloneListEmptyState
-              icon={error ? "alert-circle" : hasCriteria ? "search" : "check"}
-              title={
-                error
-                  ? "No pudimos cargar el historial"
-                  : hasCriteria
-                    ? "No hay resultados"
-                    : "Aún no hay solicitudes finalizadas"
-              }
-              description={
-                error
-                  ? error
-                  : hasCriteria
-                    ? "Prueba cambiando la búsqueda o limpiando los filtros."
-                    : emptyDescription
-              }
-              actionLabel={error ? "Reintentar" : hasCriteria ? "Limpiar filtros" : null}
-              actionIcon={!error && hasCriteria ? "x" : undefined}
-              onAction={error ? onRetry : hasCriteria ? onClear : undefined}
-            />
-          )}
-        </View>
-      }
-      ListFooterComponent={
-        isLoadingMore ? (
-          <View style={s.footer}>
-            <ActivityIndicator color={t.colors.primary} />
+        }
+        ListEmptyComponent={
+          <View style={s.emptyState}>
+            {isLoading ? (
+              <LoadingState label="Cargando historial..." />
+            ) : (
+              <StandaloneListEmptyState
+                icon={error ? "alert-circle" : hasCriteria ? "search" : "check"}
+                title={
+                  error
+                    ? "No pudimos cargar el historial"
+                    : hasCriteria
+                      ? "No hay resultados"
+                      : "Aún no hay solicitudes finalizadas"
+                }
+                description={
+                  error
+                    ? error
+                    : hasCriteria
+                      ? "Prueba cambiando la búsqueda o limpiando los filtros."
+                      : emptyDescription
+                }
+                actionLabel={
+                  error ? "Reintentar" : hasCriteria ? "Limpiar filtros" : null
+                }
+                actionIcon={!error && hasCriteria ? "x" : undefined}
+                onAction={error ? onRetry : hasCriteria ? onClear : undefined}
+              />
+            )}
           </View>
-        ) : null
-      }
-    />
+        }
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={s.footer}>
+              <ActivityIndicator color={t.colors.primary} />
+            </View>
+          ) : null
+        }
+      />
+      <CompletedRequestsTopBar
+        title="Solicitudes finalizadas"
+        accessory={toolbar}
+      />
+    </View>
+  );
+}
+
+function CompletedRequestsTopBar({
+  title,
+  accessory,
+}: {
+  title: string;
+  accessory?: React.ReactNode;
+}) {
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const s = React.useMemo(
+    () => createCompletedTopBarStyles(t, insets.top, Boolean(accessory)),
+    [accessory, insets.top, t]
+  );
+
+  const goBack = React.useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/");
+  }, []);
+
+  return (
+    <GlassSurface
+      variant="chrome"
+      blur="chrome"
+      style={s.topBar}
+      clipStyle={s.topBarClip}
+      contentStyle={s.topBarContent}
+    >
+      <View style={s.topBarTitleRow}>
+        <Pressable
+          onPress={goBack}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          hitSlop={12}
+          style={s.topBarSide}
+        >
+          <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+        </Pressable>
+
+        <Text variant="subtitle" align="center" maxLines={1} style={s.topBarTitle}>
+          {title}
+        </Text>
+
+        <View style={s.topBarSide} />
+      </View>
+
+      {accessory ? <View style={s.topBarAccessory}>{accessory}</View> : null}
+    </GlassSurface>
   );
 }
 
 function createStyles(t: Theme) {
   return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: t.colors.background,
+    },
+    stateContent: {
+      flex: 1,
+      justifyContent: "center",
+      paddingHorizontal: t.spacing.md,
+    },
     listContent: {
       flexGrow: 1,
       gap: t.spacing.md,
-      paddingTop: DETAIL_TOP_BAR_VISIBLE_HEIGHT + t.spacing.lg,
+      paddingHorizontal: t.spacing.md,
       paddingBottom: t.spacing.xl,
-    },
-    headerContent: {
-      gap: t.spacing.md,
-      paddingBottom: t.spacing.xs,
     },
     toolbar: {
       flexDirection: "row",
       alignItems: "center",
-      gap: t.spacing.sm,
+      gap: t.spacing.md,
     },
     searchTrigger: {
       flex: 1,
@@ -691,6 +845,66 @@ function createStyles(t: Theme) {
       minHeight: 64,
       alignItems: "center",
       justifyContent: "center",
+    },
+  });
+}
+
+function createCompletedTopBarStyles(
+  t: Theme,
+  topInset = 0,
+  hasTopBarAccessory = false
+) {
+  const topOffset = topInset + t.spacing.md;
+  const topBarHeight =
+    topOffset +
+    (hasTopBarAccessory
+      ? COMPLETED_TOP_BAR_ACCESSORY_HEIGHT
+      : COMPLETED_TOP_BAR_TITLE_HEIGHT);
+
+  return StyleSheet.create({
+    topBar: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      elevation: Platform.OS === "android" ? 4 : 10,
+      height: topBarHeight,
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+    },
+    topBarClip: {
+      borderTopLeftRadius: 0,
+      borderTopRightRadius: 0,
+      borderBottomLeftRadius: t.glass.radius.chrome,
+      borderBottomRightRadius: t.glass.radius.chrome,
+      overflow: "hidden",
+    },
+    topBarContent: {
+      flex: 1,
+      paddingTop: topOffset,
+      paddingHorizontal: t.spacing.xl,
+      paddingBottom: t.spacing.md,
+    },
+    topBarTitleRow: {
+      height: 56,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    topBarSide: {
+      width: 40,
+      alignItems: "flex-start",
+      justifyContent: "center",
+    },
+    topBarTitle: {
+      flex: 1,
+    },
+    topBarAccessory: {
+      height: 48,
+      marginTop: t.spacing.sm,
     },
   });
 }

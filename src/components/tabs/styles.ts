@@ -1,13 +1,17 @@
 import { Theme } from "@/src/themes";
-import { ViewStyle } from "react-native";
+import { TextStyle, ViewStyle } from "react-native";
 
 export type TabsStyles = {
     base : {
         container: ViewStyle;
+        content: ViewStyle;
     },
     header: {
         tabsContainer: ViewStyle;
         tabsContainerActive: ViewStyle;
+        tabsContainerPressed: ViewStyle;
+        tabLabelActive: TextStyle;
+        tabLabelInactive: TextStyle;
     },
     content : {
         container: ViewStyle;
@@ -18,28 +22,41 @@ export function createTabsStyles(t: Theme): TabsStyles {
     return {
         base: {
             container: {
-                flexDirection: "row",
-                backgroundColor: t.colors.border,
-                padding: t.spacing.xs,
-                borderRadius: t.borders.lg,
                 height: 44,
+            },
+            content: {
+                flex: 1,
+                flexDirection: "row",
+                padding: t.spacing.xs,
                 gap: t.spacing.xs,
             }
         },
         header: {
             tabsContainer: {
+                flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "center",
-                borderRadius: t.borders.lg,
-                flex : 1
+                borderRadius: t.glass.radius.control - t.spacing.xs,
+                flex: 1,
             },
             tabsContainerActive: {
-                backgroundColor: t.colors.background,
+                ...t.glass.segmentActive,
+            },
+            tabsContainerPressed: {
+                opacity: 0.8,
+            },
+            tabLabelActive: {
+                color: t.colors.textDark,
+                fontFamily: t.typography.subtitle.fontFamily,
+            },
+            tabLabelInactive: {
+                color: t.colors.textMedium,
+                opacity: 0.64,
             }
         },
         content: {
             container: {
-                marginTop: t.spacing.lg
+                marginTop: t.spacing.xl
             }
         }
     };

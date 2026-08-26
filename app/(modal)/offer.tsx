@@ -1,4 +1,8 @@
 import Button from "@/src/components/button/Button";
+import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
+import AssistantReviewCard, {
+  type AssistantReviewNotice,
+} from "@/src/components/assistant/AssistantReviewCard";
 import ExpandableInfoCard from "@/src/components/expandableInfoCard/ExpandableInfoCard";
 import FilePicker, {
   SelectedFile,
@@ -47,7 +51,6 @@ import {
 } from "@react-navigation/native";
 import {
   AccessibilityInfo,
-  Animated,
   Image,
   Keyboard,
   Platform,
@@ -129,6 +132,12 @@ type PendingAssistantRetry = {
   successfulImageCount: number;
 };
 
+const OFFER_PROCESSING_STEPS = [
+  "Revisando el producto",
+  "Organizando precio y entrega",
+  "Preparando el resumen",
+] as const;
+
 function normalizeCurrency(value: string | null | undefined) {
   return (value ?? "")
     .normalize("NFD")
@@ -155,83 +164,6 @@ function formatSummaryMoney(
 
 function createLocalId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
-}
-
-function AssistantThinkingBlock() {
-  const t = useTheme();
-  const dotOpacities = useRef([
-    new Animated.Value(0.35),
-    new Animated.Value(0.35),
-    new Animated.Value(0.35),
-  ]).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.stagger(
-        140,
-        dotOpacities.map((opacity) =>
-          Animated.sequence([
-            Animated.timing(opacity, {
-              toValue: 1,
-              duration: 360,
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacity, {
-              toValue: 0.35,
-              duration: 360,
-              useNativeDriver: true,
-            }),
-          ])
-        )
-      )
-    );
-
-    animation.start();
-    return () => animation.stop();
-  }, [dotOpacities]);
-
-  return (
-    <View
-      accessible
-      accessibilityRole="progressbar"
-      accessibilityLiveRegion="polite"
-      accessibilityLabel="Pensando"
-      style={{
-        maxWidth: "96%",
-        alignSelf: "flex-start",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: t.spacing.xs,
-        paddingVertical: t.spacing.xs,
-      }}
-    >
-      <Text variant="body" color="stateAnulated">
-        Pensando
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-        {dotOpacities.map((opacity, index) => (
-          <Animated.View
-            key={index}
-            style={{
-              width: 4,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: t.colors.stateAnulated,
-              opacity,
-              transform: [
-                {
-                  translateY: opacity.interpolate({
-                    inputRange: [0.35, 1],
-                    outputRange: [1, -2],
-                  }),
-                },
-              ],
-            }}
-          />
-        ))}
-      </View>
-    </View>
-  );
 }
 
 function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
@@ -328,44 +260,14 @@ function OfferAssistantEmptyState() {
   );
 }
 
-function SummaryDetailPill({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number | null | undefined;
-}) {
-  const t = useTheme();
-  const displayValue = String(value);
-
-  return (
-    <View
-      style={{
-        flexGrow: 1,
-        flexBasis: "47%",
-        borderRadius: 16,
-        backgroundColor: t.colors.background,
-        paddingHorizontal: t.spacing.sm,
-        paddingVertical: t.spacing.sm,
-        gap: 2,
-      }}
-    >
-      <Text variant="small" color="stateAnulated">
-        {label}
-      </Text>
-      <Text variant="body" maxLines={2}>
-        {displayValue}
-      </Text>
-    </View>
-  );
-}
-
 function hasSummaryValue(value: string | number | null | undefined) {
   return value !== null && value !== undefined && value !== "";
 }
 
 function OfferSummaryCard({
   summary,
+  purchaseRequestTitle,
+  offerPhotoCount,
   missingFields,
   hasOfferPhoto,
   disabled,
@@ -374,6 +276,8 @@ function OfferSummaryCard({
   onPublish,
 }: {
   summary: SellerOfferAssistantSummary | null;
+  purchaseRequestTitle: string | null | undefined;
+  offerPhotoCount: number;
   missingFields: string[];
   hasOfferPhoto: boolean;
   disabled: boolean;
@@ -381,7 +285,6 @@ function OfferSummaryCard({
   onContinue: () => void;
   onPublish: () => void;
 }) {
-  const t = useTheme();
   const formattedPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
   const formattedShippingPrice = formatSummaryMoney(
     summary?.precioEnvio,
@@ -396,200 +299,52 @@ function OfferSummaryCard({
     ? `${summary.envioMaximoDias} día(s)`
     : null;
   const details = [
+    { label: "Precio", value: formattedPrice },
     { label: "Entrega", value: deliveryText },
     { label: "Tiempo máximo de entrega", value: shippingTimingText },
     { label: "Costo de envío", value: formattedShippingPrice },
     { label: "Retiro", value: pickupText },
     { label: "Retiro disponible en", value: pickupTimingText },
-    { label: "Moneda", value: summary?.moneda },
+    {
+      label: "Fotos",
+      value:
+        offerPhotoCount > 0
+          ? `${offerPhotoCount} ${offerPhotoCount === 1 ? "foto adjunta" : "fotos adjuntas"}`
+          : null,
+    },
   ].filter((item) => hasSummaryValue(item.value));
+  const notices: AssistantReviewNotice[] = [];
+
+  if (missingFields.length > 0) {
+    notices.push({ text: `Falta completar: ${missingFields.join(", ")}` });
+  }
+
+  if (!hasOfferPhoto) {
+    notices.push({
+      text: "Adjunta al menos una foto real de la oferta antes de enviarla.",
+      tone: "error",
+    });
+  }
 
   return (
-    <View
-      style={{
-        alignSelf: "stretch",
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: t.colors.border,
-        backgroundColor: t.colors.backgroudWhite,
-        padding: t.spacing.md,
-        gap: t.spacing.md,
-      }}
-    >
-      <View
-        style={{
-          gap: t.spacing.sm,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: t.spacing.md,
-          }}
-        >
-          <Text variant="small" color="stateAnulated">
-            Resumen de la oferta
-          </Text>
-          <Text
-            variant="subtitle"
-            maxLines={1}
-            style={{ color: t.colors.primary, flexShrink: 0 }}
-          >
-            {formattedPrice ?? "Precio pendiente"}
-          </Text>
-        </View>
-        <Text variant="body">
-          {summary?.descripcion ?? "Sin descripción todavía"}
-        </Text>
-      </View>
-
-      {details.length > 0 ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-          {details.map((item) => (
-            <SummaryDetailPill
-              key={item.label}
-              label={item.label}
-              value={item.value}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      {missingFields.length > 0 ? (
-        <View
-          style={{
-            borderRadius: 16,
-            backgroundColor: t.colors.primaryLight,
-            padding: t.spacing.sm,
-            gap: t.spacing.xs,
-          }}
-        >
-          <Text variant="small" color="stateAnulated">
-            Falta
-          </Text>
-          <Text variant="body">{missingFields.join(", ")}</Text>
-        </View>
-      ) : null}
-
-      {!hasOfferPhoto ? (
-        <View
-          style={{
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: t.colors.error,
-            padding: t.spacing.sm,
-          }}
-        >
-          <Text variant="body" color="error">
-            Adjunta al menos una foto real de la oferta antes de enviarla.
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={{ gap: t.spacing.sm }}>
-        <Button
-          title="Enviar oferta"
-          icon="check"
-          variant="dark"
-          disabled={disabled || !hasOfferPhoto}
-          loading={loading}
-          onPress={onPublish}
-        />
-        <Button
-          title="Seguir ajustando"
-          icon="sliders-horizontal"
-          variant="white"
-          disabled={disabled}
-          onPress={onContinue}
-        />
-      </View>
-    </View>
-  );
-}
-
-function ReadyToReviewCard({
-  disabled,
-  onPress,
-}: {
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const t = useTheme();
-
-  return (
-    <View
-      style={{
-        alignSelf: "stretch",
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: t.colors.border,
-        backgroundColor: t.colors.backgroudWhite,
-        padding: t.spacing.md,
-        gap: t.spacing.md,
-        shadowColor: t.colors.shadow,
-        shadowOpacity: 0.08,
-        shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 12,
-        elevation: 2,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: t.spacing.sm,
-        }}
-      >
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: t.colors.primaryLight,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name="sparkles" size={22} color={t.colors.primary} />
-        </View>
-
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="small" color="textDark">
-            Oferta lista
-          </Text>
-          <Text variant="body">Revisa el resumen antes de enviarla</Text>
-          <Text variant="small" color="stateAnulated">
-            Confirma precio, entrega y fotos.
-          </Text>
-        </View>
-      </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [
-          {
-            height: 46,
-            borderRadius: t.borders.md,
-            backgroundColor: t.colors.textDark,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: t.spacing.xs,
-            opacity: disabled ? 0.6 : 1,
-          },
-          pressed && !disabled ? { opacity: 0.9, transform: [{ scale: 0.98 }] } : null,
-        ]}
-      >
-        <Text variant="small" style={{ color: t.colors.backgroudWhite }}>
-          Revisar resumen
-        </Text>
-        <Icon name="arrow-right" size={18} color={t.colors.backgroudWhite} />
-      </Pressable>
-    </View>
+    <AssistantReviewCard
+      completionTitle="Oferta lista"
+      completionDescription="Revisa precio, entrega y fotos antes de enviarla."
+      title={purchaseRequestTitle?.trim() || "Oferta"}
+      description={summary?.descripcion ?? "Sin descripción todavía"}
+      rows={details.map((item) => ({
+        label: item.label,
+        value: String(item.value),
+      }))}
+      notices={notices}
+      primaryLabel="Enviar oferta"
+      primaryDisabled={disabled || !hasOfferPhoto}
+      primaryLoading={loading}
+      onPrimaryPress={onPublish}
+      secondaryLabel="Seguir ajustando"
+      secondaryDisabled={disabled}
+      onSecondaryPress={onContinue}
+    />
   );
 }
 
@@ -613,13 +368,21 @@ function OfferAssistantScreen({
   const [successfulOfferPhotoCount, setSuccessfulOfferPhotoCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
-  const [isGeneratingResponse, setIsGeneratingResponse] = useState(false);
+  const [processingMode, setProcessingMode] = useState<
+    "thinking" | "summary" | null
+  >(null);
   const [pendingRetry, setPendingRetry] = useState<PendingAssistantRetry | null>(null);
   const [allowExit, setAllowExit] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
   const shownSuccessOfferIdRef = useRef<string | null>(null);
 
   const hasOfferPhoto = successfulOfferPhotoCount > 0;
+
+  useEffect(() => {
+    if (showSummary) {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }
+  }, [showSummary]);
 
   useEffect(() => {
     return () => {
@@ -636,7 +399,7 @@ function OfferAssistantScreen({
     activeRequestRef.current = null;
     activeRequest.abort();
     setIsBusy(false);
-    setIsGeneratingResponse(false);
+    setProcessingMode(null);
     AccessibilityInfo.announceForAccessibility("Respuesta detenida");
   }, []);
 
@@ -722,6 +485,8 @@ function OfferAssistantScreen({
           result.assistantMessage,
           isReadyResult && !isContinueAction ? "ready" : undefined
         );
+      } else {
+        setShowSummary(true);
       }
 
       if (result.status === "sent") {
@@ -771,7 +536,13 @@ function OfferAssistantScreen({
       const requestController = new AbortController();
       activeRequestRef.current = requestController;
       setIsBusy(true);
-      setIsGeneratingResponse(!input.uiAction);
+      setProcessingMode(
+        input.uiAction === "SHOW_SUMMARY"
+          ? "summary"
+          : input.uiAction
+            ? null
+            : "thinking"
+      );
       try {
         const result = await callSellerOfferAssistant({
           ...input,
@@ -788,7 +559,7 @@ function OfferAssistantScreen({
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
           setIsBusy(false);
-          setIsGeneratingResponse(false);
+          setProcessingMode(null);
         }
       }
     },
@@ -835,7 +606,6 @@ function OfferAssistantScreen({
       ]);
 
       if (shouldOpenSummary) {
-        setShowSummary(true);
         await executeAssistantRequest({
           prompt: "",
           offerDraftId,
@@ -864,21 +634,6 @@ function OfferAssistantScreen({
       offerDraftId,
     ]
   );
-
-  const handleShowSummary = useCallback(async () => {
-    if (!offerDraftId) {
-      showWarning("No hay resumen todavía", "Primero cuéntale al asistente los detalles de la oferta.");
-      return;
-    }
-
-    setShowSummary(true);
-    await executeAssistantRequest({
-      prompt: "",
-      offerDraftId,
-      uiAction: "SHOW_SUMMARY",
-      identity: createSellerOfferAssistantRequestIdentity("seller-offer-summary"),
-    });
-  }, [executeAssistantRequest, offerDraftId]);
 
   const handleContinue = useCallback(async () => {
     clearReviewState();
@@ -1000,7 +755,11 @@ function OfferAssistantScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
-          scrollRef.current?.scrollToEnd({ animated: true });
+          if (showSummary) {
+            scrollRef.current?.scrollTo({ y: 0, animated: false });
+          } else {
+            scrollRef.current?.scrollToEnd({ animated: true });
+          }
         }}
         contentContainerStyle={{
           paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
@@ -1011,11 +770,24 @@ function OfferAssistantScreen({
       >
         {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
 
-        {messages.map((message) => (
-          <AssistantMessageBubble key={message.id} message={message} />
-        ))}
+        {showSummary ? (
+          <Text variant="body">
+            Listo. Revisa que todo esté correcto antes de enviar tu oferta.
+          </Text>
+        ) : (
+          messages.map((message) => (
+            <AssistantMessageBubble key={message.id} message={message} />
+          ))
+        )}
 
-        {isBusy ? <AssistantThinkingBlock /> : null}
+        {isBusy ? (
+          <AssistantProcessingProgress
+            title="Preparando tu oferta"
+            steps={OFFER_PROCESSING_STEPS}
+            variant={processingMode === "summary" ? "steps" : "thinking"}
+            onStop={processingMode ? handleStop : undefined}
+          />
+        ) : null}
 
         {pendingRetry ? (
           <Pressable
@@ -1037,16 +809,11 @@ function OfferAssistantScreen({
           </Pressable>
         ) : null}
 
-        {isReadyToSend && !showSummary && !isBusy && status !== "sent" ? (
-          <ReadyToReviewCard
-            disabled={isBusy}
-            onPress={handleShowSummary}
-          />
-        ) : null}
-
         {showSummary ? (
           <OfferSummaryCard
             summary={summary}
+            purchaseRequestTitle={purchaseRequestTitle}
+            offerPhotoCount={successfulOfferPhotoCount}
             missingFields={missingFields}
             hasOfferPhoto={hasOfferPhoto}
             disabled={isBusy || !isReadyToSend}
@@ -1070,12 +837,16 @@ function OfferAssistantScreen({
           clearOnSendStart
           autoFocus={messages.length === 0}
           disabled={isBusy}
-          busy={isGeneratingResponse}
-          onStop={handleStop}
           maxChars={4000}
           maxImages={6}
-          placeholder="Describe tu oferta o adjunta fotos reales"
-          onSend={handleSend}
+          placeholder={
+            showSummary
+              ? "Escribe un cambio"
+              : "Describe tu oferta o adjunta fotos reales"
+          }
+          onSend={(payload) => {
+            void handleSend(payload);
+          }}
         />
       </View>
     </View>

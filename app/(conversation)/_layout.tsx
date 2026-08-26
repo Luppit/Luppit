@@ -1,6 +1,7 @@
 import { useFocusEffect } from "@react-navigation/native";
 import ConversationActionButtons, {
   ConversationActionButtonConfig,
+  ConversationActionSummary,
 } from "@/src/components/conversation/ConversationActionButtons";
 import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
@@ -56,6 +57,7 @@ import {
   LayoutChangeEvent,
   Platform,
   Pressable,
+  StyleSheet,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -169,9 +171,7 @@ function toTopButtonConfig(action: ConversationViewAction): ConversationActionBu
     id: action.id,
     label: action.label || action.code || "",
     icon: normalizeIcon(action.icon),
-    backgroundColorKey: isPrimary ? "primary" : "backgroudWhite",
-    textColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
-    iconColorKey: isDanger ? "error" : isPrimary ? "backgroudWhite" : "textDark",
+    tone: isPrimary ? "primary" : isDanger ? "danger" : "secondary",
   };
 }
 
@@ -225,6 +225,27 @@ function toStringValue(value: unknown) {
   if (value == null) return "-";
   if (typeof value === "string") return value;
   return String(value);
+}
+
+function toOptionalDisplayText(value: unknown) {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text && text !== "-" ? text : null;
+}
+
+function formatOfferPrice(context: Record<string, unknown>) {
+  const amount = context.offer_price_amount;
+  const currencyCode = toOptionalDisplayText(context.offer_currency_code)?.toUpperCase();
+
+  if (typeof amount === "number" && Number.isFinite(amount)) {
+    const prefix = currencyCode === "USD" ? "$" : "₡";
+    return `${prefix}${amount.toLocaleString("en-US", {
+      minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+      maximumFractionDigits: 2,
+    })}`;
+  }
+
+  return toOptionalDisplayText(context.offer_price);
 }
 
 type RatingPayload = {
@@ -305,7 +326,9 @@ export default function ConversationLayout() {
   const [loadError, setLoadError] = useState<AppError | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
+  const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
+  const [headerChromeHeight, setHeaderChromeHeight] = useState(0);
   const [purchaseRequestTitle, setPurchaseRequestTitle] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
@@ -555,6 +578,7 @@ export default function ConversationLayout() {
 
       isExecutingActionRef.current = true;
       setIsExecutingAction(true);
+      setExecutingActionId(action.id);
 
       try {
         let result:
@@ -699,6 +723,7 @@ export default function ConversationLayout() {
       } finally {
         isExecutingActionRef.current = false;
         setIsExecutingAction(false);
+        setExecutingActionId(null);
       }
     },
     [
@@ -1041,6 +1066,13 @@ export default function ConversationLayout() {
     setToastBottomInset(TOAST_INSET_SOURCE, nextHeight + t.spacing.sm);
   }, [t.spacing.sm]);
 
+  const handleHeaderChromeLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setHeaderChromeHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading) {
@@ -1086,19 +1118,17 @@ export default function ConversationLayout() {
     );
   }
 
-  const topActions = conversationView.actions
-    .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
-    .map(toTopButtonConfig);
+  const rawTopActions = conversationView.actions.filter(
+    (action) => (action.ui_slot ?? "").toUpperCase() === "TOP"
+  );
+  const topActions = rawTopActions.map(toTopButtonConfig);
   const topActionsSignature = topActions
     .map(
-      (action) =>
-        `${action.id}:${action.label}:${action.icon}:${action.backgroundColorKey}:${action.textColorKey}:${action.iconColorKey}`
+      (action) => `${action.id}:${action.label}:${action.icon}:${action.tone}`
     )
     .join("|");
   const topActionsById = new Map(
-    conversationView.actions
-      .filter((action) => (action.ui_slot ?? "").toUpperCase() === "TOP")
-      .map((action) => [action.id, action] as const)
+    rawTopActions.map((action) => [action.id, action] as const)
   );
   const auxActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
@@ -1107,12 +1137,21 @@ export default function ConversationLayout() {
     (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
   const showActionButtons = topActions.length > 0;
+  const offerPriceField = rawTopActions
+    .flatMap((action) => action.confirmation?.fields ?? [])
+    .find((field) => normalizeText(field.value_source) === "offer_price");
+  const offerPrice = formatOfferPrice(conversationView.context);
+  const topActionSummary: ConversationActionSummary | undefined = offerPrice
+    ? {
+        label: toOptionalDisplayText(offerPriceField?.label) ?? "Precio",
+        value: offerPrice,
+      }
+    : undefined;
   const headerBarHeight = 56;
-  const headerChromeHeight = insets.top + 72;
-  const actionButtonsOverlaySpace = showActionButtons ? 64 + t.spacing.md : 0;
+  const headerChromeFallbackHeight = insets.top + 72;
   const composerOverlayFallbackHeight =
     showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
-  const contentTopInset = headerChromeHeight + actionButtonsOverlaySpace;
+  const contentTopInset = Math.max(headerChromeHeight, headerChromeFallbackHeight);
   const contentBottomInset = showComposer
     ? composerOverlayHeight || composerOverlayFallbackHeight
     : 0;
@@ -1145,6 +1184,7 @@ export default function ConversationLayout() {
           <GlassSurface
             variant="chrome"
             blur="chrome"
+            onLayout={handleHeaderChromeLayout}
             style={{
               position: "absolute",
               top: 0,
@@ -1152,7 +1192,6 @@ export default function ConversationLayout() {
               right: 0,
               zIndex: 10,
               elevation: Platform.OS === "android" ? 4 : 10,
-              height: headerChromeHeight,
               borderTopLeftRadius: 0,
               borderTopRightRadius: 0,
               borderBottomLeftRadius: t.glass.radius.chrome,
@@ -1166,29 +1205,42 @@ export default function ConversationLayout() {
               overflow: "hidden",
             }}
             contentStyle={{
-              flex: 1,
               paddingTop: insets.top + t.spacing.xs,
-              paddingHorizontal: t.spacing.xl,
-              paddingBottom: t.spacing.xs,
+              paddingHorizontal: t.spacing.lg,
+              paddingBottom: showActionButtons ? t.spacing.md : t.spacing.xs,
             }}
           >
             <View
               style={{
-                height: headerBarHeight,
+                minHeight: headerBarHeight,
                 flexDirection: "row",
                 alignItems: "center",
                 justifyContent: "space-between",
+                paddingVertical: t.spacing.xs,
               }}
             >
               <Pressable
                 onPress={() => router.back()}
-                hitSlop={12}
-                style={{ width: 40, alignItems: "flex-start", justifyContent: "center" }}
+                accessibilityRole="button"
+                accessibilityLabel="Volver"
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                }}
               >
                 <Icon name="arrow-left" size={28} />
               </Pressable>
 
-              <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
+              <Text
+                variant="subtitle"
+                align="center"
+                maxLines={2}
+                maxFontSizeMultiplier={2}
+                accessibilityRole="header"
+                style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
+              >
                 {title}
               </Text>
 
@@ -1196,47 +1248,50 @@ export default function ConversationLayout() {
                 <Pressable
                   onPress={() => openConversationMenu(menuActions)}
                   disabled={isExecutingAction}
-                  hitSlop={12}
-                  style={{
-                    width: 40,
+                  accessibilityRole="button"
+                  accessibilityLabel="Más acciones"
+                  accessibilityState={{
+                    disabled: isExecutingAction,
+                    busy: isExecutingAction,
+                  }}
+                  style={({ pressed }) => ({
+                    width: 44,
+                    height: 44,
                     alignItems: "flex-end",
                     justifyContent: "center",
-                    opacity: isExecutingAction ? 0.6 : 1,
-                  }}
+                    opacity: isExecutingAction ? 0.6 : pressed ? 0.72 : 1,
+                  })}
                 >
                   <Icon name="ellipsis" size={28} />
                 </Pressable>
               ) : (
-                <View style={{ width: 40 }} />
+                <View style={{ width: 44, height: 44 }} />
               )}
             </View>
-          </GlassSurface>
 
-          {showActionButtons ? (
-            <View
-              style={{
-                position: "absolute",
-                top: headerChromeHeight - t.spacing.xs,
-                left: 0,
-                right: 0,
-                zIndex: 10,
-                elevation: Platform.OS === "android" ? 4 : 10,
-                alignItems: "center",
-                backgroundColor: "transparent",
-              }}
-              pointerEvents="box-none"
-            >
-              <ConversationActionButtons
-                key={topActionsSignature}
-                buttons={topActions}
-                onPress={(id) => {
-                  const action = topActionsById.get(id);
-                  if (!action) return;
-                  handleActionPress(action);
+            {showActionButtons ? (
+              <View
+                style={{
+                  paddingTop: t.spacing.sm,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: t.colors.border,
                 }}
-              />
-            </View>
-          ) : null}
+              >
+                <ConversationActionButtons
+                  key={topActionsSignature}
+                  buttons={topActions}
+                  summary={topActionSummary}
+                  disabled={isExecutingAction}
+                  loadingButtonId={executingActionId}
+                  onPress={(id) => {
+                    const action = topActionsById.get(id);
+                    if (!action) return;
+                    handleActionPress(action);
+                  }}
+                />
+              </View>
+            ) : null}
+          </GlassSurface>
 
           <View
             style={{

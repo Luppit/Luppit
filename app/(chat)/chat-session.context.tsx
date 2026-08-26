@@ -45,6 +45,7 @@ type ChatSessionContextValue = {
   summaryText: string | null;
   purchaseRequestId: string | null;
   isSendingMessage: boolean;
+  isGeneratingSummary: boolean;
   isExecutingControl: boolean;
   canPublish: boolean;
   showComposer: boolean;
@@ -71,6 +72,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   summaryText: null,
   purchaseRequestId: null,
   isSendingMessage: false,
+  isGeneratingSummary: false,
   isExecutingControl: false,
   canPublish: false,
   showComposer: true,
@@ -133,6 +135,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [purchaseRequestId, setPurchaseRequestId] = useState<string | null>(null);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isExecutingControl, setIsExecutingControl] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
   const requestSequenceRef = useRef(0);
@@ -153,6 +156,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     activeRequestRef.current = null;
     activeRequest.abort();
     setIsSendingMessage(false);
+    setIsGeneratingSummary(false);
     AccessibilityInfo.announceForAccessibility("Respuesta detenida");
   }, []);
 
@@ -248,6 +252,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       const requestController = new AbortController();
       activeRequestRef.current = requestController;
       setIsSendingMessage(true);
+      setIsGeneratingSummary(
+        requests.some((request) => request.ui_action === "SHOW_SUMMARY")
+      );
       try {
         for (let index = 0; index < requests.length; index += 1) {
           const input = requests[index];
@@ -303,6 +310,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
           setIsSendingMessage(false);
+          setIsGeneratingSummary(false);
         }
       }
     },
@@ -423,9 +431,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const value = useMemo(
     () => ({
       messages,
-      title:
-        summary?.titulo ??
-        (uiState === "review" ? "Resumen de solicitud" : "Crear solicitud"),
+      title: "Crear solicitud",
       draftId,
       status,
       uiState,
@@ -438,6 +444,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       summaryText,
       purchaseRequestId,
       isSendingMessage,
+      isGeneratingSummary,
       isExecutingControl,
       canPublish:
         Boolean(draftId) &&
@@ -461,6 +468,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       continueClarifying,
       draftId,
       isExecutingControl,
+      isGeneratingSummary,
       isSendingMessage,
       messages,
       missingFields,

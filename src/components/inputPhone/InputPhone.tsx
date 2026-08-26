@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { Text } from "../Text";
+import type { TextProps } from "../Text";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { createInputPhoneStyles } from "./styles";
 
@@ -17,6 +18,7 @@ type InputPhoneProps = TextInputProps & {
   error?: string;
   hasError?: boolean;
   baseContainerStyle?: StyleProp<ViewStyle>;
+  labelColor?: TextProps["color"];
 };
 
 export const defaultCountryCode = "+506";
@@ -27,6 +29,7 @@ export const InputPhone = ({
   error,
   hasError,
   baseContainerStyle,
+  labelColor = "stateAnulated",
   ...props
 }: InputPhoneProps) => {
   const t = useTheme();
@@ -40,7 +43,7 @@ export const InputPhone = ({
 
   return (
     <View style={[s.phoneInputContainer, baseContainerStyle]}>
-      <Text color="stateAnulated" style={s.label}>
+      <Text color={labelColor} style={s.label}>
         {label}:
       </Text>
       <View
@@ -51,7 +54,7 @@ export const InputPhone = ({
         ]}
       >
         <View style={s.country.countryCodeContainer} pointerEvents="none">
-          <Text style={s.country.countryCodeText} color="stateAnulated">
+          <Text style={s.country.countryCodeText} color="textMedium">
             {countryCode}
           </Text>
         </View>

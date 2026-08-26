@@ -149,6 +149,66 @@ function getSummaryChoiceConfigText(
   return toOptionalText(input.component_config?.[key]);
 }
 
+function SummaryTextAreaInput({
+  input,
+  disabled,
+  error,
+  onFocus,
+  onClearError,
+}: {
+  input: PopupSummaryInput;
+  disabled: boolean;
+  error?: string;
+  onFocus: (target: number) => void;
+  onClearError: () => void;
+}) {
+  const t = useTheme();
+  const s = useMemo(() => createGlobalPopupStyles(t), [t]);
+  const [value, setValue] = useState("");
+  const configuredMaxLength =
+    typeof input.component_config?.max_length === "number"
+      ? Math.max(1, Math.trunc(input.component_config.max_length))
+      : 1000;
+  const placeholder =
+    typeof input.component_config?.placeholder === "string"
+      ? input.component_config.placeholder
+      : undefined;
+
+  return (
+    <View style={s.summaryTextArea}>
+      <Text variant="small" style={s.summaryInputLabel}>
+        {input.label}
+      </Text>
+      <TextArea
+        value={value}
+        accessibilityLabel={input.label}
+        accessibilityHint={input.helper_text ?? undefined}
+        placeholder={placeholder}
+        multiline
+        maxLength={configuredMaxLength}
+        disabled={disabled}
+        hasError={Boolean(error)}
+        error={error}
+        baseContainerStyle={{ marginBottom: 0 }}
+        inputContainerStyle={s.summaryTextAreaInput}
+        inputStyle={s.summaryTextAreaText}
+        textAlignVertical="top"
+        onFocus={(event) => onFocus(event.nativeEvent.target)}
+        onChangeText={(nextValue) => {
+          setValue(nextValue);
+          if (error) onClearError();
+          input.onValueChange?.(nextValue);
+        }}
+      />
+      {input.helper_text ? (
+        <Text variant="small" style={s.summaryTextAreaHelper}>
+          {input.helper_text}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -194,9 +254,6 @@ export default function GlobalPopupHost() {
   >({});
   const [activeSummaryChoiceInputId, setActiveSummaryChoiceInputId] =
     useState<string | null>(null);
-  const [summaryTextValues, setSummaryTextValues] = useState<
-    Record<string, string>
-  >({});
   const [isSuccessActionPending, setSuccessActionPending] = useState(false);
   const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const sheetHeightRef = useRef(320);
@@ -357,7 +414,6 @@ export default function GlobalPopupHost() {
             setSummaryInputResetKeys({});
             setSummaryChoiceValues({});
             setActiveSummaryChoiceInputId(null);
-            setSummaryTextValues({});
             setSuccessActionPending(false);
           }
         });
@@ -446,7 +502,6 @@ export default function GlobalPopupHost() {
       setSummaryInputResetKeys({});
       setSummaryChoiceValues({});
       setActiveSummaryChoiceInputId(null);
-      setSummaryTextValues({});
       setSuccessActionPending(false);
       setMounted(true);
       opacity.setValue(0);
@@ -980,7 +1035,6 @@ export default function GlobalPopupHost() {
               >
                 <GlassSurface
                   variant="sheet"
-                  highlight
                   style={s.successSheet}
                   contentStyle={s.successSheetContent}
                 >
@@ -1895,64 +1949,22 @@ export default function GlobalPopupHost() {
                             }
 
                             if (input.kind === "textarea") {
-                              const configuredMaxLength =
-                                typeof input.component_config?.max_length === "number"
-                                  ? Math.max(
-                                      1,
-                                      Math.trunc(input.component_config.max_length)
-                                    )
-                                  : 1000;
-                              const placeholder =
-                                typeof input.component_config?.placeholder === "string"
-                                  ? input.component_config.placeholder
-                                  : undefined;
-
                               return (
-                                <View key={input.id} style={s.summaryTextArea}>
-                                  <Text
-                                    variant="small"
-                                    style={s.summaryInputLabel}
-                                  >
-                                    {input.label}
-                                  </Text>
-                                  <TextArea
-                                    value={summaryTextValues[input.id] ?? ""}
-                                    placeholder={placeholder}
-                                    multiline
-                                    maxLength={configuredMaxLength}
-                                    disabled={pendingSummaryActionId != null}
-                                    hasError={Boolean(summaryInputErrors[input.id])}
-                                    error={summaryInputErrors[input.id]}
-                                    baseContainerStyle={{ marginBottom: 0 }}
-                                    inputContainerStyle={s.summaryTextAreaInput}
-                                    inputStyle={s.summaryTextAreaText}
-                                    textAlignVertical="top"
-                                    onFocus={(event) =>
-                                      scrollSummaryInputIntoView(event.nativeEvent.target)
-                                    }
-                                    onChangeText={(value) => {
-                                      setSummaryTextValues((current) => ({
-                                        ...current,
-                                        [input.id]: value,
-                                      }));
-                                      setSummaryInputErrors((current) => {
-                                        if (!current[input.id]) return current;
-                                        const next = { ...current };
-                                        delete next[input.id];
-                                        return next;
-                                      });
-                                      input.onValueChange?.(value);
-                                    }}
-                                  />
-                                  {input.helper_text ? (
-                                    <Text
-                                      variant="small"
-                                      style={s.summaryTextAreaHelper}
-                                    >
-                                      {input.helper_text}
-                                    </Text>
-                                  ) : null}
-                                </View>
+                                <SummaryTextAreaInput
+                                  key={`${input.id}-${summaryInputResetKeys[input.id] ?? 0}`}
+                                  input={input}
+                                  disabled={pendingSummaryActionId != null}
+                                  error={summaryInputErrors[input.id]}
+                                  onFocus={scrollSummaryInputIntoView}
+                                  onClearError={() => {
+                                    setSummaryInputErrors((current) => {
+                                      if (!current[input.id]) return current;
+                                      const next = { ...current };
+                                      delete next[input.id];
+                                      return next;
+                                    });
+                                  }}
+                                />
                               );
                             }
 

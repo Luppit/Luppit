@@ -174,7 +174,7 @@ export default function BusinessTeamScreen() {
         },
         {
           id: "revoke-invitation",
-          label: "Cancelar invitación",
+          label: "Cancelar",
           icon: "x-circle",
           textColorKey: "error",
           iconColorKey: "error",

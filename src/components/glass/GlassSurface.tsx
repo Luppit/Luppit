@@ -17,20 +17,16 @@ type GlassBlur = keyof Theme["glass"]["blurIntensity"];
 type GlassSurfaceProps = ViewProps & {
   variant?: GlassVariant;
   blur?: GlassBlur | false;
-  highlight?: boolean;
   clipStyle?: StyleProp<ViewStyle>;
   contentStyle?: StyleProp<ViewStyle>;
-  highlightStyle?: StyleProp<ViewStyle>;
 };
 
 export default function GlassSurface({
   variant = "surface",
   blur,
-  highlight = false,
   style,
   clipStyle,
   contentStyle,
-  highlightStyle,
   children,
   ...viewProps
 }: GlassSurfaceProps) {
@@ -52,7 +48,7 @@ export default function GlassSurface({
       style={[
         variantStyle,
         shouldUseLayeredMaterial ? { backgroundColor: "transparent" } : null,
-        { borderRadius: radius },
+        { borderRadius: radius, borderCurve: "continuous" },
         style,
       ]}
     >
@@ -61,7 +57,11 @@ export default function GlassSurface({
           pointerEvents="none"
           style={[
             StyleSheet.absoluteFillObject,
-            { borderRadius: radius, overflow: "hidden" },
+            {
+              borderRadius: radius,
+              borderCurve: "continuous",
+              overflow: "hidden",
+            },
             clipStyle,
           ]}
         >
@@ -76,10 +76,6 @@ export default function GlassSurface({
           />
           {tintStyle ? <View style={[StyleSheet.absoluteFillObject, tintStyle]} /> : null}
         </View>
-      ) : null}
-
-      {highlight ? (
-        <View pointerEvents="none" style={[t.glass.topHighlight, highlightStyle]} />
       ) : null}
 
       <View style={contentStyle}>{children}</View>

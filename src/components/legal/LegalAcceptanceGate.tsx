@@ -8,13 +8,13 @@ import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
-import { signOut } from "@/src/lib/supabase";
 import {
   acceptCurrentLegalDocuments,
   getCurrentLegalAcceptanceState,
   LEGAL_DOCUMENT_CODES,
 } from "@/src/services/legal-document.service";
 import { useTheme } from "@/src/themes";
+import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { showError } from "@/src/utils/useToast";
 import { router, usePathname } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -160,7 +160,7 @@ export default function LegalAcceptanceGate({
             accessibilityRole="button"
             hitSlop={8}
             style={styles.signOut}
-            onPress={() => void signOut()}
+            onPress={openSignOutConfirmation}
           >
             <Text variant="small" color="textMedium">
               Cerrar sesión

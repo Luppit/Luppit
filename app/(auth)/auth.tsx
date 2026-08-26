@@ -1,7 +1,7 @@
 import Button from "@/src/components/button/Button";
 import { Text } from "@/src/components/Text";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
-import { borders, colors, spacing } from "@/src/themes";
+import { colors, spacing } from "@/src/themes";
 import { Asset } from "expo-asset";
 import { Link, router } from "expo-router";
 import React from "react";
@@ -27,7 +27,12 @@ export default function auth() {
         <Text variant="title" align="center" style={{ marginBottom: spacing.xs }}>
           ¡Luppit te da la bienvenida!
         </Text>
-        <Text variant="body" color="stateAnulated" align="center">
+        <Text
+          variant="body"
+          color="textMedium"
+          align="center"
+          style={styles.brandDescription}
+        >
           Empieza a comprar y vender en nuestra comunidad.
         </Text>
       </View>
@@ -44,7 +49,14 @@ export default function auth() {
 
         <View style={styles.parentContainer}>
           <View style={styles.childrenLine}></View>
-          <View style={styles.separatorCircle}></View>
+          <Text
+            variant="small"
+            color="textMedium"
+            align="center"
+            style={styles.separatorLabel}
+          >
+            o
+          </Text>
           <View style={styles.childrenLine}></View>
         </View>
 
@@ -108,6 +120,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingBottom: spacing.xl,
   },
+  brandDescription: {
+    opacity: 0.65,
+  },
   actions: {
     width: "100%",
     paddingBottom: spacing.lg,
@@ -140,13 +155,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: spacing.lg,
   },
-  separatorCircle: {
-    width: 10,
-    height: 10,
-    borderRadius: borders.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+  separatorLabel: {
+    width: spacing.lg,
     marginHorizontal: spacing.sm,
   },
 });
