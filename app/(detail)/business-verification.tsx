@@ -15,11 +15,12 @@ import {
   submitCurrentBusinessVerification,
 } from "@/src/services/business-verification.service";
 import { openPopup } from "@/src/services/popup.service";
+import { getBusinessVerificationRefreshMessage } from "@/src/services/business-verification.helpers";
 import { Theme, useTheme } from "@/src/themes";
-import { showError, showSuccess } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
@@ -38,24 +39,88 @@ export default function BusinessVerificationScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+  const requestRef = useRef<{ profileId: string; showProgress: boolean } | null>(null);
+  const verificationRef = useRef<BusinessVerification | null>(null);
 
   const profileId = activeProfile?.profile.id ?? null;
+  const profileIdRef = useRef(profileId);
+  profileIdRef.current = profileId;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    requestRef.current = null;
+    verificationRef.current = null;
+    setVerification(null);
+    setRnpNumber("");
+    setFiles([]);
+    setIsLoading(true);
+    setIsRefreshing(false);
+    setLoadError(null);
+  }, [profileId]);
+
   const load = useCallback(async (showProgress = false) => {
     if (!profileId) return;
+    if (requestRef.current?.profileId === profileId) {
+      if (showProgress) {
+        requestRef.current.showProgress = true;
+        setIsRefreshing(true);
+      }
+      return;
+    }
+    const request = { profileId, showProgress };
+    requestRef.current = request;
+    const isCurrent = () => mountedRef.current &&
+      profileIdRef.current === profileId && requestRef.current === request;
+    const previous = verificationRef.current;
     if (showProgress) setIsRefreshing(true);
-    const result = await getCurrentBusinessVerification(profileId);
-    if (!result.ok) {
-      showError("No pudimos consultar la solicitud", result.error.message);
-    } else {
+    setLoadError(null);
+    try {
+      const result = await getCurrentBusinessVerification(profileId);
+      if (!isCurrent()) return;
+      if (!result.ok) {
+        setLoadError("No pudimos actualizar el estado. Intentá de nuevo.");
+        showError("No pudimos actualizar el estado", "Intentá de nuevo.");
+        return;
+      }
+
+      verificationRef.current = result.data;
       setVerification(result.data);
       setRnpNumber((current) => current || result.data.rnpNumber || "");
+      if (request.showProgress) {
+        const message = getBusinessVerificationRefreshMessage(previous, result.data);
+        if (result.data.status === "APPROVED" && previous?.status !== "APPROVED") {
+          showSuccess(message);
+        } else {
+          showInfo(message);
+        }
+      }
       if (result.data.status === "APPROVED") {
         const activated = await refreshProfiles(profileId);
-        if (activated) router.replace("/(tabs)");
+        if (!isCurrent()) return;
+        if (activated) {
+          router.replace("/(tabs)");
+        } else {
+          setLoadError("Tu negocio está aprobado. No pudimos actualizar tu perfil. Intentá de nuevo.");
+          showError("No pudimos actualizar tu perfil", "Tu negocio sigue aprobado. Intentá de nuevo.");
+        }
       }
+    } catch {
+      if (!isCurrent()) return;
+      setLoadError("No pudimos actualizar el estado. Intentá de nuevo.");
+      showError("No pudimos actualizar el estado", "Intentá de nuevo.");
+    } finally {
+      if (isCurrent()) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+      if (requestRef.current === request) requestRef.current = null;
     }
-    setIsLoading(false);
-    if (showProgress) setIsRefreshing(false);
   }, [profileId, refreshProfiles]);
 
   useFocusEffect(useCallback(() => {
@@ -70,8 +135,22 @@ export default function BusinessVerificationScreen() {
     return () => subscription.remove();
   }, [load]);
 
-  if (!activeProfile || isLoading || !verification) {
+  if (!activeProfile || isLoading) {
     return <LoadingState label="Consultando la verificación..." />;
+  }
+
+  if (!verification) {
+    return (
+      <View style={s.content}>
+        <Text align="center">{loadError || "No pudimos consultar la solicitud."}</Text>
+        <Button
+          title={isRefreshing ? "Actualizando..." : "Reintentar"}
+          loading={isRefreshing}
+          onPress={() => void load(true)}
+        />
+        <SupportContactRow />
+      </View>
+    );
   }
 
   const hasEmail = isProfileEmailSetupComplete(activeProfile.profile);
@@ -122,6 +201,7 @@ export default function BusinessVerificationScreen() {
       showError("No pudimos enviar la solicitud", result.error.message);
       return;
     }
+    verificationRef.current = result.data;
     setVerification(result.data);
     setFiles([]);
     showSuccess("Solicitud enviada", "Nuestro equipo la revisará en un máximo de dos días hábiles.");
@@ -160,11 +240,14 @@ export default function BusinessVerificationScreen() {
             Te avisaremos por correo y dentro de la app. La revisión puede tardar hasta dos días hábiles.
           </Text>
           <Button
-            title="Actualizar estado"
+            title={isRefreshing ? "Consultando..." : "Consultar estado"}
             variant="white"
             loading={isRefreshing}
             onPress={() => void load(true)}
           />
+          <Text variant="small" color="textMedium">
+            Tu solicitud ya fue enviada. Este botón consulta si hay novedades; no vuelve a enviar tus documentos.
+          </Text>
         </View>
       ) : verification.status === "REJECTED" ? (
         <View style={s.surface}>
@@ -211,6 +294,18 @@ export default function BusinessVerificationScreen() {
 
           <Button title="Enviar a revisión" loading={isSubmitting} onPress={() => void submit()} />
         </>
+      ) : null}
+
+      {(loadError || isRefreshing) && verification.status !== "PENDING" ? (
+        <View style={s.surface}>
+          <Text color="textMedium">{loadError || "Actualizando el estado de tu solicitud..."}</Text>
+          <Button
+            title={isRefreshing ? "Actualizando..." : "Reintentar"}
+            variant="white"
+            loading={isRefreshing}
+            onPress={() => void load(true)}
+          />
+        </View>
       ) : null}
 
       <View style={s.surface}>

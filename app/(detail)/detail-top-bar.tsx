@@ -19,6 +19,7 @@ import { Platform, Pressable, Share, View } from "react-native";
 type DetailTopBarProps = {
   title?: string;
   hideMenu?: boolean;
+  hideBack?: boolean;
   purchaseRequestId?: string | null;
   purchaseRequestStatus?: string | null;
   topInset: number;
@@ -29,6 +30,7 @@ export const DETAIL_TOP_BAR_VISIBLE_HEIGHT = 72;
 export default function DetailTopBar({
   title,
   hideMenu = false,
+  hideBack = false,
   purchaseRequestId,
   purchaseRequestStatus,
   topInset,
@@ -265,20 +267,24 @@ export default function DetailTopBar({
           justifyContent: "space-between",
         }}
       >
-        <Pressable
-          onPress={handleBackPress}
-          accessibilityRole="button"
-          accessibilityLabel="Volver"
-          hitSlop={12}
-          style={{
-            width: 44,
-            height: 44,
-            alignItems: "flex-start",
-            justifyContent: "center",
-          }}
-        >
-          <Icon name="arrow-left" size={28} />
-        </Pressable>
+        {hideBack ? (
+          <View style={{ width: 44, height: 44 }} />
+        ) : (
+          <Pressable
+            onPress={handleBackPress}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+            hitSlop={12}
+            style={{
+              width: 44,
+              height: 44,
+              alignItems: "flex-start",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="arrow-left" size={28} />
+          </Pressable>
+        )}
 
         <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
           {title ?? ""}

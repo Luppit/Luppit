@@ -101,6 +101,7 @@ export default function DetailLayout() {
         <DetailTopBar
           title={title}
           hideMenu={hideMenu}
+          hideBack={pathname === "/business-verification"}
           purchaseRequestId={purchaseRequestId}
           purchaseRequestStatus={purchaseRequestStatus}
           topInset={insets.top}
