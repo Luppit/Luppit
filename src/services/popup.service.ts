@@ -196,10 +196,13 @@ export type PopupProfileSwitcherItem = {
   id: string;
   title: string;
   subtitle?: string;
+  pictureKind?: "buyer" | "business";
+  pictureName?: string | null;
   imagePath?: string | null;
   imageUrl?: string | null;
   unreadNotificationCount?: number;
   isActive?: boolean;
+  accessibilityLabel?: string;
   onPress?: () => void | Promise<void>;
 };
 

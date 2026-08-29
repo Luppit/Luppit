@@ -370,22 +370,34 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     openPopup({
       type: "profileSwitcher",
       profiles: profiles.map((profile) => {
-        const picture =
-          profile.role === "buyer"
-            ? getProfilePictureSource(profile)
-            : { imagePath: null, imageUrl: null };
+        const isSeller = profile.role === "seller";
+        const businessName = profile.businessName?.trim() || null;
+        const picture = isSeller
+          ? {
+              imagePath: profile.businessImagePath,
+              imageUrl: profile.businessImageUrl,
+            }
+          : getProfilePictureSource(profile);
 
         return {
           id: profile.profile.id,
           title: profile.profile.name,
-          subtitle:
-            profile.role === "seller"
-              ? profile.businessName || "Vendedor"
-              : "Comprador",
+          subtitle: isSeller
+            ? businessName
+              ? `Vendedor · ${businessName}`
+              : "Vendedor"
+            : "Comprador",
+          pictureKind: isSeller ? "business" : "buyer",
+          pictureName: isSeller ? businessName : profile.profile.name,
           imagePath: picture.imagePath,
           imageUrl: picture.imageUrl,
           unreadNotificationCount: profile.unreadCount,
           isActive: profile.profile.id === activeProfile?.profile.id,
+          accessibilityLabel: isSeller
+            ? businessName
+              ? `Perfil vendedor de ${profile.profile.name}, negocio ${businessName}`
+              : `Perfil vendedor de ${profile.profile.name}`
+            : `Perfil comprador de ${profile.profile.name}`,
           onPress: async () => {
             await switchProfile(profile.profile.id);
           },
