@@ -162,6 +162,7 @@
     },
     "android": {
       "package": "com.luppit.app",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",

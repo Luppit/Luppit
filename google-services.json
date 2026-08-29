@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "301280257188",
+    "project_id": "luppit-57613",
+    "storage_bucket": "luppit-57613.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:301280257188:android:d4f7c29524812a53337231",
+        "android_client_info": {
+          "package_name": "com.luppit.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9mLW6nnT6X8MkMLHFGBxKL1e0MINTqJY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
