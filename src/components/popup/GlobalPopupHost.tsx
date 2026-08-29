@@ -1325,6 +1325,15 @@ export default function GlobalPopupHost() {
                         const hasUnreadNotifications =
                           typeof profile.unreadNotificationCount === "number" &&
                           profile.unreadNotificationCount > 0;
+                        const profileAccessibilityLabel = [
+                          profile.accessibilityLabel ??
+                            [profile.title, profile.subtitle].filter(Boolean).join(", "),
+                          formatUnreadNotificationCount(
+                            profile.unreadNotificationCount
+                          ),
+                        ]
+                          .filter(Boolean)
+                          .join(". ");
 
                         return (
                           <React.Fragment key={profile.id}>
@@ -1337,10 +1346,20 @@ export default function GlobalPopupHost() {
                               ]}
                               onPress={() => handleProfileSwitcherPress(index)}
                               accessibilityRole="button"
+                              accessibilityLabel={profileAccessibilityLabel}
+                              accessibilityHint={
+                                profile.isActive
+                                  ? undefined
+                                  : "Cambia a este perfil."
+                              }
+                              accessibilityState={{
+                                disabled: Boolean(profile.isActive),
+                                selected: Boolean(profile.isActive),
+                              }}
                             >
                               <ProfilePicture
-                                kind="buyer"
-                                name={profile.title}
+                                kind={profile.pictureKind ?? "buyer"}
+                                name={profile.pictureName ?? profile.title}
                                 imagePath={profile.imagePath}
                                 imageUrl={profile.imageUrl}
                                 size={48}

@@ -4,8 +4,13 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
+import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import {
+  createRoundedSurfaceStyle,
+  ROUNDED_SURFACE_RADIUS,
+} from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import {
   LocationOption,
@@ -16,19 +21,16 @@ import { updateCurrentBusinessLocation } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AccessibilityInfo,
+  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type SelectOption = {
-  code: string;
-  label: string;
-};
 
 export default function BusinessLocationEditScreen() {
   const t = useTheme();
@@ -46,92 +48,95 @@ export default function BusinessLocationEditScreen() {
   const initialLocationId = getParamValue(params.locationId) || null;
   const initialLocationLabel = getParamValue(params.locationLabel);
   const [locations, setLocations] = useState<LocationOption[]>([]);
-  const [selectedProvinceCode, setSelectedProvinceCode] = useState<string | null>(null);
-  const [selectedCantonCode, setSelectedCantonCode] = useState<string | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const isMountedRef = useRef(true);
+  const loadRequestIdRef = useRef(0);
 
   useEffect(() => {
-    let active = true;
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const loadLocations = useCallback(async () => {
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
 
     if (!isBusinessOwner) {
       setIsLoading(false);
-      return () => {
-        active = false;
-      };
+      return;
     }
 
-    const loadLocations = async () => {
-      setIsLoading(true);
-      const result = await getActiveBusinessLocations();
-      if (!active) return;
+    setIsLoading(true);
+    setLoadError(false);
+    const result = await getActiveBusinessLocations();
+    if (!isMountedRef.current || loadRequestIdRef.current !== requestId) return;
 
-      if (!result.ok) {
-        setLocations([]);
-        setIsLoading(false);
-        showError("No se pudo cargar la ubicación", result.error.message);
-        return;
-      }
-
-      const nextLocations = result.data;
-      const currentLocation = initialLocationId
-        ? nextLocations.find((location) => location.id === initialLocationId) ?? null
-        : null;
-
-      setLocations(nextLocations);
-      setSelectedProvinceCode(currentLocation?.province_code ?? null);
-      setSelectedCantonCode(currentLocation?.canton_code ?? null);
-      setSelectedLocationId(currentLocation?.id ?? null);
+    if (!result.ok) {
+      setLocations([]);
+      setSelectedLocationId(null);
+      setLoadError(true);
       setIsLoading(false);
-    };
+      return;
+    }
 
-    void loadLocations();
+    const nextLocations = result.data;
+    const currentLocation = initialLocationId
+      ? nextLocations.find((location) => location.id === initialLocationId) ?? null
+      : null;
 
-    return () => {
-      active = false;
-    };
+    setLocations(nextLocations);
+    setSelectedLocationId(currentLocation?.id ?? null);
+    setIsLoading(false);
   }, [initialLocationId, isBusinessOwner]);
 
-  const provinceOptions = useMemo(
-    () => getUniqueOptions(locations, "province_code", "province"),
+  useEffect(() => {
+    void loadLocations();
+  }, [loadLocations]);
+
+  const selectableLocations = useMemo(
+    () =>
+      locations.filter(
+        (location) =>
+          typeof location.district === "string" &&
+          location.district.trim().length > 0
+      ),
     [locations]
   );
-  const cantonOptions = useMemo(
+  const normalizedQuery = normalizeSearchText(searchQuery);
+  const filteredLocations = useMemo(() => {
+    if (!normalizedQuery) return selectableLocations;
+
+    return selectableLocations.filter((location) =>
+      normalizeSearchText(formatLocationLabel(location)).includes(normalizedQuery)
+    );
+  }, [normalizedQuery, selectableLocations]);
+  const selectedLocation = useMemo(
     () =>
-      getUniqueOptions(
-        locations.filter((location) => location.province_code === selectedProvinceCode),
-        "canton_code",
-        "canton"
-      ),
-    [locations, selectedProvinceCode]
-  );
-  const districtOptions = useMemo(
-    () =>
-      locations
-        .filter(
-          (location) =>
-            location.province_code === selectedProvinceCode &&
-            location.canton_code === selectedCantonCode &&
-            typeof location.district === "string" &&
-            location.district.trim().length > 0
-        )
-        .map((location) => ({
-          id: location.id,
-          code: location.district_code ?? location.territorial_code ?? location.id,
-          label: location.district?.trim() ?? "",
-          location,
-        })),
-    [locations, selectedCantonCode, selectedProvinceCode]
+      selectableLocations.find((location) => location.id === selectedLocationId) ??
+      null,
+    [selectableLocations, selectedLocationId]
   );
   const currentLocationIsSelectable = initialLocationId
-    ? locations.some((location) => location.id === initialLocationId)
+    ? selectableLocations.some((location) => location.id === initialLocationId)
     : true;
   const canSave =
     Boolean(selectedLocationId) &&
     selectedLocationId !== initialLocationId &&
     !isLoading &&
     !isSaving;
+
+  const selectLocation = useCallback((location: LocationOption) => {
+    setSelectedLocationId(location.id);
+    AccessibilityInfo.announceForAccessibility(
+      `Ubicación seleccionada: ${formatLocationLabel(location)}`
+    );
+  }, []);
 
   const saveLocation = async () => {
     if (!isBusinessOwner) {
@@ -162,7 +167,7 @@ export default function BusinessLocationEditScreen() {
       <View style={s.container}>
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={s.content}
+          contentContainerStyle={s.restrictedContent}
         >
           <GroupedListSection title="Ubicación del negocio">
             <GroupedListRow
@@ -182,90 +187,127 @@ export default function BusinessLocationEditScreen() {
     return <LoadingState label="Cargando ubicaciones..." style={s.loadingBox} />;
   }
 
-  return (
-    <View style={s.container}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.content}
-      >
-        {!currentLocationIsSelectable ? (
-          <View style={s.warningBox}>
-            <Icon name="alert-circle" size={18} color={t.colors.secondary} />
-            <View style={s.warningText}>
-              {initialLocationLabel ? (
-                <Text maxLines={2}>{initialLocationLabel}</Text>
-              ) : null}
-              <Text color="stateAnulated">
-                Esta ubicación ya no está disponible. Selecciona una ubicación válida para actualizarla.
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {locations.length === 0 ? (
+  if (loadError) {
+    return (
+      <View style={s.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.restrictedContent}
+        >
           <GroupedListSection title="Ubicación">
-            <View style={s.emptyState}>
-              <Text color="stateAnulated" align="center">
-                No encontramos ubicaciones disponibles.
-              </Text>
+            <View style={s.errorState} accessibilityLiveRegion="polite">
+              <Icon name="map-pin" size={28} color={t.colors.stateAnulated} />
+              <Text align="center">No pudimos cargar las ubicaciones.</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Intentar cargar las ubicaciones de nuevo"
+                onPress={() => void loadLocations()}
+                style={s.inlineAction}
+              >
+                <Text color="primary">Intentar de nuevo</Text>
+              </Pressable>
             </View>
           </GroupedListSection>
-        ) : (
-          <>
-            <GroupedListSection title="Provincia">
-              {provinceOptions.map((option, index) => (
-                <LocationOptionRow
-                  key={option.code}
-                  label={option.label}
-                  selected={option.code === selectedProvinceCode}
-                  showSeparator={index < provinceOptions.length - 1}
-                  onPress={() => {
-                    setSelectedProvinceCode(option.code);
-                    setSelectedCantonCode(null);
-                    setSelectedLocationId(null);
-                  }}
-                />
-              ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  const selectedDistrict = selectedLocation?.district?.trim() || "Selecciona una ubicación";
+  const selectedParentLabel = selectedLocation
+    ? formatParentLocationLabel(selectedLocation)
+    : null;
+  const trimmedQuery = searchQuery.trim();
+
+  return (
+    <View style={s.container}>
+      <FlatList
+        accessible={false}
+        data={filteredLocations}
+        keyExtractor={(location) => location.id}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.content}
+        ListHeaderComponent={
+          <View style={s.listHeader}>
+            {!currentLocationIsSelectable ? (
+              <View style={s.warningBox} accessibilityLiveRegion="polite">
+                <Icon name="alert-circle" size={18} color={t.colors.secondary} />
+                <View style={s.warningText}>
+                  {initialLocationLabel ? (
+                    <Text maxLines={2}>{initialLocationLabel}</Text>
+                  ) : null}
+                  <Text color="stateAnulated">
+                    Esta ubicación ya no está disponible. Selecciona una ubicación válida para actualizarla.
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            <GroupedListSection title="Ubicación seleccionada">
+              <GroupedListRow
+                icon="map-pin"
+                label={selectedDistrict}
+                description={selectedParentLabel}
+                descriptionColor="textMedium"
+                descriptionMaxLines={3}
+                showSeparator={false}
+              />
             </GroupedListSection>
 
-            <GroupedListSection title="Cantón">
-              {selectedProvinceCode ? (
-                cantonOptions.map((option, index) => (
-                  <LocationOptionRow
-                    key={option.code}
-                    label={option.label}
-                    selected={option.code === selectedCantonCode}
-                    showSeparator={index < cantonOptions.length - 1}
-                    onPress={() => {
-                      setSelectedCantonCode(option.code);
-                      setSelectedLocationId(null);
-                    }}
-                  />
-                ))
-              ) : (
-                <DisabledOptionLabel label="Primero selecciona una provincia" />
-              )}
-            </GroupedListSection>
+            <View style={s.searchSection}>
+              <Text variant="small" color="textMedium" style={s.sectionTitle}>
+                Buscar ubicación
+              </Text>
+              <TextField
+                accessibilityLabel="Buscar distrito, cantón o provincia"
+                accessibilityRole="search"
+                autoCapitalize="words"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+                leftIcon="search"
+                placeholder="Buscar distrito, cantón o provincia"
+                returnKeyType="search"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                baseContainerStyle={s.searchField}
+              />
+            </View>
 
-            <GroupedListSection title="Distrito">
-              {selectedCantonCode ? (
-                districtOptions.map((option, index) => (
-                  <LocationOptionRow
-                    key={option.id}
-                    label={option.label}
-                    description={formatLocationLabel(option.location)}
-                    selected={option.id === selectedLocationId}
-                    showSeparator={index < districtOptions.length - 1}
-                    onPress={() => setSelectedLocationId(option.id)}
-                  />
-                ))
-              ) : (
-                <DisabledOptionLabel label="Primero selecciona un cantón" />
-              )}
-            </GroupedListSection>
-          </>
+            <Text variant="small" color="textMedium" style={s.sectionTitle}>
+              Ubicaciones
+            </Text>
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={s.emptyState} accessibilityLiveRegion="polite">
+            <Text color="stateAnulated" align="center">
+              {trimmedQuery
+                ? `No encontramos ubicaciones para “${trimmedQuery}”.`
+                : "No encontramos ubicaciones disponibles."}
+            </Text>
+            {trimmedQuery ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setSearchQuery("")}
+                style={s.inlineAction}
+              >
+                <Text color="primary">Limpiar búsqueda</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        }
+        renderItem={({ item, index }) => (
+          <LocationOptionRow
+            location={item}
+            selected={item.id === selectedLocationId}
+            isFirst={index === 0}
+            isLast={index === filteredLocations.length - 1}
+            onPress={() => selectLocation(item)}
+          />
         )}
-      </ScrollView>
+      />
 
       <View style={s.footer}>
         <Button
@@ -283,64 +325,61 @@ function getParamValue(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value ?? "";
 }
 
-function getUniqueOptions<KCode extends keyof LocationOption, KLabel extends keyof LocationOption>(
-  locations: LocationOption[],
-  codeKey: KCode,
-  labelKey: KLabel
-) {
-  const options = new Map<string, SelectOption>();
-
-  for (const location of locations) {
-    const code = location[codeKey];
-    const label = location[labelKey];
-    if (typeof code !== "string" || typeof label !== "string") continue;
-
-    const normalizedCode = code.trim();
-    const normalizedLabel = label.trim();
-    if (!normalizedCode || !normalizedLabel || options.has(normalizedCode)) continue;
-
-    options.set(normalizedCode, {
-      code: normalizedCode,
-      label: normalizedLabel,
-    });
-  }
-
-  return Array.from(options.values());
+function normalizeSearchText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-CR")
+    .trim();
 }
 
-function DisabledOptionLabel({ label }: { label: string }) {
-  const t = useTheme();
-  const s = useMemo(() => createBusinessLocationEditStyles(t), [t]);
-
-  return (
-    <View style={s.disabledRow}>
-      <Text color="stateAnulated">{label}</Text>
-    </View>
+function formatParentLocationLabel(location: LocationOption) {
+  const parts = [location.canton, location.province]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part));
+  const uniqueParts = parts.filter(
+    (part, index) =>
+      parts.findIndex(
+        (candidate) => candidate.localeCompare(part, "es", { sensitivity: "base" }) === 0
+      ) === index
   );
+
+  return uniqueParts.join(", ") || null;
 }
 
 function LocationOptionRow({
-  label,
-  description,
+  location,
   selected,
-  showSeparator,
+  isFirst,
+  isLast,
   onPress,
 }: {
-  label: string;
-  description?: string;
+  location: LocationOption;
   selected: boolean;
-  showSeparator: boolean;
+  isFirst: boolean;
+  isLast: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createBusinessLocationEditStyles(t), [t]);
+  const label = location.district?.trim() || "Distrito sin nombre";
+  const description = formatParentLocationLabel(location);
+  const accessibilityLabel = formatLocationLabel(location);
 
   return (
     <Pressable
       accessibilityRole="radio"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={
+        selected ? "Ubicación seleccionada." : "Selecciona esta ubicación."
+      }
       accessibilityState={{ checked: selected }}
       onPress={onPress}
-      style={[s.optionRow, description ? s.optionRowWithDescription : null]}
+      style={[
+        s.optionRow,
+        isFirst ? s.optionRowFirst : null,
+        isLast ? s.optionRowLast : null,
+      ]}
     >
       <View style={s.optionText}>
         <Text variant="body" maxLines={2}>
@@ -355,7 +394,7 @@ function LocationOptionRow({
       <View style={[s.checkCircle, selected ? s.checkCircleSelected : null]}>
         {selected ? <Icon name="check" size={16} color={t.colors.backgroudWhite} /> : null}
       </View>
-      {showSeparator ? <View style={s.rowSeparator} /> : null}
+      {!isLast ? <View style={s.rowSeparator} /> : null}
     </Pressable>
   );
 }
@@ -367,9 +406,18 @@ function createBusinessLocationEditStyles(t: Theme, bottomInset = 0) {
     },
     content: {
       flexGrow: 1,
-      gap: t.spacing.lg,
       paddingTop: t.spacing.lg,
       paddingBottom: 96 + bottomInset,
+    },
+    restrictedContent: {
+      flexGrow: 1,
+      gap: t.spacing.lg,
+      paddingTop: t.spacing.lg,
+      paddingBottom: t.spacing.xl + bottomInset,
+    },
+    listHeader: {
+      gap: t.spacing.lg,
+      marginBottom: t.spacing.sm,
     },
     loadingBox: {
       flex: 1,
@@ -389,28 +437,52 @@ function createBusinessLocationEditStyles(t: Theme, bottomInset = 0) {
       flex: 1,
       gap: 2,
     },
-    emptyState: {
-      minHeight: 120,
+    searchSection: {
+      gap: t.spacing.sm,
+    },
+    sectionTitle: {
+      paddingLeft: t.spacing.md,
+    },
+    searchField: {
+      marginBottom: 0,
+    },
+    errorState: {
+      minHeight: 168,
       alignItems: "center",
       justifyContent: "center",
-      padding: t.spacing.md,
+      gap: t.spacing.sm,
+      padding: t.spacing.lg,
+    },
+    emptyState: {
+      minHeight: 136,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: t.spacing.sm,
+      padding: t.spacing.lg,
+      ...createRoundedSurfaceStyle(t),
+    },
+    inlineAction: {
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: t.spacing.md,
     },
     optionRow: {
-      minHeight: 58,
+      minHeight: 74,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.sm,
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.md,
+      backgroundColor: t.colors.backgroudWhite,
     },
-    optionRowWithDescription: {
-      minHeight: 74,
+    optionRowFirst: {
+      borderTopLeftRadius: ROUNDED_SURFACE_RADIUS,
+      borderTopRightRadius: ROUNDED_SURFACE_RADIUS,
     },
-    disabledRow: {
-      minHeight: 58,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
-      justifyContent: "center",
+    optionRowLast: {
+      borderBottomLeftRadius: ROUNDED_SURFACE_RADIUS,
+      borderBottomRightRadius: ROUNDED_SURFACE_RADIUS,
     },
     optionText: {
       flex: 1,

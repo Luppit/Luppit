@@ -4945,6 +4945,7 @@ export type Database = {
         Args: never
         Returns: {
           business_id: string
+          business_image_path: string
           business_name: string
           business_verification_safe_message: string
           business_verification_status: string

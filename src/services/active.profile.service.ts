@@ -35,6 +35,8 @@ export type ActiveProfileSummary = {
   role: "buyer" | "seller" | null;
   businessId: string | null;
   businessName: string | null;
+  businessImagePath: string | null;
+  businessImageUrl: string | null;
   membershipRole: "owner" | "member" | null;
   profileImagePath: string | null;
   profileImageUrl: string | null;
@@ -121,6 +123,24 @@ function parseCount(value: unknown) {
   return 0;
 }
 
+function resolveProfileImageSource(value: unknown) {
+  const imagePath =
+    typeof value === "string" && value.trim() ? value.trim() : null;
+  const imageObjectPath = imagePath
+    ? parseProfileImageStorageReference(
+        imagePath,
+        STORAGE_BUCKETS.profileImages
+      )
+    : null;
+  const imageUrl = imageObjectPath
+    ? supabase.storage
+        .from(STORAGE_BUCKETS.profileImages)
+        .getPublicUrl(imageObjectPath).data.publicUrl || null
+    : null;
+
+  return { imagePath, imageUrl };
+}
+
 function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
@@ -142,21 +162,8 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
     row.membership_role === "owner" || row.membership_role === "member"
       ? row.membership_role
       : null;
-  const profileImagePath =
-    typeof row.profile_image_path === "string" && row.profile_image_path.trim()
-      ? row.profile_image_path.trim()
-      : null;
-  const profileImageObjectPath = profileImagePath
-    ? parseProfileImageStorageReference(
-        profileImagePath,
-        STORAGE_BUCKETS.profileImages
-      )
-    : null;
-  const profileImageUrl = profileImageObjectPath
-    ? supabase.storage
-        .from(STORAGE_BUCKETS.profileImages)
-        .getPublicUrl(profileImageObjectPath).data.publicUrl || null
-    : null;
+  const profileImage = resolveProfileImageSource(row.profile_image_path);
+  const businessImage = resolveProfileImageSource(row.business_image_path);
   const identityStatus =
     row.identity_status === "NOT_STARTED" ||
     row.identity_status === "IN_PROGRESS" ||
@@ -188,15 +195,17 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
       email_opt_in_at:
         typeof row.email_opt_in_at === "string" ? row.email_opt_in_at : null,
       is_default: row.is_default === true,
-      image_path: profileImagePath,
+      image_path: profileImage.imagePath,
     } as ActiveProfile,
     setupStatus,
     role,
     businessId: typeof row.business_id === "string" ? row.business_id : null,
     businessName: typeof row.business_name === "string" ? row.business_name : null,
+    businessImagePath: businessImage.imagePath,
+    businessImageUrl: businessImage.imageUrl,
     membershipRole,
-    profileImagePath,
-    profileImageUrl,
+    profileImagePath: profileImage.imagePath,
+    profileImageUrl: profileImage.imageUrl,
     identityStatus,
     businessVerificationStatus,
     businessVerificationSafeMessage:
