@@ -213,13 +213,30 @@ export default function BusinessVerificationScreen() {
       contentContainerStyle={s.content}
       keyboardShouldPersistTaps="handled"
     >
-      <View style={s.header}>
-        <View style={s.icon}><Icon name="house" size={24} color={t.colors.primary} /></View>
-        <Text variant="title" align="center">Verificá tu negocio</Text>
-        <Text color="textMedium" align="center" style={s.description}>
-          Enviá la información para que nuestro equipo pueda revisarla.
-        </Text>
-      </View>
+      {hasEmail && verification.status === "PENDING" ? (
+        <View style={s.reviewHeader}>
+          <View style={s.icon}><Icon name="file-text" size={24} color={t.colors.primary} /></View>
+          <View style={s.reviewStatus}>
+            <Text variant="small">En revisión</Text>
+          </View>
+          <View style={s.reviewSummary}>
+            <Text variant="title" align="center" accessibilityRole="header">
+              {"Estamos revisando\ntu solicitud"}
+            </Text>
+            <Text variant="small" color="textMedium" align="center" style={s.description}>
+              Ya recibimos la información de tu negocio.
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View style={s.header}>
+          <View style={s.icon}><Icon name="house" size={24} color={t.colors.primary} /></View>
+          <Text variant="title" align="center">Verificá tu negocio</Text>
+          <Text color="textMedium" align="center" style={s.description}>
+            Enviá la información para que nuestro equipo pueda revisarla.
+          </Text>
+        </View>
+      )}
 
       {!hasEmail ? (
         <View style={s.surface}>
@@ -234,20 +251,26 @@ export default function BusinessVerificationScreen() {
           />
         </View>
       ) : verification.status === "PENDING" ? (
-        <View style={s.surface}>
-          <Text variant="subtitle">Solicitud en revisión</Text>
-          <Text color="textMedium">
-            Te avisaremos por correo y dentro de la app. La revisión puede tardar hasta dos días hábiles.
-          </Text>
-          <Button
-            title={isRefreshing ? "Consultando..." : "Consultar estado"}
-            variant="white"
-            loading={isRefreshing}
-            onPress={() => void load(true)}
-          />
-          <Text variant="small" color="textMedium">
-            Tu solicitud ya fue enviada. Este botón consulta si hay novedades; no vuelve a enviar tus documentos.
-          </Text>
+        <View style={s.reviewContent}>
+          <View style={s.reviewMessage}>
+            <Text variant="subtitle" align="center" accessibilityRole="header">
+              Por ahora, no necesitás enviar más documentos.
+            </Text>
+            <Text variant="small" color="textMedium" align="center">
+              Te avisaremos por correo y en la app cuando haya novedades.
+            </Text>
+          </View>
+          <View style={s.reviewActions}>
+            <Button
+              title={isRefreshing ? "Consultando..." : "Consultar estado"}
+              variant="white"
+              loading={isRefreshing}
+              onPress={() => void load(true)}
+            />
+            <Text variant="small" color="textMedium" align="center">
+              Solo consulta novedades; no vuelve a enviar tus documentos.
+            </Text>
+          </View>
         </View>
       ) : verification.status === "REJECTED" ? (
         <View style={s.surface}>
@@ -341,6 +364,17 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
       alignSelf: "center",
     },
     header: { alignItems: "center", gap: t.spacing.sm },
+    reviewHeader: { alignItems: "center", gap: t.spacing.md },
+    reviewSummary: { alignItems: "center", gap: t.spacing.sm },
+    reviewStatus: {
+      backgroundColor: t.colors.primaryLight,
+      borderRadius: t.borders.md,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.xs,
+    },
+    reviewContent: { paddingHorizontal: t.spacing.md, gap: t.spacing.lg },
+    reviewMessage: { gap: t.spacing.sm },
+    reviewActions: { gap: t.spacing.sm },
     icon: {
       width: 52,
       height: 52,
