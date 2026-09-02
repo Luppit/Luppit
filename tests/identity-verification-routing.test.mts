@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  continueIdentityVerificationAfterOnboarding,
   continueSignupAfterVerification,
   getBuyerProfileCreationMode,
   getNoProfileAccountState,
@@ -44,6 +45,35 @@ test("every unfinished required identity state resumes the Didit route", () => {
       status,
     );
   }
+});
+
+test("profile state refresh completes before identity navigation", async () => {
+  const events: string[] = [];
+
+  const continued = await continueIdentityVerificationAfterOnboarding({
+    refreshProfiles: async () => {
+      events.push("refresh");
+      return true;
+    },
+    navigate: () => events.push("navigate"),
+  });
+
+  assert.equal(continued, true);
+  assert.deepEqual(events, ["refresh", "navigate"]);
+});
+
+test("identity navigation stays put when profile state cannot refresh", async () => {
+  let didNavigate = false;
+
+  const continued = await continueIdentityVerificationAfterOnboarding({
+    refreshProfiles: async () => false,
+    navigate: () => {
+      didNavigate = true;
+    },
+  });
+
+  assert.equal(continued, false);
+  assert.equal(didNavigate, false);
 });
 
 test("legacy-exempt accounts retain the existing profile-creation route", () => {

@@ -29,6 +29,19 @@ export type SignupPostVerificationAction =
   | "resume_onboarding"
   | "start_onboarding";
 
+export async function continueIdentityVerificationAfterOnboarding(
+  dependencies: {
+    refreshProfiles: () => Promise<boolean>;
+    navigate: () => void;
+  },
+): Promise<boolean> {
+  const refreshed = await dependencies.refreshProfiles();
+  if (!refreshed) return false;
+
+  dependencies.navigate();
+  return true;
+}
+
 export function getSignupPostVerificationAction(
   profileCount: number,
   onboarding: AccountOnboarding,
