@@ -218,13 +218,20 @@ function AccountSettingsContent({
   const phone = profile?.phone?.trim() || "";
   const {
     permissionStatus: pushPermissionStatus,
+    permissionCanAskAgain,
     enablePushNotifications,
     openPushNotificationSettings,
   } = usePushNotifications();
   const pushPermissionLabel = pushPermissionStatus === "granted"
     ? "Activadas"
-    : pushPermissionStatus === "denied"
+    : pushPermissionStatus === "provisional"
+    ? "Silenciosas"
+    : pushPermissionStatus === "ephemeral"
+    ? "Temporales"
+    : pushPermissionStatus === "denied" || pushPermissionStatus === "blocked"
     ? "Desactivadas"
+    : pushPermissionStatus === "unavailable"
+    ? "No disponibles"
     : "Sin configurar";
 
   return (
@@ -344,13 +351,19 @@ function AccountSettingsContent({
           label="Notificaciones push"
           value={pushPermissionLabel}
           onPress={() => {
-            if (
-              pushPermissionStatus === "denied" ||
-              pushPermissionStatus === "unavailable"
+            if (pushPermissionStatus === "unavailable") {
+              showError(
+                "Notificaciones no disponibles",
+                "No pudimos consultar los permisos de este dispositivo.",
+              );
+            } else if (
+              pushPermissionStatus === "undetermined" ||
+              pushPermissionStatus === "provisional" ||
+              (pushPermissionStatus === "denied" && permissionCanAskAgain)
             ) {
-              void openPushNotificationSettings();
-            } else {
               void enablePushNotifications();
+            } else {
+              void openPushNotificationSettings();
             }
           }}
         />

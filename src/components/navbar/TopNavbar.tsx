@@ -445,6 +445,14 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
     hasSellerHomeFilters(sellerHomeFilters);
   const buyerFilterCount = countBuyerHomeFilterGroups(homeFilters);
   const sellerFilterCount = countSellerHomeFilterGroups(sellerHomeFilters);
+  const activeProfileSubtitle =
+    activeProfile?.role === "seller"
+      ? activeProfile.businessName?.trim()
+        ? `Vendedor · ${activeProfile.businessName.trim()}`
+        : "Vendedor"
+      : activeProfile?.role === "buyer"
+        ? "Comprador"
+        : null;
 
   return (
     <GlassSurface
@@ -455,9 +463,21 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       contentStyle={s.containerContent}
     >
       <Pressable onPress={() => void openProfileSwitcher()}>
-        <View style={s.profileRow}>
-          <Text variant="subtitle">{activeProfile?.profile.name ?? "Mi perfil"}</Text>
-          <Icon name="chevron-down" size={18} />
+        <View style={s.profileIdentity}>
+          <View style={s.profileRow}>
+            <Text variant="subtitle">{activeProfile?.profile.name ?? "Mi perfil"}</Text>
+            <Icon name="chevron-down" size={18} />
+          </View>
+          {activeProfileSubtitle ? (
+            <Text
+              variant="small"
+              color="stateAnulated"
+              maxLines={1}
+              style={s.profileSubtitle}
+            >
+              {activeProfileSubtitle}
+            </Text>
+          ) : null}
         </View>
       </Pressable>
 

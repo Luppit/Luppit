@@ -5,7 +5,7 @@ export type OtpVerifierStyles = {
   label: ViewStyle;
   otpCodeContainer: ViewStyle;
   otpCodeInputContainer: ViewStyle;
-  otpCodeInputContainerFocused: ViewStyle;
+  otpCodeInputContainerFocused: ViewStyle & TextStyle;
   otpCodeInput: TextStyle;
   otpCaret: ViewStyle;
   otpAndroidInput: TextStyle;
@@ -14,8 +14,8 @@ export type OtpVerifierStyles = {
   resendCodeView: ViewStyle;
   errorView: ViewStyle;
   inputState: {
-    error : ViewStyle;
-    success : ViewStyle;
+    error : ViewStyle & TextStyle;
+    success : ViewStyle & TextStyle;
   }
 };
 

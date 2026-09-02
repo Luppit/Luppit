@@ -3,6 +3,7 @@ import FilePicker, { SelectedFile } from "@/src/components/filePicker/FilePicker
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { getProfilePictureSource } from "@/src/components/profile/ProfilePicture";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
@@ -33,6 +34,7 @@ export default function BusinessVerificationScreen() {
     [insets.bottom, insets.top, t],
   );
   const { activeProfile, profiles, refreshProfiles, switchProfile } = useActiveProfile();
+  const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const [verification, setVerification] = useState<BusinessVerification | null>(null);
   const [rnpNumber, setRnpNumber] = useState("");
   const [files, setFiles] = useState<SelectedFile[]>([]);
@@ -135,6 +137,13 @@ export default function BusinessVerificationScreen() {
     return () => subscription.remove();
   }, [load]);
 
+  const hasEmail = isProfileEmailSetupComplete(activeProfile?.profile);
+
+  useEffect(() => {
+    if (!hasEmail || verification?.status !== "PENDING") return;
+    void presentInitialPushPermissionPrompt("businessVerificationPending");
+  }, [hasEmail, presentInitialPushPermissionPrompt, verification?.status]);
+
   if (!activeProfile || isLoading) {
     return <LoadingState label="Consultando la verificación..." />;
   }
@@ -153,7 +162,6 @@ export default function BusinessVerificationScreen() {
     );
   }
 
-  const hasEmail = isProfileEmailSetupComplete(activeProfile.profile);
   const canSubmit = verification.status === null || verification.status === "NEEDS_ACTION";
   const openProfileSwitcher = () => {
     openPopup({

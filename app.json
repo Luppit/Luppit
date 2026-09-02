@@ -162,6 +162,7 @@
     },
     "android": {
       "package": "com.luppit.app",
+      "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {

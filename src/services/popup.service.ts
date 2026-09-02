@@ -250,6 +250,10 @@ export function openPopup(config: PopupConfig) {
   emit();
 }
 
+export function hasOpenPopup() {
+  return currentState.config !== null;
+}
+
 export function closePopup() {
   const config = currentState.config;
   const onDismiss =
