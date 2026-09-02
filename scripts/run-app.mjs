@@ -10,6 +10,8 @@ const MODE_ALIASES = {
   sim: "simulator",
   simulator: "simulator",
   "ios-simulator": "simulator",
+  android: "android-device",
+  "android-device": "android-device",
   reinstall: "reinstall",
   reuse: "reinstall",
   development: "development",
@@ -106,6 +108,22 @@ export function createLaunchPlan(modeInput, platformInput) {
         "Builds and installs the local Debug app using Xcode's incremental cache, starts Metro, and opens Luppit in the simulator.",
       command: "npx",
       args: ["expo", "run:ios"],
+      env: PROFILE_ENV.development,
+      sentry: "Artifact upload is disabled; no EAS build is created.",
+    };
+  }
+
+  if (mode === "android-device") {
+    if (platformInput) {
+      throw new Error("The Android device launch does not need a platform.");
+    }
+
+    return {
+      mode: "Android device",
+      description:
+        "Builds and installs the local Debug app on a connected Android device, starts Metro, and opens Luppit.",
+      command: "npx",
+      args: ["expo", "run:android", "--device"],
       env: PROFILE_ENV.development,
       sentry: "Artifact upload is disabled; no EAS build is created.",
     };
@@ -212,6 +230,7 @@ Interactive:
 Direct:
   npm run app -- dev
   npm run app -- simulator
+  npm run app -- android
   npm run app -- reinstall
   npm run app -- development <ios|ios-simulator|android>
   npm run app -- preview <ios|ios-simulator|android>
@@ -253,6 +272,11 @@ async function getInteractiveSelection() {
         description: "Builds locally, installs, starts Metro, and opens Luppit for Codex/style work.",
       },
       {
+        value: "android-device",
+        label: "Start app on an Android device",
+        description: "Builds locally, installs, starts Metro, and opens Luppit on a connected phone.",
+      },
+      {
         value: "reinstall",
         label: "Reinstall an existing development build",
         description: "Open the latest EAS builds without creating or spending another build.",
@@ -279,7 +303,12 @@ async function getInteractiveSelection() {
       },
     ]);
 
-    if (mode === "dev" || mode === "simulator" || mode === "reinstall") {
+    if (
+      mode === "dev"
+      || mode === "simulator"
+      || mode === "android-device"
+      || mode === "reinstall"
+    ) {
       return { mode };
     }
 

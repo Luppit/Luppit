@@ -26,6 +26,16 @@ test("simulator builds and opens the local iOS app without EAS or Sentry upload"
   assert.match(plan.sentry, /no EAS build/i);
 });
 
+test("Android device mode builds and opens the local app without EAS or Sentry upload", () => {
+  const plan = createLaunchPlan("android");
+
+  assert.equal(plan.command, "npx");
+  assert.deepEqual(plan.args, ["expo", "run:android", "--device"]);
+  assert.equal(plan.env.EXPO_PUBLIC_BUILD_PROFILE, "development");
+  assert.equal(plan.env.SENTRY_DISABLE_AUTO_UPLOAD, "true");
+  assert.match(plan.sentry, /no EAS build/i);
+});
+
 test("reinstall opens existing EAS builds without creating a build", () => {
   const plan = createLaunchPlan("reinstall");
 
