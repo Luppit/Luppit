@@ -1,29 +1,29 @@
 import Button from "@/src/components/button/Button";
+import { BundledSvg } from "@/src/components/BundledSvg";
 import { Text } from "@/src/components/Text";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { colors, spacing } from "@/src/themes";
-import { Asset } from "expo-asset";
 import { Link, router } from "expo-router";
 import React from "react";
-import { StyleSheet, View } from "react-native";
-import { SvgUri } from "react-native-svg";
+import { Image, StyleSheet, View } from "react-native";
 
 export default function auth() {
-  const logoAsset = Asset.fromModule(
-    require("../../assets/images/logo-icon.svg"),
-  );
-
   return (
     <View style={styles.container}>
       <View style={styles.brand}>
-        {logoAsset.uri ? (
-          <SvgUri
-            uri={logoAsset.uri}
-            width={80}
-            height={80}
-            style={{ marginBottom: spacing.lg }}
-          />
-        ) : null}
+        <BundledSvg
+          asset={require("../../assets/images/logo-icon.svg")}
+          width={80}
+          height={80}
+          style={{ marginBottom: spacing.lg }}
+          fallback={
+            <Image
+              source={require("../../assets/images/icon.png")}
+              style={styles.logoFallback}
+              resizeMode="contain"
+            />
+          }
+        />
         <Text variant="title" align="center" style={{ marginBottom: spacing.xs }}>
           ¡Luppit te da la bienvenida!
         </Text>
@@ -122,6 +122,11 @@ const styles = StyleSheet.create({
   },
   brandDescription: {
     opacity: 0.65,
+  },
+  logoFallback: {
+    width: 80,
+    height: 80,
+    marginBottom: spacing.lg,
   },
   actions: {
     width: "100%",

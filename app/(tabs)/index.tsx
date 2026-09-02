@@ -1,10 +1,12 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import { BundledSvg } from "@/src/components/BundledSvg";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
+import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
@@ -45,11 +47,9 @@ import { type Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
-import { Asset } from "expo-asset";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { SvgUri } from "react-native-svg";
 
 const BUYER_DEFAULT_STAGE = "all";
 const SELLER_DEFAULT_STAGE = "for_you";
@@ -71,7 +71,10 @@ export default function HomeScreen() {
 }
 
 function getHomeTopContentInset(t: Theme, hasFilterChip: boolean) {
-  const profileHeight = t.typography.subtitle.lineHeight;
+  const profileHeight =
+    t.typography.subtitle.lineHeight +
+    t.spacing.sm +
+    t.typography.small.lineHeight;
   const searchHeight = 48;
   const segmentHeight = 58;
   const headerHeight =
@@ -388,6 +391,7 @@ function MarketplaceHomeContent({
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
+  const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
   const stageScrollRef = useRef<ScrollView | null>(null);
   const topContentInset = useMemo(
@@ -430,6 +434,16 @@ function MarketplaceHomeContent({
 
     return () => clearTimeout(timer);
   }, [selectedStageCode]);
+
+  useEffect(() => {
+    if (isLoading || setupRequirement || !hub) return;
+    void presentInitialPushPermissionPrompt("home");
+  }, [
+    hub,
+    isLoading,
+    presentInitialPushPermissionPrompt,
+    setupRequirement,
+  ]);
 
   const openSortPopup = useCallback(() => {
     if (role !== "buyer" || !sortConfig || !onSelectSort) return;
@@ -668,20 +682,22 @@ function MarketplaceHomeContent({
 function HomeRailEmptyState({ message }: { message: string }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
   return (
     <View style={s.inlineEmptyState}>
       <View style={s.inlineEmptyIllustration}>
-        {emptyBoxAsset?.uri ? (
-          <SvgUri uri={emptyBoxAsset.uri} width={112} height={112} />
-        ) : (
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={s.inlineEmptyFallbackImage}
-            resizeMode="contain"
-          />
-        )}
+        <BundledSvg
+          asset={require("../../assets/images/empty_box.svg")}
+          width={112}
+          height={112}
+          fallback={
+            <Image
+              source={require("../../assets/images/icon.png")}
+              style={s.inlineEmptyFallbackImage}
+              resizeMode="contain"
+            />
+          }
+        />
       </View>
       <Text variant="small" color="stateAnulated" align="center" style={s.inlineEmptyText}>
         {message}
@@ -738,7 +754,6 @@ function AccountSetupRequiredState({
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const { activeProfile } = useActiveProfile();
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
   const requiresSellerCategories = requirement === "seller_categories";
   const isMemberWaitingForCategories =
     requiresSellerCategories && activeProfile?.membershipRole === "member";
@@ -747,15 +762,18 @@ function AccountSetupRequiredState({
     <View
       style={[s.stateContent, { paddingTop: topContentInset }]}
     >
-      {emptyBoxAsset?.uri ? (
-        <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
-      ) : (
-        <Image
-          source={require("../../assets/images/icon.png")}
-          style={s.stateFallbackImage}
-          resizeMode="contain"
-        />
-      )}
+      <BundledSvg
+        asset={require("../../assets/images/empty_box.svg")}
+        width={240}
+        height={220}
+        fallback={
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={s.stateFallbackImage}
+            resizeMode="contain"
+          />
+        }
+      />
       <Text align="center" variant="body">
         {isMemberWaitingForCategories
           ? "El negocio necesita al menos una categoría de venta. Pedile al administrador principal que la configure para recibir oportunidades."
@@ -812,21 +830,23 @@ function HomeEmptyState({
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
-  const emptyBoxAsset = Asset.fromModule(require("../../assets/images/empty_box.svg"));
 
   return (
     <View
       style={[s.stateContent, { paddingTop: topContentInset }]}
     >
-      {emptyBoxAsset?.uri ? (
-        <SvgUri uri={emptyBoxAsset.uri} width={240} height={220} />
-      ) : (
-        <Image
-          source={require("../../assets/images/icon.png")}
-          style={s.stateFallbackImage}
-          resizeMode="contain"
-        />
-      )}
+      <BundledSvg
+        asset={require("../../assets/images/empty_box.svg")}
+        width={240}
+        height={220}
+        fallback={
+          <Image
+            source={require("../../assets/images/icon.png")}
+            style={s.stateFallbackImage}
+            resizeMode="contain"
+          />
+        }
+      />
       <Text align="center" variant="body">
         {message}
       </Text>

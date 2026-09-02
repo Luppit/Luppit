@@ -28,10 +28,16 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       paddingBottom: t.spacing.md,
       gap: t.spacing.md,
     },
+    profileIdentity: {
+      gap: t.spacing.sm,
+    },
     profileRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.xs,
+    },
+    profileSubtitle: {
+      maxWidth: "100%",
     },
     searchInputContainer: {
       borderRadius: 999,

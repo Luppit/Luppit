@@ -24,6 +24,44 @@ export type PushRegistrationDiagnostic = {
   code: string;
 };
 
+export type PushPermissionStatus =
+  | "granted"
+  | "provisional"
+  | "ephemeral"
+  | "denied"
+  | "blocked"
+  | "undetermined"
+  | "unavailable";
+
+export type PushPermissionState = {
+  status: PushPermissionStatus;
+  canAskAgain: boolean;
+};
+
+export type NativePushPermissionInput = {
+  platform: "android" | "ios";
+  granted: boolean;
+  status: "granted" | "denied" | "undetermined";
+  canAskAgain: boolean;
+  iosStatus?:
+    | "authorized"
+    | "provisional"
+    | "ephemeral"
+    | "denied"
+    | "not_determined"
+    | null;
+};
+
+export type PushPromptEligibilityInput = {
+  permissionStatus: PushPermissionStatus;
+  isAuthenticated: boolean;
+  hasActiveProfile: boolean;
+  isAppActive: boolean;
+  isEligibleSurface: boolean;
+  hasShownPrompt: boolean;
+  hasOpenPopup: boolean;
+};
+
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -54,6 +92,64 @@ export function createPushRegistrationDiagnostic(
       normalizeDiagnosticCode(fallbackCode) ??
       "unknown",
   };
+}
+
+export function mapPushPermissionState(
+  input: NativePushPermissionInput,
+): PushPermissionState {
+  if (input.platform === "ios") {
+    if (input.iosStatus === "authorized") {
+      return { status: "granted", canAskAgain: input.canAskAgain };
+    }
+    if (input.iosStatus === "provisional") {
+      return { status: "provisional", canAskAgain: input.canAskAgain };
+    }
+    if (input.iosStatus === "ephemeral") {
+      return { status: "ephemeral", canAskAgain: input.canAskAgain };
+    }
+    if (input.iosStatus === "denied") {
+      return {
+        status: input.canAskAgain ? "denied" : "blocked",
+        canAskAgain: input.canAskAgain,
+      };
+    }
+    if (input.iosStatus === "not_determined") {
+      return { status: "undetermined", canAskAgain: input.canAskAgain };
+    }
+  }
+
+  if (input.granted || input.status === "granted") {
+    return { status: "granted", canAskAgain: input.canAskAgain };
+  }
+  if (input.status === "denied") {
+    return {
+      status: input.canAskAgain ? "denied" : "blocked",
+      canAskAgain: input.canAskAgain,
+    };
+  }
+  return { status: "undetermined", canAskAgain: input.canAskAgain };
+}
+
+export function canRegisterForPush(status: PushPermissionStatus) {
+  return status === "granted" || status === "provisional" || status === "ephemeral";
+}
+
+export function shouldUnregisterPushDevice(status: PushPermissionStatus) {
+  return status === "denied" || status === "blocked";
+}
+
+export function shouldPresentPushPermissionPrompt(
+  input: PushPromptEligibilityInput,
+) {
+  return (
+    input.permissionStatus === "undetermined" &&
+    input.isAuthenticated &&
+    input.hasActiveProfile &&
+    input.isAppActive &&
+    input.isEligibleSurface &&
+    !input.hasShownPrompt &&
+    !input.hasOpenPopup
+  );
 }
 
 function getUuid(value: unknown) {

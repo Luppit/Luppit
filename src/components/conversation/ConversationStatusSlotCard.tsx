@@ -1,13 +1,12 @@
+import { BundledSvg } from "@/src/components/BundledSvg";
 import { Text } from "@/src/components/Text";
 import { Icon } from "@/src/components/Icon";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { lucideIcons, type LucideIconName } from "@/src/icons/lucide";
 import { ConversationViewSlot } from "@/src/services/conversation.service";
 import { Theme, useTheme } from "@/src/themes";
-import { Asset } from "expo-asset";
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
-import { SvgUri } from "react-native-svg";
 
 type Props = {
   slot: ConversationViewSlot;
@@ -53,8 +52,6 @@ function getDeadlineCaption(slot: ConversationViewSlot) {
 export default function ConversationStatusSlotCard({ slot }: Props) {
   const t = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
-  const [assetFailed, setAssetFailed] = useState(false);
-  const deadlineBoxUri = useMemo(() => Asset.fromModule(deadlineBoxAsset).uri, []);
   const formattedDate = formatDeadlineDate(slot.due_at, slot.formatted_due_at);
   const deadlineCaption = getDeadlineCaption(slot);
   const statusIcon =
@@ -67,14 +64,9 @@ export default function ConversationStatusSlotCard({ slot }: Props) {
           <View style={s.iconBadge}>
             <Icon name={statusIcon} size={22} color={t.colors.primary} />
           </View>
-        ) : !assetFailed ? (
-          <SvgUri
-            uri={deadlineBoxUri}
-            width={34}
-            height={34}
-            onError={() => setAssetFailed(true)}
-          />
-        ) : null}
+        ) : (
+          <BundledSvg asset={deadlineBoxAsset} width={34} height={34} />
+        )}
         <View style={s.headerCopy}>
           {slot.eyebrow_label ? (
             <Text variant="small" color="textMedium" style={s.eyebrow}>

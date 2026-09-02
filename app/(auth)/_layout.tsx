@@ -32,7 +32,10 @@ export default function AuthLayout() {
           pathname: "/(detail)/create-profile",
           params: {
             setup: "true",
-            title: state === "setup_required" ? "Completar perfil" : "Crear perfil",
+            title:
+              state === "setup_required"
+                ? "Completar perfil"
+                : "Completar registro",
             hideMenu: "true",
           },
         }}

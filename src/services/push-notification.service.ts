@@ -1,24 +1,30 @@
 import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { supabase } from "@/src/lib/supabase/client";
 import { fromAppError, fromSupabaseError } from "@/src/lib/supabase/errors";
-import { createSecureKVStorage } from "@/src/store/factory";
+import { createKVStorage, createSecureKVStorage } from "@/src/store/factory";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import {
+  canRegisterForPush,
   createPushRegistrationDiagnostic,
+  mapPushPermissionState,
   parsePushNotificationRoute,
   shouldSuppressForegroundPush,
 } from "./push-notification.helpers";
-import type { PushRegistrationDiagnostic } from "./push-notification.helpers";
+import type {
+  NativePushPermissionInput,
+  PushPermissionState,
+  PushRegistrationDiagnostic,
+} from "./push-notification.helpers";
 
-export type PushPermissionStatus =
-  | "granted"
-  | "denied"
-  | "undetermined"
-  | "unavailable";
+export type {
+  PushPermissionState,
+  PushPermissionStatus,
+} from "./push-notification.helpers";
 
-const storage = createSecureKVStorage();
+const secureStorage = createSecureKVStorage();
+const promptStorage = createKVStorage();
 const environmentKey = (
   process.env.EXPO_PUBLIC_ENV ??
   process.env.EXPO_PUBLIC_SUPABASE_URL ??
@@ -78,6 +84,10 @@ function isNativePushPlatform(): boolean {
 }
 
 function promptStorageKey(userId: string) {
+  return `push_prompt_shown_v2:${environmentKey}:${userId}`;
+}
+
+function legacyPromptStorageKey(userId: string) {
   return `push_prompt_shown:${environmentKey}:${userId}`;
 }
 
@@ -120,27 +130,57 @@ export async function configurePushNotificationChannels() {
   ]);
 }
 
-function mapPermissionStatus(
+function getIosAuthorizationStatus(
   permission: Notifications.NotificationPermissionsStatus,
-): PushPermissionStatus {
-  if (permission.granted) return "granted";
-  if (permission.status === Notifications.PermissionStatus.DENIED) {
-    return "denied";
+): NativePushPermissionInput["iosStatus"] {
+  switch (permission.ios?.status) {
+    case Notifications.IosAuthorizationStatus.AUTHORIZED:
+      return "authorized";
+    case Notifications.IosAuthorizationStatus.PROVISIONAL:
+      return "provisional";
+    case Notifications.IosAuthorizationStatus.EPHEMERAL:
+      return "ephemeral";
+    case Notifications.IosAuthorizationStatus.DENIED:
+      return "denied";
+    case Notifications.IosAuthorizationStatus.NOT_DETERMINED:
+      return "not_determined";
+    default:
+      return null;
   }
-  return "undetermined";
 }
 
-export async function getPushPermissionStatus(): Promise<PushPermissionStatus> {
-  if (!isNativePushPlatform()) return "unavailable";
+function mapPermissionStatus(
+  permission: Notifications.NotificationPermissionsStatus,
+): PushPermissionState {
+  const status = permission.status === Notifications.PermissionStatus.GRANTED
+    ? "granted"
+    : permission.status === Notifications.PermissionStatus.DENIED
+    ? "denied"
+    : "undetermined";
+  return mapPushPermissionState({
+    platform: Platform.OS === "ios" ? "ios" : "android",
+    granted: permission.granted,
+    status,
+    canAskAgain: permission.canAskAgain,
+    iosStatus: getIosAuthorizationStatus(permission),
+  });
+}
+
+export async function getPushPermissionStatus(): Promise<PushPermissionState> {
+  if (!isNativePushPlatform()) {
+    return { status: "unavailable", canAskAgain: false };
+  }
   try {
     return mapPermissionStatus(await Notifications.getPermissionsAsync());
   } catch {
-    return "unavailable";
+    return { status: "unavailable", canAskAgain: false };
   }
 }
 
-export async function requestPushPermission(): Promise<PushPermissionStatus> {
-  if (!isNativePushPlatform()) return "unavailable";
+export async function requestPushPermission(): Promise<PushPermissionState> {
+  if (!isNativePushPlatform()) {
+    return { status: "unavailable", canAskAgain: false };
+  }
   try {
     await configurePushNotificationChannels();
     const permission = await Notifications.requestPermissionsAsync({
@@ -152,7 +192,7 @@ export async function requestPushPermission(): Promise<PushPermissionStatus> {
     });
     return mapPermissionStatus(permission);
   } catch {
-    return "unavailable";
+    return { status: "unavailable", canAskAgain: false };
   }
 }
 
@@ -170,12 +210,12 @@ async function performCurrentPushDeviceRegistration(
 
   const permission = await getPushPermissionStatus();
   const projectId = getProjectId();
-  if (permission !== "granted") {
+  if (!canRegisterForPush(permission.status)) {
     return pushRegistrationFailure(
       "permission",
       fromAppError("unknown"),
       undefined,
-      `permission_${permission}`,
+      `permission_${permission.status}`,
     );
   }
   if (!projectId) {
@@ -216,7 +256,7 @@ async function performCurrentPushDeviceRegistration(
 
   let previousToken: string | null = null;
   try {
-    previousToken = await storage.getItem(tokenStorageKey);
+    previousToken = await secureStorage.getItem(tokenStorageKey);
   } catch {
     // Registration can continue without the previous local token.
   }
@@ -242,7 +282,7 @@ async function performCurrentPushDeviceRegistration(
     }
 
     try {
-      await storage.setItem(tokenStorageKey, token);
+      await secureStorage.setItem(tokenStorageKey, token);
     } catch {
       // The remote device registration succeeded; local caching is best effort.
     }
@@ -279,7 +319,7 @@ export function registerCurrentPushDevice(
 
 export async function unregisterCurrentPushDevice() {
   try {
-    const token = await storage.getItem(tokenStorageKey);
+    const token = await secureStorage.getItem(tokenStorageKey);
     if (!token) return true;
 
     const result = await supabase.rpc(
@@ -287,7 +327,7 @@ export async function unregisterCurrentPushDevice() {
       { p_expo_push_token: token },
     );
     if (result.error) return false;
-    await storage.removeItem(tokenStorageKey);
+    await secureStorage.removeItem(tokenStorageKey);
     return true;
   } catch {
     return false;
@@ -295,9 +335,35 @@ export async function unregisterCurrentPushDevice() {
 }
 
 export async function hasShownPushPermissionPrompt(userId: string) {
-  return (await storage.getItem(promptStorageKey(userId))) === "true";
+  try {
+    if ((await promptStorage.getItem(promptStorageKey(userId))) === "true") {
+      return true;
+    }
+  } catch {
+    // Fall through to the legacy marker when installation storage is unavailable.
+  }
+
+  try {
+    if ((await secureStorage.getItem(legacyPromptStorageKey(userId))) !== "true") {
+      return false;
+    }
+    try {
+      await promptStorage.setItem(promptStorageKey(userId), "true");
+      await secureStorage.removeItem(legacyPromptStorageKey(userId));
+    } catch {
+      // The legacy marker still prevents a repeated prompt.
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function markPushPermissionPromptShown(userId: string) {
-  await storage.setItem(promptStorageKey(userId), "true");
+  await promptStorage.setItem(promptStorageKey(userId), "true");
+  try {
+    await secureStorage.removeItem(legacyPromptStorageKey(userId));
+  } catch {
+    // The installation-scoped marker is authoritative.
+  }
 }

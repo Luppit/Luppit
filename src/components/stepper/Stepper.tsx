@@ -1,4 +1,5 @@
 import { useTheme } from "@/src/themes";
+import { useFocusEffect } from "@react-navigation/native";
 import React, {
   useCallback,
   forwardRef,
@@ -8,6 +9,7 @@ import React, {
   useState,
 } from "react";
 import {
+  BackHandler,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -50,11 +52,22 @@ export type StepperProps = {
   initialStep?: number;
   onFinish?: () => void;
   onBackAtFirstStep?: () => void;
+  backDisabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
 const Stepper = forwardRef<StepperRef, StepperProps>(
-  ({ steps, initialStep = 0, onFinish, onBackAtFirstStep, style }, ref) => {
+  (
+    {
+      steps,
+      initialStep = 0,
+      onFinish,
+      onBackAtFirstStep,
+      backDisabled = false,
+      style,
+    },
+    ref,
+  ) => {
     const t = useTheme();
     const s = useMemo(() => createStepperStyles(t), [t]);
     const scrollViewRef = useRef<ScrollView | null>(null);
@@ -67,9 +80,26 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
     }, [currentStep, onFinish, totalSteps]);
 
     const goBack = useCallback(() => {
+      if (backDisabled) return;
       if (currentStep === 0) onBackAtFirstStep?.();
       else setCurrentStep((i) => i - 1);
-    }, [currentStep, onBackAtFirstStep]);
+    }, [backDisabled, currentStep, onBackAtFirstStep]);
+
+    useFocusEffect(
+      useCallback(() => {
+        if (Platform.OS !== "android" || currentStep === 0) return;
+
+        const subscription = BackHandler.addEventListener(
+          "hardwareBackPress",
+          () => {
+            goBack();
+            return true;
+          }
+        );
+
+        return () => subscription.remove();
+      }, [currentStep, goBack])
+    );
 
     useImperativeHandle(
       ref,
@@ -127,7 +157,12 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
               <View style={s.header.container}>
                 {/* Header */}
                 <View style={s.header.icon}>
-                  <Pressable onPress={goBack}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: backDisabled }}
+                    disabled={backDisabled}
+                    onPress={goBack}
+                  >
                     <Icon name="arrow-left" size={20}></Icon>
                   </Pressable>
                 </View>

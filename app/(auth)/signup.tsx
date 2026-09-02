@@ -4,6 +4,7 @@ import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
 import {
+  PostPhoneVerificationSetupError,
   signUpWithPhoneOtp,
   verifyBuyerPhoneOtp,
   verifySellerPhoneOtp,
@@ -40,13 +41,26 @@ function SignupEntryStep({
   legalAccepted: boolean;
   onToggleLegal: () => void;
 }) {
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const isSendingCodeRef = useRef(false);
+
   const sendCode = async () => {
+    if (isSendingCodeRef.current) return;
+    isSendingCodeRef.current = true;
+    setIsSendingCode(true);
+    let didSendCode = false;
     try {
       await signUpWithPhoneOtp(defaultCountryCode + values.phoneNumber);
-      next();
-    } catch (err: any) {
-      showError(err.message);
+      didSendCode = true;
+    } catch (err) {
+      showError(
+        err instanceof Error ? err.message : "No se pudo enviar el código."
+      );
+    } finally {
+      isSendingCodeRef.current = false;
+      setIsSendingCode(false);
     }
+    if (didSendCode) next();
   };
 
   const legalMissingFields = legalAccepted
@@ -61,6 +75,7 @@ function SignupEntryStep({
           values={values}
           setValues={setValues}
           onCreate={sendCode}
+          loading={isSendingCode}
           additionalMissingFields={legalMissingFields}
           supportingContent={(
             <LegalAcceptance
@@ -78,6 +93,7 @@ function SignupEntryStep({
           values={values}
           setValues={setValues}
           onCreate={sendCode}
+          loading={isSendingCode}
           additionalMissingFields={legalMissingFields}
           supportingContent={(
             <LegalAcceptance
@@ -170,43 +186,33 @@ function VerifyStep({
   userType,
   values,
   legalAccepted,
+  onVerifyingChange,
 }: {
   userType: UserType;
   values: SignupFormValues;
   legalAccepted: boolean;
+  onVerifyingChange: (isVerifying: boolean) => void;
 }) {
   const isSeller = userType === "seller";
 
   const phoneNumber = values.phoneNumber;
 
   const onVerify = async (code: string) => {
-    if (!isSeller) {
-      return await verifyBuyerPhoneOtp(
-        defaultCountryCode + phoneNumber,
-        code,
-        legalAccepted,
-      )
-        .then(() => {
-          router.replace("/(auth)/identity-verification");
-          return true;
-        })
-        .catch((err) => {
-          showError(err.message);
-          return false;
-        });
-    }
-
-    return await verifySellerPhoneOtp(
-      defaultCountryCode + phoneNumber,
-      code,
-      legalAccepted,
-    )
+    const verify = isSeller ? verifySellerPhoneOtp : verifyBuyerPhoneOtp;
+    return await verify(defaultCountryCode + phoneNumber, code, legalAccepted)
       .then(() => {
-        router.replace("/(auth)/identity-verification");
         return true;
       })
       .catch((err) => {
-        showError(err.message);
+        if (err instanceof PostPhoneVerificationSetupError) {
+          showError("Teléfono verificado", err.message);
+          return true;
+        }
+        showError(
+          err instanceof Error
+            ? err.message
+            : "No pudimos verificar el código."
+        );
         return false;
       });
   };
@@ -220,6 +226,7 @@ function VerifyStep({
       phoneNumber={phoneNumber}
       onVerify={onVerify}
       onResend={onResend}
+      onVerifyingChange={onVerifyingChange}
     />
   );
 }
@@ -229,6 +236,7 @@ export default function Signup() {
 
   const [userType, setUserType] = useState<UserType>("buyer");
   const [legalAccepted, setLegalAccepted] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const [values, setValues] = useState<SignupFormValues>({
     phoneNumber: "",
@@ -261,6 +269,7 @@ export default function Signup() {
             userType={userType}
             values={values}
             legalAccepted={legalAccepted}
+            onVerifyingChange={setIsVerifying}
           />
         ),
       },
@@ -277,6 +286,7 @@ export default function Signup() {
       <Stepper
         steps={steps}
         ref={stepperRef}
+        backDisabled={isVerifying}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
     </View>

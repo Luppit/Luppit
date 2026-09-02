@@ -8,6 +8,7 @@ export type CreateUserFormTabProps = {
   values: any;
   setValues: any;
   onCreate: () => Promise<void>;
+  loading?: boolean;
   additionalMissingFields?: string[];
   supportingContent?: ReactNode;
 }
@@ -18,14 +19,13 @@ export default function CreateUserFormTab({
   values,
   setValues,
   onCreate,
+  loading = false,
   additionalMissingFields = [],
   supportingContent,
 }: CreateUserFormTabProps) {
-
-const [errors, setErrors] = useState({
+  const [errors, setErrors] = useState({
     phoneNumber: "",
   });
-
   const phoneRegex = /^(?![0-9]{8}$)/;
 
   const validateFields = () => {
@@ -45,7 +45,7 @@ const [errors, setErrors] = useState({
   const createUser = async () => {
     if (!validateFields()) return;
     await onCreate();
-  }
+  };
  
   return (
     <View>
@@ -68,6 +68,7 @@ const [errors, setErrors] = useState({
         variant="dark"
         onPress={() => createUser()}
         title="Siguiente"
+        loading={loading}
       />
     </View>
   );

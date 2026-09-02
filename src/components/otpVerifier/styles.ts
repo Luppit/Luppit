@@ -5,16 +5,17 @@ export type OtpVerifierStyles = {
   label: ViewStyle;
   otpCodeContainer: ViewStyle;
   otpCodeInputContainer: ViewStyle;
-  otpCodeInputContainerFocused: ViewStyle;
+  otpCodeInputContainerFocused: ViewStyle & TextStyle;
   otpCodeInput: TextStyle;
   otpCaret: ViewStyle;
+  otpAndroidInput: TextStyle;
   otpHiddenInput: TextStyle;
-  pasteCodeButton: ViewStyle;
+  resendCodeButton: ViewStyle;
   resendCodeView: ViewStyle;
   errorView: ViewStyle;
   inputState: {
-    error : ViewStyle;
-    success : ViewStyle;
+    error : ViewStyle & TextStyle;
+    success : ViewStyle & TextStyle;
   }
 };
 
@@ -38,12 +39,6 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       flexDirection: "row",
       justifyContent: "space-between",
       marginBottom: t.spacing.md,
-      ...Platform.select({
-        android: {
-          position: "relative",
-        } as ViewStyle,
-        default: {},
-      }),
     },
     otpCodeInputContainer: {
       width: 50,
@@ -53,12 +48,6 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       borderRadius: t.borders.sm,
       alignItems: "center",
       justifyContent: "center",
-      ...Platform.select({
-        android: {
-          zIndex: 2,
-        } as ViewStyle,
-        default: {},
-      }),
     },
     otpCodeInputContainerFocused: {
       borderColor: t.colors.primary,
@@ -75,20 +64,26 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       borderRadius: 1,
       backgroundColor: t.colors.primary,
     },
+    otpAndroidInput: {
+      ...t.typography.subtitle,
+      width: "100%",
+      height: 60,
+      marginBottom: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: t.borders.sm,
+      color: t.colors.textDark,
+      backgroundColor: t.colors.backgroudWhite,
+      textAlign: "center",
+      textAlignVertical: "center",
+      letterSpacing: t.spacing.md,
+      fontVariant: ["tabular-nums"],
+      includeFontPadding: false,
+    },
     otpHiddenInput: {
       position: "absolute",
       ...Platform.select({
-        android: {
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          zIndex: 1,
-          padding: 0,
-          borderWidth: 0,
-          color: "transparent",
-          backgroundColor: "transparent",
-        } as TextStyle,
         web: {
           width: 1,
           height: 1,
@@ -105,14 +100,13 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
         } as TextStyle,
       }),
     },
-    pasteCodeButton: {
+    resendCodeButton: {
       minHeight: 48,
-      alignSelf: "flex-start",
       justifyContent: "center",
-      marginBottom: t.spacing.md,
     },
     resendCodeView: {
       flexDirection: "row",
+      alignItems: "center",
     },
   };
 }

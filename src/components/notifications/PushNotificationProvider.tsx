@@ -3,9 +3,13 @@ import { supabase } from "@/src/lib/supabase/client";
 import {
   markCurrentProfileNotificationRead,
 } from "@/src/services/notification.service";
-import { openPopup } from "@/src/services/popup.service";
 import {
-  PushPermissionStatus,
+  hasOpenPopup,
+  openPopup,
+  subscribePopup,
+} from "@/src/services/popup.service";
+import type { PushPermissionStatus } from "@/src/services/push-notification.service";
+import {
   configurePushNotificationChannels,
   getPushPermissionStatus,
   hasShownPushPermissionPrompt,
@@ -15,12 +19,18 @@ import {
   setForegroundConversationId,
   unregisterCurrentPushDevice,
 } from "@/src/services/push-notification.service";
-import { parsePushNotificationRoute } from "@/src/services/push-notification.helpers";
+import {
+  canRegisterForPush,
+  parsePushNotificationRoute,
+  shouldPresentPushPermissionPrompt,
+  shouldUnregisterPushDevice,
+} from "@/src/services/push-notification.helpers";
 import { showError } from "@/src/utils/useToast";
 import * as Notifications from "expo-notifications";
 import {
   router,
   useGlobalSearchParams,
+  usePathname,
   useSegments,
 } from "expo-router";
 import React, {
@@ -36,16 +46,22 @@ import { AppState, Linking } from "react-native";
 
 type PushNotificationContextValue = {
   permissionStatus: PushPermissionStatus;
+  permissionCanAskAgain: boolean;
   enablePushNotifications: () => Promise<PushPermissionStatus>;
   openPushNotificationSettings: () => Promise<void>;
   refreshPushPermissionStatus: () => Promise<PushPermissionStatus>;
+  presentInitialPushPermissionPrompt: (
+    context: "home" | "businessVerificationPending",
+  ) => Promise<boolean>;
 };
 
 const PushNotificationContext = createContext<PushNotificationContextValue>({
   permissionStatus: "unavailable",
+  permissionCanAskAgain: false,
   enablePushNotifications: async () => "unavailable",
   openPushNotificationSettings: async () => {},
   refreshPushPermissionStatus: async () => "unavailable",
+  presentInitialPushPermissionPrompt: async () => false,
 });
 
 function getSingleParam(value: string | string[] | undefined) {
@@ -67,12 +83,23 @@ export function PushNotificationProvider({
     switchProfile,
   } = useActiveProfile();
   const segments = useSegments();
+  const pathname = usePathname();
   const params = useGlobalSearchParams<{ conversationId?: string | string[] }>();
-  const [permissionStatus, setPermissionStatus] =
-    useState<PushPermissionStatus>("unavailable");
+  const [permissionState, setPermissionState] = useState({
+    status: "unavailable" as PushPermissionStatus,
+    canAskAgain: false,
+  });
+  const [popupIsOpen, setPopupIsOpen] = useState(hasOpenPopup);
   const promptUserRef = useRef<string | null>(null);
+  const promptInFlightRef = useRef(false);
   const handledResponseRef = useRef<string | null>(null);
   const activeProfileId = activeProfile?.profile.id ?? null;
+  const profileStateRef = useRef(state);
+  const activeProfileIdRef = useRef(activeProfileId);
+  const pathnameRef = useRef(pathname);
+  profileStateRef.current = state;
+  activeProfileIdRef.current = activeProfileId;
+  pathnameRef.current = pathname;
   const isConversationScreen = segments.includes("(conversation)" as never);
   const foregroundConversationId = isConversationScreen
     ? getSingleParam(params.conversationId)
@@ -83,16 +110,21 @@ export function PushNotificationProvider({
     return () => setForegroundConversationId(null);
   }, [foregroundConversationId]);
 
+  useEffect(
+    () => subscribePopup(({ config }) => setPopupIsOpen(config !== null)),
+    [],
+  );
+
   const refreshPushPermissionStatus = useCallback(async () => {
-    const nextStatus = await getPushPermissionStatus();
-    setPermissionStatus(nextStatus);
-    return nextStatus;
+    const nextPermission = await getPushPermissionStatus();
+    setPermissionState(nextPermission);
+    return nextPermission.status;
   }, []);
 
   const enablePushNotifications = useCallback(async () => {
-    const nextStatus = await requestPushPermission();
-    setPermissionStatus(nextStatus);
-    if (nextStatus === "granted") {
+    const nextPermission = await requestPushPermission();
+    setPermissionState(nextPermission);
+    if (canRegisterForPush(nextPermission.status)) {
       const registration = await registerCurrentPushDevice();
       if (!registration.ok) {
         showError(
@@ -102,10 +134,10 @@ export function PushNotificationProvider({
             : "Revisá tu conexión e intentá nuevamente.",
         );
       }
-    } else if (nextStatus === "denied") {
+    } else if (shouldUnregisterPushDevice(nextPermission.status)) {
       await unregisterCurrentPushDevice();
     }
-    return nextStatus;
+    return nextPermission.status;
   }, []);
 
   const openPushNotificationSettings = useCallback(async () => {
@@ -124,12 +156,12 @@ export function PushNotificationProvider({
     let active = true;
     const synchronize = async () => {
       await configurePushNotificationChannels();
-      const nextStatus = await getPushPermissionStatus();
+      const nextPermission = await getPushPermissionStatus();
       if (!active) return;
-      setPermissionStatus(nextStatus);
-      if (nextStatus === "granted") {
+      setPermissionState(nextPermission);
+      if (canRegisterForPush(nextPermission.status)) {
         await registerCurrentPushDevice();
-      } else if (nextStatus === "denied") {
+      } else if (shouldUnregisterPushDevice(nextPermission.status)) {
         await unregisterCurrentPushDevice();
       }
     };
@@ -140,39 +172,48 @@ export function PushNotificationProvider({
     };
   }, [state]);
 
-  useEffect(() => {
-    if (
-      permissionStatus !== "undetermined" ||
-      (state !== "ready" &&
-        state !== "identity_required" &&
-        state !== "business_verification_required")
-    ) {
-      return;
-    }
+  const presentInitialPushPermissionPrompt = useCallback(
+    async (context: "home" | "businessVerificationPending") => {
+      if (promptInFlightRef.current) return false;
+      promptInFlightRef.current = true;
+      try {
+        const nextPermission = await getPushPermissionStatus();
+        setPermissionState(nextPermission);
+        const session = await supabase.auth.getSession();
+        const userId = session.data.session?.user.id;
+        if (!userId || promptUserRef.current === userId) return false;
 
-    let active = true;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const preparePrompt = async () => {
-      const session = await supabase.auth.getSession();
-      const userId = session.data.session?.user.id;
-      if (
-        !active ||
-        !userId ||
-        promptUserRef.current === userId ||
-        await hasShownPushPermissionPrompt(userId)
-      ) {
-        return;
-      }
-      promptUserRef.current = userId;
-      await markPushPermissionPromptShown(userId);
-      timeoutId = setTimeout(() => {
-        if (!active) return;
+        const hasShownPrompt = await hasShownPushPermissionPrompt(userId);
+        const currentState = profileStateRef.current;
+        const currentPathname = pathnameRef.current;
+        const isEligibleSurface =
+          context === "home"
+            ? currentState === "ready" && currentPathname === "/"
+            : currentState === "business_verification_required" &&
+              currentPathname === "/business-verification";
+        if (
+          !shouldPresentPushPermissionPrompt({
+            permissionStatus: nextPermission.status,
+            isAuthenticated: true,
+            hasActiveProfile: activeProfileIdRef.current != null,
+            isAppActive: AppState.currentState === "active",
+            isEligibleSurface,
+            hasShownPrompt,
+            hasOpenPopup: popupIsOpen || hasOpenPopup(),
+          })
+        ) {
+          return false;
+        }
+
+        promptUserRef.current = userId;
         openPopup({
           type: "summary",
           title: "Activá las notificaciones",
           icon: "bell",
           description:
-            "Te avisaremos solo sobre mensajes y cambios importantes en ofertas, entregas y verificaciones. La pantalla bloqueada no mostrará detalles privados.",
+            context === "businessVerificationPending"
+              ? "Te avisaremos cuando cambie el estado de tu verificación y cuando tengas mensajes u ofertas."
+              : "Te avisaremos sobre mensajes y cambios importantes en ofertas, entregas y verificaciones. No mostraremos detalles privados en la pantalla bloqueada.",
           dismissOnBackdropPress: false,
           actions: [
             {
@@ -182,7 +223,7 @@ export function PushNotificationProvider({
             },
             {
               id: "enable-push-notifications",
-              label: "Activar",
+              label: "Activar notificaciones",
               icon: "bell",
               onPress: async () => {
                 await enablePushNotifications();
@@ -191,15 +232,18 @@ export function PushNotificationProvider({
             },
           ],
         });
-      }, 1200);
-    };
-    void preparePrompt();
-
-    return () => {
-      active = false;
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [enablePushNotifications, permissionStatus, state]);
+        try {
+          await markPushPermissionPromptShown(userId);
+        } catch {
+          // The in-memory guard prevents another prompt during this session.
+        }
+        return true;
+      } finally {
+        promptInFlightRef.current = false;
+      }
+    },
+    [enablePushNotifications, popupIsOpen],
+  );
 
   const handleNotificationResponse = useCallback(async (
     response: Notifications.NotificationResponse,
@@ -327,21 +371,26 @@ export function PushNotificationProvider({
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState !== "active") return;
+      if (
+        nextState !== "active" ||
+        (state !== "ready" &&
+          state !== "identity_required" &&
+          state !== "business_verification_required")
+      ) return;
       void refreshPushPermissionStatus().then((nextStatus) => {
-        if (nextStatus === "granted") {
+        if (canRegisterForPush(nextStatus)) {
           void registerCurrentPushDevice();
-        } else if (nextStatus === "denied") {
+        } else if (shouldUnregisterPushDevice(nextStatus)) {
           void unregisterCurrentPushDevice();
         }
       });
     });
     return () => subscription.remove();
-  }, [refreshPushPermissionStatus]);
+  }, [refreshPushPermissionStatus, state]);
 
   useEffect(() => {
     if (
-      permissionStatus !== "granted" ||
+      !canRegisterForPush(permissionState.status) ||
       (state !== "ready" &&
         state !== "identity_required" &&
         state !== "business_verification_required")
@@ -352,17 +401,21 @@ export function PushNotificationProvider({
       void registerCurrentPushDevice(devicePushToken);
     });
     return () => subscription.remove();
-  }, [permissionStatus, state]);
+  }, [permissionState.status, state]);
 
   const value = useMemo(() => ({
-    permissionStatus,
+    permissionStatus: permissionState.status,
+    permissionCanAskAgain: permissionState.canAskAgain,
     enablePushNotifications,
     openPushNotificationSettings,
+    presentInitialPushPermissionPrompt,
     refreshPushPermissionStatus,
   }), [
     enablePushNotifications,
     openPushNotificationSettings,
-    permissionStatus,
+    permissionState.canAskAgain,
+    permissionState.status,
+    presentInitialPushPermissionPrompt,
     refreshPushPermissionStatus,
   ]);
 

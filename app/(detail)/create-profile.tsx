@@ -20,7 +20,10 @@ import {
   beginCurrentUserSellerOnboarding,
   createCurrentUserBuyerProfileFromVerifiedIdentity,
 } from "@/src/services/identity-verification.service";
-import { getBuyerProfileCreationMode } from "@/src/services/identity-verification.helpers";
+import {
+  continueIdentityVerificationAfterOnboarding,
+  getBuyerProfileCreationMode,
+} from "@/src/services/identity-verification.helpers";
 import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
 import {
@@ -214,12 +217,22 @@ export default function CreateProfileScreen() {
     if (requiresBuyerIdentityVerification) {
       setIsSaving(true);
       const onboarding = await beginCurrentUserBuyerOnboarding();
-      setIsSaving(false);
       if (!onboarding.ok) {
+        setIsSaving(false);
         showError("No se pudo iniciar la verificación", onboarding.error.message);
         return;
       }
-      router.push("/(auth)/identity-verification");
+      const continued = await continueIdentityVerificationAfterOnboarding({
+        refreshProfiles,
+        navigate: () => router.replace("/(auth)/identity-verification"),
+      });
+      setIsSaving(false);
+      if (!continued) {
+        showError(
+          "Verificación iniciada",
+          "No pudimos abrirla todavía. Intenta nuevamente."
+        );
+      }
       return;
     }
 
@@ -228,17 +241,28 @@ export default function CreateProfileScreen() {
       const onboarding = await beginCurrentUserSellerOnboarding(
         sellerUsesInvitation ? invitationId : null,
       );
-      setIsSaving(false);
       if (!onboarding.ok) {
+        setIsSaving(false);
         showError("No se pudo iniciar la verificación", onboarding.error.message);
         return;
       }
       if (onboarding.data.profileId) {
         const activated = await refreshProfiles(onboarding.data.profileId);
+        setIsSaving(false);
         if (activated) router.replace("/(tabs)");
         return;
       }
-      router.push("/(auth)/identity-verification");
+      const continued = await continueIdentityVerificationAfterOnboarding({
+        refreshProfiles,
+        navigate: () => router.replace("/(auth)/identity-verification"),
+      });
+      setIsSaving(false);
+      if (!continued) {
+        showError(
+          "Verificación iniciada",
+          "No pudimos abrirla todavía. Intenta nuevamente."
+        );
+      }
       return;
     }
 
