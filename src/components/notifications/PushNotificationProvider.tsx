@@ -218,12 +218,12 @@ export function PushNotificationProvider({
           actions: [
             {
               id: "push-notifications-later",
-              label: "Ahora no",
+              label: "No",
               icon: "arrow-left",
             },
             {
               id: "enable-push-notifications",
-              label: "Activar notificaciones",
+              label: "Activar",
               icon: "bell",
               onPress: async () => {
                 await enablePushNotifications();
