@@ -1,3 +1,4 @@
+import { BundledSvg } from "@/src/components/BundledSvg";
 import { TextField } from "@/src/components/inputField/InputField";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
@@ -40,12 +41,10 @@ import {
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
 import { router, usePathname } from "expo-router";
-import { Asset } from "expo-asset";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { createTopNavbarStyles } from "./topNavbarStyles";
 import {
@@ -116,13 +115,6 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const pathname = usePathname();
   const { activeProfile, profiles, refreshProfiles, switchProfile } =
     useActiveProfile();
-  const segmentIconUris = useMemo(() => {
-    const uris: Record<string, string> = {};
-    for (const [svgName, moduleRef] of Object.entries(segmentSvgModules)) {
-      uris[svgName] = Asset.fromModule(moduleRef).uri;
-    }
-    return uris;
-  }, []);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [selectedSegmentSvgName, setSelectedSegmentSvgNameState] = useState("");
   const [searchValue, setSearchValue] = useState("");
@@ -132,7 +124,6 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
   const [sellerCategoryOptions, setSellerCategoryOptions] = useState<
     SellerHomeFilterCategoryOption[]
   >([]);
-  const [failedSegmentIcons, setFailedSegmentIcons] = useState<Record<string, true>>({});
   const [pendingInvitationCount, setPendingInvitationCount] = useState(0);
   const [profileSwitcherOpenRequestId, setProfileSwitcherOpenRequestId] =
     useState(0);
@@ -520,9 +511,15 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
         contentContainerStyle={s.categoryListContainer}
       >
         {segments.map((segment) => {
-          const segmentIconUri = segmentIconUris[segment.svgName];
+          const segmentIconAsset = segmentSvgModules[segment.svgName];
           const isSelected =
             selectedSegmentSvgName === segment.svgName && !segment.isDisabled;
+          const fallbackImage = (
+            <Image
+              source={require("../../../assets/images/icon.png")}
+              style={[s.categoryImage, isSelected && s.categoryImageActive]}
+            />
+          );
 
           return (
             <Pressable
@@ -541,24 +538,15 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
               ]}
             >
               <View style={s.categoryImageContainer}>
-                {!segmentIconUri || failedSegmentIcons[segment.svgName] ? (
-                  <Image
-                    source={require("../../../assets/images/icon.png")}
-                    style={[s.categoryImage, isSelected && s.categoryImageActive]}
-                  />
-                ) : (
-                  <SvgUri
-                    uri={segmentIconUri}
+                {segmentIconAsset ? (
+                  <BundledSvg
+                    asset={segmentIconAsset}
                     width={isSelected ? 38 : 34}
                     height={isSelected ? 38 : 34}
-                    onError={() =>
-                      setFailedSegmentIcons((current) =>
-                        current[segment.svgName]
-                          ? current
-                          : { ...current, [segment.svgName]: true }
-                      )
-                    }
+                    fallback={fallbackImage}
                   />
+                ) : (
+                  fallbackImage
                 )}
               </View>
               <Text

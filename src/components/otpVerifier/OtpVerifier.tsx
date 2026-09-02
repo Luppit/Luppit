@@ -1,7 +1,6 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import { showError } from "@/src/utils/useToast";
-import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, TextInput, View } from "react-native";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
@@ -181,23 +180,8 @@ export const OtpVerifier = ({
     void maybeComplete(next);
   };
 
-  const pasteCode = async () => {
-    if (isValid || isVerifying) return;
-
-    try {
-      const clipboardValue = await Clipboard.getStringAsync();
-      const cleaned = normalizeOtpValue(clipboardValue, otpLength);
-      if (!cleaned) return;
-
-      handleChange(cleaned);
-      if (cleaned.length < otpLength) focus();
-    } catch {
-      showError("No se pudo pegar el código", "Intenta nuevamente.");
-    }
-  };
-
   const resendCode = async () => {
-    if (!isActive || isResendingRef.current) return;
+    if (!isActive || isVerifying || isResendingRef.current) return;
     isResendingRef.current = true;
     setIsResending(true);
     setIsActive(false);
@@ -224,6 +208,55 @@ export const OtpVerifier = ({
     }
   };
 
+  const input = (
+    <TextInput
+      ref={inputRef}
+      value={values.join("")}
+      onChangeText={handleChange}
+      onPressIn={isAndroid ? focus : undefined}
+      onFocus={(event) => {
+        stepperKeyboard?.scrollToFocusedInput(event.target);
+        setFocusedIndex(Math.min(values.join("").length, otpLength - 1));
+      }}
+      onBlur={() => setFocusedIndex(null)}
+      keyboardType="number-pad"
+      inputMode="numeric"
+      maxLength={isAndroid ? undefined : otpLength}
+      editable={!isValid && !isVerifying}
+      textContentType={isAndroid ? undefined : "oneTimeCode"}
+      autoComplete={isAndroid ? "sms-otp" : "one-time-code"}
+      importantForAutofill={isAndroid ? "yes" : undefined}
+      accessibilityLabel={
+        isAndroid
+          ? `Código de verificación de ${otpLength} dígitos`
+          : undefined
+      }
+      accessibilityHint={
+        isAndroid
+          ? "Ingresa el código recibido por mensaje de texto"
+          : undefined
+      }
+      accessibilityState={
+        isAndroid
+          ? { busy: isVerifying, disabled: isValid || isVerifying }
+          : undefined
+      }
+      caretHidden={!isAndroid}
+      selectionColor={isAndroid ? t.colors.primary : undefined}
+      underlineColorAndroid="transparent"
+      style={
+        isAndroid
+          ? [
+              s.otpAndroidInput,
+              focusedIndex !== null ? s.otpCodeInputContainerFocused : undefined,
+              hasError ? s.inputState.error : undefined,
+              isValid ? s.inputState.success : undefined,
+            ]
+          : s.otpHiddenInput
+      }
+    />
+  );
+
   return (
     <View>
       <View style={s.label}>
@@ -231,97 +264,42 @@ export const OtpVerifier = ({
           Se ha enviado un código a {maskPhone(phoneNumber)}
         </Text>
       </View>
-      <Pressable
-        style={s.otpCodeContainer}
-        onPress={isAndroid ? undefined : focus}
-        disabled={isValid || isVerifying}
-        accessible={isAndroid ? false : undefined}
-        importantForAccessibility={isAndroid ? "no" : undefined}
-      >
-        <TextInput
-          ref={inputRef}
-          value={values.join("")}
-          onChangeText={handleChange}
-          onPressIn={isAndroid ? focus : undefined}
-          onFocus={(event) => {
-            stepperKeyboard?.scrollToFocusedInput(event.target);
-            setFocusedIndex(Math.min(values.join("").length, otpLength - 1));
-          }}
-          onBlur={() => setFocusedIndex(null)}
-          keyboardType="number-pad"
-          inputMode="numeric"
-          maxLength={otpLength}
-          editable={!isValid && !isVerifying}
-          textContentType={isAndroid ? undefined : "oneTimeCode"}
-          autoComplete={isAndroid ? "sms-otp" : "one-time-code"}
-          importantForAutofill={isAndroid ? "yes" : undefined}
-          accessibilityLabel={
-            isAndroid
-              ? `Código de verificación de ${otpLength} dígitos`
-              : undefined
-          }
-          accessibilityHint={
-            isAndroid
-              ? "Ingresa el código recibido por mensaje de texto"
-              : undefined
-          }
-          caretHidden
-          selectionColor={isAndroid ? "transparent" : undefined}
-          underlineColorAndroid="transparent"
-          style={s.otpHiddenInput}
-        />
-        {Array.from({ length: otpLength }).map((_, index) => (
-          <View
-            key={index}
-            accessible={isAndroid ? false : undefined}
-            importantForAccessibility={
-              isAndroid ? "no-hide-descendants" : undefined
-            }
-            pointerEvents={isAndroid ? "none" : undefined}
-            style={[
-              s.otpCodeInputContainer,
-              focusedIndex === index
-                ? s.otpCodeInputContainerFocused
-                : undefined,
-              hasError ? s.inputState.error : undefined,
-              isValid ? s.inputState.success : undefined,
-            ]}
-          >
-            {values[index] ? (
-              <Text style={s.otpCodeInput}>{values[index]}</Text>
-            ) : focusedIndex === index ? (
-              <View style={s.otpCaret} />
-            ) : null}
-          </View>
-        ))}
-      </Pressable>
-      {isAndroid && !isValid && (
+      {isAndroid ? (
+        input
+      ) : (
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Pegar código"
-          accessibilityHint="Pega el código de verificación desde el portapapeles"
-          accessibilityState={{ disabled: isVerifying }}
-          disabled={isVerifying}
-          onPress={() => void pasteCode()}
-          style={({ pressed }) => [
-            s.pasteCodeButton,
-            pressed && !isVerifying ? { opacity: 0.6 } : undefined,
-          ]}
+          style={s.otpCodeContainer}
+          onPress={focus}
+          disabled={isValid || isVerifying}
         >
-          <Text
-            style={{ textDecorationLine: "underline" }}
-            color={isVerifying ? "stateAnulated" : "textDark"}
-          >
-            Pegar código
-          </Text>
+          {input}
+          {Array.from({ length: otpLength }).map((_, index) => (
+            <View
+              key={index}
+              style={[
+                s.otpCodeInputContainer,
+                focusedIndex === index
+                  ? s.otpCodeInputContainerFocused
+                  : undefined,
+                hasError ? s.inputState.error : undefined,
+                isValid ? s.inputState.success : undefined,
+              ]}
+            >
+              {values[index] ? (
+                <Text style={s.otpCodeInput}>{values[index]}</Text>
+              ) : focusedIndex === index ? (
+                <View style={s.otpCaret} />
+              ) : null}
+            </View>
+          ))}
         </Pressable>
       )}
       {Boolean(hasError) && (
-        <View
-          style={s.errorView}
-          accessibilityLiveRegion={isAndroid ? "polite" : undefined}
-        >
-          <Text color="error">
+        <View style={s.errorView}>
+          <Text
+            color="error"
+            accessibilityLiveRegion={isAndroid ? "polite" : undefined}
+          >
             Código inválido. Por favor, inténtalo de nuevo.
           </Text>
         </View>
@@ -329,19 +307,33 @@ export const OtpVerifier = ({
       <View style={s.resendCodeView}>
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: !isActive || isResending }}
-          disabled={!isActive || isResending}
+          accessibilityLabel="Reenviar código"
+          accessibilityHint={!isActive ? "Disponible en unos segundos" : undefined}
+          accessibilityState={{
+            disabled: !isActive || isVerifying || isResending,
+          }}
+          disabled={!isActive || isVerifying || isResending}
           onPress={resendCode}
+          style={s.resendCodeButton}
         >
           <Text
             style={{ textDecorationLine: "underline" }}
-            color={isActive && !isResending ? "textDark" : "stateAnulated"}
+            color={
+              isActive && !isVerifying && !isResending
+                ? "textDark"
+                : "stateAnulated"
+            }
           >
             Reenviar código
           </Text>
         </Pressable>
         {Boolean(!isActive) && (
-          <Text color="textDark" style={{ marginLeft: t.spacing.sm }}>
+          <Text
+            color="textDark"
+            style={{ marginLeft: t.spacing.sm }}
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+          >
             ({remainingTime}s)
           </Text>
         )}

@@ -4,14 +4,13 @@ import {
 import type { ChatMessage } from "./chat-session.context";
 import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
 import AssistantReviewCard from "@/src/components/assistant/AssistantReviewCard";
+import { BundledSvg } from "@/src/components/BundledSvg";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
-import { Asset } from "expo-asset";
 import React, { useEffect, useRef } from "react";
 import { Image, ScrollView, View } from "react-native";
-import { SvgUri } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
 
@@ -172,7 +171,6 @@ function PublishRequestCard({
 
 function EmptyRequestAssistantState() {
   const t = useTheme();
-  const logoAsset = Asset.fromModule(require("../../assets/images/logo-icon.svg"));
 
   return (
     <View
@@ -194,15 +192,18 @@ function EmptyRequestAssistantState() {
           justifyContent: "center",
         }}
       >
-        {logoAsset.uri ? (
-          <SvgUri uri={logoAsset.uri} width={40} height={40} />
-        ) : (
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={{ width: 40, height: 40 }}
-            resizeMode="contain"
-          />
-        )}
+        <BundledSvg
+          asset={require("../../assets/images/logo-icon.svg")}
+          width={40}
+          height={40}
+          fallback={
+            <Image
+              source={require("../../assets/images/icon.png")}
+              style={{ width: 40, height: 40 }}
+              resizeMode="contain"
+            />
+          }
+        />
       </View>
       <Text variant="body" align="center">
         ¿Qué estás buscando hoy?

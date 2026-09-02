@@ -1,9 +1,8 @@
+import { BundledSvg } from "@/src/components/BundledSvg";
 import { useTheme } from "@/src/themes/ThemeProvider";
-import { Asset } from "expo-asset";
 import { Link } from "expo-router";
 import React from "react";
 import { Platform, Pressable, StyleSheet, TextStyle, View } from "react-native";
-import { SvgUri } from "react-native-svg";
 import { Icon } from "../Icon";
 import { Text } from "../Text";
 import { createNavbarStyles } from "./styles";
@@ -16,9 +15,7 @@ type Props = {
   unreadNotificationCount?: number;
 };
 
-const homeLogoAsset = Asset.fromModule(
-  require("../../../assets/images/logo-icon.svg"),
-);
+const homeLogoAsset = require("../../../assets/images/logo-icon.svg");
 
 export default function NavbarItem({
   item,
@@ -61,8 +58,15 @@ export default function NavbarItem({
     >
       <View style={[s.itemInner, active && s.itemInnerActive, disabled && s.itemInnerDisabled]}>
         <View style={s.iconSlot}>
-          {isHomeItem && homeLogoAsset.uri ? (
-            <SvgUri uri={homeLogoAsset.uri} width={18} height={24} />
+          {isHomeItem ? (
+            <BundledSvg
+              asset={homeLogoAsset}
+              width={18}
+              height={24}
+              fallback={
+                item.icon ? <Icon name={item.icon} size={22} color={labelColor} /> : null
+              }
+            />
           ) : item.icon ? (
             <Icon name={item.icon} size={22} color={labelColor} />
           ) : null}
