@@ -96,7 +96,7 @@ export default function LegalAcceptanceGate({
           <View style={styles.icon}>
             <Icon name="shield-check" size={28} color={t.colors.primary} />
           </View>
-          <Text variant="title">Documentos legales actualizados</Text>
+          <Text variant="title">Documentos legales</Text>
           <Text variant="body" color="textMedium">
             Revisa los documentos vigentes y confirma tu aceptación para
             continuar usando Luppit.

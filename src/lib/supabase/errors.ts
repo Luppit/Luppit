@@ -9,11 +9,11 @@ export type AppError = {
 const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message: string }> = {
   signup_disabled: {
     type: "auth",
-    message: "No encontramos una cuenta activa con ese número.",
+    message: "No pudimos enviar el código. Verifica el número o crea una cuenta.",
   },
   "signups not allowed for otp": {
     type: "auth",
-    message: "No encontramos una cuenta activa con ese número.",
+    message: "No pudimos enviar el código. Verifica el número o crea una cuenta.",
   },
   otp_expired: {
     type: "validation",

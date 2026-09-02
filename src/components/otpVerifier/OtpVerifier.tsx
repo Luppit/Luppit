@@ -2,7 +2,7 @@ import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes/ThemeProvider";
 import { showError } from "@/src/utils/useToast";
 import * as Clipboard from "expo-clipboard";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, TextInput, View } from "react-native";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
 import { normalizeOtpValue } from "./otp";
@@ -12,25 +12,24 @@ type OtpVerifierProps = {
   phoneNumber: string;
   onVerify: (code: string) => Promise<boolean>;
   onResendCode: () => Promise<void>;
+  onVerifyingChange?: (isVerifying: boolean) => void;
   otpLength?: number;
 };
 
 const otpLengthDefault = 6;
 const isAndroid = Platform.OS === "android";
+const resendIntervalSeconds = 30;
 
 export const OtpVerifier = ({
   phoneNumber,
   onVerify,
   onResendCode,
+  onVerifyingChange,
   otpLength = otpLengthDefault,
 }: OtpVerifierProps) => {
   const t = useTheme();
   const s = useMemo(() => createOtpVerifierStyles(t), [t]);
   const stepperKeyboard = useStepperKeyboard();
-
-  useEffect(() => {
-    startCountdown();
-  }, []);
 
   const maskPhone = (phone: string) => {
     return phone.slice(0, -4).replace(/\d/g, "*") + phone.slice(-4);
@@ -41,18 +40,57 @@ export const OtpVerifier = ({
   );
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
-  const [isActive, setIsActive] = useState<boolean>(true);
+  const [isActive, setIsActive] = useState<boolean>(false);
   const [hasError, setHasError] = useState<boolean>(false);
   const [isValid, setIsValid] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [isResending, setIsResending] = useState<boolean>(false);
 
-  const INTERLVAL_TIME = 30;
-  const [remainingTime, setRemainingTime] = useState<number>(INTERLVAL_TIME);
+  const [remainingTime, setRemainingTime] = useState<number>(
+    resendIntervalSeconds
+  );
 
   const inputRef = useRef<TextInput | null>(null);
   const isVerifyingRef = useRef(false);
   const focusMayBeStaleRef = useRef(false);
   const refocusFrameRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+  const isResendingRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  const stopCountdown = useCallback(() => {
+    if (countdownIntervalRef.current !== null) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  }, []);
+
+  const startCountdown = useCallback(() => {
+    stopCountdown();
+    setIsActive(false);
+    setRemainingTime(resendIntervalSeconds);
+    countdownIntervalRef.current = setInterval(() => {
+      setRemainingTime((time) => {
+        if (time <= 1) {
+          stopCountdown();
+          setIsActive(true);
+          return 0;
+        }
+        return time - 1;
+      });
+    }, 1000);
+  }, [stopCountdown]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    startCountdown();
+    return () => {
+      isMountedRef.current = false;
+      stopCountdown();
+    };
+  }, [startCountdown, stopCountdown]);
 
   useEffect(() => {
     if (!isAndroid) return;
@@ -109,16 +147,21 @@ export const OtpVerifier = ({
 
     isVerifyingRef.current = true;
     setIsVerifying(true);
+    onVerifyingChange?.(true);
 
     try {
       const success = await onVerify(nextValues.join(""));
+      if (!isMountedRef.current) return;
       setIsValid(success);
       if (!success) {
         setHasError(true);
       }
     } finally {
       isVerifyingRef.current = false;
-      setIsVerifying(false);
+      if (isMountedRef.current) {
+        setIsVerifying(false);
+        onVerifyingChange?.(false);
+      }
     }
   };
 
@@ -154,30 +197,31 @@ export const OtpVerifier = ({
   };
 
   const resendCode = async () => {
-    if (!isActive) return;
+    if (!isActive || isResendingRef.current) return;
+    isResendingRef.current = true;
+    setIsResending(true);
     setIsActive(false);
-    await onResendCode();
-    setValues(Array(otpLength).fill(""));
-    setFocusedIndex(0);
-    setHasError(false);
-    setIsValid(false);
-    startCountdown();
-    focus();
-  };
-
-  const startCountdown = () => {
-    setIsActive(false);
-    setRemainingTime(INTERLVAL_TIME);
-    const interval = setInterval(() => {
-      setRemainingTime((time) => {
-        if (time <= 1) {
-          clearInterval(interval);
-          setIsActive(true);
-          return INTERLVAL_TIME;
-        }
-        return time - 1;
-      });
-    }, 1000);
+    try {
+      await onResendCode();
+      if (!isMountedRef.current) return;
+      setValues(Array(otpLength).fill(""));
+      setFocusedIndex(0);
+      setHasError(false);
+      setIsValid(false);
+      focus();
+    } catch (err) {
+      if (isMountedRef.current) {
+        showError(
+          err instanceof Error ? err.message : "No se pudo reenviar el código."
+        );
+      }
+    } finally {
+      isResendingRef.current = false;
+      if (isMountedRef.current) {
+        setIsResending(false);
+        startCountdown();
+      }
+    }
   };
 
   return (
@@ -283,10 +327,15 @@ export const OtpVerifier = ({
         </View>
       )}
       <View style={s.resendCodeView}>
-        <Pressable onPress={resendCode}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !isActive || isResending }}
+          disabled={!isActive || isResending}
+          onPress={resendCode}
+        >
           <Text
             style={{ textDecorationLine: "underline" }}
-            color={isActive ? "textDark" : "stateAnulated"}
+            color={isActive && !isResending ? "textDark" : "stateAnulated"}
           >
             Reenviar código
           </Text>

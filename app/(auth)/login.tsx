@@ -17,6 +17,8 @@ export function Step1({ next, values, setValues }: any) {
   const [errors, setErrors] = useState({
     phoneNumber: "",
   });
+  const [isSendingCode, setIsSendingCode] = useState(false);
+  const isSendingCodeRef = useRef(false);
 
   const validateFields = useCallback(() => {
     const newErrors: Record<string, string> = {};
@@ -30,13 +32,22 @@ export function Step1({ next, values, setValues }: any) {
   }, [values.phoneNumber]);
 
   const sendOtp = useCallback(async () => {
-    if (!validateFields()) return;
+    if (isSendingCodeRef.current || !validateFields()) return;
+    isSendingCodeRef.current = true;
+    setIsSendingCode(true);
+    let didSendCode = false;
     try {
       await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
-      next();
+      didSendCode = true;
     } catch (err) {
-      showError(err instanceof Error ? err.message : "No se pudo enviar el código.");
+      showError(
+        err instanceof Error ? err.message : "No se pudo enviar el código."
+      );
+    } finally {
+      isSendingCodeRef.current = false;
+      setIsSendingCode(false);
     }
+    if (didSendCode) next();
   }, [next, validateFields, values.phoneNumber]);
 
   return (
@@ -55,12 +66,17 @@ export function Step1({ next, values, setValues }: any) {
         hasError={!!errors.phoneNumber}
         error={errors.phoneNumber}
       ></InputPhone>
-      <Button variant="dark" onPress={() => sendOtp()} title="Siguiente" />
+      <Button
+        variant="dark"
+        onPress={() => sendOtp()}
+        title="Siguiente"
+        loading={isSendingCode}
+      />
     </View>
   );
 }
 
-export function Step2({ values }: any) {
+export function Step2({ values, onVerifyingChange }: any) {
   const onVerify = async (code: string) => {
     return await verifyPhoneOtp(defaultCountryCode + values.phoneNumber, code)
       .then(() => true)
@@ -71,11 +87,7 @@ export function Step2({ values }: any) {
   };
 
   const onResend = async () => {
-    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber).catch(
-      (err) => {
-        showError(err.message);
-      }
-    );
+    await signInWithPhoneOtp(defaultCountryCode + values.phoneNumber);
   };
 
   return (
@@ -83,6 +95,7 @@ export function Step2({ values }: any) {
       phoneNumber={values.phoneNumber}
       onVerify={onVerify}
       onResend={onResend}
+      onVerifyingChange={onVerifyingChange}
     />
   );
 }
@@ -93,6 +106,7 @@ export default function Login() {
   const [values, setValues] = useState({
     phoneNumber: "",
   });
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const steps: Step[] = React.useMemo(
     () => [
@@ -112,7 +126,9 @@ export default function Login() {
         title: "Verificación de código",
         description: "Ingresa el código enviado a tu teléfono",
         isNextStepShown: false,
-        render: () => <Step2 values={values} />,
+        render: () => (
+          <Step2 values={values} onVerifyingChange={setIsVerifying} />
+        ),
       },
     ],
     [values]
@@ -123,6 +139,7 @@ export default function Login() {
       <Stepper
         steps={steps}
         ref={stepperRef}
+        backDisabled={isVerifying}
         onBackAtFirstStep={() => router.back()}
       ></Stepper>
     </View>

@@ -1,6 +1,7 @@
 import {
   abortProfileScopedRequests,
   createCurrentUserProfile,
+  listCurrentUserProfiles,
   requestActiveProfileRefresh,
   setInitialProfileBootstrapPending,
   setCurrentProfileSummary,
@@ -10,7 +11,9 @@ import { RPC_FUNCTIONS } from "@/src/db/functions";
 import {
   beginCurrentUserBuyerOnboarding,
   beginCurrentUserSellerOnboarding,
+  getCurrentAccountOnboarding,
 } from "@/src/services/identity-verification.service";
+import { continueSignupAfterVerification } from "@/src/services/identity-verification.helpers";
 import { router } from "expo-router";
 import { supabase } from "./client";
 import { fromAppError, fromSupabaseError } from "./errors";
@@ -28,6 +31,7 @@ export type InitialProfileInput = {
 };
 
 export class InitialProfileSetupError extends Error {}
+export class PostPhoneVerificationSetupError extends InitialProfileSetupError {}
 
 function throwLocalizedSupabaseError(error: unknown): never {
   throw new Error(fromSupabaseError(error).message);
@@ -35,13 +39,6 @@ function throwLocalizedSupabaseError(error: unknown): never {
 
 async function sendPhoneOtp(phone: string, event: AuthEvent) {
   const shouldCreateUser = event === "SignUp";
-  const isRegistered = shouldCreateUser
-    ? await isPhoneNumberRegistered(phone)
-    : false;
-  if (isRegistered) {
-    throw new Error("El número de teléfono ya está registrado.");
-  }
-
   const { data, error } = await supabase.auth.signInWithOtp({
     phone,
     options: {
@@ -50,15 +47,6 @@ async function sendPhoneOtp(phone: string, event: AuthEvent) {
   });
   if (error) throwLocalizedSupabaseError(error);
   return data;
-}
-
-async function isPhoneNumberRegistered(phone: string) {
-  const { data, error } = await supabase.rpc(
-    RPC_FUNCTIONS.PHONE_NUMBER_IS_REGISTERED,
-    { p_phone: phone }
-  );
-  if (error) throwLocalizedSupabaseError(error);
-  return data === true;
 }
 
 async function VerifyPhoneOtpInternal(
@@ -145,26 +133,7 @@ export async function verifyBuyerPhoneOtp(
   token: string,
   legalAccepted: boolean
 ) {
-  if (!legalAccepted) {
-    throw new InitialProfileSetupError(
-      "Debes aceptar los documentos legales para crear tu cuenta."
-    );
-  }
-
-  let didStoreOnboarding = false;
-  setInitialProfileBootstrapPending(true);
-  try {
-    const data = await VerifyPhoneOtpInternal(phone, token, undefined, true);
-    const onboarding = await beginCurrentUserBuyerOnboarding();
-    if (!onboarding.ok) {
-      throw new InitialProfileSetupError(onboarding.error.message);
-    }
-    didStoreOnboarding = true;
-    return data;
-  } finally {
-    setInitialProfileBootstrapPending(false);
-    if (didStoreOnboarding) await requestActiveProfileRefresh();
-  }
+  return await verifySignupPhoneOtp(phone, token, legalAccepted, "buyer");
 }
 
 export async function verifySellerPhoneOtp(
@@ -172,25 +141,71 @@ export async function verifySellerPhoneOtp(
   token: string,
   legalAccepted: boolean
 ) {
+  return await verifySignupPhoneOtp(phone, token, legalAccepted, "seller");
+}
+
+async function verifySignupPhoneOtp(
+  phone: string,
+  token: string,
+  legalAccepted: boolean,
+  intendedRole: "buyer" | "seller",
+) {
   if (!legalAccepted) {
     throw new InitialProfileSetupError(
       "Debes aceptar los documentos legales para crear tu cuenta."
     );
   }
 
-  let didStoreOnboarding = false;
+  let didVerifySession = false;
   setInitialProfileBootstrapPending(true);
   try {
     const data = await VerifyPhoneOtpInternal(phone, token, undefined, true);
-    const onboarding = await beginCurrentUserSellerOnboarding();
-    if (!onboarding.ok) {
-      throw new InitialProfileSetupError(onboarding.error.message);
+    didVerifySession = true;
+
+    try {
+      const legalAcceptance = await supabase.rpc(
+        RPC_FUNCTIONS.ACCEPT_CURRENT_LEGAL_DOCUMENTS,
+        { p_source: "APP" }
+      );
+      if (legalAcceptance.error) {
+        throw new Error(
+          "No pudimos guardar la aceptación de los documentos legales."
+        );
+      }
+
+      await continueSignupAfterVerification(intendedRole, {
+        getProfileCount: async () => {
+          const profiles = await listCurrentUserProfiles();
+          if (!profiles.ok) throw new Error(profiles.error.message);
+          return profiles.data.length;
+        },
+        getOnboarding: async () => {
+          const onboarding = await getCurrentAccountOnboarding();
+          if (!onboarding.ok) throw new Error(onboarding.error.message);
+          return onboarding.data;
+        },
+        beginOnboarding: async (role) => {
+          const started = role === "buyer"
+            ? await beginCurrentUserBuyerOnboarding()
+            : await beginCurrentUserSellerOnboarding();
+          if (!started.ok) throw new Error(started.error.message);
+        },
+      });
+      return data;
+    } catch (error) {
+      throw new PostPhoneVerificationSetupError(
+        error instanceof Error ? error.message : fromAppError("unknown").message
+      );
     }
-    didStoreOnboarding = true;
-    return data;
   } finally {
     setInitialProfileBootstrapPending(false);
-    if (didStoreOnboarding) await requestActiveProfileRefresh();
+    if (didVerifySession) {
+      try {
+        await requestActiveProfileRefresh();
+      } catch {
+        // Do not turn a completed phone verification into an invalid-code error.
+      }
+    }
   }
 }
 

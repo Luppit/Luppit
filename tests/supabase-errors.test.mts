@@ -11,7 +11,10 @@ test("localizes the missing OTP account response", () => {
     message: "Signups not allowed for OTP",
   });
 
-  assert.equal(byCode.message, "No encontramos una cuenta activa con ese número.");
+  assert.equal(
+    byCode.message,
+    "No pudimos enviar el código. Verifica el número o crea una cuenta.",
+  );
   assert.equal(byLegacyMessage.message, byCode.message);
 });
 
