@@ -1,8 +1,11 @@
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes/ThemeProvider";
+import { showError } from "@/src/utils/useToast";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import { AppState, Platform, Pressable, TextInput, View } from "react-native";
 import { useStepperKeyboard } from "../stepper/StepperKeyboardContext";
+import { normalizeOtpValue } from "./otp";
 import { createOtpVerifierStyles } from "./styles";
 
 type OtpVerifierProps = {
@@ -13,6 +16,7 @@ type OtpVerifierProps = {
 };
 
 const otpLengthDefault = 6;
+const isAndroid = Platform.OS === "android";
 
 export const OtpVerifier = ({
   phoneNumber,
@@ -47,8 +51,57 @@ export const OtpVerifier = ({
 
   const inputRef = useRef<TextInput | null>(null);
   const isVerifyingRef = useRef(false);
+  const focusMayBeStaleRef = useRef(false);
+  const refocusFrameRef = useRef<number | null>(null);
 
-  const focus = () => inputRef.current?.focus();
+  useEffect(() => {
+    if (!isAndroid) return;
+
+    const markFocusAsStale = () => {
+      if (refocusFrameRef.current !== null) {
+        cancelAnimationFrame(refocusFrameRef.current);
+        refocusFrameRef.current = null;
+      }
+      focusMayBeStaleRef.current = true;
+      setFocusedIndex(null);
+    };
+
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextAppState) => {
+        if (nextAppState !== "active") markFocusAsStale();
+      }
+    );
+    const blurSubscription = AppState.addEventListener(
+      "blur",
+      markFocusAsStale
+    );
+
+    return () => {
+      appStateSubscription.remove();
+      blurSubscription.remove();
+      if (refocusFrameRef.current !== null) {
+        cancelAnimationFrame(refocusFrameRef.current);
+      }
+    };
+  }, []);
+
+  const focus = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    if (!isAndroid || !focusMayBeStaleRef.current) {
+      input.focus();
+      return;
+    }
+
+    focusMayBeStaleRef.current = false;
+    input.blur();
+    refocusFrameRef.current = requestAnimationFrame(() => {
+      refocusFrameRef.current = null;
+      inputRef.current?.focus();
+    });
+  };
   const blur = () => inputRef.current?.blur();
 
   const maybeComplete = async (nextValues: string[]) => {
@@ -72,7 +125,7 @@ export const OtpVerifier = ({
   const handleChange = (text: string) => {
     if (isValid || isVerifying) return;
     setHasError(false);
-    const cleaned = text.replace(/\D/g, "").slice(0, otpLength);
+    const cleaned = normalizeOtpValue(text, otpLength);
     const next = Array.from(
       { length: otpLength },
       (_, index) => cleaned[index] ?? ""
@@ -83,6 +136,21 @@ export const OtpVerifier = ({
     if (cleaned.length === otpLength) blur();
 
     void maybeComplete(next);
+  };
+
+  const pasteCode = async () => {
+    if (isValid || isVerifying) return;
+
+    try {
+      const clipboardValue = await Clipboard.getStringAsync();
+      const cleaned = normalizeOtpValue(clipboardValue, otpLength);
+      if (!cleaned) return;
+
+      handleChange(cleaned);
+      if (cleaned.length < otpLength) focus();
+    } catch {
+      showError("No se pudo pegar el código", "Intenta nuevamente.");
+    }
   };
 
   const resendCode = async () => {
@@ -121,13 +189,16 @@ export const OtpVerifier = ({
       </View>
       <Pressable
         style={s.otpCodeContainer}
-        onPress={focus}
+        onPress={isAndroid ? undefined : focus}
         disabled={isValid || isVerifying}
+        accessible={isAndroid ? false : undefined}
+        importantForAccessibility={isAndroid ? "no" : undefined}
       >
         <TextInput
           ref={inputRef}
           value={values.join("")}
           onChangeText={handleChange}
+          onPressIn={isAndroid ? focus : undefined}
           onFocus={(event) => {
             stepperKeyboard?.scrollToFocusedInput(event.target);
             setFocusedIndex(Math.min(values.join("").length, otpLength - 1));
@@ -137,15 +208,32 @@ export const OtpVerifier = ({
           inputMode="numeric"
           maxLength={otpLength}
           editable={!isValid && !isVerifying}
-          textContentType="oneTimeCode"
-          autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
-          importantForAutofill="yes"
+          textContentType={isAndroid ? undefined : "oneTimeCode"}
+          autoComplete={isAndroid ? "sms-otp" : "one-time-code"}
+          importantForAutofill={isAndroid ? "yes" : undefined}
+          accessibilityLabel={
+            isAndroid
+              ? `Código de verificación de ${otpLength} dígitos`
+              : undefined
+          }
+          accessibilityHint={
+            isAndroid
+              ? "Ingresa el código recibido por mensaje de texto"
+              : undefined
+          }
           caretHidden
+          selectionColor={isAndroid ? "transparent" : undefined}
+          underlineColorAndroid="transparent"
           style={s.otpHiddenInput}
         />
         {Array.from({ length: otpLength }).map((_, index) => (
           <View
             key={index}
+            accessible={isAndroid ? false : undefined}
+            importantForAccessibility={
+              isAndroid ? "no-hide-descendants" : undefined
+            }
+            pointerEvents={isAndroid ? "none" : undefined}
             style={[
               s.otpCodeInputContainer,
               focusedIndex === index
@@ -163,8 +251,32 @@ export const OtpVerifier = ({
           </View>
         ))}
       </Pressable>
+      {isAndroid && !isValid && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Pegar código"
+          accessibilityHint="Pega el código de verificación desde el portapapeles"
+          accessibilityState={{ disabled: isVerifying }}
+          disabled={isVerifying}
+          onPress={() => void pasteCode()}
+          style={({ pressed }) => [
+            s.pasteCodeButton,
+            pressed && !isVerifying ? { opacity: 0.6 } : undefined,
+          ]}
+        >
+          <Text
+            style={{ textDecorationLine: "underline" }}
+            color={isVerifying ? "stateAnulated" : "textDark"}
+          >
+            Pegar código
+          </Text>
+        </Pressable>
+      )}
       {Boolean(hasError) && (
-        <View style={s.errorView}>
+        <View
+          style={s.errorView}
+          accessibilityLiveRegion={isAndroid ? "polite" : undefined}
+        >
           <Text color="error">
             Código inválido. Por favor, inténtalo de nuevo.
           </Text>

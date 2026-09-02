@@ -9,6 +9,7 @@ export type OtpVerifierStyles = {
   otpCodeInput: TextStyle;
   otpCaret: ViewStyle;
   otpHiddenInput: TextStyle;
+  pasteCodeButton: ViewStyle;
   resendCodeView: ViewStyle;
   errorView: ViewStyle;
   inputState: {
@@ -37,6 +38,12 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       flexDirection: "row",
       justifyContent: "space-between",
       marginBottom: t.spacing.md,
+      ...Platform.select({
+        android: {
+          position: "relative",
+        } as ViewStyle,
+        default: {},
+      }),
     },
     otpCodeInputContainer: {
       width: 50,
@@ -46,6 +53,12 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
       borderRadius: t.borders.sm,
       alignItems: "center",
       justifyContent: "center",
+      ...Platform.select({
+        android: {
+          zIndex: 2,
+        } as ViewStyle,
+        default: {},
+      }),
     },
     otpCodeInputContainerFocused: {
       borderColor: t.colors.primary,
@@ -64,18 +77,39 @@ export function createOtpVerifierStyles(t: Theme): OtpVerifierStyles {
     },
     otpHiddenInput: {
       position: "absolute",
-      width: 1,
-      height: 1,
-      opacity: 0,
       ...Platform.select({
+        android: {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 1,
+          padding: 0,
+          borderWidth: 0,
+          color: "transparent",
+          backgroundColor: "transparent",
+        } as TextStyle,
         web: {
+          width: 1,
+          height: 1,
+          opacity: 0,
           outlineWidth: 0,
           outlineColor: "transparent",
           borderWidth: 0,
           backgroundColor: "transparent",
         } as TextStyle,
-        default: {},
+        default: {
+          width: 1,
+          height: 1,
+          opacity: 0,
+        } as TextStyle,
       }),
+    },
+    pasteCodeButton: {
+      minHeight: 48,
+      alignSelf: "flex-start",
+      justifyContent: "center",
+      marginBottom: t.spacing.md,
     },
     resendCodeView: {
       flexDirection: "row",
