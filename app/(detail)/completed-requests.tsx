@@ -533,7 +533,7 @@ function SellerCompletedRequests() {
   const openSort = React.useCallback(() => {
     openPopup({
       type: "sort",
-      title: "Ordenar solicitudes",
+      title: "Ordenar ofertas",
       options: SELLER_SORT_OPTIONS,
       initialSelectedId: sortCode,
       onSelect: setSortCode,

@@ -108,7 +108,7 @@ function BuyerProfileContent() {
         <LoadingState label="Cargando perfil..." variant="inline" style={s.loadingBox} />
       ) : (
         <>
-          <View style={s.buyerIdentityCard}>
+          <View style={s.identityCard}>
             <ProfilePicture
               kind="buyer"
               name={overview?.profile.name}
@@ -116,11 +116,11 @@ function BuyerProfileContent() {
               imageUrl={buyerPicture.imageUrl}
               size={72}
             />
-            <View style={s.buyerIdentityText}>
+            <View style={s.identityText}>
               <Text variant="subtitle" maxLines={2} style={s.flexText}>
                 {overview?.profile.name?.trim() || "Perfil de comprador"}
               </Text>
-              <View style={s.buyerPhoneText}>
+              <View style={s.identityDetail}>
                 <Text variant="small" color="stateAnulated">
                   Número telefónico
                 </Text>
@@ -236,6 +236,7 @@ function SellerProfileContent() {
 
   const phone = overview?.profile.phone?.trim() || "";
   const business = overview?.business ?? null;
+  const businessPicture = getProfilePictureSource(business);
   const rating = business?.rating;
   const ratingLabel =
     typeof rating === "number" && business?.numRatings
@@ -271,15 +272,26 @@ function SellerProfileContent() {
         <LoadingState label="Cargando perfil..." variant="inline" style={s.loadingBox} />
       ) : (
         <>
-          <View style={s.phoneCard}>
-            <View style={s.iconBadge}>
-              <Icon name="lock" size={21} color={t.colors.textDark} />
-            </View>
-            <View style={s.phoneText}>
-              <Text color="stateAnulated">Número telefónico</Text>
-              <Text variant="subtitle" maxLines={1} style={s.flexText}>
-                {phone || "Sin número registrado"}
+          <View style={s.identityCard}>
+            <ProfilePicture
+              kind="business"
+              name={business?.name}
+              imagePath={businessPicture.imagePath}
+              imageUrl={businessPicture.imageUrl}
+              size={72}
+            />
+            <View style={s.identityText}>
+              <Text variant="subtitle" maxLines={2} style={s.flexText}>
+                {business?.name?.trim() || "Perfil de vendedor"}
               </Text>
+              <View style={s.identityDetail}>
+                <Text variant="small" color="stateAnulated">
+                  Número telefónico
+                </Text>
+                <Text maxLines={1} style={s.flexText}>
+                  {phone || "Sin número registrado"}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -509,16 +521,7 @@ function createProfileStyles(t: Theme) {
       justifyContent: "center",
       gap: t.spacing.sm,
     },
-    phoneCard: {
-      minHeight: 76,
-      ...cardSurface,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.sm + t.spacing.xs,
-    },
-    buyerIdentityCard: {
+    identityCard: {
       minHeight: 104,
       ...cardSurface,
       padding: t.spacing.md,
@@ -526,17 +529,12 @@ function createProfileStyles(t: Theme) {
       alignItems: "center",
       gap: t.spacing.md,
     },
-    buyerIdentityText: {
+    identityText: {
       flex: 1,
       minWidth: 0,
       gap: t.spacing.xs,
     },
-    buyerPhoneText: {
-      gap: 2,
-    },
-    phoneText: {
-      flex: 1,
-      minWidth: 0,
+    identityDetail: {
       gap: 2,
     },
     flexText: {

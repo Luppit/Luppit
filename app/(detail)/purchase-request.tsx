@@ -493,7 +493,7 @@ export default function PurchaseRequestDetailScreen() {
   const openSortPopup = () => {
     openPopup({
       type: "sort",
-      title: "Ordenar",
+      title: "Ordenar ofertas",
       options: BUYER_OFFER_SORT_OPTIONS,
       initialSelectedId: selectedSortId,
       onSelect: setSelectedSortId,

@@ -349,7 +349,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
   const openSortPopup = React.useCallback(() => {
     openPopup({
       type: "sort",
-      title: "Ordenar",
+      title: "Ordenar favoritas",
       options: FAVORITE_SORT_OPTIONS,
       initialSelectedId: selectedSortId,
       onSelect: setSelectedSortId,
