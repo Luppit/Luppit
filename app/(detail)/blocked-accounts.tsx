@@ -14,7 +14,7 @@ import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -97,31 +97,35 @@ export default function BlockedAccountsScreen() {
     return <LoadingState label="Cargando cuentas bloqueadas..." />;
   }
 
-  return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
-    >
-      {blocks.length === 0 ? (
+  if (blocks.length === 0) {
+    return (
+      <View style={styles.centerState}>
         <StandaloneListEmptyState
           icon="shield-check"
           title="No tienes cuentas bloqueadas"
           description="Los contactos que bloquees desde una conversación aparecerán aquí."
         />
-      ) : (
-        <GroupedListSection title="Contactos bloqueados">
-          {blocks.map((block, index) => (
-            <GroupedListRow
-              key={block.id}
-              icon={block.counterpartType === "BUSINESS" ? "house" : "user"}
-              label={block.counterpartLabel}
-              description={formatBlockedDate(block.createdAt)}
-              showSeparator={index < blocks.length - 1}
-              onPress={() => openUnblockConfirmation(block)}
-            />
-          ))}
-        </GroupedListSection>
-      )}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.content}
+    >
+      <GroupedListSection title="Contactos bloqueados">
+        {blocks.map((block, index) => (
+          <GroupedListRow
+            key={block.id}
+            icon={block.counterpartType === "BUSINESS" ? "house" : "user"}
+            label={block.counterpartLabel}
+            description={formatBlockedDate(block.createdAt)}
+            showSeparator={index < blocks.length - 1}
+            onPress={() => openUnblockConfirmation(block)}
+          />
+        ))}
+      </GroupedListSection>
     </ScrollView>
   );
 }
@@ -130,9 +134,15 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
   return StyleSheet.create({
     content: {
       paddingTop: topInset + t.spacing.md,
-      paddingHorizontal: t.spacing.md,
       paddingBottom: bottomInset + t.spacing.xl,
       gap: t.spacing.lg,
+    },
+    centerState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingTop: topInset,
+      paddingHorizontal: t.spacing.lg,
     },
   });
 }

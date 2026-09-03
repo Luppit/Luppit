@@ -355,7 +355,7 @@ function SellerOffersContent() {
   const openSortPopup = React.useCallback(() => {
     openPopup({
       type: "sort",
-      title: "Ordenar",
+      title: "Ordenar ofertas",
       options: SELLER_OFFER_SORT_OPTIONS,
       initialSelectedId: selectedSortId,
       onSelect: setSelectedSortId,
@@ -498,11 +498,9 @@ function SellerOffersContent() {
               : "Buscar y filtrar ofertas"
           }
         >
-          <Icon name="sliders-horizontal" size={20} color={t.colors.stateAnulated} />
+          <Icon name="search" size={20} color={t.colors.stateAnulated} />
           <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
-            {hasActiveFilters
-              ? `Filtros activos (${activeFilterCount})`
-              : "Buscar y filtrar"}
+            {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
           </Text>
         </Pressable>
 

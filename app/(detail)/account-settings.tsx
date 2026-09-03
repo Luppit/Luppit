@@ -347,7 +347,7 @@ function AccountSettingsContent({
           }
         />
         <GroupedListRow
-          icon="bell"
+          icon="smartphone"
           label="Notificaciones push"
           value={pushPermissionLabel}
           onPress={() => {

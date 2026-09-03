@@ -112,7 +112,7 @@ export function GroupedListRow({
       </View>
       {rightAccessory}
       {shouldShowChevron ? (
-        <Icon name="arrow-right" size={18} color={t.colors.stateAnulated} />
+        <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
       ) : null}
     </>
   );
