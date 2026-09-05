@@ -43,6 +43,9 @@ export type SellerOfferAssistantControlAction =
 export type SellerOfferAssistantSummary = {
   descripcion: string | null;
   precio: number | null;
+  basePrecio: "UNIT" | "TOTAL" | null;
+  cantidadOfrecida: number | null;
+  precioTotal: number | null;
   moneda: string | null;
   entrega: string | null;
   retiro: string | null;
@@ -142,6 +145,11 @@ function normalizeSummary(value: unknown): SellerOfferAssistantSummary | null {
   return {
     descripcion: normalizeString(record.descripcion),
     precio: normalizeNumber(record.precio),
+    basePrecio: record.base_precio === "UNIT" || record.base_precio === "TOTAL"
+      ? record.base_precio
+      : null,
+    cantidadOfrecida: normalizeNumber(record.cantidad_ofrecida),
+    precioTotal: normalizeNumber(record.precio_total),
     moneda: normalizeString(record.moneda),
     entrega: hasStructuredMethods
       ? normalizeString(delivery?.label)

@@ -1,3 +1,4 @@
+import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
 import {
   callPurchaseRequestAssistant,
   createPurchaseRequestAssistantRequestIdentity,
@@ -86,35 +87,6 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
 
 function createMessageId(prefix: "user" | "assistant") {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
-}
-
-function normalizeReply(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function shouldOpenSummaryFromReply(value: string) {
-  const normalized = normalizeReply(value);
-  if (!normalized) return false;
-
-  return [
-    "si",
-    "si ok",
-    "si, ok",
-    "sí",
-    "ok",
-    "dale",
-    "claro",
-    "mostrar resumen",
-    "ver resumen",
-    "muéstrame el resumen",
-    "muestrame el resumen",
-    "ensename el resumen",
-    "enséñame el resumen",
-  ].some((option) => normalized === option || normalized.includes(option));
 }
 
 const imageOnlyPrompt = "Adjunto imágenes de referencia para mi solicitud.";
@@ -352,7 +324,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         status === "ready" &&
         uiState !== "review" &&
         pendingAction === "ASK_SHOW_SUMMARY" &&
-        shouldOpenSummaryFromReply(trimmed)
+        shouldOpenAssistantSummary(trimmed)
       ) {
         requests.push({
           prompt: "",

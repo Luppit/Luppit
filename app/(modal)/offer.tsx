@@ -1,3 +1,4 @@
+import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
 import Button from "@/src/components/button/Button";
 import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
 import AssistantReviewCard, {
@@ -87,29 +88,6 @@ function normalize(value: string | null | undefined) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-}
-
-function shouldOpenSummaryFromReply(value: string) {
-  const normalized = normalize(value)
-    .replace(/[.,!?¿¡]/g, "")
-    .replace(/\s+/g, " ");
-  if (!normalized) return false;
-
-  if (
-    ["si", "si ok", "si por favor", "yes", "ok", "dale", "claro"].includes(
-      normalized
-    )
-  ) {
-    return true;
-  }
-
-  return [
-    "mostrar resumen",
-    "ver resumen",
-    "revisar resumen",
-    "muestrame el resumen",
-    "ensename el resumen",
-  ].some((option) => normalized === option || normalized.includes(option));
 }
 
 function buildFallbackPurchaseRequest(
@@ -299,7 +277,20 @@ function OfferSummaryCard({
     ? `${summary.envioMaximoDias} día(s)`
     : null;
   const details = [
-    { label: "Precio", value: formattedPrice },
+    {
+      label: summary?.basePrecio === "UNIT" ? "Precio por unidad" : "Precio total",
+      value: formattedPrice,
+    },
+    {
+      label: "Cantidad ofrecida",
+      value: summary?.cantidadOfrecida != null ? String(summary.cantidadOfrecida) : null,
+    },
+    {
+      label: "Total de productos",
+      value: summary?.basePrecio === "UNIT"
+        ? formatSummaryMoney(summary?.precioTotal, summary?.moneda)
+        : null,
+    },
     { label: "Entrega", value: deliveryText },
     { label: "Tiempo máximo de entrega", value: shippingTimingText },
     { label: "Costo de envío", value: formattedShippingPrice },
@@ -590,7 +581,7 @@ function OfferAssistantScreen({
         images.length === 0 &&
         !!offerDraftId &&
         isReadyToSend &&
-        shouldOpenSummaryFromReply(userText);
+        shouldOpenAssistantSummary(userText);
 
       if (!shouldOpenSummary) {
         clearReviewState();
