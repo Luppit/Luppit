@@ -335,3 +335,50 @@ test("unmount aborts the request and prevents a late reply", async () => {
   await pending;
   assert.equal(session.state.messages.length, 1);
 });
+
+test("pending summary acceptance opens backend review and retains the draft summary", async () => {
+  for (const reply of ["Si", "Sí", "Sí, por favor"]) {
+    const session = createSession();
+    const initial = session.state.sendMessage({ text: "2", images: [] });
+    session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY", isReadyToPublish: true }));
+    await initial;
+    const pending = session.state.sendMessage({ text: reply, images: [] });
+    assert.equal(session.calls[1].input.ui_action, "SHOW_SUMMARY");
+    assert.equal(session.calls[1].input.draft_id, "draft-1");
+    assert.equal(session.state.uiState, "normal", "review waits for backend confirmation");
+    session.calls[1].response.resolve(success({ status: "ready", uiState: "review", isReadyToPublish: true, assistantMessage: null, summary: { titulo: "Llantas", categoria: "Llantas", marca: [], atributos: { cantidad: 2 } }, summaryText: "2 llantas" }));
+    await pending;
+    assert.equal(session.state.uiState, "review");
+    assert.equal(session.state.summary?.atributos?.cantidad, 2);
+    assert.equal(session.state.canPublish, true);
+    assert.equal(session.calls.length, 2);
+  }
+});
+
+for (const text of ["Mentira quiero 4", "Ocupo con una presión específica, pero no conozco mucho del tema, me ayudas?", "Sí, pero quiero 4"]) {
+  test(`ready/review follow-up reaches the authoritative assistant: ${text}`, async () => {
+    for (const uiState of ["normal", "review"] as const) {
+      const session = createSession();
+      const initial = session.state.sendMessage({ text: "2", images: [] });
+      session.calls[0].response.resolve(success({ status: "ready", uiState, pendingAction: uiState === "review" ? null : "ASK_SHOW_SUMMARY" }));
+      await initial;
+      const pending = session.state.sendMessage({ text, images: [] });
+      if (uiState === "review") {
+        assert.equal(session.calls[1].input.ui_action, "CONTINUE");
+        assert.equal(session.calls[1].input.draft_id, "draft-1");
+        session.calls[1].response.resolve(success({ status: "ready", uiState: "normal", assistantMessage: null }));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      const call = session.calls.at(-1)!;
+      assert.equal(call.input.ui_action, undefined);
+      assert.equal(call.input.prompt, text);
+      assert.equal(call.input.draft_id, "draft-1");
+      const answer = text.includes("presión") ? "La presión depende del vehículo. ¿Qué modelo y año es?" : "Actualicé la cantidad a 4. ¿Deseas ver el resumen?";
+      call.response.resolve(success({ status: "ready", assistantMessage: answer, pendingAction: text.includes("presión") ? null : "ASK_SHOW_SUMMARY" }));
+      await pending;
+      assert.equal(session.state.messages.at(-1)?.text, answer);
+      assert.equal(session.state.draftId, "draft-1");
+      assert.equal(session.state.uiState, "normal");
+    }
+  });
+}
