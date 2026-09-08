@@ -761,15 +761,10 @@ function OfferAssistantScreen({
       >
         {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
 
-        {showSummary ? (
-          <Text variant="body">
-            Listo. Revisa que todo esté correcto antes de enviar tu oferta.
-          </Text>
-        ) : (
+        {!showSummary &&
           messages.map((message) => (
             <AssistantMessageBubble key={message.id} message={message} />
-          ))
-        )}
+          ))}
 
         {isBusy ? (
           <AssistantProcessingProgress

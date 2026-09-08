@@ -13,3 +13,10 @@ export function shouldOpenAssistantSummary(value: string) {
     "ensename el resumen", "si quiero ver el resumen",
   ].includes(reply);
 }
+
+export function isAssistantReviewInstruction(value: string) {
+  return [
+    "Listo. Revisa que todo esté correcto antes de publicar.",
+    "Aqui tienes el resumen. ¿Deseas publicar o seguir ajustando?",
+  ].includes(value.replace(/\s+/g, " ").trim());
+}

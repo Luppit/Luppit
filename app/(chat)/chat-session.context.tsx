@@ -1,4 +1,7 @@
-import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
+import {
+  isAssistantReviewInstruction,
+  shouldOpenAssistantSummary,
+} from "../../src/utils/assistantSummaryReply";
 import { isPurchaseRequestReadyToPublish } from "../../src/utils/purchaseRequestReadiness";
 import {
   callPurchaseRequestAssistant,
@@ -186,7 +189,11 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       setPurchaseRequestId(next.purchaseRequestId);
 
       const assistantMessage = next.assistantMessage;
-      if (appendAssistantMessage && assistantMessage) {
+      if (
+        appendAssistantMessage &&
+        assistantMessage &&
+        !(next.uiState === "review" && isAssistantReviewInstruction(assistantMessage))
+      ) {
         setMessages((prev) => [
           ...prev,
           {
