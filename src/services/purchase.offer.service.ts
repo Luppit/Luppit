@@ -23,6 +23,7 @@ import {
 } from "../lib/supabase/storage";
 import { getBusinessIdByProfileId } from "./profile.business.service";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { normalizePurchaseOfferPricing } from "../utils/conversationOfferPrice";
 
 export type PurchaseOffer = Row<"purchase_offer">;
 export type PurchaseOfferCardData = PurchaseOffer & {
@@ -31,6 +32,8 @@ export type PurchaseOfferCardData = PurchaseOffer & {
   business_rating: number | null;
   business_num_ratings: number | null;
   offer_currency_code: string | null;
+  offer_price_summary?: string | null;
+  offer_product_subtotal?: number | null;
   conversation_id?: string | null;
 };
 export type SellerPurchaseOfferCardData = PurchaseOffer & {
@@ -39,6 +42,8 @@ export type SellerPurchaseOfferCardData = PurchaseOffer & {
   request_category_name: string | null;
   request_profile_name: string | null;
   offer_currency_code: string | null;
+  offer_price_summary?: string | null;
+  offer_product_subtotal?: number | null;
   conversation_id: string | null;
   conversation_status_code: string | null;
   conversation_status_label: string | null;
@@ -382,6 +387,7 @@ export async function getCurrentBuyerPurchaseRequestOffers(
     ok: true,
     data: rows.map((row) => ({
       ...row,
+      ...normalizePurchaseOfferPricing(row as Record<string, unknown>),
       business_name: typeof row.business_name === "string" ? row.business_name : null,
       business_province:
         typeof row.business_province === "string" ? row.business_province : null,
@@ -442,6 +448,7 @@ export async function getCurrentSellerPurchaseOffers(
       const compatibilityRow = row as Record<string, unknown>;
       return {
         ...row,
+        ...normalizePurchaseOfferPricing(compatibilityRow),
         request_category_id:
           typeof row.request_category_id === "string" ? row.request_category_id : null,
         request_title:

@@ -4557,8 +4557,12 @@ export type Database = {
           description: string
           id: string
           offer_currency_code: string
+          offer_price_summary: string | null
+          offer_product_subtotal: number | null
           price: number
+          price_basis: string | null
           purchase_request_id: string
+          quantity_offered: number | null
         }[]
       }
       get_buyer_purchase_request_offers_before_request_cancellation: {
@@ -4858,8 +4862,12 @@ export type Database = {
           description: string
           id: string
           offer_currency_code: string
+          offer_price_summary: string | null
+          offer_product_subtotal: number | null
           price: number
+          price_basis: string | null
           purchase_request_id: string
+          quantity_offered: number | null
           request_category_id: string
           request_category_name: string
           request_profile_name: string

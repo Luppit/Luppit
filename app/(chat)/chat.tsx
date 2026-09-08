@@ -9,7 +9,7 @@ import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import { Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
@@ -117,6 +117,8 @@ function humanizeAttributeLabel(value: string) {
 function PublishRequestCard({
   summary,
   description,
+  isReadyToPublish,
+  missingFields,
   disabled,
   continueDisabled,
   loading,
@@ -125,6 +127,8 @@ function PublishRequestCard({
 }: {
   summary: PurchaseRequestAssistantSummary | null;
   description: string | null;
+  isReadyToPublish: boolean;
+  missingFields: string[];
   disabled: boolean;
   continueDisabled: boolean;
   loading: boolean;
@@ -150,14 +154,21 @@ function PublishRequestCard({
 
   return (
     <AssistantReviewCard
-      completionTitle="Solicitud lista"
-      completionDescription="Revisa los detalles antes de publicar."
+      completionTitle={isReadyToPublish ? "Solicitud lista" : "Solicitud por completar"}
+      completionDescription={isReadyToPublish
+        ? "Revisa los detalles antes de publicar."
+        : "Completa los datos pendientes para poder publicar."}
+      isComplete={isReadyToPublish}
       title={summary?.titulo ?? "Solicitud"}
       description={description}
       rows={details.map((item) => ({
         label: item.label,
         value: String(item.value),
       }))}
+      notices={missingFields.length > 0 ? [{
+        text: `Falta completar: ${missingFields.map(humanizeAttributeLabel).join(", ")}.`,
+        tone: "error",
+      }] : []}
       primaryLabel="Publicar solicitud"
       primaryDisabled={disabled}
       primaryLoading={loading}
@@ -220,6 +231,8 @@ export default function ChatScreen() {
     messages,
     uiState,
     canPublish,
+    isReadyToPublish,
+    missingFields,
     isSendingMessage,
     isGeneratingSummary,
     isExecutingControl,
@@ -232,23 +245,13 @@ export default function ChatScreen() {
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl;
 
-  useEffect(() => {
-    if (uiState === "review") {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    }
-  }, [uiState]);
-
   return (
     <ScrollView
       ref={scrollRef}
       keyboardDismissMode="interactive"
       keyboardShouldPersistTaps="handled"
       onContentSizeChange={() => {
-        if (uiState === "review") {
-          scrollRef.current?.scrollTo({ y: 0, animated: false });
-        } else {
-          scrollRef.current?.scrollToEnd({ animated: true });
-        }
+        scrollRef.current?.scrollToEnd({ animated: true });
       }}
       contentContainerStyle={{
         paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT + t.spacing.lg,
@@ -260,17 +263,11 @@ export default function ChatScreen() {
     >
       {messages.length === 0 && !isAssistantBusy ? <EmptyRequestAssistantState /> : null}
 
-      {uiState === "review" ? (
-        <Text variant="body">
-          Listo. Revisa que todo esté correcto antes de publicar.
-        </Text>
-      ) : (
-        messages.map((message) =>
-          message.sender === "user" ? (
-            <UserMessageBlock key={message.id} message={message} />
-          ) : (
-            <AssistantTextBlock key={message.id} text={message.text} />
-          )
+      {messages.map((message) =>
+        message.sender === "user" ? (
+          <UserMessageBlock key={message.id} message={message} />
+        ) : (
+          <AssistantTextBlock key={message.id} text={message.text} />
         )
       )}
 
@@ -288,6 +285,8 @@ export default function ChatScreen() {
           <PublishRequestCard
             summary={summary}
             description={summaryText}
+            isReadyToPublish={isReadyToPublish}
+            missingFields={missingFields}
             disabled={!canPublish || isAssistantBusy}
             continueDisabled={isAssistantBusy}
             loading={isExecutingControl}

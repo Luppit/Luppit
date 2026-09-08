@@ -6,6 +6,7 @@ import { Text } from "@/src/components/Text";
 import { LucideIconName } from "@/src/icons/lucide";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
+import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
 import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
@@ -83,9 +84,12 @@ export default function OfferCard({
   const province = offer.business_province?.trim();
   const rating = offer.business_rating;
   const numRatings = offer.business_num_ratings;
-  const currencyCode = offer.offer_currency_code ?? "CRC";
-  const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
-  const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("en-US")}`;
+  const formattedPrice = formatConversationOfferPrice({
+    ...offer,
+    offer_price_amount: offer.price,
+    offer_price_basis: offer.price_basis,
+    offer_quantity_offered: offer.quantity_offered,
+  }) ?? "Precio no disponible";
   const description = offer.description?.trim();
   const methodItem = timeline.find(
     (item) =>
@@ -106,7 +110,7 @@ export default function OfferCard({
       body={
         <View style={s.body}>
           <View style={s.priceRow}>
-            <Text variant="subtitle" maxLines={1} style={s.price}>
+            <Text variant="subtitle" style={s.price}>
               {formattedPrice}
             </Text>
             {rating != null ? (

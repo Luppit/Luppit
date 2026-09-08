@@ -4,6 +4,7 @@ import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
 import { SellerPurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
+import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -12,14 +13,6 @@ type SellerOfferCardProps = {
   onPress?: () => void;
   onLongPress?: () => void;
 };
-
-function normalize(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
 
 function formatOfferDate(rawDate: string | null | undefined) {
   if (!rawDate) return null;
@@ -59,12 +52,12 @@ export default function SellerOfferCard({
   const accessibleOfferDate = formatAccessibleOfferDate(offer.created_at);
   const statusLabel = offer.conversation_status_label?.trim();
   const buyerLabel = profileName ? `Comprador · ${profileName}` : "Comprador";
-  const currencyCode = offer.offer_currency_code ?? "CRC";
-  const pricePrefix = normalize(currencyCode) === "usd" ? "$" : "₡";
-  const formattedPrice = `${pricePrefix}${Number(offer.price ?? 0).toLocaleString("es-CR", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+  const formattedPrice = formatConversationOfferPrice({
+    ...offer,
+    offer_price_amount: offer.price,
+    offer_price_basis: offer.price_basis,
+    offer_quantity_offered: offer.quantity_offered,
+  }) ?? "Precio no disponible";
   const accessibilityLabel = [
     categoryName,
     requestTitle || "Solicitud",

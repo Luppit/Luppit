@@ -49,7 +49,8 @@ export function createConversationActionButtonsStyles(
     },
     summaryValue: {
       color: t.colors.textDark,
-      flexShrink: 0,
+      flexShrink: 1,
+      maxWidth: "100%",
       fontVariant: ["tabular-nums"],
     },
     actions: {

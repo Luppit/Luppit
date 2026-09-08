@@ -19,6 +19,7 @@ export type AssistantReviewNotice = {
 type AssistantReviewCardProps = {
   completionTitle: string;
   completionDescription: string;
+  isComplete?: boolean;
   title: string;
   description?: string | null;
   rows: AssistantReviewRow[];
@@ -35,6 +36,7 @@ type AssistantReviewCardProps = {
 export default function AssistantReviewCard({
   completionTitle,
   completionDescription,
+  isComplete = true,
   title,
   description,
   rows,
@@ -76,13 +78,13 @@ export default function AssistantReviewCard({
               borderRadius: 22,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: t.colors.primaryLight,
+              backgroundColor: isComplete ? t.colors.primaryLight : t.colors.background,
             }}
           >
             <Icon
-              name="check"
+              name={isComplete ? "check" : "info"}
               size={23}
-              color={t.colors.primary}
+              color={isComplete ? t.colors.primary : t.colors.textMedium}
               strokeWidth={2.5}
             />
           </View>

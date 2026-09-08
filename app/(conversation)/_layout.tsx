@@ -40,6 +40,7 @@ import {
   setToastBottomInset,
 } from "@/src/services/toast.service";
 import { Theme, useTheme } from "@/src/themes";
+import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
 import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, {
@@ -231,21 +232,6 @@ function toOptionalDisplayText(value: unknown) {
   if (typeof value !== "string") return null;
   const text = value.trim();
   return text && text !== "-" ? text : null;
-}
-
-function formatOfferPrice(context: Record<string, unknown>) {
-  const amount = context.offer_price_amount;
-  const currencyCode = toOptionalDisplayText(context.offer_currency_code)?.toUpperCase();
-
-  if (typeof amount === "number" && Number.isFinite(amount)) {
-    const prefix = currencyCode === "USD" ? "$" : "₡";
-    return `${prefix}${amount.toLocaleString("en-US", {
-      minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-      maximumFractionDigits: 2,
-    })}`;
-  }
-
-  return toOptionalDisplayText(context.offer_price);
 }
 
 type RatingPayload = {
@@ -1140,7 +1126,7 @@ export default function ConversationLayout() {
   const offerPriceField = rawTopActions
     .flatMap((action) => action.confirmation?.fields ?? [])
     .find((field) => normalizeText(field.value_source) === "offer_price");
-  const offerPrice = formatOfferPrice(conversationView.context);
+  const offerPrice = formatConversationOfferPrice(conversationView.context);
   const topActionSummary: ConversationActionSummary | undefined = offerPrice
     ? {
         label: toOptionalDisplayText(offerPriceField?.label) ?? "Precio",

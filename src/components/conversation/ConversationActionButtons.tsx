@@ -78,7 +78,6 @@ export default function ConversationActionButtons({
             <Text
               selectable
               variant="subtitle"
-              maxLines={2}
               maxFontSizeMultiplier={2}
               style={s.summaryValue}
             >

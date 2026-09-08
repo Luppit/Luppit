@@ -1,4 +1,5 @@
 import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
+import { isPurchaseRequestReadyToPublish } from "../../src/utils/purchaseRequestReadiness";
 import {
   callPurchaseRequestAssistant,
   createPurchaseRequestAssistantRequestIdentity,
@@ -48,6 +49,7 @@ type ChatSessionContextValue = {
   isSendingMessage: boolean;
   isGeneratingSummary: boolean;
   isExecutingControl: boolean;
+  isReadyToPublish: boolean;
   canPublish: boolean;
   showComposer: boolean;
   canCompose: boolean;
@@ -75,6 +77,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   isSendingMessage: false,
   isGeneratingSummary: false,
   isExecutingControl: false,
+  isReadyToPublish: false,
   canPublish: false,
   showComposer: true,
   canCompose: true,
@@ -109,6 +112,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isExecutingControl, setIsExecutingControl] = useState(false);
+  const [isReadyToPublish, setIsReadyToPublish] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
   const requestSequenceRef = useRef(0);
   const shownSuccessRequestIdRef = useRef<string | null>(null);
@@ -170,6 +174,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
       setDraftId(next.draftId);
       setStatus(next.status);
+      setIsReadyToPublish(isPurchaseRequestReadyToPublish(next));
       setUiState(next.uiState ?? (next.status === "published" ? "published" : "normal"));
       setPendingAction(next.pendingAction);
       setRequiredFields(next.requiredFields);
@@ -418,9 +423,10 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       isSendingMessage,
       isGeneratingSummary,
       isExecutingControl,
+      isReadyToPublish,
       canPublish:
         Boolean(draftId) &&
-        status === "ready" &&
+        isReadyToPublish &&
         uiState === "review" &&
         !isSendingMessage &&
         !isExecutingControl,
@@ -441,6 +447,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       draftId,
       isExecutingControl,
       isGeneratingSummary,
+      isReadyToPublish,
       isSendingMessage,
       messages,
       missingFields,
