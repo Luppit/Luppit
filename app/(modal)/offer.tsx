@@ -10,6 +10,7 @@ import FilePicker, {
 } from "@/src/components/filePicker/FilePicker";
 import { Icon } from "@/src/components/Icon";
 import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
+import { useAndroidChatKeyboardVisible } from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
 import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
 import { Currency, getCurrencies } from "@/src/services/currency.service";
@@ -348,6 +349,7 @@ function OfferAssistantScreen({
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
   const navigation = useNavigation();
   const scrollRef = useRef<ScrollView>(null);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
@@ -816,7 +818,9 @@ function OfferAssistantScreen({
           paddingBottom:
             Platform.OS === "ios"
               ? Math.max(insets.bottom + t.spacing.sm, t.spacing.lg)
-              : t.spacing.sm,
+              : Platform.OS === "android" && !isAndroidKeyboardVisible
+                ? Math.max(insets.bottom, t.spacing.sm)
+                : t.spacing.sm,
         }}
       >
         <InputChat

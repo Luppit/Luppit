@@ -1,9 +1,10 @@
 import ModalTopBar from "./modal-top-bar";
 import DetailTopBar, { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "../(detail)/detail-top-bar";
 import { useTheme } from "@/src/themes";
+import ChatKeyboardAvoidingView from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import { Slot, useGlobalSearchParams, usePathname } from "expo-router";
 import React from "react";
-import { KeyboardAvoidingView, Platform, View } from "react-native";
+import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ModalLayout() {
@@ -40,10 +41,9 @@ export default function ModalLayout() {
           <ModalTopBar title={title} />
         </View>
       )}
-      <KeyboardAvoidingView
+      <ChatKeyboardAvoidingView
+        androidEnabled={isOfferModal}
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
       >
         <View
           style={{
@@ -55,7 +55,7 @@ export default function ModalLayout() {
         >
           <Slot />
         </View>
-      </KeyboardAvoidingView>
+      </ChatKeyboardAvoidingView>
       {usesDetailTopBar ? (
         <DetailTopBar
           title={title}

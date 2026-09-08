@@ -7,6 +7,9 @@ import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
+import ChatKeyboardAvoidingView, {
+  useAndroidChatKeyboardVisible,
+} from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
@@ -54,7 +57,6 @@ import React, {
 } from "react";
 import {
   Keyboard,
-  KeyboardAvoidingView,
   LayoutChangeEvent,
   Platform,
   Pressable,
@@ -300,6 +302,7 @@ function getActionSuccessMessage(value: unknown) {
 export default function ConversationLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
   const params = useGlobalSearchParams<{
     conversationId?: string | string[];
     title?: string | string[];
@@ -1138,7 +1141,7 @@ export default function ConversationLayout() {
   const composerOverlayFallbackHeight =
     showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
   const contentTopInset = Math.max(headerChromeHeight, headerChromeFallbackHeight);
-  const contentBottomInset = showComposer
+  const contentBottomInset = showComposer && Platform.OS !== "android"
     ? composerOverlayHeight || composerOverlayFallbackHeight
     : 0;
   const title = purchaseRequestTitle ?? routeTitle ?? "Conversación";
@@ -1161,10 +1164,8 @@ export default function ConversationLayout() {
 
   return (
     <ConversationLayoutContext.Provider value={providerValue}>
-      <KeyboardAvoidingView
+      <ChatKeyboardAvoidingView
         style={{ flex: 1, backgroundColor: t.colors.background }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
       >
         <View style={{ flex: 1 }}>
           <GlassSurface
@@ -1294,7 +1295,7 @@ export default function ConversationLayout() {
               pointerEvents="box-none"
               onLayout={handleComposerOverlayLayout}
               style={{
-                position: "absolute",
+                position: Platform.OS === "android" ? "relative" : "absolute",
                 left: 0,
                 right: 0,
                 bottom: 0,
@@ -1350,7 +1351,9 @@ export default function ConversationLayout() {
                 style={{
                   paddingHorizontal: t.spacing.md,
                   paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
-                  paddingBottom: Math.max(insets.bottom, t.spacing.sm),
+                  paddingBottom: isAndroidKeyboardVisible
+                    ? t.spacing.sm
+                    : Math.max(insets.bottom, t.spacing.sm),
                   backgroundColor: t.colors.background,
                 }}
               >
@@ -1413,7 +1416,7 @@ export default function ConversationLayout() {
             </View>
           ) : null}
         </View>
-      </KeyboardAvoidingView>
+      </ChatKeyboardAvoidingView>
     </ConversationLayoutContext.Provider>
   );
 }

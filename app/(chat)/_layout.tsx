@@ -4,6 +4,7 @@ import {
   useChatSession,
 } from "./chat-session.context";
 import InputChat from "@/src/components/inputChat/inputChat";
+import ChatKeyboardAvoidingView from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import { Roles } from "@/src/services/role.service";
 import {
   clearToastBottomInset,
@@ -15,7 +16,6 @@ import { Redirect, Slot, router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Keyboard,
-  KeyboardAvoidingView,
   LayoutChangeEvent,
   Platform,
   View,
@@ -77,10 +77,8 @@ function ChatLayoutContent() {
   }, []);
 
   return (
-    <KeyboardAvoidingView
+    <ChatKeyboardAvoidingView
       style={{ flex: 1, backgroundColor: t.colors.background }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={0}
     >
       <View style={{ flex: 1 }}>
         <ChatTopBar
@@ -130,7 +128,7 @@ function ChatLayoutContent() {
           </View>
         ) : null}
       </View>
-    </KeyboardAvoidingView>
+    </ChatKeyboardAvoidingView>
   );
 }
 
