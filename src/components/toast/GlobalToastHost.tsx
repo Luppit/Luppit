@@ -1,5 +1,8 @@
 import ToastCard from "@/src/components/toast/ToastCard";
-import { getUnconsumedKeyboardOverlap } from "@/src/components/toast/keyboard";
+import {
+  getAndroidToastBottom,
+  getUnconsumedKeyboardOverlap,
+} from "@/src/components/toast/keyboard";
 import {
   hideToast,
   subscribeToast,
@@ -9,6 +12,7 @@ import {
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -84,7 +88,7 @@ export default function GlobalToastHost() {
   const [actionPending, setActionPending] = useState(false);
   const [bottomInset, setBottomInset] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [androidKeyboardOverlap, setAndroidKeyboardOverlap] = useState(0);
+  const [androidKeyboardOverlap, setAndroidKeyboardOverlap] = useState<number | null>(null);
 
   const hostRef = useRef<View | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -102,6 +106,8 @@ export default function GlobalToastHost() {
   const durationToastIdRef = useRef<string | null>(null);
   const dismissRef = useRef<(id?: string) => void>(() => undefined);
   const androidKeyboardTopRef = useRef<number | null>(null);
+  const androidMeasurementRef = useRef(0);
+  const androidMeasureFrameRef = useRef<number | null>(null);
   const androidMeasureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
@@ -109,18 +115,21 @@ export default function GlobalToastHost() {
   const measureAndroidKeyboardOverlap = useCallback(() => {
     if (Platform.OS !== "android") return;
 
+    const measurement = ++androidMeasurementRef.current;
     const keyboardTop = androidKeyboardTopRef.current;
     if (keyboardTop == null) {
-      setAndroidKeyboardOverlap(0);
+      setAndroidKeyboardOverlap(null);
       return;
     }
 
     hostRef.current?.measureInWindow((_x, y, _width, height) => {
+      if (measurement !== androidMeasurementRef.current) return;
+
       setAndroidKeyboardOverlap(
-        getUnconsumedKeyboardOverlap(y + height, keyboardTop)
+        getUnconsumedKeyboardOverlap(y + height, keyboardTop, insets.top)
       );
     });
-  }, []);
+  }, [insets.top]);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -385,6 +394,23 @@ export default function GlobalToastHost() {
     const hideEvent =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
+    const scheduleAndroidMeasurement = () => {
+      if (androidMeasureFrameRef.current != null) {
+        cancelAnimationFrame(androidMeasureFrameRef.current);
+      }
+      androidMeasureFrameRef.current = requestAnimationFrame(() => {
+        androidMeasureFrameRef.current = null;
+        measureAndroidKeyboardOverlap();
+      });
+      if (androidMeasureTimerRef.current) {
+        clearTimeout(androidMeasureTimerRef.current);
+      }
+      androidMeasureTimerRef.current = setTimeout(() => {
+        androidMeasureTimerRef.current = null;
+        measureAndroidKeyboardOverlap();
+      }, 150);
+    };
+
     const handleKeyboardShow = (event: KeyboardEvent) => {
       if (Platform.OS === "ios") {
         Keyboard.scheduleLayoutAnimation(event);
@@ -392,15 +418,9 @@ export default function GlobalToastHost() {
         return;
       }
 
+      androidMeasurementRef.current += 1;
       androidKeyboardTopRef.current = event.endCoordinates.screenY;
-      requestAnimationFrame(measureAndroidKeyboardOverlap);
-      if (androidMeasureTimerRef.current) {
-        clearTimeout(androidMeasureTimerRef.current);
-      }
-      androidMeasureTimerRef.current = setTimeout(
-        measureAndroidKeyboardOverlap,
-        150
-      );
+      scheduleAndroidMeasurement();
     };
     const handleKeyboardHide = (event: KeyboardEvent) => {
       if (Platform.OS === "ios") {
@@ -409,8 +429,13 @@ export default function GlobalToastHost() {
         return;
       }
 
+      androidMeasurementRef.current += 1;
       androidKeyboardTopRef.current = null;
-      setAndroidKeyboardOverlap(0);
+      setAndroidKeyboardOverlap(null);
+      if (androidMeasureFrameRef.current != null) {
+        cancelAnimationFrame(androidMeasureFrameRef.current);
+        androidMeasureFrameRef.current = null;
+      }
       if (androidMeasureTimerRef.current) {
         clearTimeout(androidMeasureTimerRef.current);
         androidMeasureTimerRef.current = null;
@@ -420,14 +445,29 @@ export default function GlobalToastHost() {
     const showSubscription = Keyboard.addListener(showEvent, handleKeyboardShow);
     const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
 
+    if (Platform.OS === "android") {
+      androidKeyboardTopRef.current = Keyboard.metrics()?.screenY ?? null;
+      scheduleAndroidMeasurement();
+    }
+
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
+      androidMeasurementRef.current += 1;
+      if (androidMeasureFrameRef.current != null) {
+        cancelAnimationFrame(androidMeasureFrameRef.current);
+        androidMeasureFrameRef.current = null;
+      }
       if (androidMeasureTimerRef.current) {
         clearTimeout(androidMeasureTimerRef.current);
+        androidMeasureTimerRef.current = null;
       }
     };
   }, [measureAndroidKeyboardOverlap]);
+
+  useLayoutEffect(() => {
+    if (renderedToast) measureAndroidKeyboardOverlap();
+  }, [measureAndroidKeyboardOverlap, renderedToast]);
 
   useEffect(() => {
     return subscribeToast(({ current, bottomInset: nextBottomInset }) => {
@@ -496,12 +536,20 @@ export default function GlobalToastHost() {
 
   const restingBottom =
     bottomInset > 0 ? bottomInset : Math.max(insets.bottom, t.spacing.sm);
-  const keyboardSpacing = bottomInset > 0 ? bottomInset : t.spacing.sm;
-  const viewportBottom = androidKeyboardOverlap > 0
-    ? androidKeyboardOverlap + keyboardSpacing
+  const viewportBottom = androidKeyboardOverlap != null
+    ? getAndroidToastBottom(androidKeyboardOverlap, bottomInset, t.spacing.sm)
     : keyboardHeight > 0
       ? keyboardHeight + (bottomInset > 0 ? bottomInset : t.spacing.sm)
       : restingBottom;
+  const keyboardSpacing = viewportBottom - (androidKeyboardOverlap ?? 0);
+  // Keep the entry animation and dismissal drag within the space above the IME.
+  const cardTranslateY = androidKeyboardOverlap != null
+    ? translateY.interpolate({
+        inputRange: [0, keyboardSpacing],
+        outputRange: [0, keyboardSpacing],
+        extrapolateRight: "clamp",
+      })
+    : translateY;
 
   const toastViewport = renderedToast ? (
     <View
@@ -517,7 +565,7 @@ export default function GlobalToastHost() {
           styles.animatedCard,
           {
             opacity,
-            transform: [{ translateY }, { scale }],
+            transform: [{ translateY: cardTranslateY }, { scale }],
           },
         ]}
       >

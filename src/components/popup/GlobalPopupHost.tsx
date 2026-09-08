@@ -1577,9 +1577,6 @@ export default function GlobalPopupHost() {
                           >
                             {summaryConfig.title}
                           </Text>
-                          {summaryConfig.icon ? (
-                            <Icon name={summaryConfig.icon} size={20} color={t.colors.textDark} />
-                          ) : null}
                           {summaryConfig.showCloseButton ? (
                             <Pressable
                               accessibilityRole="button"

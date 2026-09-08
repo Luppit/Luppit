@@ -3,6 +3,7 @@ import {
   GroupedListSection,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { isProfileEmailSetupComplete } from "@/src/components/navbar/useEmailSetupGate";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { hasProfilePicture } from "@/src/components/profile/ProfilePicture";
@@ -215,6 +216,11 @@ function AccountSettingsContent({
     profileState === "business_verification_required";
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
   const isVerifiedIdentity = activeProfile?.identityStatus === "VERIFIED";
+  const hasBuyerProfile = profiles.some((profile) => profile.role === "buyer");
+  const addProfileLabel = hasBuyerProfile ? "Agregar negocio" : "Crear perfil";
+  const canAddProfile =
+    !isBusinessVerificationRequired &&
+    isProfileEmailSetupComplete(activeProfile?.profile);
   const phone = profile?.phone?.trim() || "";
   const {
     permissionStatus: pushPermissionStatus,
@@ -233,6 +239,12 @@ function AccountSettingsContent({
     : pushPermissionStatus === "unavailable"
     ? "No disponibles"
     : "Sin configurar";
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshProfiles(activeProfile?.profile.id);
+    }, [activeProfile?.profile.id, refreshProfiles])
+  );
 
   return (
     <ScrollView
@@ -293,7 +305,7 @@ function AccountSettingsContent({
         <GroupedListRow
           icon="mail-warning"
           label="Correo"
-          showSeparator={false}
+          showSeparator={canAddProfile}
           onPress={() =>
             router.push({
               pathname: "/(modal)/email-setup",
@@ -301,6 +313,19 @@ function AccountSettingsContent({
             })
           }
         />
+        {canAddProfile ? (
+          <GroupedListRow
+            icon="circle-plus"
+            label={addProfileLabel}
+            showSeparator={false}
+            onPress={() =>
+              router.push({
+                pathname: "/(detail)/create-profile",
+                params: { title: addProfileLabel, hideMenu: "true" },
+              })
+            }
+          />
+        ) : null}
       </GroupedListSection>
 
       {isSeller && !isBusinessVerificationRequired ? (

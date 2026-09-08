@@ -265,6 +265,12 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
           await syncAssistantState(result, {
             appendAssistantMessage: input.ui_action !== "CONTINUE",
           });
+          if (
+            requestController.signal.aborted ||
+            activeRequestRef.current !== requestController
+          ) {
+            return;
+          }
           if (!result.ok) {
             if (
               result.error.code !== "PROFILE_SCOPED_REQUEST_ABORTED" &&

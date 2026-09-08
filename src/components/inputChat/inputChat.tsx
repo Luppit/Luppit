@@ -300,12 +300,12 @@ export default function InputChat({
               style={({ pressed }) => [
                 styles.sendButton,
                 !canSend && !canStop ? styles.sendButtonDisabled : null,
-                isBusy ? styles.sendButtonBusy : null,
+                canStop ? styles.sendButtonBusy : null,
                 pressed && (canSend || canStop) ? styles.sendButtonPressed : null,
               ]}
               hitSlop={8}
             >
-              {isBusy ? (
+              {canStop ? (
                 <Square
                   size={15}
                   color={t.colors.backgroudWhite}

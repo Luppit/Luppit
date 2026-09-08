@@ -34,6 +34,8 @@ function ChatLayoutContent() {
     uiState,
     showComposer,
     canCompose,
+    isSendingMessage,
+    stopAssistant,
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -114,6 +116,8 @@ function ChatLayoutContent() {
               sendOnReturn={false}
               autoFocus={messages.length === 0}
               disabled={!canCompose}
+              busy={isSendingMessage}
+              onStop={stopAssistant}
               placeholder={
                 uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
               }

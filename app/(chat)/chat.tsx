@@ -241,7 +241,6 @@ export default function ChatScreen() {
     summaryText,
     publishDraft,
     status,
-    stopAssistant,
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl;
 
@@ -276,7 +275,6 @@ export default function ChatScreen() {
           title="Preparando tu solicitud"
           steps={REQUEST_PROCESSING_STEPS}
           variant={isGeneratingSummary ? "steps" : "thinking"}
-          onStop={stopAssistant}
         />
       ) : null}
 
