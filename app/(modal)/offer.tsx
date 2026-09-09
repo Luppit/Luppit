@@ -1,6 +1,11 @@
 import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
 import Button from "@/src/components/button/Button";
 import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
+import OfferRequestReference from "@/src/components/assistant/OfferRequestReference";
+import {
+  getOfferRequestReference,
+  type OfferRequestReference as RequestReference,
+} from "@/src/services/purchase.offer.reference.service";
 import AssistantReviewCard, {
   type AssistantReviewNotice,
 } from "@/src/components/assistant/AssistantReviewCard";
@@ -343,9 +348,11 @@ function OfferSummaryCard({
 function OfferAssistantScreen({
   conversationId,
   purchaseRequestTitle,
+  requestReference,
 }: {
   conversationId: string | null | undefined;
   purchaseRequestTitle: string | null | undefined;
+  requestReference: RequestReference;
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -748,7 +755,7 @@ function OfferAssistantScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
-          if (showSummary) {
+          if (showSummary || messages.length === 0) {
             scrollRef.current?.scrollTo({ y: 0, animated: false });
           } else {
             scrollRef.current?.scrollToEnd({ animated: true });
@@ -761,6 +768,7 @@ function OfferAssistantScreen({
           flexGrow: 1,
         }}
       >
+        <OfferRequestReference reference={requestReference} />
         {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
 
         {!showSummary &&
@@ -844,14 +852,31 @@ function OfferAssistantScreen({
 }
 
 export default function OfferScreen() {
-  const t = useTheme();
   const params = useLocalSearchParams<{
     purchaseRequest?: string | string[];
     purchaseRequestId?: string | string[];
     conversationId?: string | string[];
     mode?: string | string[];
   }>();
-  const initialPurchaseRequest = parsePurchaseRequestParam(params.purchaseRequest);
+  const conversationId = Array.isArray(params.conversationId)
+    ? params.conversationId[0]
+    : params.conversationId;
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+
+  return <OfferScreenContent key={`${mode ?? "create"}:${conversationId ?? ""}`} params={params} />;
+}
+
+function OfferScreenContent({ params }: { params: {
+  purchaseRequest?: string | string[];
+  purchaseRequestId?: string | string[];
+  conversationId?: string | string[];
+  mode?: string | string[];
+} }) {
+  const t = useTheme();
+  const initialPurchaseRequest = useMemo(
+    () => parsePurchaseRequestParam(params.purchaseRequest),
+    [params.purchaseRequest]
+  );
   const purchaseRequestId = Array.isArray(params.purchaseRequestId)
     ? params.purchaseRequestId[0]
     : params.purchaseRequestId;
@@ -864,8 +889,11 @@ export default function OfferScreen() {
     initialPurchaseRequest ?? buildFallbackPurchaseRequest(purchaseRequestId)
   );
   const [requestLoading, setRequestLoading] = useState(
-    !initialPurchaseRequest && !!purchaseRequestId
+    !isEditMode || (!initialPurchaseRequest && !!purchaseRequestId)
   );
+  const [requestReference, setRequestReference] = useState<RequestReference | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestRetry, setRequestRetry] = useState(0);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -919,6 +947,30 @@ export default function OfferScreen() {
   }, []);
 
   useEffect(() => {
+    if (!isEditMode) {
+      let active = true;
+      setRequestLoading(true);
+      setRequestError(null);
+      const loadReference = async () => {
+        try {
+          const result = await getOfferRequestReference(conversationId ?? "");
+          if (!active) return;
+          if (result.ok) {
+            setPurchaseRequest(result.data);
+            setRequestReference(result.data);
+          } else {
+            setRequestError("No pudimos cargar la solicitud del comprador. Inténtalo de nuevo.");
+          }
+        } catch {
+          if (active) setRequestError("No pudimos cargar la solicitud del comprador. Inténtalo de nuevo.");
+        } finally {
+          if (active) setRequestLoading(false);
+        }
+      };
+      void loadReference();
+      return () => { active = false; };
+    }
+
     if (initialPurchaseRequest) {
       setPurchaseRequest(initialPurchaseRequest);
       setRequestLoading(false);
@@ -955,7 +1007,7 @@ export default function OfferScreen() {
     return () => {
       active = false;
     };
-  }, [initialPurchaseRequest, resolvedPurchaseRequestId]);
+  }, [conversationId, initialPurchaseRequest, isEditMode, requestRetry, resolvedPurchaseRequestId]);
 
   useEffect(() => {
     void loadCatalogs();
@@ -1156,7 +1208,7 @@ export default function OfferScreen() {
     );
   }
 
-  if (!purchaseRequest) {
+  if (requestError || !purchaseRequest) {
     return (
       <View
         style={{
@@ -1168,18 +1220,20 @@ export default function OfferScreen() {
         }}
       >
         <Text align="center" color="stateAnulated">
-          No encontramos la solicitud asociada.
+          {requestError ?? "No encontramos la solicitud asociada."}
         </Text>
+        {requestError ? <Button title="Reintentar" onPress={() => setRequestRetry((current) => current + 1)} /> : null}
         <Button title="Volver" onPress={() => router.back()} />
       </View>
     );
   }
 
-  if (!isEditMode) {
+  if (!isEditMode && requestReference) {
     return (
       <OfferAssistantScreen
         conversationId={conversationId}
         purchaseRequestTitle={purchaseRequest?.title}
+        requestReference={requestReference}
       />
     );
   }
