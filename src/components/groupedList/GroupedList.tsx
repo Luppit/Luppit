@@ -18,6 +18,7 @@ type GroupedListSectionProps = GroupedListProps & {
 type GroupedListRowProps = {
   icon: LucideIconName;
   label: string;
+  labelMaxLines?: number;
   value?: string | null;
   description?: string | null;
   destructive?: boolean;
@@ -58,6 +59,7 @@ export function GroupedListSection({
 export function GroupedListRow({
   icon,
   label,
+  labelMaxLines = 1,
   value,
   description,
   destructive = false,
@@ -93,7 +95,7 @@ export function GroupedListRow({
           <Text
             variant="body"
             style={[s.rowLabel, { color: contentColor }]}
-            maxLines={hasValue ? 2 : 1}
+            maxLines={hasValue ? 2 : labelMaxLines}
           >
             {label}
           </Text>
@@ -125,6 +127,7 @@ export function GroupedListRow({
         onPress={onPress}
         style={[
           s.row,
+          labelMaxLines !== 1 ? s.rowWithWrappedLabel : null,
           hasDescription ? s.rowWithDescription : null,
           hasValue ? s.rowWithValue : null,
           hasRoomyDescription ? s.rowWithRoomyDescription : null,
@@ -139,6 +142,7 @@ export function GroupedListRow({
     <View
       style={[
         s.row,
+        labelMaxLines !== 1 ? s.rowWithWrappedLabel : null,
         hasDescription ? s.rowWithDescription : null,
         hasValue ? s.rowWithValue : null,
         hasRoomyDescription ? s.rowWithRoomyDescription : null,
@@ -168,6 +172,9 @@ function createGroupedListStyles(t: Theme) {
       flexDirection: "row",
       alignItems: "center",
       gap: t.spacing.sm,
+    },
+    rowWithWrappedLabel: {
+      paddingVertical: t.spacing.xs,
     },
     rowWithDescription: {
       minHeight: 74,

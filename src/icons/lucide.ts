@@ -13,6 +13,7 @@ import {
   ChevronUp,
   CircleHelp,
   CirclePlus,
+  Clock,
   Copy,
   Ellipsis,
   Eraser,
@@ -36,6 +37,7 @@ import {
   Pencil,
   Plane,
   Plus,
+  RefreshCw,
   Search,
   Send,
   ShieldCheck,
@@ -51,6 +53,7 @@ import {
   Trash2,
   Truck,
   User,
+  UsersRound,
   X,
   XCircle
 } from "lucide-react-native";
@@ -88,6 +91,9 @@ export const lucideIcons = {
   "book-open": BookOpen,
   "message-circle": MessageCircle,
   user: User,
+  "users-round": UsersRound,
+  clock: Clock,
+  "refresh-cw": RefreshCw,
   "circle-plus": CirclePlus,
   copy: Copy,
   "message-square": MessageSquare,

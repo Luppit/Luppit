@@ -3,6 +3,7 @@ import { RPC_FUNCTIONS } from "@/src/db/functions";
 import { supabase } from "@/src/lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "@/src/lib/supabase/errors";
 import { STORAGE_BUCKETS } from "@/src/lib/supabase/storage";
+import { APP_CONFIG_KEYS, getAppConfigValue } from "./app.config.service";
 
 export type BusinessVerificationStatus =
   | "PENDING"
@@ -32,6 +33,10 @@ type ServiceResult<T> =
 
 const MAX_FILES = 5;
 const MAX_BYTES = 5_000_000;
+
+export function getBusinessVerificationReviewEstimate() {
+  return getAppConfigValue(APP_CONFIG_KEYS.businessVerificationReviewEstimate);
+}
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)

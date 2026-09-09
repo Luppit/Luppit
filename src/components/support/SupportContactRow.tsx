@@ -36,7 +36,7 @@ export function SupportContactRow({
   const description = isLoading
     ? "Cargando correo de soporte…"
     : supportEmail
-      ? `Escríbenos a ${supportEmail}.`
+      ? supportEmail
       : "Soporte no disponible temporalmente.";
 
   return (
@@ -44,6 +44,7 @@ export function SupportContactRow({
       icon="life-buoy"
       label="Contactar soporte"
       description={description}
+      descriptionColor="textMedium"
       showSeparator={showSeparator}
       accessibilityLabel="Enviar correo a soporte"
       onPress={

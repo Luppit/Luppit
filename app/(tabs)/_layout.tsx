@@ -74,7 +74,7 @@ export default function TabsLayout() {
       <Redirect
         href={{
           pathname: "/(detail)/business-verification",
-          params: { title: "Verificar negocio", hideMenu: "true" },
+          params: { title: "Verificación del negocio", hideMenu: "true" },
         }}
       />
     );

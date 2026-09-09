@@ -15,7 +15,7 @@ const DEFAULT_DETAIL_TITLES: Record<string, string> = {
   "/business-categories": "Categorías de venta",
   "/business-invitation-new": "Nueva invitación",
   "/business-invitations": "Equipo",
-  "/business-verification": "Verificar negocio",
+  "/business-verification": "Verificación del negocio",
   "/business-profile": "Negocio",
   "/buyer-home-group": "Tus solicitudes",
   "/buyer-profile": "Perfil del comprador",

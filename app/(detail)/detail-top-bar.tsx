@@ -268,7 +268,7 @@ export default function DetailTopBar({
         }}
       >
         {hideBack ? (
-          <View style={{ width: 44, height: 44 }} />
+          hideMenu ? null : <View style={{ width: 44, height: 44 }} />
         ) : (
           <Pressable
             onPress={handleBackPress}
@@ -291,7 +291,7 @@ export default function DetailTopBar({
         </Text>
 
         {hideMenu ? (
-          <View style={{ width: 40 }} />
+          hideBack ? null : <View style={{ width: 40 }} />
         ) : (
           <Pressable
             onPress={() =>

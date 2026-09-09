@@ -1,5 +1,6 @@
 import Button from "@/src/components/button/Button";
 import FilePicker, { SelectedFile } from "@/src/components/filePicker/FilePicker";
+import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -12,6 +13,7 @@ import { Text } from "@/src/components/Text";
 import { isProfileEmailSetupComplete } from "@/src/components/navbar/useEmailSetupGate";
 import {
   BusinessVerification,
+  getBusinessVerificationReviewEstimate,
   getCurrentBusinessVerification,
   submitCurrentBusinessVerification,
 } from "@/src/services/business-verification.service";
@@ -36,6 +38,7 @@ export default function BusinessVerificationScreen() {
   const { activeProfile, profiles, refreshProfiles, switchProfile } = useActiveProfile();
   const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const [verification, setVerification] = useState<BusinessVerification | null>(null);
+  const [reviewEstimate, setReviewEstimate] = useState<string | null>(null);
   const [rnpNumber, setRnpNumber] = useState("");
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -130,6 +133,16 @@ export default function BusinessVerificationScreen() {
     return () => {};
   }, [load]));
 
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void getBusinessVerificationReviewEstimate().then((result) => {
+      if (active) setReviewEstimate(result.ok ? result.data : null);
+    }).catch(() => {
+      if (active) setReviewEstimate(null);
+    });
+    return () => { active = false; };
+  }, []));
+
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void load();
@@ -212,7 +225,12 @@ export default function BusinessVerificationScreen() {
     verificationRef.current = result.data;
     setVerification(result.data);
     setFiles([]);
-    showSuccess("Solicitud enviada", "Nuestro equipo la revisará en un máximo de dos días hábiles.");
+    showSuccess(
+      "Solicitud enviada",
+      reviewEstimate
+        ? `Tiempo estimado de revisión: ${reviewEstimate}.`
+        : "Te avisaremos por correo y en la app cuando haya novedades.",
+    );
   };
 
   return (
@@ -231,8 +249,8 @@ export default function BusinessVerificationScreen() {
             <Text variant="title" align="center" accessibilityRole="header">
               {"Estamos revisando\ntu solicitud"}
             </Text>
-            <Text variant="small" color="textMedium" align="center" style={s.description}>
-              Ya recibimos la información de tu negocio.
+            <Text color="textMedium" align="center" style={s.description}>
+              Recibimos tus documentos. Por ahora no necesitás enviar nada más.
             </Text>
           </View>
         </View>
@@ -260,25 +278,29 @@ export default function BusinessVerificationScreen() {
         </View>
       ) : verification.status === "PENDING" ? (
         <View style={s.reviewContent}>
-          <View style={s.reviewMessage}>
-            <Text variant="subtitle" align="center" accessibilityRole="header">
-              Por ahora, no necesitás enviar más documentos.
-            </Text>
-            <Text variant="small" color="textMedium" align="center">
-              Te avisaremos por correo y en la app cuando haya novedades.
-            </Text>
+          <View style={s.reviewDetails}>
+            <View style={s.reviewClock} accessible={false}>
+              <Icon name="clock" size={24} color={t.colors.primary} />
+            </View>
+            <View style={s.reviewMessage}>
+              {reviewEstimate ? (
+                <View style={s.reviewEstimate}>
+                  <Text variant="small" color="textMedium">Tiempo estimado de revisión</Text>
+                  <Text variant="subtitle">{reviewEstimate}</Text>
+                </View>
+              ) : null}
+              <Text variant="small" color="textMedium">
+                Te avisaremos por correo y en la app cuando haya novedades.
+              </Text>
+            </View>
           </View>
-          <View style={s.reviewActions}>
-            <Button
-              title={isRefreshing ? "Consultando..." : "Consultar estado"}
-              variant="white"
-              loading={isRefreshing}
-              onPress={() => void load(true)}
-            />
-            <Text variant="small" color="textMedium" align="center">
-              Solo consulta novedades; no vuelve a enviar tus documentos.
-            </Text>
-          </View>
+          <Button
+            title={isRefreshing ? "Consultando..." : "Consultar estado"}
+            icon="refresh-cw"
+            variant="white"
+            loading={isRefreshing}
+            onPress={() => void load(true)}
+          />
         </View>
       ) : verification.status === "REJECTED" ? (
         <View style={s.surface}>
@@ -339,24 +361,28 @@ export default function BusinessVerificationScreen() {
         </View>
       ) : null}
 
-      <View style={s.surface}>
+      <GroupedListSection title="Tu cuenta">
         {profiles.length > 1 ? (
-          <Button
-            title="Cambiar perfil"
-            variant="white"
+          <GroupedListRow
+            icon="users-round"
+            label="Cambiar perfil"
+            labelMaxLines={2}
+            showSeparator={false}
             onPress={openProfileSwitcher}
           />
         ) : null}
-        <Button
-          title="Configuración de la cuenta"
-          variant="white"
+        <GroupedListRow
+          icon="settings"
+          label="Configuración de la cuenta"
+          labelMaxLines={2}
+          showSeparator={false}
           onPress={() => router.push({
             pathname: "/(detail)/account-settings",
             params: { title: "Configuración", hideMenu: "true" },
           })}
         />
         <SupportContactRow />
-      </View>
+      </GroupedListSection>
     </ScrollView>
   );
 }
@@ -366,6 +392,7 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
     content: {
       paddingTop: topInset + t.spacing.lg,
       paddingBottom: bottomInset + t.spacing.xl,
+      paddingHorizontal: t.spacing.sm,
       gap: t.spacing.lg,
       width: "100%",
       maxWidth: 560,
@@ -380,9 +407,11 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.xs,
     },
-    reviewContent: { paddingHorizontal: t.spacing.md, gap: t.spacing.lg },
-    reviewMessage: { gap: t.spacing.sm },
-    reviewActions: { gap: t.spacing.sm },
+    reviewContent: { gap: t.spacing.lg, paddingTop: t.spacing.sm },
+    reviewDetails: { flexDirection: "row", alignItems: "flex-start", gap: t.spacing.md, paddingHorizontal: t.spacing.md },
+    reviewClock: { paddingTop: t.spacing.xs },
+    reviewMessage: { flex: 1, gap: t.spacing.sm },
+    reviewEstimate: { gap: t.spacing.xs },
     icon: {
       width: 52,
       height: 52,

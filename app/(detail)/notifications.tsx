@@ -168,7 +168,7 @@ function getNotificationActions(
         onPress: () =>
           router.push({
             pathname: "/(detail)/business-verification",
-            params: { title: "Verificar negocio", hideMenu: "true" },
+            params: { title: "Verificación del negocio", hideMenu: "true" },
           }),
       },
     ];

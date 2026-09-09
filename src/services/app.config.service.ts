@@ -5,6 +5,7 @@ import { AppError, fromSupabaseError } from "../lib/supabase/errors";
 
 export const APP_CONFIG_KEYS = {
   accountDeletionUrl: "account_deletion_url",
+  businessVerificationReviewEstimate: "business_verification_review_estimate",
   privacyPolicyUrl: "privacy_policy_url",
   supportEmail: "support_email",
   supportUrl: "support_url",
