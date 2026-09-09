@@ -203,7 +203,6 @@ function BuyerCompletedRequests() {
     null
   );
   const [items, setItems] = React.useState<MarketplaceHubItem[]>([]);
-  const [total, setTotal] = React.useState(0);
   const [page, setPage] = React.useState(1);
   const [hasMore, setHasMore] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -264,11 +263,9 @@ function BuyerCompletedRequests() {
           );
           setPage(pageResult.data.page);
           setHasMore(pageResult.data.has_more);
-          setTotal(pageResult.data.total);
         } else {
           if (replace) {
             setItems([]);
-            setTotal(0);
           }
           setError(pageResult.error.message);
         }
@@ -276,7 +273,6 @@ function BuyerCompletedRequests() {
         if (generation !== generationRef.current) return;
         if (replace) {
           setItems([]);
-          setTotal(0);
         }
         setError("Ocurrió un error inesperado al cargar el historial.");
       } finally {
@@ -345,7 +341,6 @@ function BuyerCompletedRequests() {
   return (
     <CompletedListLayout
       data={items}
-      resultCount={total}
       keyExtractor={(item) => item.purchase_request_id}
       isLoading={isLoading}
       isRefreshing={isRefreshing}
@@ -544,7 +539,6 @@ function SellerCompletedRequests() {
   return (
     <CompletedListLayout
       data={offers}
-      resultCount={offers.length}
       keyExtractor={(offer) => offer.id}
       isLoading={isLoading}
       isRefreshing={isRefreshing}
@@ -576,7 +570,6 @@ function SellerCompletedRequests() {
 
 type CompletedListLayoutProps<T> = {
   data: T[];
-  resultCount: number;
   keyExtractor: (item: T) => string;
   isLoading: boolean;
   isRefreshing: boolean;
@@ -598,7 +591,6 @@ type CompletedListLayoutProps<T> = {
 
 function CompletedListLayout<T>({
   data,
-  resultCount,
   keyExtractor,
   isLoading,
   isRefreshing,
@@ -674,18 +666,15 @@ function CompletedListLayout<T>({
           },
         ]}
         ListHeaderComponent={
-          <View style={s.summaryRow}>
-            <Text variant="small" color="textMedium">
-              {resultCount} {resultCount === 1 ? "resultado" : "resultados"}
-            </Text>
-            {hasCriteria ? (
+          hasCriteria ? (
+            <View style={s.clearRow}>
               <Pressable accessibilityRole="button" onPress={onClear} hitSlop={8}>
                 <Text variant="small" style={s.clearText}>
                   Limpiar todo
                 </Text>
               </Pressable>
-            ) : null}
-          </View>
+            </View>
+          ) : null
         }
         ListEmptyComponent={
           <View style={s.emptyState}>
@@ -830,11 +819,11 @@ function createStyles(t: Theme) {
       alignItems: "center",
       justifyContent: "center",
     },
-    summaryRow: {
+    clearRow: {
       minHeight: 32,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      justifyContent: "flex-end",
     },
     clearText: {
       color: t.colors.primary,
