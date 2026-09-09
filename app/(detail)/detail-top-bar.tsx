@@ -310,7 +310,7 @@ export default function DetailTopBar({
                   },
                   {
                     id: "category-info",
-                    label: "Información sobre categorías",
+                    label: "Ver categoría",
                     icon: "circle-help",
                     textColorKey: "textDark",
                     iconColorKey: "textDark",

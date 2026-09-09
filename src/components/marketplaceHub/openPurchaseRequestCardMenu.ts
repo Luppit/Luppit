@@ -40,7 +40,7 @@ export function openPurchaseRequestCardMenu({
       favoriteOption,
       {
         id: "category-info",
-        label: "Información sobre categorías",
+        label: "Ver categoría",
         icon: "circle-help",
         textColorKey: "textDark",
         iconColorKey: "textDark",

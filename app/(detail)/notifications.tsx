@@ -293,7 +293,8 @@ export default function NotificationsScreen() {
         },
         {
           id: "dismiss-all-notifications",
-          label: "Limpiar todas",
+          label: "Limpiar",
+          accessibilityLabel: "Limpiar todas las notificaciones",
           icon: "trash-2",
           backgroundColorKey: "backgroudWhite",
           textColorKey: "error",

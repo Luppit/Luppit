@@ -847,6 +847,8 @@ export default function GlobalPopupHost() {
               return (
                 <Pressable
                   key={action.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel ?? action.label}
                   disabled={isDisabled}
                   style={[
                     s.summaryActionButton,
@@ -2149,7 +2151,7 @@ export default function GlobalPopupHost() {
                           <Pressable
                             key={action.id}
                             accessibilityRole="button"
-                            accessibilityLabel={action.label}
+                            accessibilityLabel={action.accessibilityLabel ?? action.label}
                             accessibilityState={{
                               disabled: isDisabled,
                               busy: isPending,

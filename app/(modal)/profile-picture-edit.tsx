@@ -214,7 +214,8 @@ export default function ProfilePictureEditScreen() {
         },
         {
           id: "remove-profile-picture",
-          label: "Eliminar foto",
+          label: "Eliminar",
+          accessibilityLabel: "Eliminar foto",
           icon: "trash-2",
           textColorKey: "error",
           iconColorKey: "error",

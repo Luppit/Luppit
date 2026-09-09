@@ -548,7 +548,8 @@ function openProfileDeletionConfirmation({
       },
       {
         id: "continue-profile-deletion",
-        label: "Verificar teléfono",
+        label: "Verificar",
+        accessibilityLabel: "Verificar teléfono",
         icon: "trash-2",
         textColorKey: "error",
         iconColorKey: "error",
@@ -597,7 +598,8 @@ function openAccountDeletionConfirmation({ phone }: { phone: string }) {
       },
       {
         id: "continue-account-deletion",
-        label: "Verificar teléfono",
+        label: "Verificar",
+        accessibilityLabel: "Verificar teléfono",
         icon: "trash-2",
         backgroundColorKey: "backgroudWhite",
         textColorKey: "error",
@@ -784,7 +786,8 @@ function openDeletionAccepted(
     actions: [
       {
         id: "copy-deletion-reference",
-        label: "Copiar referencia",
+        label: "Copiar",
+        accessibilityLabel: "Copiar código de referencia",
         icon: "copy",
         showPendingState: false,
         onPress: async () => {

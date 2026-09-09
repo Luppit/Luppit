@@ -51,6 +51,7 @@ export type PopupSummaryActionResult =
 export type PopupSummaryAction = {
   id: string;
   label: string;
+  accessibilityLabel?: string;
   icon?: LucideIconName;
   backgroundColorKey?: ThemeColorKey;
   textColorKey?: ThemeColorKey;

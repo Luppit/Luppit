@@ -20,7 +20,8 @@ export function openSignOutConfirmation() {
       },
       {
         id: "confirm-sign-out",
-        label: "Cerrar sesión",
+        label: "Salir",
+        accessibilityLabel: "Salir y cerrar sesión",
         icon: "log-out",
         backgroundColorKey: "backgroudWhite",
         textColorKey: "error",

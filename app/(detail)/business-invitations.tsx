@@ -113,12 +113,13 @@ export default function BusinessTeamScreen() {
       actions: [
         {
           id: "keep-member",
-          label: "Conservar acceso",
+          label: "Conservar",
           icon: "arrow-left",
         },
         {
           id: "remove-member",
-          label: "Quitar del equipo",
+          label: "Quitar",
+          accessibilityLabel: "Quitar del equipo",
           icon: "trash-2",
           textColorKey: "error",
           iconColorKey: "error",

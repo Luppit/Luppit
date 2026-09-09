@@ -1423,7 +1423,7 @@ function OfferScreenContent({ params }: { params: {
                 actions: [
                   {
                     id: "edit",
-                    label: "Seguir editando",
+                    label: "Editar",
                     icon: "sliders-horizontal",
                     backgroundColorKey: "backgroudWhite",
                     textColorKey: "textDark",
@@ -1431,7 +1431,7 @@ function OfferScreenContent({ params }: { params: {
                   },
                   {
                     id: "publish",
-                    label: isEditMode ? "Guardar cambios" : "Publicar oferta",
+                    label: isEditMode ? "Guardar" : "Publicar",
                     icon: "check",
                     backgroundColorKey: "primary",
                     textColorKey: "backgroudWhite",
