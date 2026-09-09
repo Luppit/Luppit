@@ -146,6 +146,7 @@ function screenFixture(params: Record<string, any> = {}) {
     react: runtime.react,
     "../../src/utils/assistantSummaryReply": assistantSummaryReply,
     "react-native": { ...Object.fromEntries(["Image", "Pressable", "ScrollView", "View", "TouchableWithoutFeedback"].map((v) => [v, v])), Platform: { OS: "ios" }, Keyboard: { dismiss() {} }, AccessibilityInfo: { announceForAccessibility() {} } },
+    "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: () => void | Promise<void>) => { await navigate(); } },
     "@/src/themes": { useTheme: () => theme },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
     "expo-router": { router: { back() {}, replace() {} }, useLocalSearchParams: () => params },

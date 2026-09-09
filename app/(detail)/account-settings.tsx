@@ -640,6 +640,7 @@ function openDeletionOtpConfirmation({
   let otpCode = "";
   openPopup({
     type: "summary",
+    androidBackActionId: "cancel-deletion-otp",
     title: "Confirma que sos vos",
     icon: "smartphone",
     description:
@@ -775,6 +776,7 @@ function openDeletionAccepted(
         ? `La eliminación se completó. Guardá el código de referencia como comprobante. ${supportInstruction}`
         : `Tu solicitud quedó registrada y se procesará automáticamente. ${supportInstruction}`,
     dismissOnBackdropPress: false,
+    androidBackActionId: "close-deletion-confirmation",
     rows: [
       { label: "Código de referencia", value: request.requestId },
       { label: "Plazo máximo", value: dueDate },

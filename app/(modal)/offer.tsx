@@ -1,3 +1,4 @@
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
 import Button from "@/src/components/button/Button";
 import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
@@ -368,6 +369,8 @@ function OfferAssistantScreen({
   const [successfulOfferPhotoCount, setSuccessfulOfferPhotoCount] = useState(0);
   const [showSummary, setShowSummary] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
+  const [hasComposerDraft, setHasComposerDraft] = useState(false);
+  useAndroidLeaveGuard(!offerDraftId && (hasComposerDraft || messages.length > 0 || isBusy));
   const [processingMode, setProcessingMode] = useState<
     "thinking" | "summary" | null
   >(null);
@@ -701,9 +704,11 @@ function OfferAssistantScreen({
       openPopup({
         type: "summary",
         title: "¿Salir de la oferta?",
-        description:
-          "Puedes salir y continuar después, o descartar este borrador.",
+        description: Platform.OS === "android" && hasComposerDraft
+          ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
+          : "Puedes salir y continuar después, o descartar este borrador.",
         dismissOnBackdropPress: false,
+        showCloseButton: Platform.OS === "android",
         actions: [
           {
             id: "exit-offer",
@@ -832,6 +837,7 @@ function OfferAssistantScreen({
         }}
       >
         <InputChat
+          onDraftChange={setHasComposerDraft}
           clearOnSendStart
           autoFocus={messages.length === 0}
           disabled={isBusy}
@@ -908,6 +914,19 @@ function OfferScreenContent({ params }: { params: {
   const [editDraft, setEditDraft] = useState<EditablePurchaseOfferDraft | null>(null);
   const [editDraftLoading, setEditDraftLoading] = useState(isEditMode);
   const [didApplyEditDraft, setDidApplyEditDraft] = useState(false);
+  const [initialEditValues, setInitialEditValues] = useState<string | null>(null);
+  const [isSavingOffer, setIsSavingOffer] = useState(false);
+  const editValues = JSON.stringify([
+    description, price, currencyId, files.map((file) => file.uri),
+    [...deliveryMethods].sort(), pickupDelay, shippingCost, shippingMaxTime,
+  ]);
+  useEffect(() => {
+    if (didApplyEditDraft && initialEditValues === null) setInitialEditValues(editValues);
+  }, [didApplyEditDraft, editValues, initialEditValues]);
+  const allowNavigation = useAndroidLeaveGuard(
+    isEditMode && initialEditValues !== null && editValues !== initialEditValues,
+    isSavingOffer
+  );
   const resolvedPurchaseRequestId = purchaseRequestId ?? editDraft?.purchaseRequestId ?? null;
   const pickupCatalog = useMemo(
     () => deliveryCatalog.find((item) => item.method_kind === "pickup") ?? null,
@@ -1164,25 +1183,31 @@ function OfferScreenContent({ params }: { params: {
         shippingMaxDays,
       };
 
-      const result = await updatePurchaseOffer(payload);
-      if (!result.ok) {
-        showError("No se pudo guardar la oferta", result.error.message);
-        return;
-      }
+      setIsSavingOffer(true);
+      try {
+        const result = await updatePurchaseOffer(payload);
+        if (!result.ok) {
+          showError("No se pudo guardar la oferta", result.error.message);
+          return;
+        }
 
-      showSuccess("Oferta actualizada");
-      router.replace({
-        pathname: "/(conversation)/offer",
-        params: {
-          conversationId,
-          title: purchaseRequest?.title ?? "Conversación",
-        },
-      });
+        showSuccess("Oferta actualizada");
+        await allowNavigation(() => router.replace({
+          pathname: "/(conversation)/offer",
+          params: {
+            conversationId,
+            title: purchaseRequest?.title ?? "Conversación",
+          },
+        }));
+      } finally {
+        setIsSavingOffer(false);
+      }
       return;
     }
 
     showInfo("Creación desde el asistente", "La creación de ofertas ahora se hace con el asistente.");
   }, [
+    allowNavigation,
     conversationId,
     currencyId,
     deliveryMethods,

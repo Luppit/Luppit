@@ -8,7 +8,7 @@ import { signInWithPhoneOtp, verifyPhoneOtp } from "@/src/lib/supabase";
 import { showError, showMissingFields } from "@/src/utils";
 import { router } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import VerifyCode from "./signup/VerifyCode";
 
 const PHONE_REGEX = /^(?![0-9]{8}$)/;
@@ -140,7 +140,13 @@ export default function Login() {
         steps={steps}
         ref={stepperRef}
         backDisabled={isVerifying}
-        onBackAtFirstStep={() => router.back()}
+        onBackAtFirstStep={() => {
+          if (Platform.OS === "android" && !router.canGoBack()) {
+            router.replace("/(auth)/auth");
+          } else {
+            router.back();
+          }
+        }}
       ></Stepper>
     </View>
   );

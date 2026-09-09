@@ -1,8 +1,8 @@
+import { goBackOrHome, useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { useTheme } from "@/src/themes";
-import { router } from "expo-router";
 import React from "react";
 import { Platform, Pressable, View } from "react-native";
 
@@ -20,6 +20,7 @@ export default function ModalTopBar({
   topInset = 0,
 }: ModalTopBarProps) {
   const t = useTheme();
+  useAndroidBackAction(goBackOrHome);
   const content = (
     <View
       style={{
@@ -38,7 +39,7 @@ export default function ModalTopBar({
 
       {glass ? (
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBackOrHome}
           hitSlop={12}
           style={{ width: 40, alignItems: "flex-end", justifyContent: "center" }}
         >
@@ -46,7 +47,7 @@ export default function ModalTopBar({
         </Pressable>
       ) : (
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBackOrHome}
           hitSlop={12}
           style={{ width: 40, alignItems: "flex-end" }}
         >

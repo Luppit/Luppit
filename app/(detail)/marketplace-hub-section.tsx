@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
@@ -513,6 +514,8 @@ export default function MarketplaceHubSectionScreen() {
 
     router.replace("/(tabs)");
   }, []);
+
+  useAndroidBackAction(handleBackPress);
 
   const openSearchAndFilters = useCallback(() => {
     const chipGroups = [

@@ -1,5 +1,5 @@
 import { useTheme } from "@/src/themes";
-import { useFocusEffect } from "@react-navigation/native";
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import React, {
   useCallback,
   forwardRef,
@@ -9,7 +9,6 @@ import React, {
   useState,
 } from "react";
 import {
-  BackHandler,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -85,21 +84,10 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
       else setCurrentStep((i) => i - 1);
     }, [backDisabled, currentStep, onBackAtFirstStep]);
 
-    useFocusEffect(
-      useCallback(() => {
-        if (Platform.OS !== "android" || currentStep === 0) return;
-
-        const subscription = BackHandler.addEventListener(
-          "hardwareBackPress",
-          () => {
-            goBack();
-            return true;
-          }
-        );
-
-        return () => subscription.remove();
-      }, [currentStep, goBack])
-    );
+    useAndroidBackAction(goBack, {
+      enabled: currentStep > 0 || backDisabled || Boolean(onBackAtFirstStep),
+      priority: 1,
+    });
 
     useImperativeHandle(
       ref,

@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -14,7 +16,7 @@ import {
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   Platform,
@@ -44,6 +46,9 @@ export default function HomePresetScreen() {
   const [currentPresetId, setCurrentPresetId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const allowNavigation = useAndroidLeaveGuard(
+    !isLoading && selectedPresetId !== currentPresetId, isSaving
+  );
 
   const loadOptions = useCallback(async () => {
     setIsLoading(true);
@@ -94,7 +99,7 @@ export default function HomePresetScreen() {
     }
 
     showSuccess("Vista de inicio actualizada");
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   if (isLoading) {

@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
@@ -17,6 +19,9 @@ export default function BusinessNameEditScreen() {
   const initialValue = Array.isArray(params.value) ? params.value[0] : params.value;
   const [value, setValue] = useState(initialValue ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  const allowNavigation = useAndroidLeaveGuard(
+    canManage && value.trim() !== (initialValue ?? "").trim(), isSaving
+  );
   const t = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
 
@@ -42,7 +47,7 @@ export default function BusinessNameEditScreen() {
     }
 
     showSuccess("Nombre comercial actualizado");
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   return (

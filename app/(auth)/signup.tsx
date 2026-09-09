@@ -14,7 +14,7 @@ import { borders, colors, spacing } from "@/src/themes";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
 
@@ -287,7 +287,13 @@ export default function Signup() {
         steps={steps}
         ref={stepperRef}
         backDisabled={isVerifying}
-        onBackAtFirstStep={() => router.back()}
+        onBackAtFirstStep={() => {
+          if (Platform.OS === "android" && !router.canGoBack()) {
+            router.replace("/(auth)/auth");
+          } else {
+            router.back();
+          }
+        }}
       ></Stepper>
     </View>
   );

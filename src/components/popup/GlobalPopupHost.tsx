@@ -1,3 +1,4 @@
+import { resolveAndroidPopupBack } from "./androidBack";
 import { Icon } from "@/src/components/Icon";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
@@ -215,6 +216,7 @@ export default function GlobalPopupHost() {
   const { height: windowHeight } = useWindowDimensions();
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
+  const summaryActionPendingRef = useRef(false);
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
   const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
@@ -617,7 +619,8 @@ export default function GlobalPopupHost() {
   };
 
   const handleSummaryActionPress = async (action: PopupSummaryAction) => {
-    if (pendingSummaryActionId) return;
+    if (action.disabled || summaryActionPendingRef.current) return;
+    summaryActionPendingRef.current = true;
 
     setPendingSummaryActionId(action.id);
     setSummaryFeedback(null);
@@ -691,6 +694,7 @@ export default function GlobalPopupHost() {
         closePopup();
       }
     } finally {
+      summaryActionPendingRef.current = false;
       setPendingSummaryActionId(null);
     }
   };
@@ -961,6 +965,25 @@ export default function GlobalPopupHost() {
     setActiveDateField(null);
   };
 
+  const handleAndroidBack = () => {
+    if (Keyboard.isVisible()) {
+      Keyboard.dismiss();
+      return;
+    }
+    if (successConfig || summaryActionPendingRef.current) return;
+    if (activeSummaryChoiceInputId) {
+      dismissCurrentLayer();
+      return;
+    }
+    const action = resolveAndroidPopupBack(
+      summaryConfig,
+      canDismissPopup,
+      pendingSummaryActionId != null
+    );
+    if (action.type === "action") void handleSummaryActionPress(action.action);
+    else if (action.type === "close") closePopup();
+  };
+
   if (!isMounted) return null;
 
   const summaryFeedbackPresentation = summaryFeedback
@@ -974,13 +997,15 @@ export default function GlobalPopupHost() {
       visible={isMounted}
       animationType="none"
       onRequestClose={
-        successConfig
-          ? () => undefined
-          : activeSummaryChoiceInputId
-            ? dismissCurrentLayer
-            : canDismissPopup
-              ? closePopup
-              : undefined
+        Platform.OS === "android"
+          ? handleAndroidBack
+          : successConfig
+            ? () => undefined
+            : activeSummaryChoiceInputId
+              ? dismissCurrentLayer
+              : canDismissPopup
+                ? closePopup
+                : undefined
       }
     >
       <View
@@ -1581,7 +1606,7 @@ export default function GlobalPopupHost() {
                             <Pressable
                               accessibilityRole="button"
                               accessibilityLabel="Cerrar"
-                              accessibilityHint="Cierra el detalle de la notificación."
+                              accessibilityHint={Platform.OS === "android" ? "Cierra este diálogo." : "Cierra el detalle de la notificación."}
                               disabled={pendingSummaryActionId != null}
                               hitSlop={4}
                               onPress={closePopup}

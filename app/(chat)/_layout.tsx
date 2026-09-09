@@ -1,3 +1,5 @@
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import ChatTopBar from "./chat-top-bar";
 import {
   ChatSessionProvider,
@@ -35,9 +37,21 @@ function ChatLayoutContent() {
     showComposer,
     canCompose,
     isSendingMessage,
+    isExecutingControl,
+    draftId,
     stopAssistant,
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [hasComposerDraft, setHasComposerDraft] = useState(false);
+  useAndroidLeaveGuard(
+    uiState !== "published" && (hasComposerDraft || messages.length > 0 || Boolean(draftId)),
+    isExecutingControl
+  );
+  const closeChat = useCallback(() => {
+    Keyboard.dismiss();
+    router.dismissTo("/(tabs)");
+  }, []);
+  useAndroidBackAction(closeChat);
 
   const handleComposerLayout = useCallback(
     (event: LayoutChangeEvent) => {
@@ -83,10 +97,7 @@ function ChatLayoutContent() {
       <View style={{ flex: 1 }}>
         <ChatTopBar
           title={title}
-          onClose={() => {
-            Keyboard.dismiss();
-            router.dismissTo("/(tabs)");
-          }}
+          onClose={closeChat}
           topInset={insets.top}
           isSurfaceVisible={Boolean(title?.trim())}
         />
@@ -110,6 +121,7 @@ function ChatLayoutContent() {
             }}
           >
             <InputChat
+              onDraftChange={setHasComposerDraft}
               clearOnSendStart
               sendOnReturn={false}
               autoFocus={messages.length === 0}

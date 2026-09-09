@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import LoadingState from "@/src/components/loading/LoadingState";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LuppitChip from "@/src/components/chip/LuppitChip";
@@ -513,6 +514,8 @@ function FavoritesTopBar({
 
     router.replace("/");
   }, []);
+
+  useAndroidBackAction(goBack);
 
   return (
     <GlassSurface

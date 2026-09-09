@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import { GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
@@ -17,7 +19,6 @@ import {
   showMissingFields,
   showSuccess,
 } from "@/src/utils/useToast";
-import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Keyboard,
@@ -64,6 +65,13 @@ export default function EmailSetupScreen() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [didTryEmailSubmit, setDidTryEmailSubmit] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [initialEmail, setInitialEmail] = useState("");
+  const [initialOptIn, setInitialOptIn] = useState(false);
+  const allowNavigation = useAndroidLeaveGuard(
+    !isLoading && (normalizeEmail(email) !== normalizeEmail(initialEmail) ||
+      emailOptIn !== initialOptIn || step === "otp"),
+    isSendingCode || isVerifying
+  );
 
   useEffect(() => {
     let active = true;
@@ -79,6 +87,8 @@ export default function EmailSetupScreen() {
         return;
       }
 
+      setInitialEmail(result.data.email ?? "");
+      setInitialOptIn(result.data.emailOptIn);
       setEmail(result.data.email ?? "");
       setEmailOptIn(result.data.emailOptIn);
       setIsLoading(false);
@@ -204,7 +214,7 @@ export default function EmailSetupScreen() {
     }
 
     showSuccess("Correo verificado");
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   const handleEditEmail = () => {

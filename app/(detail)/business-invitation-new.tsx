@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import {
@@ -13,7 +15,6 @@ import {
   showMissingFields,
   showSuccess,
 } from "@/src/utils/useToast";
-import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -51,6 +52,7 @@ export default function NewBusinessInvitationScreen() {
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const allowNavigation = useAndroidLeaveGuard(isOwner && Boolean(phone.trim()), isSaving);
 
   const invite = async () => {
     const phoneNumber = phone.trim();
@@ -82,7 +84,7 @@ export default function NewBusinessInvitationScreen() {
       "Invitación enviada",
       "La persona podrá aceptarla en Luppit durante los próximos 7 días."
     );
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   return (

@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -175,6 +176,14 @@ export default function IdentityVerificationScreen() {
     }
   };
 
+  const returnToApp = useCallback(() => {
+    if (isStarting || isCancelling) return;
+    router.replace("/(tabs)");
+  }, [isStarting, isCancelling]);
+  useAndroidBackAction(returnToApp, {
+    enabled: !isLoading && Boolean(onboarding) && profiles.length > 0,
+  });
+
   const openCancelConfirmation = () => {
     openPopup({
       type: "summary",
@@ -316,7 +325,7 @@ export default function IdentityVerificationScreen() {
             title="Volver a la app"
             variant="white"
             disabled={isStarting || isCancelling}
-            onPress={() => router.replace("/(tabs)")}
+            onPress={returnToApp}
           />
         ) : null}
       </View>

@@ -1,7 +1,7 @@
 import { useTheme } from "@/src/themes";
 import * as ImagePicker from "expo-image-picker";
 import { ArrowUp, Paperclip, Square, X } from "lucide-react-native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TextInputKeyPressEvent } from "react-native";
 import {
   Image,
@@ -41,6 +41,7 @@ export type InputChatProps = {
   onStop?: () => void;
   onPickImages?: () => Promise<ChatImage[] | void> | ChatImage[] | void;
   onImagesChange?: (images: ChatImage[]) => void;
+  onDraftChange?: (hasDraft: boolean) => void;
 };
 
 export default function InputChat({
@@ -59,6 +60,7 @@ export default function InputChat({
   onStop,
   onPickImages,
   onImagesChange,
+  onDraftChange,
 }: InputChatProps) {
   const t = useTheme();
   const styles = createInputChatStyles(t);
@@ -70,6 +72,12 @@ export default function InputChat({
   const sendIdRef = useRef(0);
   const isBusy = busy || sending;
   const isBlocked = disabled || isBusy;
+
+  useEffect(() => {
+    onDraftChange?.(Boolean(text.trim()) || images.length > 0 || sending);
+  }, [images.length, onDraftChange, sending, text]);
+
+  useEffect(() => () => onDraftChange?.(false), [onDraftChange]);
 
   const updateImages = useCallback(
     (updater: (prev: ChatImage[]) => ChatImage[]) => {

@@ -14,7 +14,7 @@ import type { callPurchaseRequestAssistant } from "../src/services/purchase.requ
 // This does not exercise native layout or React scheduling.
 function createHooks() {
   const values: unknown[] = [];
-  const cleanups: (() => void)[] = [];
+  const cleanups = new Map<number, () => void>();
   let cursor = 0;
   const hooks = {
     createContext: () => ({ Provider: "Provider" }),
@@ -35,12 +35,16 @@ function createHooks() {
     },
     useCallback: (callback: unknown) => callback,
     useMemo: (callback: () => unknown) => callback(),
-    useEffect: (callback: () => (() => void) | void) => {
+    useEffect: (callback: () => (() => void) | void, dependencies: unknown[] = []) => {
       const index = cursor++;
-      if (index in values) return;
-      values[index] = true;
+      const previous = values[index] as unknown[] | undefined;
+      if (previous && dependencies.length === previous.length &&
+        dependencies.every((value, position) => Object.is(value, previous[position]))) return;
+      cleanups.get(index)?.();
+      cleanups.delete(index);
+      values[index] = dependencies;
       const cleanup = callback();
-      if (cleanup) cleanups.push(cleanup);
+      if (cleanup) cleanups.set(index, cleanup);
     },
   };
   return {
@@ -182,6 +186,26 @@ test("non-cancellable shared callers retain the disabled send arrow while busy",
   assert.equal(composer.action.disabled, true);
   assert.ok(composer.nodes.some((node) => node.type === "ArrowUp"));
   assert.ok(!composer.nodes.some((node) => node.type === "Square"));
+});
+
+test("composer reports unsaved content and keeps the leave guard active until sending finishes", async () => {
+  const changes: boolean[] = [];
+  const pending = deferred<void>();
+  const composer = createComposer({
+    clearOnSendStart: true,
+    onDraftChange: (hasDraft) => changes.push(hasDraft),
+    onSend: () => pending.promise,
+  });
+  composer.input.onChangeText("Solicitud sin enviar");
+  void composer.nodes;
+  assert.equal(changes.at(-1), true);
+  const sent = composer.action.onPress();
+  assert.equal(composer.input.value, "");
+  assert.equal(changes.at(-1), true);
+  pending.resolve();
+  await sent;
+  void composer.nodes;
+  assert.equal(changes.at(-1), false);
 });
 
 test("shared conversation callers can still preview and send an image without text", async () => {

@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import { TextField } from "@/src/components/inputField/InputField";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
@@ -71,6 +73,9 @@ export default function ProfileFieldEditScreen() {
   const [didSubmit, setDidSubmit] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const isVerifiedIdentity = activeProfile?.identityStatus === "VERIFIED";
+  const allowNavigation = useAndroidLeaveGuard(
+    !isVerifiedIdentity && value.trim() !== (initialValue ?? "").trim(), isSaving
+  );
 
   useEffect(() => {
     if (isVerifiedIdentity) router.back();
@@ -107,7 +112,7 @@ export default function ProfileFieldEditScreen() {
     }
 
     showSuccess(config.success);
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   return (

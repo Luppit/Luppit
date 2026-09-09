@@ -214,6 +214,7 @@ export function PushNotificationProvider({
             context === "businessVerificationPending"
               ? "Te avisaremos cuando cambie el estado de tu verificación y cuando tengas mensajes u ofertas."
               : "Te avisaremos sobre mensajes y cambios importantes en ofertas, entregas y verificaciones. No mostraremos detalles privados en la pantalla bloqueada.",
+          androidBackActionId: "push-notifications-later",
           dismissOnBackdropPress: false,
           actions: [
             {

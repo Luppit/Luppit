@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { Icon } from "@/src/components/Icon";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -754,6 +755,8 @@ function CompletedRequestsTopBar({
 
     router.replace("/");
   }, []);
+
+  useAndroidBackAction(goBack);
 
   return (
     <GlassSurface

@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { Icon } from "@/src/components/Icon";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
@@ -589,6 +590,8 @@ function ChatsTopBar({
 
     router.replace("/");
   }, []);
+
+  useAndroidBackAction(goBack);
 
   return (
     <GlassSurface

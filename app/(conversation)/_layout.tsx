@@ -1,3 +1,5 @@
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { useFocusEffect } from "@react-navigation/native";
 import ConversationActionButtons, {
   ConversationActionButtonConfig,
@@ -337,6 +339,23 @@ export default function ConversationLayout() {
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
   const showComposer = conversationView?.permissions.can_send_messages ?? false;
+  const [hasComposerDraft, setHasComposerDraft] = useState(false);
+  const [pendingMessageCount, setPendingMessageCount] = useState(0);
+  const allowNavigation = useAndroidLeaveGuard(
+    showComposer && hasComposerDraft, isExecutingAction || pendingMessageCount > 0
+  );
+  const closeConversation = useCallback(() => {
+    if (!router.canGoBack() &&
+      (Platform.OS === "android" || isUnavailableConversationError(loadError))) {
+      router.replace("/(tabs)/chats");
+      return;
+    }
+    router.back();
+  }, [loadError]);
+  useAndroidBackAction(closeConversation, {
+    enabled: Boolean(conversationId) && !isLoading &&
+      (Boolean(conversationView && profileId) || isUnavailableConversationError(loadError)),
+  });
 
   useEffect(() => {
     if (!showComposer) {
@@ -687,7 +706,7 @@ export default function ConversationLayout() {
         const conversationWasPurged = didPurgeConversationResult(result.data, conversationId);
         if (conversationWasPurged) {
           showSuccess(getActionSuccessMessage(result.data));
-          router.replace("/(tabs)/chats");
+          await allowNavigation(() => router.replace("/(tabs)/chats"));
           return true;
         }
 
@@ -716,6 +735,7 @@ export default function ConversationLayout() {
       }
     },
     [
+      allowNavigation,
       conversationId,
       profileId,
       conversationView?.role_code,
@@ -1091,11 +1111,7 @@ export default function ConversationLayout() {
           title={isUnavailable ? "Volver" : "Reintentar"}
           onPress={() => {
             if (isUnavailable) {
-              if (router.canGoBack()) {
-                router.back();
-              } else {
-                router.replace("/(tabs)/chats");
-              }
+              closeConversation();
               return;
             }
 
@@ -1207,7 +1223,7 @@ export default function ConversationLayout() {
               }}
             >
               <Pressable
-                onPress={() => router.back()}
+                onPress={closeConversation}
                 accessibilityRole="button"
                 accessibilityLabel="Volver"
                 style={{
@@ -1358,6 +1374,7 @@ export default function ConversationLayout() {
                 }}
               >
                 <InputChat
+                  onDraftChange={setHasComposerDraft}
                   clearOnSendStart
                   placeholder="Escribe un mensaje"
                   onSend={({ text, images }) => {
@@ -1377,6 +1394,7 @@ export default function ConversationLayout() {
                       ...outgoingMessages,
                     ]);
 
+                    setPendingMessageCount((current) => current + 1);
                     void (async () => {
                       try {
                         const created = await createConversationMessages({
@@ -1408,6 +1426,8 @@ export default function ConversationLayout() {
                           "No se pudo enviar el mensaje",
                           "Ocurrió un error, intenta de nuevo."
                         );
+                      } finally {
+                        setPendingMessageCount((current) => Math.max(0, current - 1));
                       }
                     })();
                   }}

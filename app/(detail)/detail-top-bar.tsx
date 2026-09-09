@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 import GlassSurface from "@/src/components/glass/GlassSurface";
@@ -50,6 +51,8 @@ export default function DetailTopBar({
 
     router.replace("/(tabs)");
   }, []);
+
+  useAndroidBackAction(handleBackPress, { enabled: !hideBack });
 
   useEffect(() => {
     let active = true;

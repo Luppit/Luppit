@@ -1,3 +1,4 @@
+import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import RoleGate from "@/src/components/role/RoleGate";
@@ -547,6 +548,8 @@ function OffersTopBar({
 
     router.replace("/");
   }, []);
+
+  useAndroidBackAction(goBack);
 
   return (
     <GlassSurface

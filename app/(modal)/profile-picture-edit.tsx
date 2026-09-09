@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import {
   GroupedList,
@@ -22,7 +24,6 @@ import { showToast } from "@/src/services/toast.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import * as ImagePicker from "expo-image-picker";
-import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, ScrollView, StyleSheet, View } from "react-native";
 
@@ -115,6 +116,7 @@ export default function ProfilePictureEditScreen() {
     ? activeProfile?.businessName || "negocio"
     : activeProfile?.profile.name || "comprador";
   const isBusy = isSaving || isRemoving;
+  const allowNavigation = useAndroidLeaveGuard(Boolean(draft), isBusy);
   const hasCurrentPicture = Boolean(target?.imagePath || target?.imageUrl);
   const canSave = Boolean(draft && target?.canManage && !isBusy);
 
@@ -185,11 +187,13 @@ export default function ProfilePictureEditScreen() {
     setTarget(result.data);
     setDraft(null);
     setShowFallbackAfterMetadataClearFailure(false);
-    if (target.kind === "buyer_profile") {
-      await refreshProfiles(activeProfile?.profile.id);
-    }
-    showSuccess(isBusiness ? "Foto del negocio actualizada" : "Foto de perfil actualizada");
-    router.back();
+    await allowNavigation(async () => {
+      if (target.kind === "buyer_profile") {
+        await refreshProfiles(activeProfile?.profile.id);
+      }
+      showSuccess(isBusiness ? "Foto del negocio actualizada" : "Foto de perfil actualizada");
+      goBackOrHome();
+    });
   };
 
   const confirmRemoveImage = () => {
@@ -232,11 +236,13 @@ export default function ProfilePictureEditScreen() {
             setTarget(result.data);
             setDraft(null);
             setShowFallbackAfterMetadataClearFailure(false);
-            if (target.kind === "buyer_profile") {
-              await refreshProfiles(activeProfile?.profile.id);
-            }
-            showSuccess("Foto eliminada");
-            setTimeout(() => router.back(), 0);
+            await allowNavigation(async () => {
+              if (target.kind === "buyer_profile") {
+                await refreshProfiles(activeProfile?.profile.id);
+              }
+              showSuccess("Foto eliminada");
+              setTimeout(goBackOrHome, 0);
+            });
             return true;
           },
         },

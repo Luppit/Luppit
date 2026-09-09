@@ -1,3 +1,5 @@
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
+import { goBackOrHome, useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import Button from "@/src/components/button/Button";
 import {
   GroupedListRow,
@@ -18,7 +20,6 @@ import {
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
@@ -73,6 +74,13 @@ export default function BusinessCategoriesScreen() {
   const [initialCategoryIds, setInitialCategoryIds] = useState<string[]>([]);
   const [categoryBrowserPath, setCategoryBrowserPath] = useState<string[]>([]);
   const [categorySearchValue, setCategorySearchValue] = useState("");
+  const goToPreviousCategory = useCallback(() => {
+    setCategoryBrowserPath((current) => current.slice(0, -1));
+  }, []);
+  useAndroidBackAction(goToPreviousCategory, {
+    enabled: categorySearchValue.trim().length === 0 && categoryBrowserPath.length > 0,
+    priority: 1,
+  });
   const [didCategoryLoadFail, setDidCategoryLoadFail] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -153,6 +161,9 @@ export default function BusinessCategoriesScreen() {
     initialCategoryIds,
     selectedCategories.map((preference) => preference.categoryId)
   );
+  const allowNavigation = useAndroidLeaveGuard(
+    !isLoading && isBusinessOwner && hasCategoryChanges, isSaving
+  );
 
   const addCategory = useCallback((category: BusinessCategoryOption) => {
     setSelectedCategories((current) => {
@@ -216,7 +227,7 @@ export default function BusinessCategoriesScreen() {
       setInitialCategories(reconciledCategories);
       setInitialCategoryIds(result.data.categoryIds);
       showSuccess("Categorías actualizadas");
-      router.back();
+      allowNavigation(goBackOrHome);
     } catch {
       showError("No se pudieron actualizar las categorías");
     } finally {
@@ -338,7 +349,7 @@ export default function BusinessCategoriesScreen() {
                 {categorySearchValue.trim().length === 0 && categoryBrowserPath.length > 0 ? (
                   <CategoryBrowserBackRow
                     showSeparator={categoryBrowserItems.length > 0}
-                    onBack={() => setCategoryBrowserPath((current) => current.slice(0, -1))}
+                    onBack={goToPreviousCategory}
                   />
                 ) : null}
 

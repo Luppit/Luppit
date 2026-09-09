@@ -1,3 +1,5 @@
+import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
+import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
 import {
   GroupedListRow,
@@ -20,7 +22,7 @@ import {
 import { updateCurrentBusinessLocation } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
-import { router, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -53,6 +55,11 @@ export default function BusinessLocationEditScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const allowNavigation = useAndroidLeaveGuard(
+    !isLoading && isBusinessOwner && Boolean(selectedLocationId) &&
+      selectedLocationId !== initialLocationId,
+    isSaving
+  );
   const isMountedRef = useRef(true);
   const loadRequestIdRef = useRef(0);
 
@@ -159,7 +166,7 @@ export default function BusinessLocationEditScreen() {
     }
 
     showSuccess("Ubicación actualizada");
-    router.back();
+    allowNavigation(goBackOrHome);
   };
 
   if (activeProfileState !== "loading" && !isBusinessOwner) {
