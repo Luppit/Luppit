@@ -342,7 +342,9 @@ export default function BusinessVerificationScreen() {
             <Text variant="small" color="textMedium">
               Adjuntá documentos que permitan verificar el negocio y tu relación con él. Nuestro equipo revisará la información y podrá solicitar documentos adicionales.
             </Text>
-            <Text variant="small" color="stateAnulated">PDF, JPG o PNG · máximo 5 archivos de 5 MB.</Text>
+            <Text variant="small" color="stateAnulated">
+              Solo se aceptan archivos PDF, JPG o PNG. Máximo 5 archivos de 5 MB cada uno.
+            </Text>
           </View>
 
           <Button title="Enviar a revisión" loading={isSubmitting} onPress={() => void submit()} />
