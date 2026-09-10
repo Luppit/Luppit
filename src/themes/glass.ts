@@ -16,6 +16,7 @@ function createShadow(
     },
     android: {
       elevation,
+      shadowColor: color,
     },
     default: {
       shadowColor: color,

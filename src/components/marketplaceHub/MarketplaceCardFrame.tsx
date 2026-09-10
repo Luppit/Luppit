@@ -6,7 +6,7 @@ import {
 } from "@/src/components/surface/styles";
 import { Theme, useTheme } from "@/src/themes";
 import React, { ReactNode, useMemo, useRef } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 
 type MarketplaceCardFrameProps = {
   title: string;
@@ -141,7 +141,9 @@ export default function MarketplaceCardFrame({
       style={({ pressed }) => [
         s.pressable,
         {
-          opacity: pressed ? 0.88 : 1,
+          // Fading elevated glass exposes the Android shadow through the card.
+          opacity:
+            pressed && (Platform.OS !== "android" || !glassSurface) ? 0.88 : 1,
           transform: [{ scale: pressed ? 0.985 : 1 }],
         },
       ]}
