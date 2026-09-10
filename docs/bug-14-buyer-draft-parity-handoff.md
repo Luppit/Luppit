@@ -1,90 +1,68 @@
 # Bug 14: buyer request draft resume and discard
 
-Status: draft identity fixes implemented and tested; resume/discard parity awaits approval of the public contract and database changes below. This patch does **not** yet make saved buyer drafts resumable or discardable.
+Status: approved scope implemented and committed in isolated app, Edge, and database worktrees. Local validation passed. The parent task owns integration into the saved main checkouts. Hosted deployment and physical-device acceptance remain pending.
 
-## Scope and checkout evidence
+## Exact revisions and integration
 
-- App worktree: `/Users/josedanielcr/.codex/worktrees/28f0/Luppit`, based on `15f7acfbaf33c725d87df989be35646b6b764c81`.
-- Database source inspected read-only: `/Users/josedanielcr/Development/luppit-supabase`, `f16a3cda5aedfc38e0aa2810b19c857ddf3a8e35`.
-- Edge source inspected read-only: `/Users/josedanielcr/Development/ai-edge-functions`, `8161db6089aa79ffc333963b6e6106c435ec7597`. The deployable buyer source is `supabase/functions/ai-completar/`; the older root copy differs.
-- Hosted LuppitDB inspection was limited to function definitions, grants, policies, constraints, and menu configuration. No actual draft/message content or credentials were read.
-- No merges, commits, pushes, release builds, backend edits, or deployments. The saved main checkouts remain unchanged.
-
-## Implemented independently of new contracts
-
-`app/(chat)/chat-session.context.tsx` now retains the latest successful non-null draft ID, forwards a newly returned ID to undispatched requests in a CONTINUE -> correction sequence, and stops that sequence when the server reports publication. Retry saves the exact dispatched draft ID, prompt, and request identities. An empty restoration or confirmed discard will need an explicit session reset in the future restoration path; it must not be inferred from an ordinary response omitting `draft_id`.
-
-`tests/buyer-chat-stop.test.mts` adds three runtime callback regressions and makes test request identities distinct. All three new regressions failed against the original implementation and pass after the change. The tests exercise callbacks with deferred mocked responses, not native React scheduling or a device.
-
-## Seller flow compared with buyer
-
-| Area | Seller | Buyer today |
+| Repository | Required base | Implementation commit |
 | --- | --- | --- |
-| Entry | Conversation opens offer editor; editor calls RESTORE on mount with conversation ID. | Existing create tab redirects to `/(chat)/chat`; a new provider starts with empty state. |
-| Restore | Edge selects newest active draft for owned active profile + conversation, reconstructs summary, and returns saved messages. | Only SHOW_SUMMARY, CONTINUE, and PUBLISH are accepted. There is no request draft-management RPC. |
-| Leave | `usePreventRemove` opens the shared popup with Salir and Descartar; leaving retains the server draft. | Android unsaved-change guard only; no saved draft resume/discard handling. |
-| Discard | Conditional soft discard to `status=cancelled`, `ui_state=cancelled`, pending action null; transcript is retained. | No discard action; authenticated clients have no DELETE grant or policy. |
-| Authoritative state | Draft data plus persisted messages; current offer UI does not restore every buyer-style review field. | Draft already stores data, ID, status, UI state, pending action, publication ID and update time. These must all be restored together. |
+| App | `eb888b60a43bb1c37b16870f91440602b87d52d7` | `1eebdd4d44cd5f481d6dc46914ac60dd36b431aa` |
+| Edge | `59650952691767bda0ef8433a7cc40007c3465df` | `390b6c6315913137f92db4dfbe973d5820b60bf6` |
+| Database | `f16a3cda5aedfc38e0aa2810b19c857ddf3a8e35` | `906ec97a483334062b86ea3215136bf00f044dd3` |
 
-Evidence in app: `app/(modal)/offer.tsx:439` (restore application), `:572` (entry restore), `:677` (leave confirmation); `app/(tabs)/create.tsx:15` (buyer entry); `src/services/purchase.request.assistant.service.ts:13` (buyer actions).
+This document is updated in a subsequent documentation commit on the same app branch. Integrate the branch tip to include it.
 
-Edge seller evidence: `supabase/functions/ai-vendedor-completar/index.ts:1945` (restore), `:1990` (soft discard). Buyer action allowlist: `supabase/functions/ai-completar/index.ts:49`.
+Worktrees: `/Users/josedanielcr/.codex/worktrees/28f0/Luppit`, sibling `ai-edge-functions`, and sibling `luppit-supabase`. Branches: `codex/bug14-buyer-draft-parity`, `codex/bug14-request-draft-parity`, and `codex/bug14-request-draft-lifecycle`.
 
-## Concrete proposal requiring approval
+The app base already combines the initial draft-identity fix (`bed74dc`), bug 15 image support, and bug 16 keyboard-wrapper changes. The final app changes preserve those integrations. Edge builds on bug 15's `5965095`; it retains DIRECT_SUBJECT persistence and transient VISUAL_REFERENCE behavior. No dependency or lockfile change was added. No generated database types change is needed: the publication RPC signature is unchanged.
 
-Extend the existing `POST /functions/v1/ai-completar` contract with **RESTORE** and **DISCARD**, and protect terminal draft state in the database. Keep the existing buyer create entry and seller-style shared leave popup. No new navigation route, menu item, draft-manager screen, table, column, or dependency is necessary for this proposal.
+Release order: apply the database migration, deploy `ai-completar` from the deployable Edge source, then run/build the app containing this change. Merely integrating Git branches does not enable RESTORE/DISCARD on the hosted endpoint. An older endpoint rejecting RESTORE leaves the app in its explicit retry state with composition disabled; it cannot safely pretend no draft exists.
 
-### RESTORE
+## Resulting behavior
 
-- Input uses the existing envelope: `prompt: ""`, `ui_action: "RESTORE"`, `active_profile_id`, optional `draft_id`, and the usual request identity.
-- Resolve and verify owned active profile on the server. Without an exact ID, select the newest `draft`/`ready` for that profile with no publication link; order deterministically by update time and ID. With an exact ID, never silently substitute another draft.
-- Return the existing success fields: actual `draft_id`, `status`, `updated_at`, `ui_state`, `pending_action`, `purchase_request_id`, recalculated readiness, required/optional/missing fields, category suggestions, summary and summary text. `mensaje_usuario` is null so restoration does not create a duplicate reply.
-- Add `messages` containing stable message IDs, ordered roles/content and original metadata, plus fresh signed image references. Paginate the database reads so history is not silently truncated. The existing model-history loader is unsuitable: it defaults to 12 turns and drops IDs.
-- Preserve `metadata.image_refs`; resolve persisted references into fresh signed URLs and map them into existing `ChatMessage.images: ChatImage[]`. Do not persist/cache signed URLs or invent references for transient attachments. Bug 15 confirms only DIRECT_SUBJECT images persist; VISUAL_REFERENCE attachments are intentionally transient.
-- Format stored control markers using `metadata.ui_action`; do not show raw `[ui_action:...]` or image bookkeeping tokens in the transcript. Preserve ordinary user/assistant content, hide internal system turns, and use the existing review-instruction filter where applicable.
-- Do not invoke the model, append messages, change review state, or replay a cached restore response. Recalculate readiness against current category configuration without fabricating product details.
-- No latest active draft returns an empty success. Missing, cancelled, deleted, foreign-profile, or already-published exact IDs return an explicit unavailable result. Load failure keeps composition and publishing disabled and exposes retry; it must not open an apparently new empty session.
-- There is no existing draft TTL. Do not invent expiration based on age. Unknown legacy statuses/contracts need explicit unsupported-state handling; preserve the rows.
+The existing buyer create entry automatically loads the newest active draft owned by the selected profile. It restores the actual ID, ordered transcript, current readiness/requirements, pending action, review state, summary, and fresh signed references for persisted images. No draft manager, menu item, route, table, column, or TTL was added. Older active drafts remain preserved; this entry selects the newest deterministically.
 
-Latest-draft automatic restoration matches the seller entry pattern. It does not add arbitrary multi-draft selection. Existing older active drafts stay preserved; a full list or new one-active-draft constraint would require an additional product decision.
+The shared seller-style leave popup offers **Salir** and **Descartar**, accurately warns about unsent text/photos, and only shows its close button on Android. Salir retains server state. Descartar waits for confirmed soft cancellation. Failed discard stays open and retries with the same request identity. Native Back and the visible close button retain the existing Home fallback when navigation history is absent.
 
-### DISCARD and concurrency
+Loading and errors block composition and publication. Retry reloads authoritative state. An owned draft with an unsupported contract returns its ID with `REQUEST_DRAFT_UNSUPPORTED`, allowing explicit discard from the leave popup while sending/publishing remain blocked. Missing, foreign, and terminal exact IDs return unavailable without substituting another draft. No unsupported contract is fabricated or silently deleted.
 
-- Input requires exact `draft_id`, `prompt: ""`, `ui_action: "DISCARD"`, resolved owned active profile and a stable retry identity.
-- Match ID + active profile + active status + no publication link. Set `status=cancelled`, `ui_state=cancelled`, `pending_action=null`. Return cancelled state and clear client state only after success. Repeated discard of the same owned cancelled draft succeeds idempotently; published/foreign/missing drafts must not be changed.
-- Keep draft data/messages just as seller soft discard does. Physical deletion is outside this proposal.
-- Add a database guard making cancelled/published draft state terminal for assistant writes. Otherwise an in-flight BUILD can turn a cancelled draft back into ready.
-- Update the existing `publish_purchase_request` implementation to lock the owned draft row and reject non-active/cancelled state before insertion, while preserving publication replay of an existing request ID. Keep the function signature and return type unchanged. This makes discard vs. publish choose a single winner.
-- All buyer BUILD/control updates must use active-state predicates and check returned rows. Zero matched rows means conflict/unavailable; never return a fabricated successful update.
-- Check the current owned draft before serving cached initial-request or completed-request replay. A cached ready result must not restore a cancelled/published/deleted draft in the UI.
-- Protect restore, discard, controls and send with the same request/session sequencing and abort guards. Profile switching or leaving invalidates late results; a restored ID must reach every follow-up, SHOW_SUMMARY, CONTINUE and PUBLISH.
+Saved message IDs and order are retained. Metadata-backed user control/image markers are normalized, internal assistant control JSON is omitted, actual prose/JSON is preserved, and system turns are hidden. Persisted image references are signed through the authenticated Storage client and limited to the active profile's bucket prefix. Transient or missing image-only attachments use an unavailable placeholder.
 
-Why this is required: buyer BUILD currently rewrites state by ID/profile only (`handlers/interactionHandlers.ts:2814`); SHOW_SUMMARY/CONTINUE have the same pattern (`handlers/uiActionHandlers.ts:55` and `:90`). Completed replay can return before draft state is loaded (`index.ts:243` and `:274`). The hosted `publish_purchase_request` definition matches source and checks ownership but has no row lock or cancelled-state check (database initial migration `20260716163154_initial_remote_schema.sql:8731`).
+All send/control paths preserve server draft identity and exact retry payloads. Requests share cancellation/session guards; profile switches and unmounts invalidate late responses. A restored review can continue, show summary, and publish using the same draft ID.
 
-### UI behavior after approval
+## Endpoint and database safeguards
 
-Restore on the existing buyer chat entry, disable composition until authoritative loading finishes, and replace the transcript and review state as one session. Reuse the seller Salir/Descartar confirmation: Salir retains the saved draft; Descartar waits for successful server cancellation. Keep unsent-composer-loss wording accurate. Preserve the current no-history home fallback and existing Android Back precedence; no keyboard changes belong here.
+`POST /functions/v1/ai-completar` adds RESTORE and DISCARD using the existing request envelope and owned-profile resolution. These actions invoke no model. RESTORE does not mutate conversation/review state or use cached restore replies. History loads in 500-message pages. A processing-claim check, transcript-tail check, and final draft-state check reject a snapshot affected by an overlapping turn.
 
-The root `AGENTS.md` explicitly says: “Ask before changing public APIs, schemas, navigation structure, or established app architecture.” Approval is needed for the two added Edge action values, changed publication behavior and terminal-state database guard. The architecture skill also requires preserving public APIs unless approved. No automatic approval rejection occurred.
+DISCARD requires an exact owned ID and conditionally sets active, unpublished drafts to `cancelled`; repeating an already-cancelled owned draft succeeds. Data and transcript are retained. Every buyer draft update checks active status and absence of a publication link, and verifies that a row was updated. Cached initial/completed replies resolve current ownership and terminal state before returning. Transcript persistence precedes replay completion in the deployable entry point.
 
-## Validation and integration
+Migration: `supabase/migrations/20260910041954_protect_request_draft_terminal_state.sql` in the database repository. SHA-256: `96741ec762a871bc4c5fb854da9e1909c6eea9a6c7093e8dd43fed284141d193`.
 
-Executed successfully for the independent app patch:
+The trigger prevents cancelled/published status from being revived. The existing publication RPC locks the owned draft row, rejects inactive/cancelled state, and returns the existing purchase-request ID for publication retries. Discard and publish therefore cannot both win. Physical deletion permissions and the existing RPC signature/grants remain unchanged.
 
-- Focused buyer callback tests: 20 passed.
-- `npm run test:unit`: 141 passed, zero failed.
-- `npx tsc --noEmit`: passed.
-- `npm run lint -- --no-cache`: passed.
-- `git diff --check`: passed.
+The root and deployable copies of changed buyer helpers/handlers agree. Their entry points retain their pre-existing architectural differences; deploy from `supabase/functions/ai-completar/`.
 
-The worktree initially lacked dependencies; a temporary `node_modules` symlink reused the installed app dependencies for validation and was removed afterward. No dependency or lockfile change was made. The first attempted focused run failed on missing TypeScript before the link was added.
+## Executed validation
 
-Not performed: authenticated draft restoration/discard, database mutation tests, new Edge action tests, emulator/device reproduction, hosted changes, builds or deployment. The existing source and catalog evidence establishes the blocker; it does not establish working user-visible parity.
+| Evidence | Result and limit |
+| --- | --- |
+| App unit suite | **175 passed**, zero failures. Includes the existing integrated bug 15/16 tests and updated Android Back fixture. |
+| Focused buyer session/service suite | **46 passed**. Executes actual callbacks with controlled hooks/deferred transport. Covers restore/review/images, exact retry identity, late responses, legacy recovery, iOS/Android popup configuration, unsent warning, discard failure/success, pending-control lock, and Home fallback. It does not exercise native rendering or React scheduling. |
+| App static checks | `npx tsc --noEmit`, `npm run lint -- --no-cache`, and `git diff --check` passed. Existing installed dependencies were reused through a temporary symlink, removed after validation. |
+| Edge suite | **222 passed**, zero failures. Includes full ordered restoration of 1,005 messages, in-flight/completed transcript races, ownership/signing, legacy recovery, guarded writes, and terminal replay behavior. |
+| Edge checks | `deno check index.ts supabase/functions/ai-completar/index.ts` and `git diff --check` passed. |
+| Full isolated Supabase tests | **43 files / 1,221 assertions passed**, including 16 new lifecycle tests. Applies real migrations, RLS, triggers, and RPCs to a separate local stack. |
+| Concurrent database review | Parent independently ran the exact migration hash on PostgreSQL 17: discard-first prevents publication; publish-first prevents discard; publication replay returns the same ID. This minimal fixture complements, rather than replaces, full Supabase tests. |
+| Local authenticated endpoint | **28 checks passed** against the actual deployable Deno handler over loopback and the isolated Supabase Auth/REST/Storage/RPC services. Uses synthetic users, category, drafts, transcript, and a tiny image fixture. |
 
-After approval, put DB changes/tests in an isolated sibling `luppit-supabase` worktree and Edge changes/tests in an isolated sibling `ai-edge-functions` worktree. Do not modify saved main branches. Required acceptance tests: empty/latest/exact restore; full ordered history beyond 12/1000 messages; missing/legacy/unavailable drafts; fresh image signing; ready and review restoration; active-profile isolation; resume -> correction -> summary -> continue -> publish; duplicate restore/discard; stopped/late replies; discard vs. in-flight BUILD/SHOW_SUMMARY/PUBLISH; cached replay after cancellation/publication; and iOS/Android exit/cancel/no-history behavior.
+The HTTP checks verified empty/latest/exact restore, stable 30-message history beyond the model's history window, review/normal reentry, fresh owned image signing, foreign profile/draft rejection, same-ID CONTINUE/SHOW_SUMMARY/PUBLISH, duplicate publication returning one persisted request, published/cancelled exclusions, idempotent discard, retained transcript, terminal cached replies, and unsupported-contract discard recovery. OpenAI access was absent and network access was restricted to loopback; no model behavior was evaluated.
 
-Eventual release order: validated database guard/publication migration, then buyer Edge extension, then app build containing restore/discard UI. Deploy none of these in this task. The current independent app patch needs no backend deployment.
+Local harness caveat: Colima's database clock was slightly ahead of macOS, causing the existing replay `updated_at >= created_at` constraint to reject a fast control completion. A runner-only +2-second Date shim compensated for that local skew. Production source and database schema were unchanged for this fixture issue.
 
-Overlap: bug 15 (`01a088f7-28cf-7c50-b0c4-9d87cd948bd7`) changes buyer `_layout.tsx`, `chat-session.context.tsx`, and the assistant service for images. Its image prompt edit is separate from this patch's state/request loop but shares the context file. Bug 16 also overlaps buyer chat; manually integrate and rerun the combined suite. Coordinate image normalization against persisted metadata rather than assuming every attachment survived.
+Local evidence: `/private/tmp/bug14-local-endpoint-report.json`, `/private/tmp/bug14-db-all-tests.log`, `/private/tmp/bug14-edge-tests.log`, `/private/tmp/bug14-app-unit.log`, and the parent's `/private/tmp/luppit-bugs14-16-integration-lf73ijs1/draft-sql-review.json`. Temporary files are session evidence, not deployment artifacts.
 
-Current changed files: `app/(chat)/chat-session.context.tsx`, `tests/buyer-chat-stop.test.mts`, and this handoff. No commit was created. The diff is in the isolated app worktree and exported to `/private/tmp/luppit-bug14-28f0.patch`.
+## Remaining acceptance
+
+No hosted writes, Edge deployment, release build, store submission, emulator session, or physical-device QA was performed by this task. The local HTTP runner is not the hosted Supabase Edge runtime. Hosted data/configuration and actual model correction/image semantics still require live acceptance after deployment.
+
+On iOS and Android, verify opening an existing draft; restored images and review; editing then leaving/reopening; Salir, popup dismissal, and Descartar; native gestures/Back with keyboard visible; profile switching while loading; slow/offline retry; publishing once; and reopening after cancellation/publication. Confirm that the combined bug 15 image flow and bug 16 keyboard layout render correctly on physical devices. Source/callback tests do not establish visual or device parity.
