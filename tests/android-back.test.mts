@@ -119,8 +119,12 @@ test("Create's native Back invokes the actual visible close callback and restore
     react: {
       createElement: (type: unknown, props: any, ...children: unknown[]) => ({ type, props: { ...props, children } }),
       useState: (initial: unknown) => [initial, () => {}],
+      useRef: (initial: unknown) => ({ current: initial }),
       useCallback: (fn: unknown) => fn, useEffect() {},
     },
+    "@react-navigation/native": { useNavigation: () => ({ dispatch() {} }), usePreventRemove() {} },
+    "@/src/components/profile/ActiveProfileContext": {},
+    "@/src/services/popup.service": {},
     "./chat-top-bar": { __esModule: true, default: "ChatTopBar" },
     "./chat-session.context": {
       useChatSession: () => ({ messages: [], uiState: "normal", showComposer: false }),

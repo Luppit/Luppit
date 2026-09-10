@@ -1,3 +1,6 @@
+import { useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
+import { hasOpenPopup, openPopup } from "@/src/services/popup.service";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import ChatTopBar from "./chat-top-bar";
@@ -15,7 +18,7 @@ import {
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useTheme } from "@/src/themes";
 import { Redirect, Slot, router } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   LayoutChangeEvent,
@@ -38,15 +41,48 @@ function ChatLayoutContent() {
     canCompose,
     isSendingMessage,
     isExecutingControl,
+    isRestoring,
+    status,
+    discardDraft,
     draftId,
     stopAssistant,
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
+  const navigation = useNavigation();
+  const [exitAction, setExitAction] = useState<NavigationAction | null>(null);
+  const handledExitRef = useRef<NavigationAction | null>(null);
   useAndroidLeaveGuard(
-    uiState !== "published" && (hasComposerDraft || messages.length > 0 || Boolean(draftId)),
-    isExecutingControl
+    !draftId && uiState !== "published" && (hasComposerDraft || messages.length > 0),
+    !draftId && isExecutingControl
   );
+  useEffect(() => {
+    if (!exitAction || handledExitRef.current === exitAction) return;
+    handledExitRef.current = exitAction;
+    navigation.dispatch(exitAction);
+  }, [exitAction, navigation]);
+  usePreventRemove(Boolean(draftId) && status !== "published" && status !== "cancelled" && !exitAction, ({ data }) => {
+    if (isExecutingControl || hasOpenPopup()) return;
+    Keyboard.dismiss();
+    openPopup({
+      type: "summary", title: "¿Salir de la solicitud?",
+      description: hasComposerDraft
+        ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
+        : "Puedes salir y continuar después, o descartar este borrador.",
+      dismissOnBackdropPress: false,
+      showCloseButton: Platform.OS === "android",
+      actions: [
+        { id: "exit-request", label: "Salir", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
+        { id: "discard-request-draft", label: "Descartar", backgroundColorKey: "error", textColorKey: "backgroudWhite", iconColorKey: "backgroudWhite", disabled: isSendingMessage || isRestoring, showPendingState: true,
+          onPress: async () => {
+            if (!await discardDraft()) return false;
+            setExitAction(data.action);
+            return true;
+          },
+        },
+      ],
+    });
+  });
   const closeChat = useCallback(() => {
     Keyboard.dismiss();
     router.dismissTo("/(tabs)");
@@ -124,7 +160,7 @@ function ChatLayoutContent() {
               onDraftChange={setHasComposerDraft}
               clearOnSendStart
               sendOnReturn={false}
-              autoFocus={messages.length === 0}
+              autoFocus={!isRestoring && canCompose && messages.length === 0}
               disabled={!canCompose}
               busy={isSendingMessage}
               onStop={stopAssistant}
@@ -144,6 +180,7 @@ function ChatLayoutContent() {
 }
 
 export default function ChatLayout() {
+  const { activeProfile } = useActiveProfile();
   const [ready, setReady] = useState(false);
   const [role, setRole] = useState<Roles | null>(null);
 
@@ -151,6 +188,7 @@ export default function ChatLayout() {
     let active = true;
 
     const resolveRole = async () => {
+      setReady(false);
       const result = await getCurrentUserRole();
       if (!active) return;
 
@@ -167,14 +205,14 @@ export default function ChatLayout() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [activeProfile?.profile.id]);
 
   if (!ready) return null;
 
   if (role !== Roles.BUYER) return <Redirect href="/(tabs)" />;
 
   return (
-    <ChatSessionProvider>
+    <ChatSessionProvider key={activeProfile?.profile.id}>
       <ChatLayoutContent />
     </ChatSessionProvider>
   );

@@ -16,6 +16,12 @@ function createHooks() {
   const values: unknown[] = [];
   const cleanups = new Map<number, () => void>();
   let cursor = 0;
+  const memo = (callback: () => unknown, dependencies: unknown[] = []) => {
+    const index = cursor++;
+    const previous = values[index] as { dependencies: unknown[]; value: unknown } | undefined;
+    if (previous && dependencies.length === previous.dependencies.length && dependencies.every((value, position) => Object.is(value, previous.dependencies[position]))) return previous.value;
+    const value = callback(); values[index] = { dependencies, value }; return value;
+  };
   const hooks = {
     createContext: () => ({ Provider: "Provider" }),
     createElement: (type: unknown, props: object, ...children: unknown[]) => ({
@@ -33,8 +39,8 @@ function createHooks() {
       if (!(index in values)) values[index] = { current: initial };
       return values[index];
     },
-    useCallback: (callback: unknown) => callback,
-    useMemo: (callback: () => unknown) => callback(),
+    useCallback: (callback: unknown, dependencies: unknown[]) => memo(() => callback, dependencies),
+    useMemo: memo,
     useEffect: (callback: () => (() => void) | void, dependencies: unknown[] = []) => {
       const index = cursor++;
       const previous = values[index] as unknown[] | undefined;
@@ -54,8 +60,9 @@ function createHooks() {
   };
 }
 
-function loadComponent<T>(path: string, modules: Record<string, unknown>): T {
-  const source = readFileSync(new URL(path, import.meta.url), "utf8");
+function loadComponent<T>(path: string, modules: Record<string, unknown>, expose?: string): T {
+  let source = readFileSync(new URL(path, import.meta.url), "utf8");
+  if (expose) source = source.replace(`function ${expose}(`, `export function ${expose}(`);
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       module: ts.ModuleKind.CommonJS,
@@ -86,7 +93,7 @@ function deferred<T>() {
 type Result = Awaited<ReturnType<typeof callPurchaseRequestAssistant>>;
 function success(overrides: Partial<Extract<Result, { ok: true }>> = {}): Result {
   return {
-    ok: true, draftId: "draft-1", status: "draft", uiState: "normal",
+    ok: true, messages: [], draftId: "draft-1", status: "draft", uiState: "normal",
     pendingAction: null, requiredFields: [], optionalFields: [], missingFields: [],
     categorySuggestions: [], summary: null, summaryText: null,
     purchaseRequestId: null, assistantMessage: "¿Qué medida necesitas?",
@@ -95,7 +102,7 @@ function success(overrides: Partial<Extract<Result, { ok: true }>> = {}): Result
   };
 }
 
-function createSession() {
+async function createSession(options: { restore?: Result | false } = {}) {
   const runtime = createHooks();
   let identitySequence = 0;
   const calls: { input: Parameters<typeof callPurchaseRequestAssistant>[0]; response: ReturnType<typeof deferred<Result>> }[] = [];
@@ -127,12 +134,19 @@ function createSession() {
       },
     },
   );
-  return {
+  const session = {
     calls, errors, announcements, unmount: runtime.unmount,
     get state() {
       return runtime.render(() => module.ChatSessionProvider({ children: null })).props.value as ReturnType<typeof useChatSession>;
     },
   };
+  if (options.restore !== false) {
+    void session.state;
+    calls[0].response.resolve(options.restore ?? success({ draftId: null, status: null, assistantMessage: null }));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    calls.splice(0);
+  }
+  return session;
 }
 
 type Element = { type: string; props: Record<string, any> };
@@ -266,7 +280,7 @@ test("composer releases its internal busy state when sending throws", async () =
 });
 
 test("completion restores compose and records the assistant reply and draft", async () => {
-  const session = createSession();
+  const session = await createSession();
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   assert.equal(session.state.isSendingMessage, true);
   assert.equal(session.state.canCompose, false);
@@ -279,7 +293,7 @@ test("completion restores compose and records the assistant reply and draft", as
 });
 
 test("stop immediately unlocks compose and ignores a late successful reply", async () => {
-  const session = createSession();
+  const session = await createSession();
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   session.state.stopAssistant();
   assert.equal(session.calls[0].input.signal!.aborted, true);
@@ -293,7 +307,7 @@ test("stop immediately unlocks compose and ignores a late successful reply", asy
 });
 
 test("late cancelled failure cannot show an error or reset a newer request", async () => {
-  const session = createSession();
+  const session = await createSession();
   const first = session.state.sendMessage({ text: "Primero", images: [] });
   session.state.stopAssistant();
   const second = session.state.sendMessage({ text: "Segundo", images: [] });
@@ -309,7 +323,7 @@ test("late cancelled failure cannot show an error or reset a newer request", asy
 });
 
 test("service failure restores compose and preserves the failed request for retry", async () => {
-  const session = createSession();
+  const session = await createSession();
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve({ ok: false, error: { code: "AI_TEMPORARILY_UNAVAILABLE", message: "Intenta de nuevo" } } as Result);
   await pending;
@@ -326,7 +340,7 @@ test("service failure restores compose and preserves the failed request for retr
 });
 
 test("stop between CONTINUE and the follow-up request prevents the next network call", async () => {
-  const session = createSession();
+  const session = await createSession();
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success({ status: "ready", uiState: "review" }));
   await initial;
@@ -343,7 +357,7 @@ test("stop between CONTINUE and the follow-up request prevents the next network 
 });
 
 test("CONTINUE forwards the latest draft ID and retry preserves the dispatched payload", async () => {
-  const session = createSession();
+  const session = await createSession();
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success({ status: "ready", uiState: "review" }));
   await initial;
@@ -373,7 +387,7 @@ test("CONTINUE forwards the latest draft ID and retry preserves the dispatched p
 });
 
 test("a response without draft_id preserves the latest successful draft for the next turn", async () => {
-  const session = createSession();
+  const session = await createSession();
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success());
   await initial;
@@ -389,7 +403,7 @@ test("a response without draft_id preserves the latest successful draft for the 
 });
 
 test("a published CONTINUE response stops the queued correction", async () => {
-  const session = createSession();
+  const session = await createSession();
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success({ status: "ready", uiState: "review" }));
   await initial;
@@ -405,7 +419,7 @@ test("a published CONTINUE response stops the queued correction", async () => {
 });
 
 test("summary cancellation releases both loading states and ignores a late review result", async () => {
-  const session = createSession();
+  const session = await createSession();
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY" }));
   await initial;
@@ -420,7 +434,7 @@ test("summary cancellation releases both loading states and ignores a late revie
 });
 
 test("unmount aborts the request and prevents a late reply", async () => {
-  const session = createSession();
+  const session = await createSession();
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   session.unmount();
   assert.equal(session.calls[0].input.signal!.aborted, true);
@@ -431,7 +445,7 @@ test("unmount aborts the request and prevents a late reply", async () => {
 
 test("pending summary acceptance opens backend review and retains the draft summary", async () => {
   for (const reply of ["Si", "Sí", "Sí, por favor"]) {
-    const session = createSession();
+    const session = await createSession();
     const initial = session.state.sendMessage({ text: "2", images: [] });
     session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY", isReadyToPublish: true }));
     await initial;
@@ -451,7 +465,7 @@ test("pending summary acceptance opens backend review and retains the draft summ
 for (const text of ["Mentira quiero 4", "Ocupo con una presión específica, pero no conozco mucho del tema, me ayudas?", "Sí, pero quiero 4"]) {
   test(`ready/review follow-up reaches the authoritative assistant: ${text}`, async () => {
     for (const uiState of ["normal", "review"] as const) {
-      const session = createSession();
+      const session = await createSession();
       const initial = session.state.sendMessage({ text: "2", images: [] });
       session.calls[0].response.resolve(success({ status: "ready", uiState, pendingAction: uiState === "review" ? null : "ASK_SHOW_SUMMARY" }));
       await initial;
@@ -478,7 +492,7 @@ for (const text of ["Mentira quiero 4", "Ocupo con una presión específica, per
 
 for (const text of ["", "Quiero 4 como estas", "Sí"]) {
   test(`buyer sends image content without inventing text or treating it as a summary control: ${text || "image only"}`, async () => {
-    const session = createSession();
+    const session = await createSession();
     const initial = session.state.sendMessage({ text: "Llantas", images: [] });
     session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY" }));
     await initial;
@@ -498,7 +512,7 @@ for (const text of ["", "Quiero 4 como estas", "Sí"]) {
 
 test("buyer upload failure and stop retain the original image request for retry", async () => {
   for (const stop of [false, true]) {
-    const session = createSession();
+    const session = await createSession();
     const images = [{ uri: "file:///tire.jpg", mime: "image/jpeg", size: 1024 }];
     const pending = session.state.sendMessage({ text: "", images });
     const original = session.calls[0].input;
@@ -539,4 +553,191 @@ test("buyer image composer removes a preview before sending and caps selection a
   assert.equal(payload?.text, "Con este estilo");
   assert.deepEqual(Array.from(payload?.images ?? []), images.slice(1, 3));
   assert.equal(composer.nodes.filter((node) => node.type === "Image").length, 0);
+});
+
+
+test("entry restores the server transcript, review state and ID before controls or follow-ups", async () => {
+  const restored = success({ draftId: "saved", status: "ready", uiState: "review", isReadyToPublish: true,
+    summary: { titulo: "Llantas", categoria: null, marca: [], atributos: { cantidad: 4 } },
+    summaryText: "Cuatro llantas", messages: [
+      { id: "persisted-user", role: "user", content: "Cuatro llantas", imageUrls: ["https://example.test/fresh-image"], metadata: {} },
+      { id: "persisted-assistant", role: "assistant", content: "¿Qué medida necesitas?", imageUrls: [], metadata: {} },
+    ],
+  });
+  const session = await createSession({ restore: restored });
+  assert.equal(session.state.draftId, "saved");
+  assert.equal(session.state.canPublish, true);
+  assert.equal(session.state.messages.length, 2);
+  assert.equal(session.state.messages[0].id, "persisted-user");
+  assert.equal(session.state.messages[0].images?.[0].uri, "https://example.test/fresh-image");
+  assert.equal(session.state.summaryText, "Cuatro llantas");
+  const publish = session.state.publishDraft();
+  assert.equal(session.calls[0].input.draft_id, "saved");
+  assert.equal(session.calls[0].input.ui_action, "PUBLISH");
+  session.calls[0].response.resolve(success({ draftId: "saved", status: "published", uiState: "published", purchaseRequestId: "request-1" }));
+  await publish;
+  assert.equal(session.state.canPublish, false);
+});
+
+test("RESTORE failure including an old server keeps compose blocked until successful retry", async () => {
+  const session = await createSession({ restore: { ok: false, error: { type: "validation", message: "ui_action inválido." }, statusCode: 400, requestId: null, retryAfterSeconds: null, backendMessage: null } });
+  assert.equal(session.state.canCompose, false);
+  assert.equal(session.state.sessionError, "ui_action inválido.");
+  await session.state.sendMessage({ text: "Llantas", images: [] });
+  assert.equal(session.calls.length, 0);
+  const retry = session.state.restoreDraft();
+  assert.equal(session.calls[0].input.ui_action, "RESTORE");
+  assert.equal(session.state.isRestoring, true);
+  session.calls[0].response.resolve(success({ draftId: null, status: null, assistantMessage: null }));
+  await retry;
+  assert.equal(session.state.canCompose, true);
+  assert.equal(session.state.sessionError, null);
+  assert.equal(session.state.messages.length, 0);
+});
+
+test("leaving during RESTORE aborts and ignores its late saved transcript", async () => {
+  const session = await createSession({ restore: false });
+  assert.equal(session.state.canCompose, false);
+  session.unmount();
+  assert.equal(session.calls[0].input.signal?.aborted, true);
+  session.calls[0].response.resolve(success({ draftId: "old-profile-draft" }));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(session.state.draftId, null);
+  assert.equal(session.state.messages.length, 0);
+});
+
+test("discard preserves state on failure, reuses retry identity, and clears only after cancellation", async () => {
+  const session = await createSession({ restore: success({ draftId: "saved" }) });
+  const discard = session.state.discardDraft();
+  const input = session.calls[0].input;
+  session.calls[0].response.resolve({ ok: false, error: { type: "network", message: "Sin conexión" }, statusCode: null, requestId: null, retryAfterSeconds: null, backendMessage: null });
+  assert.equal(await discard, false);
+  assert.equal(session.state.draftId, "saved");
+  const retry = session.state.discardDraft();
+  assert.equal(session.calls[1].input.draft_id, "saved");
+  assert.equal(session.calls[1].input.client_request_id, input.client_request_id);
+  assert.equal(session.calls[1].input.idempotency_key, input.idempotency_key);
+  session.calls[1].response.resolve(success({ draftId: "saved", status: "cancelled", uiState: "cancelled", assistantMessage: null }));
+  assert.equal(await retry, true);
+  assert.equal(session.state.draftId, null);
+  assert.equal(session.state.messages.length, 0);
+  assert.equal(session.state.showComposer, false);
+});
+
+test("late control completion after unmount cannot apply publication", async () => {
+  const session = await createSession({ restore: success({ draftId: "saved", status: "ready", uiState: "review", isReadyToPublish: true }) });
+  const publish = session.state.publishDraft();
+  session.unmount();
+  assert.equal(session.calls[0].input.signal?.aborted, true);
+  session.calls[0].response.resolve(success({ status: "published", uiState: "published", purchaseRequestId: "request-1" }));
+  await publish;
+  assert.equal(session.state.purchaseRequestId, null);
+});
+
+test("an unsupported restored draft stays blocked but can be explicitly discarded", async () => {
+  const session = await createSession({ restore: { ok: false, recoverableDraftId: "legacy", error: { type: "validation", code: "REQUEST_DRAFT_UNSUPPORTED", message: "Usa Descartar al salir" }, statusCode: 409, requestId: null, retryAfterSeconds: null, backendMessage: null } });
+  assert.equal(session.state.draftId, "legacy");
+  assert.equal(session.state.canCompose, false);
+  assert.equal(session.state.canPublish, false);
+  await session.state.publishDraft();
+  await session.state.continueClarifying();
+  assert.equal(session.calls.length, 0);
+  const discard = session.state.discardDraft();
+  assert.equal(session.calls[0].input.draft_id, "legacy");
+  assert.equal(session.calls[0].input.ui_action, "DISCARD");
+  session.calls[0].response.resolve(success({ draftId: "legacy", status: "cancelled", uiState: "cancelled", assistantMessage: null }));
+  assert.equal(await discard, true);
+  assert.equal(session.state.draftId, null);
+});
+
+function createLeaveLayout(platform: "ios" | "android") {
+  const runtime = createHooks();
+  const state: Record<string, any> = { title: "Crear solicitud", messages: [], uiState: "normal", status: "ready", draftId: "saved", showComposer: true, canCompose: true, isSendingMessage: false, isExecutingControl: false, isRestoring: false, discardDraft: async () => discardResult };
+  let discardResult = false;
+  let popup: any;
+  let prevented = false;
+  let onPrevent: any;
+  let hasPopup = false;
+  const dispatched: unknown[] = [];
+  const dismissals: unknown[] = [];
+  const androidGuards: unknown[][] = [];
+  const navigation = { dispatch: (action: unknown) => dispatched.push(action) };
+  const module = loadComponent<{ ChatLayoutContent: () => Element }>("../app/(chat)/_layout.tsx", {
+    react: runtime.hooks,
+    "@react-navigation/native": { useNavigation: () => navigation, usePreventRemove: (enabled: boolean, callback: unknown) => { prevented = enabled; onPrevent = callback; } },
+    "@/src/components/profile/ActiveProfileContext": { useActiveProfile() {} },
+    "@/src/services/popup.service": { hasOpenPopup: () => hasPopup, openPopup: (config: unknown) => { popup = config; } },
+    "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: (...args: unknown[]) => androidGuards.push(args) },
+    "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
+    "./chat-top-bar": "ChatTopBar",
+    "./chat-session.context": { useChatSession: () => state },
+    "@/src/components/inputChat/inputChat": "InputChat",
+    "@/src/components/inputChat/ChatKeyboardAvoidingView": "ChatKeyboardAvoidingView",
+    "@/src/services/role.service": { Roles: { BUYER: "BUYER" } },
+    "@/src/services/toast.service": { clearToastBottomInset() {}, setToastBottomInset() {} },
+    "@/src/services/user.role.service": { getCurrentUserRole() {} },
+    "@/src/themes": { useTheme: () => ({ colors: {}, spacing: { sm: 8, md: 16 } }) },
+    "expo-router": { Slot: "Slot", router: { dismissTo: (route: unknown) => dismissals.push(route) } },
+    "react-native": { View: "View", Platform: { OS: platform }, Keyboard: { dismiss() {}, addListener: () => ({ remove() {} }) } },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
+  }, "ChatLayoutContent");
+  const render = () => runtime.render(module.ChatLayoutContent);
+  return { state, dispatched, dismissals, androidGuards, render,
+    get popup() { return popup; }, get prevented() { return prevented; },
+    attempt(action: unknown) { onPrevent({ data: { action } }); },
+    setDiscardResult(value: boolean) { discardResult = value; },
+    setHasPopup(value: boolean) { hasPopup = value; },
+  };
+}
+
+for (const platform of ["ios", "android"] as const) {
+  test(`${platform} saved-draft leave uses the shared popup and dispatches only after confirmed exit`, async () => {
+    const layout = createLeaveLayout(platform);
+    const tree = layout.render();
+    assert.equal(layout.prevented, true);
+    assert.deepEqual(layout.androidGuards.at(-1), [false, false]);
+    const input = elements(tree).find((element) => element.type === "InputChat")!;
+    input.props.onDraftChange(true);
+    layout.render();
+    const action = { type: "POP", source: "buyer-chat" };
+    layout.attempt(action);
+    assert.equal(layout.popup.showCloseButton, platform === "android");
+    assert.equal(layout.popup.dismissOnBackdropPress, false);
+    assert.match(layout.popup.description, /no hayas enviado se perderán/);
+    assert.equal(layout.dispatched.length, 0, "Dismissing the popup keeps the draft open");
+    await layout.popup.actions[0].onPress();
+    layout.render();
+    assert.equal(layout.prevented, false);
+    assert.deepEqual(layout.dispatched, [action]);
+    layout.render();
+    assert.equal(layout.dispatched.length, 1);
+  });
+}
+
+test("leave waits for successful discard, blocks control races, and keeps the no-history home fallback", async () => {
+  const layout = createLeaveLayout("android");
+  const tree = layout.render();
+  elements(tree).find((element) => element.type === "ChatTopBar")!.props.onClose();
+  assert.deepEqual(layout.dismissals, ["/(tabs)"]);
+  layout.state.isExecutingControl = true;
+  layout.render();
+  const action = { type: "POP" };
+  layout.attempt(action);
+  assert.equal(Boolean(layout.popup), false);
+  layout.state.isExecutingControl = false;
+  layout.state.isSendingMessage = true;
+  layout.render();
+  layout.attempt(action);
+  assert.equal(layout.popup.actions[1].disabled, true);
+  layout.state.isSendingMessage = false;
+  layout.render();
+  layout.attempt(action);
+  assert.equal(await layout.popup.actions[1].onPress(), false);
+  layout.render();
+  assert.equal(layout.prevented, true);
+  assert.equal(layout.dispatched.length, 0);
+  layout.setDiscardResult(true);
+  assert.equal(await layout.popup.actions[1].onPress(), true);
+  layout.render();
+  assert.deepEqual(layout.dispatched, [action]);
 });

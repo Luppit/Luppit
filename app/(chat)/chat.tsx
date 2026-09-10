@@ -1,3 +1,4 @@
+import Button from "@/src/components/button/Button";
 import {
   useChatSession,
 } from "./chat-session.context";
@@ -10,7 +11,7 @@ import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
 import React, { useRef } from "react";
-import { Image, ScrollView, View } from "react-native";
+import { ActivityIndicator, Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
 
@@ -229,6 +230,9 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const {
     messages,
+    isRestoring,
+    sessionError,
+    restoreDraft,
     uiState,
     canPublish,
     isReadyToPublish,
@@ -242,7 +246,17 @@ export default function ChatScreen() {
     publishDraft,
     status,
   } = useChatSession();
-  const isAssistantBusy = isSendingMessage || isExecutingControl;
+  const isAssistantBusy = isSendingMessage || isExecutingControl || isRestoring;
+
+  if (isRestoring || sessionError) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", gap: t.spacing.md, paddingTop: insets.top + CHAT_TOP_BAR_VISIBLE_HEIGHT }}>
+        {isRestoring ? <ActivityIndicator color={t.colors.textDark} /> : null}
+        <Text align="center">{isRestoring ? "Cargando tu solicitud…" : sessionError}</Text>
+        {sessionError ? <Button title="Reintentar" onPress={() => void restoreDraft()} /> : null}
+      </View>
+    );
+  }
 
   return (
     <ScrollView

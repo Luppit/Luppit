@@ -21,17 +21,21 @@ const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
 export type PurchaseRequestAssistantUiAction =
   | "SHOW_SUMMARY"
   | "CONTINUE"
-  | "PUBLISH";
+  | "PUBLISH"
+  | "RESTORE"
+  | "DISCARD";
 
 export type PurchaseRequestAssistantStatus =
   | "draft"
   | "ready"
-  | "published";
+  | "published"
+  | "cancelled";
 
 export type PurchaseRequestAssistantUiState =
   | "normal"
   | "review"
-  | "published";
+  | "published"
+  | "cancelled";
 
 export type PurchaseRequestAssistantInteractionType =
   | "BUILD"
@@ -58,11 +62,20 @@ export type PurchaseRequestAssistantSummary = {
   atributos: Record<string, unknown>;
 };
 
+export type PurchaseRequestAssistantMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  imageUrls: string[];
+  metadata: Record<string, unknown>;
+};
+
 export type PurchaseRequestAssistantSuccess = {
   ok: true;
   draftId: string | null;
   status: PurchaseRequestAssistantStatus | null;
   updatedAt: string | null;
+  messages: PurchaseRequestAssistantMessage[];
   isReadyToPublish: boolean;
   missingFields: string[];
   requiredFields: string[];
@@ -81,6 +94,7 @@ export type PurchaseRequestAssistantSuccess = {
 
 export type PurchaseRequestAssistantFailure = {
   ok: false;
+  recoverableDraftId?: string | null;
   error: AppError;
   statusCode: number | null;
   requestId: string | null;
@@ -190,6 +204,57 @@ function toStatusCodeError(
   };
 }
 
+function normalizeRestoredMessages(payload: Record<string, unknown>): PurchaseRequestAssistantMessage[] {
+  const signedUrls = new Map<string, string>();
+  if (Array.isArray(payload.signed_images)) {
+    for (const entry of payload.signed_images) {
+      if (!entry || typeof entry !== "object") continue;
+      const ref = normalizeString(entry.storage_ref);
+      const url = normalizeString(entry.signed_url);
+      if (ref && url) signedUrls.set(ref, url);
+    }
+  }
+  if (!Array.isArray(payload.messages)) return [];
+  return payload.messages.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const id = normalizeString(entry.id);
+    const role = entry.role;
+    if (!id || (role !== "user" && role !== "assistant")) return [];
+    const metadata: Record<string, unknown> = entry.metadata && typeof entry.metadata === "object" && !Array.isArray(entry.metadata)
+      ? entry.metadata : {};
+    let content = typeof entry.content === "string" ? entry.content : "";
+    const imageUrls = normalizeStringArray(metadata.image_refs)
+      .map((ref) => signedUrls.get(ref)).filter((url): url is string => Boolean(url));
+    if (role === "user") {
+      if (typeof metadata.image_count === "number" && metadata.image_count > 0) {
+        content = content.replace(/\s*\[imagenes:\d+\]$/, "");
+      }
+      const action = metadata.ui_action;
+      if (action === "SHOW_SUMMARY" || action === "CONTINUE" || action === "PUBLISH") {
+        const suffix = `[ui_action:${action}]`;
+        if (content.endsWith(suffix)) content = content.slice(0, -suffix.length).trimEnd();
+        if (!content.trim()) content = action === "SHOW_SUMMARY" ? "Ver resumen" : action === "CONTINUE" ? "Seguir ajustando" : "Publicar solicitud";
+      }
+      if (!content.trim() && !imageUrls.length && typeof metadata.image_count === "number" && metadata.image_count > 0) {
+        content = "Imagen adjunta no disponible.";
+      }
+    }
+    if (role === "assistant" && metadata.tipo_interaccion === "CONTROL") {
+      try {
+        const stored = JSON.parse(content);
+        const keys = ["status", "tipo_interaccion", "accion_control"];
+        if (stored && typeof stored === "object" && !Array.isArray(stored) &&
+          Object.keys(stored).length === keys.length &&
+          keys.every((key) => Object.prototype.hasOwnProperty.call(stored, key) && stored[key] === metadata[key])) return [];
+      } catch {
+        // Ordinary assistant prose is not a serialized control record.
+      }
+    }
+    if (!content.trim() && !imageUrls.length) return [];
+    return [{ id, role, content, imageUrls, metadata }];
+  });
+}
+
 function toSuccessPayload(
   payload: Record<string, unknown>,
   requestId: string | null
@@ -199,6 +264,7 @@ function toSuccessPayload(
     draftId: normalizeString(payload.draft_id),
     status: (normalizeString(payload.status) as PurchaseRequestAssistantStatus | null) ?? null,
     updatedAt: normalizeString(payload.updated_at),
+    messages: normalizeRestoredMessages(payload),
     isReadyToPublish: payload.listo_para_publicar === true,
     missingFields: normalizeStringArray(payload.faltantes),
     requiredFields: normalizeStringArray(payload.required_fields),
@@ -340,8 +406,8 @@ export async function callPurchaseRequestAssistant(
     };
   }
 
-  const session = await getSession();
   const activeProfile = getCurrentProfile();
+  const session = await getSession();
   if (!session?.access_token || !activeProfile) {
     return {
       ok: false,
@@ -372,7 +438,7 @@ export async function callPurchaseRequestAssistant(
   const hasImages = (input.images ?? []).length > 0;
   const requestController = new AbortController();
   const abortFromCaller = () => requestController.abort();
-  if (input.signal?.aborted) requestController.abort();
+  if (input.signal?.aborted || getCurrentProfile()?.id !== activeProfile.id) requestController.abort();
   input.signal?.addEventListener("abort", abortFromCaller);
   const unregisterAbortController =
     registerProfileScopedAbortController(requestController);
@@ -420,12 +486,22 @@ export async function callPurchaseRequestAssistant(
         ? (payload as Record<string, unknown>)
         : {};
 
+    if (requestController.signal.aborted || getCurrentProfile()?.id !== activeProfile.id) {
+      requestController.abort();
+      throw new Error("Profile request cancelled");
+    }
+
     if (!response.ok || record.ok === false) {
       const backendMessage =
         normalizeString(record.error) ?? normalizeString(record.mensaje_usuario);
+      const errorMessage = input.ui_action === "RESTORE" && response.status === 400
+        ? "No se pudo cargar tu solicitud. Reintenta en un momento."
+        : backendMessage;
       return {
         ok: false,
-        error: toStatusCodeError(response.status, backendMessage),
+        recoverableDraftId: input.ui_action === "RESTORE" && record.code === "REQUEST_DRAFT_UNSUPPORTED"
+          ? normalizeString(record.draft_id) : null,
+        error: { ...toStatusCodeError(response.status, errorMessage), code: normalizeString(record.code) ?? undefined },
         statusCode: response.status,
         requestId: requestId ?? normalizeString(record.request_id),
         retryAfterSeconds:
@@ -434,6 +510,15 @@ export async function callPurchaseRequestAssistant(
             ? record.retry_after_seconds
             : null),
         backendMessage,
+      };
+    }
+
+    if (input.ui_action === "RESTORE" && (!Object.prototype.hasOwnProperty.call(record, "draft_id") || !Array.isArray(record.messages) ||
+      (record.draft_id == null && (record.status != null || record.messages.length > 0)) ||
+      (record.draft_id != null && record.status !== "draft" && record.status !== "ready"))) {
+      return {
+        ok: false, error: { type: "unknown", message: "No se pudo restaurar la solicitud. Reintenta en un momento." },
+        statusCode: response.status, requestId, retryAfterSeconds: null, backendMessage: null,
       };
     }
 
