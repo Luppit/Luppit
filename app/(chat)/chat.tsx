@@ -10,6 +10,10 @@ import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
+import {
+  buildPurchaseRequestSummaryRows,
+  humanizeAttributeLabel,
+} from "@/src/utils/purchaseRequestSummary";
 import React, { useRef } from "react";
 import { ActivityIndicator, Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -90,31 +94,6 @@ function UserMessageBlock({ message }: { message: ChatMessage }) {
   );
 }
 
-function hasSummaryValue(value: string | number | null | undefined) {
-  return value !== null && value !== undefined && value !== "";
-}
-
-function formatSummaryValue(value: unknown): string | null {
-  if (typeof value === "string") return value.trim() || null;
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  if (typeof value === "boolean") return value ? "Sí" : "No";
-  if (Array.isArray(value)) {
-    const formatted = value
-      .map(formatSummaryValue)
-      .filter((item): item is string => Boolean(item));
-    return formatted.length > 0 ? formatted.join(", ") : null;
-  }
-  return null;
-}
-
-function humanizeAttributeLabel(value: string) {
-  return value
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^./, (char) => char.toUpperCase());
-}
-
 function PublishRequestCard({
   summary,
   description,
@@ -136,22 +115,7 @@ function PublishRequestCard({
   onPublish: () => void;
   onContinue: () => void;
 }) {
-  const attributeDetails = Object.entries(summary?.atributos ?? {})
-    .map(([label, value]) => ({
-      label: humanizeAttributeLabel(label),
-      value: formatSummaryValue(value),
-    }))
-    .filter((item) => hasSummaryValue(item.value));
-  const details = [
-    { label: "Categoría", value: summary?.categoria },
-    {
-      label: "Marca",
-      value: summary?.marca && summary.marca.length > 0
-        ? summary.marca.join(", ")
-        : null,
-    },
-    ...attributeDetails,
-  ].filter((item) => hasSummaryValue(item.value));
+  const details = buildPurchaseRequestSummaryRows(summary);
 
   return (
     <AssistantReviewCard
@@ -162,10 +126,7 @@ function PublishRequestCard({
       isComplete={isReadyToPublish}
       title={summary?.titulo ?? "Solicitud"}
       description={description}
-      rows={details.map((item) => ({
-        label: item.label,
-        value: String(item.value),
-      }))}
+      rows={details}
       notices={missingFields.length > 0 ? [{
         text: `Falta completar: ${missingFields.map(humanizeAttributeLabel).join(", ")}.`,
         tone: "error",
