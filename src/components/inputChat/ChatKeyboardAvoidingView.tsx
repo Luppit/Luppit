@@ -10,6 +10,7 @@ import {
 import Animated, {
   KeyboardState,
   useAnimatedKeyboard,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
@@ -25,14 +26,43 @@ function AndroidChatKeyboardView({ children, style, onLayout, ...props }: ViewPr
   const viewportBottom = useSharedValue(Dimensions.get("screen").height);
   // The native stream starts on the next transition if a keyboard is already open.
   const initialKeyboard = Keyboard.metrics();
-  const initialKeyboardHeight = useSharedValue(
+  const fallbackKeyboardHeight = useSharedValue(
     initialKeyboard && initialKeyboard.height > 0
       ? Math.max(0, Dimensions.get("screen").height - initialKeyboard.screenY)
       : 0,
   );
+  const isKeyboardHidden = useSharedValue(!Keyboard.isVisible());
   // This owns Android IME layout while mounted. Keep the app's edge-to-edge
   // system bars and include the entire IME, including its navigation area.
   const keyboard = useAnimatedKeyboard();
+
+  useAnimatedReaction(
+    () => keyboard.state.value,
+    (state, previous) => {
+      if (state === KeyboardState.OPENING && state !== previous) {
+        isKeyboardHidden.value = false;
+      }
+    },
+  );
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      const { height, screenY } = event.endCoordinates;
+      fallbackKeyboardHeight.value = height > 0
+        ? Math.max(0, Dimensions.get("screen").height - screenY)
+        : 0;
+      isKeyboardHidden.value = false;
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      // A completed hide must release the composer even if the native stream is stale.
+      isKeyboardHidden.value = true;
+      fallbackKeyboardHeight.value = 0;
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [fallbackKeyboardHeight, isKeyboardHidden]);
 
   const measureViewport = useCallback(() => {
     screenHeight.value = Dimensions.get("screen").height;
@@ -48,9 +78,11 @@ function AndroidChatKeyboardView({ children, style, onLayout, ...props }: ViewPr
     paddingBottom: getChatKeyboardPadding(
       viewportBottom.value,
       screenHeight.value,
-      keyboard.state.value === KeyboardState.UNKNOWN
-        ? initialKeyboardHeight.value
-        : keyboard.height.value,
+      isKeyboardHidden.value || keyboard.state.value === KeyboardState.CLOSED
+        ? 0
+        : keyboard.state.value === KeyboardState.UNKNOWN
+          ? fallbackKeyboardHeight.value
+          : keyboard.height.value,
     ),
   }));
 
