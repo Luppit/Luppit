@@ -11,9 +11,9 @@ Applies to the buyer request-assistant chat flow under `app/(chat)`.
   - `SHOW_SUMMARY`
   - `CONTINUE`
   - `PUBLISH`
-- The chat currently runs in text-only mode:
-  - do not send images from `/(chat)` unless product explicitly re-enables that flow
-  - the composer should hide attachment affordances for this surface
+- Buyer chat accepts text, images, or both through the existing multipart `ai-completar` contract (up to 3 images, 2 MiB each; JPEG, PNG, WebP or GIF).
+- Send image-only turns with an empty prompt; do not invent text that labels their intended use. The backend decides which images describe the requested product and persist with the draft; visual references may remain transient.
+- Keep selected images in the user bubble and retain the same images and request identity on failure/retry. Restored transcripts must use persisted `metadata.image_refs` with fresh signed URLs; local picker URIs and signed URLs are not durable storage identities.
 - Shared composer internals, including multiline autosize, live in `src/components/inputChat/AGENTS.md`; this surface should configure the shared component rather than forking composer behavior.
 
 ## Chat UI Behavior

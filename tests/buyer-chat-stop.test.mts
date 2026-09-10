@@ -161,13 +161,13 @@ function createComposer(initial: Partial<InputChatProps> = {}) {
 
 test("buyer composer can stop with empty text while disabled, then restores normal send rules", () => {
   let stopped = 0;
-  const composer = createComposer({ busy: true, disabled: true, showAttachmentButton: false, maxImages: 0, onStop: () => stopped++ });
+  const composer = createComposer({ busy: true, disabled: true, maxImages: 3, onStop: () => stopped++ });
   assert.equal(composer.action.accessibilityLabel, "Detener respuesta");
   assert.equal(composer.action.disabled, false);
   assert.equal(composer.action.accessibilityState.disabled, false);
   assert.equal(composer.input.editable, false);
   assert.ok(composer.nodes.some((node) => node.type === "Square"));
-  assert.ok(!composer.nodes.some((node) => node.type === "Paperclip"));
+  assert.equal(composer.nodes.find((node) => node.props.accessibilityLabel === "Adjuntar imágenes")!.props.disabled, true);
   composer.action.onPress();
   assert.equal(stopped, 1);
   composer.update({ busy: false, disabled: false });
@@ -406,3 +406,68 @@ for (const text of ["Mentira quiero 4", "Ocupo con una presión específica, per
     }
   });
 }
+
+for (const text of ["", "Quiero 4 como estas", "Sí"]) {
+  test(`buyer sends image content without inventing text or treating it as a summary control: ${text || "image only"}`, async () => {
+    const session = createSession();
+    const initial = session.state.sendMessage({ text: "Llantas", images: [] });
+    session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY" }));
+    await initial;
+    const images = [{ uri: "file:///tire.jpg", mime: "image/jpeg", size: 1024 }];
+    const pending = session.state.sendMessage({ text, images });
+    const call = session.calls[1];
+    assert.equal(call.input.prompt, text);
+    assert.equal(call.input.ui_action, undefined);
+    assert.equal(call.input.draft_id, "draft-1");
+    assert.deepEqual(call.input.images, images);
+    assert.deepEqual(session.state.messages.at(-1)?.images, images);
+    call.response.resolve(success());
+    await pending;
+    assert.equal(session.state.draftId, "draft-1");
+  });
+}
+
+test("buyer upload failure and stop retain the original image request for retry", async () => {
+  for (const stop of [false, true]) {
+    const session = createSession();
+    const images = [{ uri: "file:///tire.jpg", mime: "image/jpeg", size: 1024 }];
+    const pending = session.state.sendMessage({ text: "", images });
+    const original = session.calls[0].input;
+    if (stop) session.state.stopAssistant();
+    session.calls[0].response.resolve({
+      ok: false, error: { type: "network", message: "No se pudo subir la imagen." },
+      statusCode: 500, requestId: null, retryAfterSeconds: null, backendMessage: null,
+    });
+    await pending;
+    assert.equal(session.state.messages.length, 1);
+    assert.deepEqual(session.state.messages[0].images, images);
+    const retry = session.state.retryMessage(session.state.messages[0].id);
+    assert.equal(session.calls[1].input.client_request_id, original.client_request_id);
+    assert.equal(session.calls[1].input.idempotency_key, original.idempotency_key);
+    assert.equal(session.calls[1].input.prompt, "");
+    assert.deepEqual(session.calls[1].input.images, images);
+    assert.equal(session.calls[1].input.signal!.aborted, false);
+    session.calls[1].response.resolve(success());
+    await retry;
+    assert.equal(session.state.messages[0].failedRequests, undefined);
+    assert.equal(session.state.messages.filter((message) => message.sender === "user").length, 1);
+  }
+});
+
+test("buyer image composer removes a preview before sending and caps selection at three", async () => {
+  const images = [1, 2, 3, 4].map((index) => ({ uri: `file:///image-${index}.jpg` }));
+  let payload: Parameters<InputChatProps["onSend"]>[0] | undefined;
+  const composer = createComposer({
+    maxImages: 3,
+    onPickImages: () => images,
+    onSend: (next) => { payload = next; },
+  });
+  await composer.nodes.find((node) => node.props.accessibilityLabel === "Adjuntar imágenes")!.props.onPress();
+  assert.equal(composer.nodes.filter((node) => node.type === "Image").length, 3);
+  composer.nodes.find((node) => node.props.accessibilityLabel === "Quitar imagen")!.props.onPress();
+  composer.input.onChangeText("Con este estilo");
+  await composer.action.onPress();
+  assert.equal(payload?.text, "Con este estilo");
+  assert.deepEqual(Array.from(payload?.images ?? []), images.slice(1, 3));
+  assert.equal(composer.nodes.filter((node) => node.type === "Image").length, 0);
+});

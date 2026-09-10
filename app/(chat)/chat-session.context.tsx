@@ -95,8 +95,6 @@ function createMessageId(prefix: "user" | "assistant") {
   return `${prefix}-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
 }
 
-const imageOnlyPrompt = "Adjunto imágenes de referencia para mi solicitud.";
-
 export function ChatSessionProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -364,7 +362,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       }
 
       requests.push({
-        prompt: trimmed || imageOnlyPrompt,
+        prompt: trimmed,
         draft_id: draftId,
         images,
         ...createPurchaseRequestAssistantRequestIdentity("message"),

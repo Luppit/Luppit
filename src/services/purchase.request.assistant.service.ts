@@ -8,6 +8,14 @@ import {
 
 const PURCHASE_REQUEST_ASSISTANT_EDGE_FUNCTION = "ai-completar";
 const MAX_IMAGES_PER_REQUEST = 3;
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
 const PROFILE_SCOPED_REQUEST_ABORTED = "PROFILE_SCOPED_REQUEST_ABORTED";
 
 export type PurchaseRequestAssistantUiAction =
@@ -240,8 +248,16 @@ export function createPurchaseRequestAssistantRequestIdentity(prefix: string) {
 
 function getImageName(image: ChatImage, index: number) {
   if (image.name && image.name.trim().length > 0) return image.name;
-  const extension = image.mime?.split("/")[1]?.split(";")[0] ?? "jpg";
+  const extension = getImageMimeType(image)?.split("/")[1] ?? "jpg";
   return `request-image-${index + 1}.${extension}`;
+}
+
+function getImageMimeType(image: ChatImage) {
+  const declared = image.mime?.split(";")[0].trim().toLowerCase();
+  if (declared) return declared === "image/jpg" ? "image/jpeg" : declared;
+  const extension = (image.name || image.uri).split(/[?#]/)[0]
+    .split(".").pop()?.toLowerCase();
+  return extension ? IMAGE_MIME_BY_EXTENSION[extension] ?? null : null;
 }
 
 function validateInput(input: PurchaseRequestAssistantRequest): AppError | null {
@@ -250,6 +266,18 @@ function validateInput(input: PurchaseRequestAssistantRequest): AppError | null 
     return {
       type: "validation",
       message: "Puedes adjuntar máximo 3 fotos por mensaje.",
+    };
+  }
+
+  if (images.some((image) =>
+    !image.uri.trim() ||
+    !Object.values(IMAGE_MIME_BY_EXTENSION).includes(getImageMimeType(image) ?? "") ||
+    (typeof image.size === "number" &&
+      (!Number.isFinite(image.size) || image.size <= 0 || image.size > MAX_IMAGE_BYTES))
+  )) {
+    return {
+      type: "validation",
+      message: "Usa imágenes JPG, PNG, WebP o GIF de hasta 2 MB cada una.",
     };
   }
 
@@ -289,7 +317,7 @@ function buildFormDataBody(
   (input.images ?? []).forEach((image, index) => {
     formData.append("images", {
       uri: image.uri,
-      type: image.mime ?? "image/jpeg",
+      type: getImageMimeType(image),
       name: getImageName(image, index),
     } as any);
   });

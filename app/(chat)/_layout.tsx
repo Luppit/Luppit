@@ -131,8 +131,7 @@ function ChatLayoutContent() {
               placeholder={
                 uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
               }
-              showAttachmentButton={false}
-              maxImages={0}
+              maxImages={3}
               onSend={({ text, images }) => {
                 void sendMessage({ text, images });
               }}

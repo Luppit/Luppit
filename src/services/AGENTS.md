@@ -51,4 +51,4 @@ Applies to service modules and RPC integration behavior.
 - Runtime application variables come from `app_config` through `app.config.service.ts`; support UI resolves `support_email` through `support.service.ts` and must not hardcode or import a build-time support address.
 - Navbar items come from `get_navbar_items_by_profile`; render DB `label`, `route`, `icon`, and `sort_order`.
 - Top-navbar segments come from `segment`; `svg_name` maps to `assets/segments/{svg_name}.svg`, and `todas` means all segments.
-- Buyer request assistant calls `POST /functions/v1/ai-completar`, preserves `draft_id`, and sends explicit control actions (`SHOW_SUMMARY`, `CONTINUE`, `PUBLISH`). This surface is text-only unless product re-enables images.
+- Buyer request assistant calls `POST /functions/v1/ai-completar`, preserves `draft_id`, and sends explicit control actions (`SHOW_SUMMARY`, `CONTINUE`, `PUBLISH`). Image messages use multipart uploads with the existing 3-image/2-MiB limits; keep authenticated profile scope, abort handling and retry identity. Image-only prompts stay empty, and the backend owns image persistence decisions.

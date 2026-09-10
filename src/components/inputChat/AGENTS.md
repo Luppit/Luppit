@@ -6,7 +6,7 @@ Applies to the shared `InputChat` composer component and its styles.
 ## Shared Composer Contract
 - `InputChat` is shared by conversation chat and buyer request-assistant chat; preserve shared behavior unless product explicitly asks for a surface-specific change.
 - Conversation chat may send text and images when DB permissions allow it.
-- Buyer request-assistant chat is text-only unless product explicitly re-enables images; call sites should hide attachment affordances for that surface.
+- Buyer request-assistant chat supports images through its service/Edge contract; the call site limits selection to 3 images and the service validates buyer-specific size/type limits.
 - Do not move DB-driven send permission, AUX action placement, or conversation message creation logic into this component.
 
 ## Multiline Autosize
@@ -19,4 +19,4 @@ Applies to the shared `InputChat` composer component and its styles.
 - The input area should keep `flex: 1`, `minWidth: 0`, `minHeight`, `maxHeight`, and `overflow: "hidden"`; row action buttons should stay bottom-aligned and stable in size.
 
 ## Verification
-- After composer changes, test single-line centering, long wrapping text, trailing newline behavior, max-height scrolling, image previews, disabled/busy state, and the buyer assistant surface with attachments hidden.
+- After composer changes, test single-line centering, long wrapping text, trailing newline behavior, max-height scrolling, image previews/removal, disabled/busy state, and buyer text-only, image-only and text-plus-image sends.
