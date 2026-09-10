@@ -97,6 +97,7 @@ function success(overrides: Partial<Extract<Result, { ok: true }>> = {}): Result
 
 function createSession() {
   const runtime = createHooks();
+  let identitySequence = 0;
   const calls: { input: Parameters<typeof callPurchaseRequestAssistant>[0]; response: ReturnType<typeof deferred<Result>> }[] = [];
   const errors: unknown[][] = [];
   const announcements: string[] = [];
@@ -116,7 +117,13 @@ function createSession() {
           calls.push({ input, response });
           return response.promise;
         },
-        createPurchaseRequestAssistantRequestIdentity: () => ({ client_request_id: "test-request" }),
+        createPurchaseRequestAssistantRequestIdentity: () => {
+          const sequence = ++identitySequence;
+          return {
+            client_request_id: `test-request-${sequence}`,
+            idempotency_key: `test-idempotency-${sequence}`,
+          };
+        },
       },
     },
   );
@@ -333,6 +340,68 @@ test("stop between CONTINUE and the follow-up request prevents the next network 
   await pending;
   assert.equal(session.calls.length, 2);
   assert.equal(session.state.messages.length, 3);
+});
+
+test("CONTINUE forwards the latest draft ID and retry preserves the dispatched payload", async () => {
+  const session = createSession();
+  const initial = session.state.sendMessage({ text: "Llantas", images: [] });
+  session.calls[0].response.resolve(success({ status: "ready", uiState: "review" }));
+  await initial;
+
+  const pending = session.state.sendMessage({ text: "Cambiar medida", images: [] });
+  session.calls[1].response.resolve(success({ draftId: "draft-latest" }));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const followUp = session.calls[2].input;
+  assert.equal(followUp.draft_id, "draft-latest");
+  session.calls[2].response.resolve({
+    ok: false,
+    error: { type: "network", message: "Intenta de nuevo" },
+    statusCode: 503, requestId: null, retryAfterSeconds: null, backendMessage: null,
+  });
+  await pending;
+
+  const failed = session.state.messages.at(-1)!;
+  assert.equal(failed.failedRequests?.[0].draft_id, "draft-latest");
+  const retry = session.state.retryMessage(failed.id);
+  assert.equal(session.calls[3].input.draft_id, followUp.draft_id);
+  assert.equal(session.calls[3].input.prompt, followUp.prompt);
+  assert.equal(session.calls[3].input.client_request_id, followUp.client_request_id);
+  assert.equal(session.calls[3].input.idempotency_key, followUp.idempotency_key);
+  session.calls[3].response.resolve(success({ draftId: "draft-latest" }));
+  await retry;
+  assert.equal(session.state.draftId, "draft-latest");
+});
+
+test("a response without draft_id preserves the latest successful draft for the next turn", async () => {
+  const session = createSession();
+  const initial = session.state.sendMessage({ text: "Llantas", images: [] });
+  session.calls[0].response.resolve(success());
+  await initial;
+  const answer = session.state.sendMessage({ text: "Una consulta", images: [] });
+  session.calls[1].response.resolve(success({ draftId: null }));
+  await answer;
+  assert.equal(session.state.draftId, "draft-1");
+
+  const followUp = session.state.sendMessage({ text: "Cantidad 4", images: [] });
+  assert.equal(session.calls[2].input.draft_id, "draft-1");
+  session.calls[2].response.resolve(success());
+  await followUp;
+});
+
+test("a published CONTINUE response stops the queued correction", async () => {
+  const session = createSession();
+  const initial = session.state.sendMessage({ text: "Llantas", images: [] });
+  session.calls[0].response.resolve(success({ status: "ready", uiState: "review" }));
+  await initial;
+  const pending = session.state.sendMessage({ text: "Cantidad 4", images: [] });
+  session.calls[1].response.resolve(success({
+    status: "published", uiState: "published", purchaseRequestId: "request-1",
+  }));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(session.calls.length, 2);
+  await pending;
+  assert.equal(session.state.canCompose, false);
+  assert.equal(session.state.isSendingMessage, false);
 });
 
 test("summary cancellation releases both loading states and ignores a late review result", async () => {

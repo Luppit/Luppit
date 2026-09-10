@@ -173,7 +173,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         });
       }
 
-      setDraftId(next.draftId);
+      if (next.draftId) setDraftId(next.draftId);
       setStatus(next.status);
       setIsReadyToPublish(isPurchaseRequestReadyToPublish(next));
       setUiState(next.uiState ?? (next.status === "published" ? "published" : "normal"));
@@ -230,16 +230,17 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     async (messageId: string, requests: PurchaseRequestAssistantRequest[]) => {
       if (activeRequestRef.current) return;
 
+      const pendingRequests = requests.map((request) => ({ ...request }));
       const requestSequence = ++requestSequenceRef.current;
       const requestController = new AbortController();
       activeRequestRef.current = requestController;
       setIsSendingMessage(true);
       setIsGeneratingSummary(
-        requests.some((request) => request.ui_action === "SHOW_SUMMARY")
+        pendingRequests.some((request) => request.ui_action === "SHOW_SUMMARY")
       );
       try {
-        for (let index = 0; index < requests.length; index += 1) {
-          const input = requests[index];
+        for (let index = 0; index < pendingRequests.length; index += 1) {
+          const input = pendingRequests[index];
           const result = await callPurchaseRequestAssistant({
             ...input,
             signal: requestController.signal,
@@ -252,7 +253,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
               setMessages((current) =>
                 current.map((message) =>
                   message.id === messageId
-                    ? { ...message, failedRequests: requests.slice(index) }
+                    ? { ...message, failedRequests: pendingRequests.slice(index) }
                     : message
                 )
               );
@@ -277,12 +278,18 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
               setMessages((current) =>
                 current.map((message) =>
                   message.id === messageId
-                    ? { ...message, failedRequests: requests.slice(index) }
+                    ? { ...message, failedRequests: pendingRequests.slice(index) }
                     : message
                 )
               );
             }
             return;
+          }
+          if (result.status === "published") break;
+          if (result.draftId) {
+            for (let nextIndex = index + 1; nextIndex < pendingRequests.length; nextIndex += 1) {
+              pendingRequests[nextIndex].draft_id = result.draftId;
+            }
           }
         }
         if (requestSequenceRef.current === requestSequence) {
