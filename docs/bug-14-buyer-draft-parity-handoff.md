@@ -1,6 +1,6 @@
 # Bug 14: buyer request draft resume and discard
 
-Status: approved scope implemented and committed in isolated app, Edge, and database worktrees. Local validation passed. The parent task owns integration into the saved main checkouts. Hosted deployment and physical-device acceptance remain pending.
+Status: implemented and integrated into local main in all three repositories. Local validation passed. On 2026-09-10 the parent deployed the database migration and buyer AI function to LuppitDB after explicit user approval. Physical-device acceptance remains pending.
 
 ## Exact revisions and integration
 
@@ -16,7 +16,7 @@ Worktrees: `/Users/josedanielcr/.codex/worktrees/28f0/Luppit`, sibling `ai-edge-
 
 The app base already combines the initial draft-identity fix (`bed74dc`), bug 15 image support, and bug 16 keyboard-wrapper changes. The final app changes preserve those integrations. Edge builds on bug 15's `5965095`; it retains DIRECT_SUBJECT persistence and transient VISUAL_REFERENCE behavior. No dependency or lockfile change was added. No generated database types change is needed: the publication RPC signature is unchanged.
 
-Release order: apply the database migration, deploy `ai-completar` from the deployable Edge source, then run/build the app containing this change. Merely integrating Git branches does not enable RESTORE/DISCARD on the hosted endpoint. An older endpoint rejecting RESTORE leaves the app in its explicit retry state with composition disabled; it cannot safely pretend no draft exists.
+Release order: database migration, deployable `ai-completar`, then the app containing this change. The hosted backend now supports RESTORE/DISCARD. An older endpoint rejecting RESTORE leaves the app in its explicit retry state with composition disabled; it cannot safely pretend no draft exists.
 
 ## Resulting behavior
 
@@ -36,7 +36,7 @@ All send/control paths preserve server draft identity and exact retry payloads. 
 
 DISCARD requires an exact owned ID and conditionally sets active, unpublished drafts to `cancelled`; repeating an already-cancelled owned draft succeeds. Data and transcript are retained. Every buyer draft update checks active status and absence of a publication link, and verifies that a row was updated. Cached initial/completed replies resolve current ownership and terminal state before returning. Transcript persistence precedes replay completion in the deployable entry point.
 
-Migration: `supabase/migrations/20260910041954_protect_request_draft_terminal_state.sql` in the database repository. SHA-256: `96741ec762a871bc4c5fb854da9e1909c6eea9a6c7093e8dd43fed284141d193`.
+Migration: `supabase/migrations/20260910060355_protect_request_draft_terminal_state.sql` in the database repository. SHA-256: `96741ec762a871bc4c5fb854da9e1909c6eea9a6c7093e8dd43fed284141d193`. Supabase recorded version `20260910060355`; database commit `891b915` aligns the original `20260910041954` filename to that version without changing any SQL.
 
 The trigger prevents cancelled/published status from being revived. The existing publication RPC locks the owned draft row, rejects inactive/cancelled state, and returns the existing purchase-request ID for publication retries. Discard and publish therefore cannot both win. Physical deletion permissions and the existing RPC signature/grants remain unchanged.
 
@@ -63,6 +63,8 @@ Local evidence: `/private/tmp/bug14-local-endpoint-report.json`, `/private/tmp/b
 
 ## Remaining acceptance
 
-No hosted writes, Edge deployment, release build, store submission, emulator session, or physical-device QA was performed by this task. The local HTTP runner is not the hosted Supabase Edge runtime. Hosted data/configuration and actual model correction/image semantics still require live acceptance after deployment.
+The parent deployed this migration and `ai-completar` version **395** to project `mesycgfytnbxpikcuqmb`, retaining JWT verification and the import map. Both deployed database function bodies match the tested migration, the terminal trigger is enabled, and the ownership guard rejected an unauthenticated identity in a rolled-back SQL check. All 25 runtime/configuration files match the uploaded source; Supabase returns the one type-only module empty, as it did in version 394. OPTIONS returned 200 and unauthenticated POST returned 401. Security advisor comparison found zero new findings. Deployment evidence is in `/private/tmp/luppit-bugs14-16-deployment-20260910/`.
+
+No release build, store submission, emulator session, physical-device QA, or authenticated hosted AI/image acceptance was performed for this deployment. The local HTTP runner is not the hosted Supabase Edge runtime. Actual model correction/image semantics still require live acceptance. This release did not apply unrelated pending migrations or push Git branches.
 
 On iOS and Android, verify opening an existing draft; restored images and review; editing then leaving/reopening; Salir, popup dismissal, and Descartar; native gestures/Back with keyboard visible; profile switching while loading; slow/offline retry; publishing once; and reopening after cancellation/publication. Confirm that the combined bug 15 image flow and bug 16 keyboard layout render correctly on physical devices. Source/callback tests do not establish visual or device parity.
