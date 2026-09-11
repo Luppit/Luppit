@@ -2,7 +2,10 @@ import { Asset } from "expo-asset";
 import React, { useEffect, useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { SvgUri } from "react-native-svg";
-import { getBundledSvgUri } from "./bundledSvgUri";
+import {
+  getAndroidBundledSvgDownloadDescriptor,
+  getBundledSvgUri,
+} from "./bundledSvgUri";
 
 type Props = Omit<
   React.ComponentProps<typeof SvgUri>,
@@ -39,7 +42,12 @@ export function BundledSvg({ asset, fallback = null, ...svgProps }: Props) {
     }
 
     setUri(null);
-    void resolvedAsset
+    // Android release builds can mark raw SVG resources as downloaded while
+    // exposing only a resource name, so copy through a fresh Asset instance.
+    const downloadableAsset = new Asset(
+      getAndroidBundledSvgDownloadDescriptor(resolvedAsset)
+    );
+    void downloadableAsset
       .downloadAsync()
       .then((downloadedAsset) => {
         if (!active) return;
