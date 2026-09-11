@@ -258,16 +258,64 @@ test("reference persists through first message, images, review and corrections w
   f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true, assistantMessage: "¿Quieres revisar el resumen?" })); await flush();
   nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onSend({ text: "Sí", images: [] });
   assert.equal(f.aiCalls[2].input.uiAction, "SHOW_SUMMARY");
+  assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
+  assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.onStop, undefined);
   f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true })); await flush();
   assertReference();
   const review = nodes(f.assistant()).find((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard")!;
   assert.ok(review);
   assert.equal(review.props.hasOfferPhoto, true);
+  const publishing = review.props.onPublish();
+  assert.equal(f.aiCalls[3].input.uiAction, "PUBLISH");
+  const publishingComposer = nodes(f.assistant()).find((n) => n.type === "InputChat")!.props;
+  assert.equal(publishingComposer.busy, true);
+  assert.equal(publishingComposer.disabled, true);
+  assert.equal(publishingComposer.onStop, undefined);
+  f.aiCalls[3].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true })); await publishing;
   const continuing = review.props.onContinue();
-  f.aiCalls[3].response.resolve(aiSuccess({ offerDraftId: "draft-A" })); await continuing;
+  assert.equal(nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, undefined);
+  f.aiCalls[4].response.resolve(aiSuccess({ offerDraftId: "draft-A" })); await continuing;
   assertReference();
   assert.ok(!nodes(f.assistant()).some((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard"));
   assert.ok(f.aiCalls.every(({ input }) => !JSON.stringify(input).includes(snapshot)));
+});
+
+test("offer composer stops a pending image message, preserves its draft, and ignores a late reply during the next send", async () => {
+  const f = screenFixture();
+  const composer = () => nodes(f.assistant()).find((n) => n.type === "InputChat")!.props;
+  f.assistant();
+  assert.equal(composer().busy, true);
+  assert.equal(composer().disabled, true);
+  assert.equal(composer().onStop, undefined);
+  f.aiCalls[0].response.resolve(aiSuccess({ offerDraftId: "saved" })); await flush();
+
+  const image = { uri: "file:///offer-photo.jpg" };
+  composer().onSend({ text: "Tengo 3 llantas", images: [image] });
+  assert.equal(composer().busy, true);
+  assert.equal(composer().disabled, true);
+  const progress = nodes(f.assistant()).find((n) => n.type === "Progress")!.props;
+  assert.equal(progress.variant, "thinking");
+  assert.equal(progress.onStop, undefined);
+  composer().onStop();
+  assert.equal(f.aiCalls[1].input.signal.aborted, true);
+  assert.equal(composer().busy, false);
+  assert.equal(composer().disabled, false);
+  assert.equal(composer().onStop, undefined);
+  assert.ok(!nodes(f.assistant()).some((n) => n.type === "Progress"));
+
+  composer().onSend({ text: "Son 4 llantas", images: [] });
+  assert.equal(f.aiCalls[2].input.offerDraftId, "saved");
+  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "stale", assistantMessage: "Late response" })); await flush();
+  assert.equal(composer().busy, true);
+  assert.equal(f.aiCalls[2].input.signal.aborted, false);
+  const messages = nodes(f.assistant()).filter((n) => typeof n.type === "function" && n.type.name === "AssistantMessageBubble");
+  assert.equal(messages.length, 2);
+  assert.equal(messages[0].props.message.images[0], image);
+
+  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "saved", assistantMessage: "¿Qué precio?" })); await flush();
+  assert.equal(composer().busy, false);
+  assert.equal(composer().disabled, false);
+  assert.equal(nodes(f.assistant()).filter((n) => typeof n.type === "function" && n.type.name === "AssistantMessageBubble").at(-1)!.props.message.text, "¿Qué precio?");
 });
 
 test("restoring an existing offer draft keeps the reference separate from restored messages", async () => {

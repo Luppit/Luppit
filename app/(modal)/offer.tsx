@@ -786,7 +786,6 @@ function OfferAssistantScreen({
             title="Preparando tu oferta"
             steps={OFFER_PROCESSING_STEPS}
             variant={processingMode === "summary" ? "steps" : "thinking"}
-            onStop={processingMode ? handleStop : undefined}
           />
         ) : null}
 
@@ -841,6 +840,8 @@ function OfferAssistantScreen({
           clearOnSendStart
           autoFocus={messages.length === 0}
           disabled={isBusy}
+          busy={isBusy}
+          onStop={processingMode ? handleStop : undefined}
           maxChars={4000}
           maxImages={6}
           placeholder={
