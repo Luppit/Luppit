@@ -45,7 +45,6 @@ export default function ConversationActionButtons({
   const { fontScale, width } = useWindowDimensions();
   const shouldStackActions =
     buttons.length > 2 || fontScale >= 1.35 || width < 350;
-  const shouldStackSummary = fontScale >= 1.45 || width < 340;
   const hasSummary = Boolean(summary?.label || summary?.value);
 
   if (buttons.length === 0) return null;
@@ -59,10 +58,7 @@ export default function ConversationActionButtons({
           accessibilityLabel={[summary?.label, summary?.value]
             .filter(Boolean)
             .join(": ")}
-          style={[
-            s.summaryContainer,
-            shouldStackSummary && s.summaryContainerStacked,
-          ]}
+          style={s.summaryContainer}
         >
           {summary?.label ? (
             <Text

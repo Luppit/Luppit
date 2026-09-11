@@ -4,7 +4,6 @@ import { TextStyle, ViewStyle } from "react-native";
 export type ConversationActionButtonsStyles = {
   container: ViewStyle;
   summaryContainer: ViewStyle;
-  summaryContainerStacked: ViewStyle;
   summaryLabel: TextStyle;
   summaryValue: TextStyle;
   actions: ViewStyle;
@@ -31,26 +30,16 @@ export function createConversationActionButtonsStyles(
       gap: t.spacing.sm + t.spacing.xs,
     },
     summaryContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: t.spacing.md,
+      alignItems: "stretch",
+      gap: t.spacing.xs,
       minHeight: 32,
       paddingHorizontal: t.spacing.xs,
     },
-    summaryContainerStacked: {
-      flexDirection: "column",
-      alignItems: "flex-start",
-      gap: t.spacing.xs,
-    },
     summaryLabel: {
-      flexShrink: 1,
       fontFamily: t.typography.subtitle.fontFamily,
     },
     summaryValue: {
       color: t.colors.textDark,
-      flexShrink: 1,
-      maxWidth: "100%",
       fontVariant: ["tabular-nums"],
     },
     actions: {
