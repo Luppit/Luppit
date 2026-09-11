@@ -1,5 +1,10 @@
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
-import { shouldOpenAssistantSummary } from "../../src/utils/assistantSummaryReply";
+import {
+  getVisibleSellerOfferMessages,
+  isSellerOfferReviewInstruction,
+  isSellerOfferSummaryInvitation,
+  isSellerOfferSummaryReply,
+} from "../../src/utils/assistantSummaryReply";
 import Button from "@/src/components/button/Button";
 import AssistantProcessingProgress from "@/src/components/assistant/AssistantProcessingProgress";
 import OfferRequestReference from "@/src/components/assistant/OfferRequestReference";
@@ -109,19 +114,12 @@ type AssistantMessage = {
   sender: "user" | "assistant";
   text: string;
   images?: ChatImage[];
-  uiKind?: "ready" | "summary";
 };
 
 type PendingAssistantRetry = {
   input: SellerOfferAssistantRequest;
   successfulImageCount: number;
 };
-
-const OFFER_PROCESSING_STEPS = [
-  "Revisando el producto",
-  "Organizando precio y entrega",
-  "Preparando el resumen",
-] as const;
 
 function normalizeCurrency(value: string | null | undefined) {
   return (value ?? "")
@@ -380,12 +378,7 @@ function OfferAssistantScreen({
   const shownSuccessOfferIdRef = useRef<string | null>(null);
 
   const hasOfferPhoto = successfulOfferPhotoCount > 0;
-
-  useEffect(() => {
-    if (showSummary) {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-    }
-  }, [showSummary]);
+  const visibleMessages = useMemo(() => getVisibleSellerOfferMessages(messages), [messages]);
 
   useEffect(() => {
     return () => {
@@ -412,13 +405,10 @@ function OfferAssistantScreen({
     setSummary(null);
     setMissingFields([]);
     setPendingRetry(null);
-    setMessages((current) =>
-      current.filter((message) => message.uiKind !== "ready" && message.uiKind !== "summary")
-    );
   }, []);
 
   const appendAssistantMessage = useCallback(
-    (text: string | null, uiKind?: AssistantMessage["uiKind"]) => {
+    (text: string | null) => {
       if (!text) return;
       setMessages((current) => [
         ...current,
@@ -426,7 +416,6 @@ function OfferAssistantScreen({
           id: createLocalId("assistant"),
           sender: "assistant",
           text,
-          uiKind,
         },
       ]);
     },
@@ -472,9 +461,10 @@ function OfferAssistantScreen({
       const isSummaryAction = input.uiAction === "SHOW_SUMMARY";
       const isReadyResult =
         result.isReadyToSend || result.status === "ready" || result.status === "sent";
-      setIsReadyToSend(isContinueAction ? false : isReadyResult);
-      setMissingFields(isContinueAction ? [] : result.missingFields);
+      setIsReadyToSend(isReadyResult);
+      setMissingFields(result.missingFields);
       if (isContinueAction) {
+        setShowSummary(false);
         setSummary(null);
       } else if (result.summary) {
         setSummary(result.summary);
@@ -483,12 +473,15 @@ function OfferAssistantScreen({
         setSuccessfulOfferPhotoCount((current) => current + successfulImageCount);
       }
 
-      if (!isSummaryAction) {
-        appendAssistantMessage(
-          result.assistantMessage,
-          isReadyResult && !isContinueAction ? "ready" : undefined
-        );
-      } else {
+      if (
+        input.uiAction !== "RESTORE" &&
+        result.assistantMessage &&
+        !isSellerOfferReviewInstruction(result.assistantMessage) &&
+        !(isContinueAction && isSellerOfferSummaryInvitation(result.assistantMessage))
+      ) {
+        appendAssistantMessage(result.assistantMessage);
+      }
+      if (isSummaryAction) {
         setShowSummary(true);
       }
 
@@ -536,6 +529,7 @@ function OfferAssistantScreen({
 
   const executeAssistantRequest = useCallback(
     async (input: SellerOfferAssistantRequest, successfulImageCount = 0) => {
+      if (activeRequestRef.current) return;
       const requestController = new AbortController();
       activeRequestRef.current = requestController;
       setIsBusy(true);
@@ -587,13 +581,20 @@ function OfferAssistantScreen({
       }
 
       const userText = text.trim();
-      if (!userText && images.length === 0) return;
+      if (
+        (!userText && images.length === 0) ||
+        activeRequestRef.current ||
+        status === "sent" ||
+        status === "cancelled"
+      ) return;
 
       const shouldOpenSummary =
         images.length === 0 &&
         !!offerDraftId &&
+        !showSummary &&
+        status === "ready" &&
         isReadyToSend &&
-        shouldOpenAssistantSummary(userText);
+        isSellerOfferSummaryReply(userText, visibleMessages[visibleMessages.length - 1]);
 
       if (!shouldOpenSummary) {
         clearReviewState();
@@ -610,7 +611,7 @@ function OfferAssistantScreen({
 
       if (shouldOpenSummary) {
         await executeAssistantRequest({
-          prompt: "",
+          prompt: userText,
           offerDraftId,
           uiAction: "SHOW_SUMMARY",
           identity: createSellerOfferAssistantRequestIdentity("seller-offer-summary"),
@@ -635,12 +636,14 @@ function OfferAssistantScreen({
       executeAssistantRequest,
       isReadyToSend,
       offerDraftId,
+      showSummary,
+      status,
+      visibleMessages,
     ]
   );
 
   const handleContinue = useCallback(async () => {
-    clearReviewState();
-    if (!offerDraftId) return;
+    if (!offerDraftId || activeRequestRef.current || status === "sent") return;
 
     await executeAssistantRequest({
       prompt: "",
@@ -648,7 +651,7 @@ function OfferAssistantScreen({
       uiAction: "CONTINUE",
       identity: createSellerOfferAssistantRequestIdentity("seller-offer-continue"),
     });
-  }, [clearReviewState, executeAssistantRequest, offerDraftId]);
+  }, [executeAssistantRequest, offerDraftId, status]);
 
   const handlePublish = useCallback(async () => {
     if (!offerDraftId) {
@@ -760,7 +763,7 @@ function OfferAssistantScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
-          if (showSummary || messages.length === 0) {
+          if (messages.length === 0) {
             scrollRef.current?.scrollTo({ y: 0, animated: false });
           } else {
             scrollRef.current?.scrollToEnd({ animated: true });
@@ -776,16 +779,15 @@ function OfferAssistantScreen({
         <OfferRequestReference reference={requestReference} />
         {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
 
-        {!showSummary &&
-          messages.map((message) => (
-            <AssistantMessageBubble key={message.id} message={message} />
-          ))}
+        {visibleMessages.map((message) => (
+          <AssistantMessageBubble key={message.id} message={message} />
+        ))}
 
         {isBusy ? (
           <AssistantProcessingProgress
             title="Preparando tu oferta"
-            steps={OFFER_PROCESSING_STEPS}
-            variant={processingMode === "summary" ? "steps" : "thinking"}
+            steps={[]}
+            variant="thinking"
           />
         ) : null}
 

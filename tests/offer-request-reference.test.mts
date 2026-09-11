@@ -139,6 +139,7 @@ test("does not mistake a seller message for the buyer request or accept another 
 
 function screenFixture(params: Record<string, any> = {}) {
   const runtime = hooks();
+  let identitySequence = 0;
   const referenceCalls: { id: string; response: ReturnType<typeof deferred> }[] = [];
   const aiCalls: { input: any; response: ReturnType<typeof deferred> }[] = [];
   const requestCalls: string[] = [];
@@ -164,7 +165,7 @@ function screenFixture(params: Record<string, any> = {}) {
     "@/src/services/purchase.offer.service": { getEditablePurchaseOfferDraftByConversationId: async () => ({ ok: true, data: { purchaseRequestId: "edit-request" } }) },
     "@/src/services/purchase.offer.reference.service": { getOfferRequestReference: (id: string) => { const response = deferred(); referenceCalls.push({ id, response }); return response.promise; } },
     "@/src/services/purchase.offer.assistant.service": {
-      createSellerOfferAssistantRequestIdentity: () => ({}),
+      createSellerOfferAssistantRequestIdentity: () => ({ clientRequestId: `request-${++identitySequence}`, idempotencyKey: `key-${identitySequence}` }),
       callSellerOfferAssistant: (input: any) => { const response = deferred(); aiCalls.push({ input, response }); return response.promise; },
     },
   };
@@ -181,6 +182,18 @@ function screenFixture(params: Record<string, any> = {}) {
 function aiSuccess(overrides: object = {}) {
   return { ok: true, offerDraftId: null, status: "draft", isReadyToSend: false, missingFields: [], summary: null, assistantMessage: null, messages: [], ...overrides };
 }
+
+test("seller summary control serializes the user's acknowledgement with its existing draft and retry identity", () => {
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": {}, "../lib/supabase/errors": {}, "./active.profile.service": {},
+  }, "\nexport { buildJsonBody };\n");
+  const identity = { clientRequestId: "summary-request", idempotencyKey: "summary-retry" };
+  const body = JSON.parse(service.buildJsonBody({ prompt: " Sí ", offerDraftId: "saved", uiAction: "SHOW_SUMMARY" }, identity, "seller"));
+  assert.deepEqual(body, {
+    prompt: "Sí", conversation_id: null, offer_draft_id: "saved", ui_action: "SHOW_SUMMARY",
+    client_request_id: identity.clientRequestId, idempotency_key: identity.idempotencyKey, active_profile_id: "seller",
+  });
+});
 
 test("creation ignores serialized request metadata and supports conversation-only entry", async () => {
   for (const params of [{ conversationId: "conversation-A" }, { conversationId: ["conversation-A"], purchaseRequestId: "request-B", purchaseRequest: JSON.stringify({ id: "request-B", title: "Wrong" }) }]) {
@@ -255,7 +268,7 @@ test("reference persists through first message, images, review and corrections w
   assertReference();
   assert.equal(f.aiCalls[1].input.prompt, "Ofrezco 4 llantas");
   assert.equal(f.aiCalls[1].input.images[0], image);
-  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true, assistantMessage: "¿Quieres revisar el resumen?" })); await flush();
+  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "draft-A", status: "ready", isReadyToSend: true, assistantMessage: "Tu oferta está lista. ¿Deseas ver el resumen?" })); await flush();
   nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onSend({ text: "Sí", images: [] });
   assert.equal(f.aiCalls[2].input.uiAction, "SHOW_SUMMARY");
   assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
@@ -342,3 +355,192 @@ test("reference rendering preserves long content with no truncation and names mi
   assert.ok(empty.some((n) => n.props.children.includes("Referencia actual de la solicitud")));
   assert.ok(empty.some((n) => n.props.children.includes("Esta solicitud no tiene título ni resumen disponibles.")));
 });
+
+const offerInvitation = "Tu oferta está lista. ¿Deseas ver el resumen?";
+const offerReviewInstruction = "Aquí tienes el resumen de la oferta. ¿Deseas enviarla o seguir ajustando?";
+const readyOffer = {
+  offerDraftId: "saved", status: "ready", isReadyToSend: true,
+  summary: { descripcion: "3 llantas", precio: 55000, basePrecio: "UNIT", cantidadOfrecida: 3, precioTotal: 165000, moneda: "COL" },
+};
+const offerFailure = { ok: false, error: { type: "network", message: "Intenta de nuevo" } };
+function assistantView(f: ReturnType<typeof screenFixture>) {
+  const tree = nodes(f.assistant());
+  return {
+    tree,
+    messages: tree.filter((n) => typeof n.type === "function" && n.type.name === "AssistantMessageBubble").map((n) => n.props.message),
+    composer: tree.find((n) => n.type === "InputChat")!.props,
+    review: tree.find((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard")?.props,
+    progress: tree.find((n) => n.type === "Progress")?.props,
+  };
+}
+async function restoreReadyOffer(f: ReturnType<typeof screenFixture>, messages = [
+  { id: "user-photo", role: "user", content: "3 llantas, retiro en tienda", imageUrls: ["https://example.test/photo"] },
+  { id: "ready", role: "assistant", content: offerInvitation, imageUrls: [] },
+]) {
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, messages }));
+  await flush();
+}
+async function openOfferSummary(f: ReturnType<typeof screenFixture>, text = "Sí") {
+  assistantView(f).composer.onSend({ text, images: [] });
+  const call = f.aiCalls.at(-1)!;
+  assert.equal(call.input.uiAction, "SHOW_SUMMARY");
+  assert.equal(call.input.offerDraftId, "saved");
+  assert.equal(call.input.prompt, text);
+  assert.equal(assistantView(f).progress!.variant, "thinking");
+  call.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: offerReviewInstruction }));
+  await flush();
+}
+
+test("offer review and repeated adjustment preserve the ordered transcript and scroll to its end", async () => {
+  const f = screenFixture();
+  await restoreReadyOffer(f);
+  const scroll = assistantView(f).tree.find((n) => n.type === "ScrollView")!;
+  const scrolling: string[] = [];
+  scroll.props.ref.current = { scrollTo: () => scrolling.push("top"), scrollToEnd: () => scrolling.push("end") };
+  await openOfferSummary(f);
+  let view = assistantView(f);
+  assert.deepEqual(view.messages.map((m) => m.text), ["3 llantas, retiro en tienda", offerInvitation, "Sí"]);
+  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.equal(view.review!.disabled, false);
+  view.tree.find((n) => n.type === "ScrollView")!.props.onContentSizeChange();
+  assert.deepEqual(scrolling, ["end"]);
+  assert.ok(view.tree.findIndex((n) => n.props === view.review) > view.tree.findLastIndex((n) => n.props.message));
+
+  for (let cycle = 0; cycle < 2; cycle++) {
+    const continuing = view.review!.onContinue();
+    assert.equal(f.aiCalls.at(-1)!.input.uiAction, "CONTINUE");
+    assert.ok(assistantView(f).review, "Review stays visible until CONTINUE succeeds");
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: offerInvitation }));
+    await continuing;
+    view = assistantView(f);
+    assert.equal(view.review, undefined);
+    assert.equal(view.messages.filter((m) => m.text === offerInvitation).length, 1);
+    assert.equal(view.messages[0].id, "user-photo");
+    assert.equal(view.messages[0].images[0].uri, "https://example.test/photo");
+    await openOfferSummary(f, "Ver resumen");
+    view = assistantView(f);
+    assert.equal(view.review!.offerPhotoCount, 1);
+  }
+  assert.equal(view.messages.filter((m) => m.text === "Ver resumen").length, 2, "Repeated genuine user messages remain");
+});
+
+test("failed CONTINUE preserves review and history; retry reuses the exact control identity", async () => {
+  const f = screenFixture();
+  await restoreReadyOffer(f);
+  await openOfferSummary(f);
+  const before = assistantView(f).messages;
+  const continuing = assistantView(f).review!.onContinue();
+  const failedCall = f.aiCalls.at(-1)!;
+  failedCall.response.resolve(offerFailure);
+  await continuing;
+  const view = assistantView(f);
+  assert.ok(view.review);
+  assert.equal(view.composer.placeholder, "Escribe un cambio");
+  assert.deepEqual(view.messages, before);
+  const retry = view.tree.find((n) => n.type === "Pressable")!.props.onPress();
+  const retryCall = f.aiCalls.at(-1)!;
+  assert.equal(retryCall.input.identity, failedCall.input.identity);
+  assert.equal(retryCall.input.offerDraftId, "saved");
+  retryCall.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: "Puedes cambiar el precio o la entrega." }));
+  await retry;
+  assert.equal(assistantView(f).review, undefined);
+  assert.equal(assistantView(f).messages.at(-1).text, "Puedes cambiar el precio o la entrega.");
+});
+
+test("restored control announcements are filtered without deleting real replies, images, or acknowledgements", async () => {
+  const f = screenFixture();
+  const usefulReply = "Cambié el precio a ₡55 000. Tu oferta está lista. ¿Deseas ver el resumen?";
+  await restoreReadyOffer(f, [
+    { id: "photo", role: "user", content: "3 llantas", imageUrls: ["https://example.test/photo"] },
+    { id: "ready", role: "assistant", content: offerInvitation, imageUrls: [] },
+    { id: "old-summary", role: "assistant", content: offerReviewInstruction, imageUrls: [] },
+    { id: "ack", role: "user", content: "Si", imageUrls: [] },
+    { id: "continue", role: "assistant", content: offerInvitation, imageUrls: [] },
+    { id: "change", role: "user", content: "Cambia el precio a 55000", imageUrls: [] },
+    { id: "useful", role: "assistant", content: usefulReply, imageUrls: [] },
+  ]);
+  let view = assistantView(f);
+  assert.deepEqual(view.messages.map((m) => m.id), ["photo", "ready", "ack", "change", "useful"]);
+  assert.equal(view.review, undefined, "RESTORE does not invent a server review state");
+  await openOfferSummary(f, "Ver resumen");
+  view = assistantView(f);
+  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.ok(view.messages.some((m) => m.text === usefulReply));
+  view.composer.onSend({ text: "Ahora son 4", images: [] });
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: offerInvitation }));
+  await flush();
+  view = assistantView(f);
+  assert.equal(view.review, undefined);
+  assert.ok(view.messages.some((m) => m.text === usefulReply));
+  assert.equal(view.messages.filter((m) => m.text === offerInvitation).length, 2, "A real correction may earn a new invitation");
+});
+
+test("offer acknowledgements require an actual pending invitation and never publish or reopen a visible summary", async () => {
+  for (const scenario of ["review", "guidance", "blocked", "mixed", "images"] as const) {
+    const f = screenFixture();
+    await restoreReadyOffer(f);
+    if (scenario === "review") await openOfferSummary(f);
+    if (scenario === "guidance" || scenario === "blocked") {
+      assistantView(f).composer.onSend({ text: "Confirma las condiciones", images: [] });
+      f.aiCalls.at(-1)!.response.resolve(aiSuccess({
+        ...readyOffer,
+        ...(scenario === "blocked" ? { status: "draft", isReadyToSend: false, missingFields: ["confirmacion de oferta"] } : {}),
+        assistantMessage: "Para completar la oferta, necesito confirmar: confirmacion de oferta. ¿Me ayudas con ese dato?",
+      }));
+      await flush();
+    }
+    const text = scenario === "mixed" ? "Sí, pero cambia la cantidad a 4" : "Sí";
+    const images = scenario === "images" ? [{ uri: "file:///new-photo.jpg" }] : [];
+    assistantView(f).composer.onSend({ text, images });
+    const call = f.aiCalls.at(-1)!;
+    assert.equal(call.input.uiAction, null, scenario);
+    assert.equal(call.input.prompt, text);
+    assert.equal(call.input.images, images);
+    assert.equal(call.input.offerDraftId, "saved");
+    f.unmount();
+  }
+});
+
+for (const outcome of ["failed", "stopped", "unmounted"] as const) {
+  test(`${outcome} offer summary preserves transcript and cannot apply a late review`, async () => {
+    const f = screenFixture();
+    await restoreReadyOffer(f);
+    assistantView(f).composer.onSend({ text: "Sí", images: [] });
+    const call = f.aiCalls.at(-1)!;
+    assert.equal(call.input.uiAction, "SHOW_SUMMARY");
+    const before = assistantView(f).messages;
+    if (outcome === "failed") {
+      call.response.resolve(offerFailure);
+      await flush();
+      const view = assistantView(f);
+      assert.equal(view.review, undefined);
+      assert.deepEqual(view.messages, before);
+      const retry = view.tree.find((n) => n.type === "Pressable")!.props.onPress();
+      const retryCall = f.aiCalls.at(-1)!;
+      assert.equal(retryCall.input.identity, call.input.identity);
+      assert.equal(retryCall.input.prompt, "Sí");
+      retryCall.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: "Falta confirmar el plazo de retiro." }));
+      await retry;
+      assert.equal(assistantView(f).messages.at(-1).text, "Falta confirmar el plazo de retiro.");
+      assert.equal(assistantView(f).messages.filter((m) => m.text === "Sí").length, 1);
+    } else {
+      if (outcome === "stopped") assistantView(f).composer.onStop();
+      else f.unmount();
+      assert.equal(call.input.signal.aborted, true);
+      if (outcome === "stopped") {
+        assistantView(f).composer.onSend({ text: "Ahora son 4", images: [] });
+      }
+      call.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "stale", assistantMessage: "Respuesta tardía" }));
+      await flush();
+      const view = assistantView(f);
+      assert.equal(view.review, undefined);
+      assert.ok(!view.messages.some((m) => m.text === "Respuesta tardía"));
+      assert.equal(view.messages[0].id, "user-photo");
+      if (outcome === "stopped") {
+        assert.equal(view.composer.busy, true);
+        assert.equal(f.aiCalls.at(-1)!.input.offerDraftId, "saved");
+      }
+    }
+  });
+}
