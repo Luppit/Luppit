@@ -296,10 +296,10 @@ function OfferSummaryCard({
         ? formatSummaryMoney(summary?.precioTotal, summary?.moneda)
         : null,
     },
-    { label: "Entrega", value: deliveryText },
+    { label: "Entrega ofrecida", value: deliveryText },
     { label: "Tiempo máximo de entrega", value: shippingTimingText },
     { label: "Costo de envío", value: formattedShippingPrice },
-    { label: "Retiro", value: pickupText },
+    { label: "Retiro ofrecido", value: pickupText },
     { label: "Retiro disponible en", value: pickupTimingText },
     {
       label: "Fotos",
@@ -325,7 +325,7 @@ function OfferSummaryCard({
   return (
     <AssistantReviewCard
       completionTitle="Oferta lista"
-      completionDescription="Revisa precio, entrega y fotos antes de enviarla."
+      completionDescription="Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
       title={purchaseRequestTitle?.trim() || "Oferta"}
       description={summary?.descripcion ?? "Sin descripción todavía"}
       rows={details.map((item) => ({
@@ -1139,13 +1139,11 @@ function OfferScreenContent({ params }: { params: {
         return `${displayName}: después de ${pickupDelay} día(s).`;
       }
       if (shippingCatalog && method === shippingCatalog.id) {
-        const costText = shippingCost
-          ? `${isColonCurrency ? "₡" : "$"}${shippingCost}`
-          : "Sin costo definido";
-        const timeText = shippingMaxTime
-          ? `${shippingMaxTime} día(s)`
-          : "sin tiempo definido";
-        return `${displayName}: ${costText}, tiempo máximo ${timeText}.`;
+        const details = [
+          shippingCost ? `${isColonCurrency ? "₡" : "$"}${shippingCost}` : null,
+          shippingMaxTime ? `tiempo máximo ${shippingMaxTime} día(s)` : null,
+        ].filter(Boolean);
+        return details.length ? `${displayName}: ${details.join(", ")}.` : displayName;
       }
       return displayName;
     })
@@ -1331,8 +1329,8 @@ function OfferScreenContent({ params }: { params: {
         {deliveryCatalog.length > 0 ? (
           <OptionsChecklistCard
             icon="truck"
-            title="Método de entrega"
-            description="Selecciona una o ambas opciones para esta oferta."
+            title="Métodos de entrega que ofreces"
+            description="Ofrece una o ambas opciones. El comprador deberá elegir y aceptar una."
             allowMultiple
             value={deliveryMethods}
             onChange={handleDeliveryMethodsChange}
@@ -1356,26 +1354,6 @@ function OfferScreenContent({ params }: { params: {
                   </View>
                 ) : shippingCatalog && delivery.id === shippingCatalog.id ? (
                   <View style={{ gap: t.spacing.xs }}>
-                    <View style={{ gap: t.spacing.xs }}>
-                      <Text color="stateAnulated">Costo</Text>
-                      <TextFieldWithToggle<string>
-                        value={shippingCost}
-                        onChangeText={(text) =>
-                          setShippingCost(text.replace(/\D/g, ""))
-                        }
-                        options={
-                          currencyToggleOptions as [
-                            { label: string; value: string },
-                            { label: string; value: string },
-                          ]
-                        }
-                        selectedOption={currencyId || currencyToggleOptions[0]?.value || ""}
-                        onOptionChange={setCurrencyId}
-                        keyboardType="number-pad"
-                        inputMode="numeric"
-                      />
-                    </View>
-
                     <View style={{ gap: t.spacing.xs }}>
                       <TextField
                         label="Tiempo máximo de entrega (días)"

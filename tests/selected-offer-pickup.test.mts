@@ -383,6 +383,36 @@ test("shared choice and rating confirmation retain DB inputs and offer-changed h
   assert.ok(f.calls.includes("closePopup")); assert.ok(f.calls.includes("refreshConversation"));
 });
 
+for (const methods of [["shipping"], ["pickup"], ["shipping", "pickup"]]) {
+  test(`accepting ${methods.join("+")} requires an explicit buyer choice and sends the offer revision`, async () => {
+    const f = fixture();
+    const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });
+    action.confirmation.payload_defaults = { offer_revision: "current-revision" } as any;
+    action.confirmation.inputs = [{
+      id: "delivery-choice", kind: "choice", payload_key: "fulfillment_catalog_id",
+      label: "Método de entrega que aceptas", is_required: true,
+      options: methods.map((method) => ({ value: method, method_kind: method, label: method })),
+    }] as any;
+    f.hook().handleActionPress(action);
+    const popup = f.popups[0];
+    assert.equal(popup.inputs[0].options.length, methods.length);
+    const missingChoice = confirm(f).onPress();
+    assert.equal(missingChoice.shouldClose, false);
+    assert.equal(missingChoice.feedback.title, "Faltan datos");
+    assert.equal(executions(f).length, 0);
+    popup.inputs[0].onValueChange("not-offered");
+    assert.ok(confirm(f).onPress().inputErrors["delivery-choice"]);
+    assert.equal(executions(f).length, 0);
+    popup.inputs[0].onValueChange(methods.at(-1));
+    const pending = confirm(f).onPress();
+    assert.equal(executions(f)[0][1].payload.fulfillment_catalog_id, methods.at(-1));
+    assert.equal(executions(f)[0][1].payload.offer_revision, "current-revision");
+    f.executions[0].resolve({ ok: true, data: {} });
+    await pending;
+    assert.equal(executions(f).length, 1);
+  });
+}
+
 test("actual conversation layout still routes TOP and MENU actions through the extracted handler", async () => {
   for (const slot of ["TOP", "MENU"]) {
     const f = fixture(); f.drawConversation();

@@ -172,8 +172,9 @@ function screenFixture(params: Record<string, any> = {}) {
   for (const [path, name] of Object.entries({
     "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
   })) modules[`@/src/components/${path}`] = name;
-  const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent };\n");
+  const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard };\n");
   return { ...runtime, modules, referenceCalls, requestCalls, aiCalls,
+    summary: (summary: object) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false }),
     route: () => runtime.render(() => screen.default()),
     content: () => runtime.render(() => screen.OfferScreenContent({ params })),
     assistant: () => runtime.render(() => screen.OfferAssistantScreen({ conversationId: "conversation-A", purchaseRequestTitle: reference.title, requestReference: reference })),
@@ -366,6 +367,17 @@ const readyOffer = {
   summary: { descripcion: "3 llantas", precio: 55000, basePrecio: "UNIT", cantidadOfrecida: 3, precioTotal: 165000, moneda: "COL" },
 };
 const offerFailure = { ok: false, error: { type: "network", message: "Intenta de nuevo" } };
+
+test("seller review displays both offered methods without inventing a shipping cost", () => {
+  const f = screenFixture();
+  const card = f.summary({ ...readyOffer.summary, entrega: "Envío", retiro: "Recoger en tienda", precioEnvio: null });
+  assert.ok(card.props.rows.some((row: any) => row.label === "Entrega ofrecida" && row.value === "Envío"));
+  assert.ok(card.props.rows.some((row: any) => row.label === "Retiro ofrecido" && row.value === "Recoger en tienda"));
+  assert.ok(!card.props.rows.some((row: any) => row.label === "Costo de envío"));
+  assert.equal(card.props.primaryDisabled, false);
+  assert.match(card.props.completionDescription, /comprador deberá elegir y aceptar/);
+});
+
 function assistantView(f: ReturnType<typeof screenFixture>) {
   const tree = nodes(f.assistant());
   return {
