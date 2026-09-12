@@ -35,6 +35,7 @@ type OfferCardProps = {
   timelineLoading?: boolean;
   timelineError?: string | null;
   onTimelineRetry?: () => void;
+  timelineActions?: React.ReactNode;
 };
 
 function normalize(value: string | null | undefined) {
@@ -77,6 +78,7 @@ export default function OfferCard({
   timelineLoading = false,
   timelineError,
   onTimelineRetry,
+  timelineActions,
 }: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
@@ -99,7 +101,7 @@ export default function OfferCard({
   const methodLabel = methodItem?.method_label?.trim() ?? null;
   const methodIcon: LucideIconName =
     methodItem?.method_kind === "shipping" ? "truck" : "map-pin";
-  const hasTimelineSection = timelineLoading || Boolean(timelineError) || timeline.length > 0;
+  const hasTimelineSection = timelineLoading || Boolean(timelineError) || timeline.length > 0 || Boolean(timelineActions);
 
   return (
     <MarketplaceCardFrame
@@ -152,6 +154,8 @@ export default function OfferCard({
                   />
                 ) : null}
               </View>
+
+              {timelineActions}
 
               {timelineLoading ? (
                 <View style={s.timelineState} accessibilityRole="text">

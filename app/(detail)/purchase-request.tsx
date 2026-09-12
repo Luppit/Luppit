@@ -8,6 +8,7 @@ import LoadingState from "@/src/components/loading/LoadingState";
 import OfferCard, {
   OfferCardTimelineItem,
 } from "@/src/components/offerCard/OfferCard";
+import SelectedOfferPickupAction from "@/src/components/offerCard/SelectedOfferPickupAction";
 import { Text } from "@/src/components/Text";
 import {
   getConversationByPurchaseOfferId,
@@ -167,6 +168,7 @@ export default function PurchaseRequestDetailScreen() {
     string | null
   >(null);
   const [timelineReloadKey, setTimelineReloadKey] = useState(0);
+  const refreshTimeline = useCallback(() => setTimelineReloadKey((value) => value + 1), []);
   const [viewsCount, setViewsCount] = useState(0);
   const params = useGlobalSearchParams<{
     purchaseRequest?: string | string[];
@@ -254,7 +256,7 @@ export default function PurchaseRequestDetailScreen() {
     }, [routePurchaseRequestId])
   );
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let active = true;
 
     const loadOffers = async () => {
@@ -283,7 +285,7 @@ export default function PurchaseRequestDetailScreen() {
     return () => {
       active = false;
     };
-  }, [filters, isTrackedRequest, purchaseRequestId, selectedSortId]);
+  }, [filters, isTrackedRequest, purchaseRequestId, selectedSortId]));
 
   useEffect(() => {
     let active = true;
@@ -687,7 +689,18 @@ export default function PurchaseRequestDetailScreen() {
                       : null
                   }
                   onTimelineRetry={
-                    isTrackedRequest ? () => setTimelineReloadKey((value) => value + 1) : undefined
+                    isTrackedRequest ? refreshTimeline : undefined
+                  }
+                  timelineActions={
+                    isTrackedRequest && offer.id === selectedOfferId && offer.conversation_id ? (
+                      <SelectedOfferPickupAction
+                        key={offer.conversation_id}
+                        conversationId={offer.conversation_id}
+                        purchaseRequestId={purchaseRequestId}
+                        purchaseOfferId={offer.id}
+                        onRefresh={refreshTimeline}
+                      />
+                    ) : undefined
                   }
                   onMenuPress={() => openOfferMenu(offer)}
                   onConnect={() => void openOfferConversation(offer.id)}
