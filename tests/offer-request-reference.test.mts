@@ -272,6 +272,7 @@ test("reference persists through first message, images, review and corrections w
   nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onSend({ text: "Sí", images: [] });
   assert.equal(f.aiCalls[2].input.uiAction, "SHOW_SUMMARY");
   assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
+  assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.onStop, undefined);
   f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true })); await flush();
   assertReference();
@@ -280,12 +281,14 @@ test("reference persists through first message, images, review and corrections w
   assert.equal(review.props.hasOfferPhoto, true);
   const publishing = review.props.onPublish();
   assert.equal(f.aiCalls[3].input.uiAction, "PUBLISH");
+  assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   const publishingComposer = nodes(f.assistant()).find((n) => n.type === "InputChat")!.props;
   assert.equal(publishingComposer.busy, true);
   assert.equal(publishingComposer.disabled, true);
   assert.equal(publishingComposer.onStop, undefined);
   f.aiCalls[3].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true })); await publishing;
   const continuing = review.props.onContinue();
+  assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, undefined);
   f.aiCalls[4].response.resolve(aiSuccess({ offerDraftId: "draft-A" })); await continuing;
   assertReference();

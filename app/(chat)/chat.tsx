@@ -19,12 +19,6 @@ import { ActivityIndicator, Image, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CHAT_TOP_BAR_VISIBLE_HEIGHT } from "./chat-top-bar";
 
-const REQUEST_PROCESSING_STEPS = [
-  "Identificando el producto",
-  "Organizando los detalles",
-  "Preparando el resumen",
-] as const;
-
 function AssistantTextBlock({ text }: { text: string }) {
   const t = useTheme();
 
@@ -199,7 +193,6 @@ export default function ChatScreen() {
     isReadyToPublish,
     missingFields,
     isSendingMessage,
-    isGeneratingSummary,
     isExecutingControl,
     continueClarifying,
     summary,
@@ -248,8 +241,8 @@ export default function ChatScreen() {
       {isSendingMessage ? (
         <AssistantProcessingProgress
           title="Preparando tu solicitud"
-          steps={REQUEST_PROCESSING_STEPS}
-          variant={isGeneratingSummary ? "steps" : "thinking"}
+          steps={[]}
+          variant="thinking"
         />
       ) : null}
 

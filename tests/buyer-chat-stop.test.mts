@@ -157,6 +157,29 @@ function elements(value: unknown): Element[] {
   return [element, ...elements(element.props.children)];
 }
 
+function createChatView(session: Awaited<ReturnType<typeof createSession>>) {
+  const runtime = createHooks();
+  const module = loadComponent<{ default: () => Element }>(
+    "../app/(chat)/chat.tsx",
+    {
+      react: runtime.hooks,
+      "react-native": Object.fromEntries(["ActivityIndicator", "Image", "ScrollView", "View"].map((name) => [name, name])),
+      "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0 }) },
+      "@/src/themes": { useTheme: () => ({ spacing: {} }) },
+      "./chat-session.context": { useChatSession: () => session.state },
+      "./chat-top-bar": { CHAT_TOP_BAR_VISIBLE_HEIGHT: 44 },
+      "@/src/components/button/Button": "Button",
+      "@/src/components/assistant/AssistantProcessingProgress": "Progress",
+      "@/src/components/assistant/AssistantReviewCard": "ReviewCard",
+      "@/src/components/BundledSvg": { BundledSvg: "BundledSvg" },
+      "@/src/components/message/MessageUtilities": "MessageUtilities",
+      "@/src/components/Text": { Text: "Text" },
+      "@/src/utils/purchaseRequestSummary": {},
+    },
+  );
+  return () => elements(runtime.render(() => module.default())).find((node) => node.type === "Progress")?.props;
+}
+
 function createComposer(initial: Partial<InputChatProps> = {}) {
   const runtime = createHooks();
   let props: InputChatProps = { onSend() {}, ...initial };
@@ -281,11 +304,15 @@ test("composer releases its internal busy state when sending throws", async () =
 
 test("completion restores compose and records the assistant reply and draft", async () => {
   const session = await createSession();
+  const progress = createChatView(session);
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   assert.equal(session.state.isSendingMessage, true);
   assert.equal(session.state.canCompose, false);
+  assert.equal(progress()!.variant, "thinking");
+  assert.equal(progress()!.onStop, undefined);
   session.calls[0].response.resolve(success());
   await pending;
+  assert.equal(progress(), undefined);
   assert.equal(session.state.isSendingMessage, false);
   assert.equal(session.state.canCompose, true);
   assert.equal(session.state.draftId, "draft-1");
@@ -420,17 +447,32 @@ test("a published CONTINUE response stops the queued correction", async () => {
 
 test("summary cancellation releases both loading states and ignores a late review result", async () => {
   const session = await createSession();
+  const progress = createChatView(session);
   const initial = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY" }));
   await initial;
   const summary = session.state.sendMessage({ text: "Ver resumen", images: [] });
   assert.equal(session.state.isGeneratingSummary, true);
+  assert.equal(progress()!.variant, "thinking");
+  assert.equal(progress()!.steps.length, 0);
+  assert.equal(progress()!.onStop, undefined);
   session.state.stopAssistant();
+  assert.equal(session.calls[1].input.signal!.aborted, true);
   assert.equal(session.state.isGeneratingSummary, false);
+  assert.equal(progress(), undefined);
   session.calls[1].response.resolve(success({ status: "ready", uiState: "review" }));
   await summary;
   assert.equal(session.state.uiState, "normal");
   assert.equal(session.state.canCompose, true);
+
+  const retry = session.state.retryMessage(session.state.messages.at(-1)!.id);
+  assert.equal(session.calls[2].input.ui_action, "SHOW_SUMMARY");
+  assert.equal(session.calls[2].input.idempotency_key, session.calls[1].input.idempotency_key);
+  assert.equal(progress()!.variant, "thinking");
+  session.calls[2].response.resolve(success({ status: "ready", uiState: "review" }));
+  await retry;
+  assert.equal(session.state.uiState, "review");
+  assert.equal(progress(), undefined);
 });
 
 test("unmount aborts the request and prevents a late reply", async () => {
@@ -446,6 +488,7 @@ test("unmount aborts the request and prevents a late reply", async () => {
 test("pending summary acceptance opens backend review and retains the draft summary", async () => {
   for (const reply of ["Si", "Sí", "Sí, por favor"]) {
     const session = await createSession();
+    const progress = createChatView(session);
     const initial = session.state.sendMessage({ text: "2", images: [] });
     session.calls[0].response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY", isReadyToPublish: true }));
     await initial;
@@ -453,8 +496,10 @@ test("pending summary acceptance opens backend review and retains the draft summ
     assert.equal(session.calls[1].input.ui_action, "SHOW_SUMMARY");
     assert.equal(session.calls[1].input.draft_id, "draft-1");
     assert.equal(session.state.uiState, "normal", "review waits for backend confirmation");
+    assert.equal(progress()!.variant, "thinking");
     session.calls[1].response.resolve(success({ status: "ready", uiState: "review", isReadyToPublish: true, assistantMessage: null, summary: { titulo: "Llantas", categoria: "Llantas", marca: [], atributos: { cantidad: 2 } }, summaryText: "2 llantas" }));
     await pending;
+    assert.equal(progress(), undefined);
     assert.equal(session.state.uiState, "review");
     assert.equal(session.state.summary?.atributos?.cantidad, 2);
     assert.equal(session.state.canPublish, true);
