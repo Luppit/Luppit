@@ -505,6 +505,23 @@ test("offer acknowledgements require an actual pending invitation and never publ
   }
 });
 
+test("Bug25 seller keeps refusals and price preferences as edits after restoration and review", async () => {
+  for (const reviewed of [false, true]) {
+    for (const text of ["No, suave, quiero que esté barato", "No", "No gracias", "Sí, pero cambia el precio", "Ver resumen después de cambiar el precio"]) {
+      const f = screenFixture();
+      await restoreReadyOffer(f);
+      if (reviewed) await openOfferSummary(f);
+      assistantView(f).composer.onSend({ text, images: [] });
+      const call = f.aiCalls.at(-1)!;
+      assert.equal(call.input.uiAction, null);
+      assert.equal(call.input.prompt, text);
+      assert.equal(call.input.offerDraftId, "saved");
+      assert.equal(assistantView(f).review, undefined);
+      f.unmount();
+    }
+  }
+});
+
 for (const outcome of ["failed", "stopped", "unmounted"] as const) {
   test(`${outcome} offer summary preserves transcript and cannot apply a late review`, async () => {
     const f = screenFixture();

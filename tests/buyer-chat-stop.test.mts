@@ -535,7 +535,7 @@ for (const text of ["Mentira quiero 4", "Ocupo con una presión específica, per
   });
 }
 
-for (const text of ["", "Quiero 4 como estas", "Sí"]) {
+for (const text of ["", "Quiero 4 como estas", "Sí", "Ver resumen", "No, suave, quiero que esté barato"]) {
   test(`buyer sends image content without inventing text or treating it as a summary control: ${text || "image only"}`, async () => {
     const session = await createSession();
     const initial = session.state.sendMessage({ text: "Llantas", images: [] });
@@ -554,6 +554,56 @@ for (const text of ["", "Quiero 4 como estas", "Sí"]) {
     assert.equal(session.state.draftId, "draft-1");
   });
 }
+
+test("Bug25 restored buyer draft keeps refusals and mixed edits on the message path, including retries", async () => {
+  for (const text of ["No, suave, quiero que esté barato", "No", "No gracias", "Todavía no", "Sí, pero quiero que esté barato"]) {
+    for (const uiState of ["normal", "review"] as const) {
+      const session = await createSession({ restore: success({
+        status: "ready", isReadyToPublish: true, uiState,
+        pendingAction: uiState === "normal" ? "ASK_SHOW_SUMMARY" : null,
+      }) });
+      const sending = session.state.sendMessage({ text, images: [] });
+      if (uiState === "review") {
+        assert.equal(session.calls[0].input.ui_action, "CONTINUE");
+        session.calls[0].response.resolve(success({ status: "ready", uiState: "normal", assistantMessage: null }));
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+      const call = session.calls.at(-1)!;
+      assert.equal(call.input.ui_action, undefined);
+      assert.equal(call.input.prompt, text);
+      assert.equal(call.input.draft_id, "draft-1");
+      call.response.resolve({ ok: false, error: { code: "AI_TEMPORARILY_UNAVAILABLE", message: "Intenta de nuevo" } } as Result);
+      await sending;
+      const retry = session.state.retryMessage(session.state.messages.at(-1)!.id);
+      const retried = session.calls.at(-1)!;
+      assert.equal(retried.input.client_request_id, call.input.client_request_id);
+      assert.equal(retried.input.idempotency_key, call.input.idempotency_key);
+      assert.equal(retried.input.prompt, text);
+      assert.equal(retried.input.ui_action, undefined);
+      retried.response.resolve(success({ status: "ready", pendingAction: "ASK_SHOW_SUMMARY" }));
+      await retry;
+      assert.equal(session.state.uiState, "normal");
+      assert.equal(session.state.draftId, "draft-1");
+      assert.equal(session.calls.some((request) => ["SHOW_SUMMARY", "PUBLISH"].includes(request.input.ui_action ?? "")), false);
+      assert.equal(session.state.messages.filter((message) => message.sender === "user" && message.text === text).length, 1);
+      assert.equal(session.state.messages.filter((message) => message.sender === "assistant").length, 1);
+    }
+  }
+});
+
+test("buyer summary acknowledgement uses restored pending action and explicit requests still reach Edge", async () => {
+  for (const pendingAction of [null, "ASK_SHOW_SUMMARY"]) {
+    for (const text of ["Sí", "Ver resumen"]) {
+      const session = await createSession({ restore: success({ status: "ready", isReadyToPublish: true, pendingAction }) });
+      const sending = session.state.sendMessage({ text, images: [] });
+      assert.equal(session.calls[0].input.ui_action, pendingAction ? "SHOW_SUMMARY" : undefined);
+      if (!pendingAction) assert.equal(session.calls[0].input.prompt, text);
+      assert.equal(session.calls[0].input.draft_id, "draft-1");
+      session.calls[0].response.resolve(success());
+      await sending;
+    }
+  }
+});
 
 test("buyer upload failure and stop retain the original image request for retry", async () => {
   for (const stop of [false, true]) {
