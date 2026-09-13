@@ -374,14 +374,26 @@ export function useConversationActions({
         ...confirmation.payload_defaults,
         ...(clientRequestId ? { client_request_id: clientRequestId } : null),
       };
+      const isOfferAcceptance =
+        confirmation.code === "BUYER_ACCEPT_OFFER_CONFIRMATION";
+      const offerName = isOfferAcceptance
+        ? confirmation.fields.find((field) => field.value_source === "offer_name")
+        : undefined;
+      const offerDescription = isOfferAcceptance
+        ? confirmation.fields.find(
+            (field) => field.value_source === "offer_description"
+          )
+        : undefined;
       const description = interpolateTemplate(
         confirmation.description_template,
         conversationView?.context ?? {}
       );
-      const rows = confirmation.fields.map((field) => ({
-        label: field.label,
-        value: toStringValue(field.value),
-      }));
+      const rows = confirmation.fields
+        .filter((field) => field !== offerName && field !== offerDescription)
+        .map((field) => ({
+          label: field.label,
+          value: toStringValue(field.value),
+        }));
       const inputs = confirmation.inputs.map((input) => ({
         id: input.id,
         kind: input.kind,
@@ -425,7 +437,11 @@ export function useConversationActions({
       openPopup({
         type: "summary",
         title: ratingInputTitle || confirmation.title,
-        description,
+        metadata: offerName ? toStringValue(offerName.value) : undefined,
+        description: offerDescription
+          ? toStringValue(offerDescription.value)
+          : description,
+        descriptionPlacement: offerDescription ? "afterRows" : undefined,
         rows,
         inputs,
         blocker: confirmation.blocker

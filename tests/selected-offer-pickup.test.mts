@@ -387,6 +387,12 @@ for (const methods of [["shipping"], ["pickup"], ["shipping", "pickup"]]) {
   test(`accepting ${methods.join("+")} requires an explicit buyer choice and sends the offer revision`, async () => {
     const f = fixture();
     const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });
+    Object.assign(action.confirmation, { code: "BUYER_ACCEPT_OFFER_CONFIRMATION" });
+    action.confirmation.fields = [
+      { label: "Oferta", value_source: "offer_name", value: "Llantas — 4 unidades" },
+      { label: "Precio", value_source: "offer_price", value: "₡100000" },
+      { label: "Descripción del producto", value_source: "offer_description", value: "Cuatro llantas nuevas." },
+    ] as any;
     action.confirmation.payload_defaults = { offer_revision: "current-revision" } as any;
     action.confirmation.inputs = [{
       id: "delivery-choice", kind: "choice", payload_key: "fulfillment_catalog_id",
@@ -395,6 +401,12 @@ for (const methods of [["shipping"], ["pickup"], ["shipping", "pickup"]]) {
     }] as any;
     f.hook().handleActionPress(action);
     const popup = f.popups[0];
+    assert.equal(popup.metadata, "Llantas — 4 unidades");
+    assert.equal(popup.rows.length, 1);
+    assert.equal(popup.rows[0].label, "Precio");
+    assert.equal(popup.rows[0].value, "₡100000");
+    assert.equal(popup.description, "Cuatro llantas nuevas.");
+    assert.equal(popup.descriptionPlacement, "afterRows");
     assert.equal(popup.inputs[0].options.length, methods.length);
     const missingChoice = confirm(f).onPress();
     assert.equal(missingChoice.shouldClose, false);
