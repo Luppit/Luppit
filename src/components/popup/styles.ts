@@ -444,7 +444,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     choiceOption: {
       minHeight: 72,
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: t.spacing.md,
       padding: t.spacing.md,
       borderWidth: 1,
@@ -514,7 +514,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     choiceOptionHeader: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       justifyContent: "space-between",
       gap: t.spacing.sm,
     },
