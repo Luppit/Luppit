@@ -60,11 +60,6 @@ export type GlobalPopupStyles = {
   summaryDescriptionScroll: ViewStyle;
   summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
-  offerSummaryRows: ViewStyle;
-  offerSummaryRow: ViewStyle;
-  offerSummaryPriceRow: ViewStyle;
-  offerSummaryPrice: TextStyle;
-  offerSummaryDescription: TextStyle;
   summaryInputsList: ViewStyle;
   summaryInputLabel: TextStyle;
   summaryTextArea: ViewStyle;
@@ -403,25 +398,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     summaryRowsList: {
       overflow: "hidden",
       ...createRoundedSurfaceStyle(t),
-    },
-    offerSummaryRows: {
-      paddingVertical: t.spacing.sm,
-    },
-    offerSummaryRow: {
-      minHeight: 0,
-    },
-    offerSummaryPriceRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "center",
-      justifyContent: "space-between",
-      columnGap: t.spacing.md,
-    },
-    offerSummaryPrice: {
-      flexShrink: 1,
-    },
-    offerSummaryDescription: {
-      color: t.colors.textMedium,
     },
     summaryInputsList: {
       gap: t.spacing.md,

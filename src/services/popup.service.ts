@@ -23,7 +23,6 @@ export type PopupMenuConfig = {
 export type PopupSummaryRow = {
   label: string;
   value: string;
-  valueSource?: string;
 };
 
 export type PopupSummaryImage = {
