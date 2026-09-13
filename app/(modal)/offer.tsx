@@ -277,6 +277,7 @@ function OfferSummaryCard({
     },
   ].filter((item) => hasSummaryValue(item.value));
   const notices: AssistantReviewNotice[] = [];
+  const isComplete = hasOfferPhoto && missingFields.length === 0;
 
   if (missingFields.length > 0) {
     notices.push({ text: `Falta completar: ${missingFields.join(", ")}` });
@@ -291,8 +292,11 @@ function OfferSummaryCard({
 
   return (
     <AssistantReviewCard
-      completionTitle="Oferta lista"
-      completionDescription="Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
+      completionTitle={isComplete ? "Oferta lista" : "Oferta incompleta"}
+      completionDescription={isComplete
+        ? "Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
+        : "Completa los datos pendientes antes de enviar tu oferta."}
+      isComplete={isComplete}
       title={purchaseRequestTitle?.trim() || "Oferta"}
       description={summary?.descripcion ?? "Sin descripción todavía"}
       rows={details.map((item) => ({
@@ -301,11 +305,11 @@ function OfferSummaryCard({
       }))}
       notices={notices}
       primaryLabel="Enviar oferta"
-      primaryDisabled={disabled || !hasOfferPhoto}
+      primaryDisabled={disabled || !isComplete}
       primaryLoading={loading}
       onPrimaryPress={onPublish}
       secondaryLabel="Seguir ajustando"
-      secondaryDisabled={disabled}
+      secondaryDisabled={loading}
       onSecondaryPress={onContinue}
     />
   );
@@ -427,10 +431,10 @@ function OfferAssistantScreen({
       const isContinueAction = input.uiAction === "CONTINUE";
       const isSummaryAction = input.uiAction === "SHOW_SUMMARY";
       const isReadyResult =
-        result.isReadyToSend || result.status === "ready" || result.status === "sent";
+        result.isReadyToSend && result.missingFields.length === 0;
       setIsReadyToSend(isReadyResult);
       setMissingFields(result.missingFields);
-      if (isContinueAction) {
+      if (isContinueAction || !isReadyResult) {
         setShowSummary(false);
         setSummary(null);
       } else if (result.summary) {
@@ -449,7 +453,7 @@ function OfferAssistantScreen({
         appendAssistantMessage(result.assistantMessage);
       }
       if (isSummaryAction) {
-        setShowSummary(true);
+        setShowSummary(isReadyResult && result.summary !== null);
       }
 
       if (result.status === "sent") {

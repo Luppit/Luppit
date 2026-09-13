@@ -174,7 +174,7 @@ function screenFixture(params: Record<string, any> = {}) {
   })) modules[`@/src/components/${path}`] = name;
   const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard };\n");
   return { ...runtime, modules, referenceCalls, requestCalls, aiCalls,
-    summary: (summary: object) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false }),
+    summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
     route: () => runtime.render(() => screen.default()),
     content: () => runtime.render(() => screen.OfferScreenContent({ params })),
     assistant: () => runtime.render(() => screen.OfferAssistantScreen({ conversationId: "conversation-A", purchaseRequestTitle: reference.title, requestReference: reference })),
@@ -275,7 +275,7 @@ test("reference persists through first message, images, review and corrections w
   assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.onStop, undefined);
-  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true })); await flush();
+  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true, summary: { descripcion: "4 llantas" } })); await flush();
   assertReference();
   const review = nodes(f.assistant()).find((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard")!;
   assert.ok(review);
@@ -376,6 +376,62 @@ test("seller review displays both offered methods without inventing a shipping c
   assert.ok(!card.props.rows.some((row: any) => row.label === "Costo de envío"));
   assert.equal(card.props.primaryDisabled, false);
   assert.match(card.props.completionDescription, /comprador deberá elegir y aceptar/);
+});
+
+test("an incomplete offer review never shows a success state and remains editable", () => {
+  const f = screenFixture();
+  const card = f.summary(readyOffer.summary, {
+    hasOfferPhoto: false, offerPhotoCount: 0,
+    missingFields: ["foto real de la oferta"], disabled: true,
+  });
+  assert.equal(card.props.completionTitle, "Oferta incompleta");
+  assert.equal(card.props.isComplete, false);
+  assert.equal(card.props.primaryDisabled, true);
+  assert.equal(card.props.secondaryDisabled, false);
+  const busy = f.summary(readyOffer.summary, { disabled: true, loading: true });
+  assert.equal(busy.props.isComplete, true);
+  assert.equal(busy.props.primaryDisabled, true);
+});
+
+for (const missingFields of [[], ["foto real de la oferta"]]) {
+  test(`legacy ready status cannot override incomplete readiness (${missingFields.length} missing fields)`, async () => {
+    const f = screenFixture();
+    f.assistant();
+    f.aiCalls[0].response.resolve(aiSuccess({
+      ...readyOffer, isReadyToSend: missingFields.length > 0, missingFields,
+      messages: [{ id: "ready", role: "assistant", content: offerInvitation, imageUrls: [] }],
+    }));
+    await flush();
+    assistantView(f).composer.onSend({ text: "Sí", images: [] });
+    assert.equal(f.aiCalls.at(-1)!.input.uiAction, null);
+    assert.equal(assistantView(f).review, undefined);
+  });
+}
+
+test("blocked summary stays in chat until an uploaded photo passes readiness", async () => {
+  const f = screenFixture();
+  await restoreReadyOffer(f);
+  assistantView(f).composer.onSend({ text: "Sí", images: [] });
+  const blocked = f.aiCalls.at(-1)!;
+  assert.equal(blocked.input.uiAction, "SHOW_SUMMARY");
+  blocked.response.resolve(aiSuccess({ ...readyOffer, isReadyToSend: false,
+    missingFields: ["foto real de la oferta"], summary: null,
+    assistantMessage: "Adjunta al menos una foto real del producto que ofreces para continuar.",
+  }));
+  await flush();
+  assert.equal(assistantView(f).review, undefined);
+  assert.match(assistantView(f).messages.at(-1).text, /Adjunta al menos una foto/);
+  const photo = { uri: "file:///product.png" };
+  assistantView(f).composer.onSend({ text: "", images: [photo] });
+  f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await flush();
+  assert.equal(assistantView(f).review, undefined);
+  const retry = assistantView(f).tree.find((node) => node.type === "Pressable" && node.props.onPress)!;
+  const retryPromise = retry.props.onPress();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: offerInvitation }));
+  await retryPromise;
+  await openOfferSummary(f);
+  assert.ok(assistantView(f).review);
 });
 
 function assistantView(f: ReturnType<typeof screenFixture>) {
