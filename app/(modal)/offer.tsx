@@ -19,7 +19,6 @@ import ExpandableInfoCard from "@/src/components/expandableInfoCard/ExpandableIn
 import FilePicker, {
   SelectedFile,
 } from "@/src/components/filePicker/FilePicker";
-import { Icon } from "@/src/components/Icon";
 import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
 import { useAndroidChatKeyboardVisible } from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
@@ -207,38 +206,6 @@ function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
         ) : null}
       </View>
       <MessageUtilities text={message.text} align="right" />
-    </View>
-  );
-}
-
-function OfferAssistantEmptyState() {
-  const t = useTheme();
-
-  return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: t.spacing.sm,
-        paddingHorizontal: t.spacing.lg,
-      }}
-    >
-      <View
-        style={{
-          width: 54,
-          height: 54,
-          borderRadius: 999,
-          backgroundColor: t.colors.primaryLight,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Icon name="sparkles" size={28} color={t.colors.primary} />
-      </View>
-      <Text variant="body" align="center">
-        Describe tu oferta y adjunta fotos reales
-      </Text>
     </View>
   );
 }
@@ -777,7 +744,6 @@ function OfferAssistantScreen({
         }}
       >
         <OfferRequestReference reference={requestReference} />
-        {messages.length === 0 && !isBusy ? <OfferAssistantEmptyState /> : null}
 
         {visibleMessages.map((message) => (
           <AssistantMessageBubble key={message.id} message={message} />
