@@ -368,14 +368,22 @@ const readyOffer = {
 };
 const offerFailure = { ok: false, error: { type: "network", message: "Intenta de nuevo" } };
 
-test("seller review displays both offered methods without inventing a shipping cost", () => {
+test("seller review groups the available delivery methods without inventing a shipping cost", () => {
   const f = screenFixture();
-  const card = f.summary({ ...readyOffer.summary, entrega: "Envío", retiro: "Recoger en tienda", precioEnvio: null });
-  assert.ok(card.props.rows.some((row: any) => row.label === "Entrega ofrecida" && row.value === "Envío"));
-  assert.ok(card.props.rows.some((row: any) => row.label === "Retiro ofrecido" && row.value === "Recoger en tienda"));
-  assert.ok(!card.props.rows.some((row: any) => row.label === "Costo de envío"));
-  assert.equal(card.props.primaryDisabled, false);
-  assert.match(card.props.completionDescription, /comprador deberá elegir y aceptar/);
+  for (const [entrega, retiro, expected] of [
+    ["Envío", "Recoger en tienda", "Envío · Recoger en tienda"],
+    ["Envío", null, "Envío"],
+    [null, "Recoger en tienda", "Recoger en tienda"],
+    [null, null, null],
+  ]) {
+    const card = f.summary({ ...readyOffer.summary, entrega, retiro, precioEnvio: null });
+    const methods = card.props.rows.filter((row: any) => row.label === "Opciones de entrega");
+    assert.equal(methods.length, expected ? 1 : 0);
+    if (expected) assert.equal(methods[0].value, expected);
+    assert.ok(!card.props.rows.some((row: any) => row.label === "Costo de envío"));
+    assert.equal(card.props.primaryDisabled, false);
+    assert.match(card.props.completionDescription, /comprador deberá elegir y aceptar/);
+  }
 });
 
 test("an incomplete offer review never shows a success state and remains editable", () => {
