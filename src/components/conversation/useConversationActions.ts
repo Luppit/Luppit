@@ -381,6 +381,7 @@ export function useConversationActions({
       const rows = confirmation.fields.map((field) => ({
         label: field.label,
         value: toStringValue(field.value),
+        valueSource: field.value_source,
       }));
       const inputs = confirmation.inputs.map((input) => ({
         id: input.id,
@@ -415,6 +416,12 @@ export function useConversationActions({
       const ratingInputTitle =
         confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
+      const isFulfillmentConfirmation = confirmation.inputs.some(
+        (input) => input.kind === "choice" && input.payload_key === "fulfillment_catalog_id"
+      );
+      const confirmContentColorKey = confirmStyle.isPrimary
+        ? isFulfillmentConfirmation ? "textDark" : "backgroudWhite"
+        : confirmStyle.isDanger ? "error" : "textDark";
       const hasUnavailableRequiredChoice = confirmation.inputs.some(
         (input) =>
           input.kind === "choice" &&
@@ -455,16 +462,8 @@ export function useConversationActions({
             label: confirmation.confirm_label || action.label || "Confirmar",
             icon: normalizeOptionalIcon(confirmation.confirm_icon),
             backgroundColorKey: confirmStyle.isPrimary ? "primary" : "backgroudWhite",
-            textColorKey: confirmStyle.isPrimary
-              ? "backgroudWhite"
-              : confirmStyle.isDanger
-                ? "error"
-                : "textDark",
-            iconColorKey: confirmStyle.isPrimary
-              ? "backgroudWhite"
-              : confirmStyle.isDanger
-                ? "error"
-                : "textDark",
+            textColorKey: confirmContentColorKey,
+            iconColorKey: confirmContentColorKey,
             disabled:
               confirmation.blocker != null || hasUnavailableRequiredChoice,
             onPress: () => {

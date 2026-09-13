@@ -267,6 +267,9 @@ export default function GlobalPopupHost() {
   const translateY = useRef(new Animated.Value(28)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const canDismissPopup = dismissOnBackdropPress && pendingSummaryActionId == null;
+  const isFulfillmentSummary = summaryConfig?.inputs?.some(
+    (input) => input.kind === "choice" && input.payload_key === "fulfillment_catalog_id"
+  );
   const activeSummaryChoiceInput =
     summaryConfig?.inputs?.find(
       (input) =>
@@ -1631,26 +1634,55 @@ export default function GlobalPopupHost() {
                         : renderSummaryDescription()}
 
                       {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
-                        <View style={s.summaryRowsList}>
-                          {summaryConfig.rows.map((row, index) => (
-                            <React.Fragment key={`${row.label}-${row.value}`}>
-                              <View
-                                accessible
-                                accessibilityLabel={`${row.label}: ${row.value}`}
-                                style={s.summaryRowBlock}
-                              >
-                                <Text variant="small" style={s.summaryRowLabel}>
-                                  {row.label}
-                                </Text>
-                                <Text variant="body" style={s.summaryRowValue}>
-                                  {row.value}
-                                </Text>
-                              </View>
-                              {index < summaryConfig.rows!.length - 1 ? (
-                                <View style={s.summaryRowSeparator} />
-                              ) : null}
-                            </React.Fragment>
-                          ))}
+                        <View
+                          style={[
+                            s.summaryRowsList,
+                            isFulfillmentSummary ? s.offerSummaryRows : null,
+                          ]}
+                        >
+                          {summaryConfig.rows.map((row, index) => {
+                            const isOfferName =
+                              isFulfillmentSummary && row.valueSource === "offer_name";
+                            const isOfferPrice =
+                              isFulfillmentSummary && row.valueSource === "offer_price";
+                            const isOfferDescription =
+                              isFulfillmentSummary && row.valueSource === "offer_description";
+
+                            return (
+                              <React.Fragment key={`${row.label}-${row.value}`}>
+                                <View
+                                  accessible
+                                  accessibilityLabel={`${row.label}: ${row.value}`}
+                                  style={[
+                                    s.summaryRowBlock,
+                                    isFulfillmentSummary ? s.offerSummaryRow : null,
+                                    isOfferPrice ? s.offerSummaryPriceRow : null,
+                                  ]}
+                                >
+                                  <Text variant="small" style={s.summaryRowLabel}>
+                                    {row.label}
+                                  </Text>
+                                  <Text
+                                    variant={
+                                      isOfferName || isOfferPrice
+                                        ? "subtitle"
+                                        : isOfferDescription ? "small" : "body"
+                                    }
+                                    style={[
+                                      s.summaryRowValue,
+                                      isOfferPrice ? s.offerSummaryPrice : null,
+                                      isOfferDescription ? s.offerSummaryDescription : null,
+                                    ]}
+                                  >
+                                    {row.value}
+                                  </Text>
+                                </View>
+                                {index < summaryConfig.rows!.length - 1 ? (
+                                  <View style={s.summaryRowSeparator} />
+                                ) : null}
+                              </React.Fragment>
+                            );
+                          })}
                         </View>
                       ) : null}
 
