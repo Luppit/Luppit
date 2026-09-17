@@ -682,7 +682,7 @@ function OfferAssistantScreen({
           },
           {
             id: "discard-draft",
-            label: isEditMode ? "Descartar cambios" : "Descartar",
+            label: "Descartar",
             backgroundColorKey: "error",
             textColorKey: "backgroudWhite",
             iconColorKey: "backgroudWhite",
