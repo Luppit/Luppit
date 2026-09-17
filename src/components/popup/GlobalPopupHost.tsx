@@ -1036,9 +1036,14 @@ export default function GlobalPopupHost() {
           />
         </Animated.View>
 
+        {/* Android's translucent Modal can overlay the IME. Disable avoidance on
+            hide so Android's keyboard end frame cannot leave residual padding. */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={
+            Platform.OS === "ios" || Platform.OS === "android" ? "padding" : undefined
+          }
+          enabled={Platform.OS !== "android" || isKeyboardVisible}
           keyboardVerticalOffset={0}
         >
           <View
