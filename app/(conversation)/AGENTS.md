@@ -14,7 +14,7 @@ Applies to conversation screens and conversation UI behavior.
 ## Implementation Rules
 - Do not hardcode product behavior by action code when an executor/confirmation exists.
 - Execute server actions through configured executor targets; `MENU` actions use the same path as `TOP`/`AUX`.
-- Current client commands: `modal.offer` opens offer creation with `purchaseRequestId` + `conversationId`; `modal.offer.edit` opens edit mode using `conversationId` as source of truth.
+- Current client commands: `modal.offer` opens offer creation with `purchaseRequestId` + `conversationId`; `modal.offer.edit` opens the private AI revision assistant using `conversationId` as source of truth. Leaving preserves the draft; discarding does not cancel the offer. A new offer revision invalidates an open buyer acceptance confirmation and requires a fresh delivery choice.
 - Render conditional confirmation inputs by kind and submit under DB-provided `payload_key`; rating popups should prefer the rating input label from DB.
 - Use DB-provided slot/card copy and preformatted due dates when available; apply only safe presentational fallbacks.
 - Do not mark messages opened in client code; loading messages must go through `public.get_conversation_messages(...)`.

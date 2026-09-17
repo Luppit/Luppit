@@ -41,7 +41,7 @@ Applies to service modules and RPC integration behavior.
 - Active business locations come from `location` rows with `country_code='CR'` and `is_active=true`; save only the selected district `location.id`.
 
 ## Offer And Timeline Services
-- Offer create/edit/save flows use normalized conversation-backed RPCs (`create_seller_offer_fulfillment_from_conversation`, `get_seller_offer_edit_payload_v2`, and `update_seller_offer_fulfillment_from_conversation`) rather than scattered direct writes.
+- Offer creation and editing share `purchase.offer.assistant.service` with `mode=create|edit`. Edit RESTORE starts/resumes a private revision; subsequent turns and publication carry the server draft version and source offer revision. Use the database revision RPCs through the seller Edge assistant; do not restore direct edit-form saves. Authoritative review photos come from `offer_images`, not transcript attachments.
 - Shipping and pickup are independent methods and may coexist; timing fields are integer days.
 - Offer upload helpers must normalize MIME types before Supabase Storage calls.
 - Buyer offer cards read seller reputation from DB-backed rating views/summaries, not legacy `business.rating` fields.

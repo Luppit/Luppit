@@ -100,6 +100,8 @@ function fixture() {
   const h = hooks();
   const calls: any[] = [];
   const popups: any[] = [];
+  const popupListeners = new Set<Function>();
+  let popupState: any = { config: null, visible: false };
   const reads: ReturnType<typeof deferred>[] = [];
   const executions: ReturnType<typeof deferred>[] = [];
   let focus: Function | undefined;
@@ -109,7 +111,9 @@ function fixture() {
     react: h.react,
     "@/src/icons/lucide": { lucideIcons: { smartphone: true, send: true, ellipsis: true } },
     "@/src/services/popup.service": {
-      openPopup: (popup: any) => popups.push(popup), closePopup: () => calls.push("closePopup"),
+      openPopup: (popup: any) => { popups.push(popup); popupState = { config: popup, visible: true }; popupListeners.forEach((listener) => listener(popupState)); },
+      closePopup: () => { calls.push("closePopup"); popupState = { config: null, visible: false }; popupListeners.forEach((listener) => listener(popupState)); },
+      subscribePopup: (listener: Function) => { popupListeners.add(listener); listener(popupState); return () => popupListeners.delete(listener); },
     },
     "@/src/services/conversation.service": {
       getCurrentUserConversationView: (id: string) => { calls.push(["view", id]); const d = deferred(); reads.push(d); return d.promise; },
@@ -447,4 +451,27 @@ test("actual conversation layout still routes TOP and MENU actions through the e
     assert.equal(buttons(refreshed), undefined);
     assert.equal(refreshed.props.value.messageRefreshTick, 1);
   }
+});
+
+test("an open acceptance confirmation closes when the offer revision changes", () => {
+  const f = fixture();
+  const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });
+  Object.assign(action.confirmation, { code: "BUYER_ACCEPT_OFFER_CONFIRMATION", payload_defaults: { offer_revision: "revision-one" } });
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  assert.equal(f.popups.length, 1);
+  const changed = { ...action, confirmation: { ...action.confirmation, payload_defaults: { offer_revision: "revision-two" } } };
+  f.hook({ conversationView: viewResult({ actions: [changed] }).data });
+  assert.ok(f.calls.includes("closePopup"));
+  assert.ok(f.calls.some((call) => call[0] === "showWarning" && call[1] === "La oferta cambió"));
+  assert.equal(executions(f).length, 0);
+});
+
+test("an offer refresh leaves an unrelated popup open after acceptance was dismissed", () => {
+  const f = fixture();
+  const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });
+  Object.assign(action.confirmation, { code: "BUYER_ACCEPT_OFFER_CONFIRMATION", payload_defaults: { offer_revision: "revision-one" } });
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  f.hook().handleActionPress(pickupAction());
+  f.hook({ conversationView: viewResult({ actions: [] }).data });
+  assert.ok(!f.calls.includes("closePopup"));
 });

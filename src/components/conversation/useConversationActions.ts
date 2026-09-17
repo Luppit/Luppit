@@ -3,6 +3,8 @@ import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
 import {
   closePopup,
   openPopup,
+  subscribePopup,
+  type PopupSummaryConfig,
   PopupSummaryActionOutcome,
 } from "@/src/services/popup.service";
 import {
@@ -16,7 +18,7 @@ import {
 } from "@/src/services/purchase.request.service";
 import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { router } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ConversationActionFailure = {
   message: string;
@@ -171,6 +173,21 @@ export function useConversationActions({
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const isExecutingActionRef = useRef(false);
+  const acceptancePopupRef = useRef<{ revision: unknown; config: PopupSummaryConfig } | null>(null);
+  useEffect(() => subscribePopup(({ config }) => {
+    if (config !== acceptancePopupRef.current?.config) acceptancePopupRef.current = null;
+  }), []);
+  useEffect(() => {
+    const pending = acceptancePopupRef.current;
+    if (!pending || !conversationView || isExecutingActionRef.current) return;
+    const acceptance = conversationView.actions.find((action) =>
+      action.confirmation?.code === "BUYER_ACCEPT_OFFER_CONFIRMATION");
+    if (acceptance?.confirmation?.payload_defaults.offer_revision !== pending.revision) {
+      acceptancePopupRef.current = null;
+      closePopup();
+      showWarning("La oferta cambió", "Revisa los términos actuales y vuelve a elegir el método de entrega.");
+    }
+  }, [conversationView]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
 
   const runAction = useCallback(
@@ -434,7 +451,7 @@ export function useConversationActions({
           input.options.length === 0
       );
 
-      openPopup({
+      const popupConfig: PopupSummaryConfig = {
         type: "summary",
         title: ratingInputTitle || confirmation.title,
         metadata: offerName ? toStringValue(offerName.value) : undefined,
@@ -680,7 +697,10 @@ export function useConversationActions({
             },
           },
         ],
-      });
+      };
+      acceptancePopupRef.current = isOfferAcceptance
+        ? { revision: confirmation.payload_defaults.offer_revision, config: popupConfig } : null;
+      openPopup(popupConfig);
     },
     [conversationView?.context, refreshConversation, runAction]
   );

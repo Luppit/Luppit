@@ -1,3 +1,4 @@
+import { getCurrentProfile, subscribeActiveProfile } from "@/src/services/active.profile.service";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import {
   getVisibleSellerOfferMessages,
@@ -15,49 +16,26 @@ import {
 import AssistantReviewCard, {
   type AssistantReviewNotice,
 } from "@/src/components/assistant/AssistantReviewCard";
-import ExpandableInfoCard from "@/src/components/expandableInfoCard/ExpandableInfoCard";
-import FilePicker, {
-  SelectedFile,
-} from "@/src/components/filePicker/FilePicker";
 import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
 import { useAndroidChatKeyboardVisible } from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
-import OptionsChecklistCard from "@/src/components/optionsChecklistCard/OptionsChecklistCard";
-import { Currency, getCurrencies } from "@/src/services/currency.service";
-import {
-  DeliveryCatalog,
-  getDeliveryCatalog,
-} from "@/src/services/delivery.catalog.service";
-import {
-  EditablePurchaseOfferDraft,
-  getEditablePurchaseOfferDraftByConversationId,
-  updatePurchaseOffer,
-  UpdatePurchaseOfferInput,
-} from "@/src/services/purchase.offer.service";
 import {
   callSellerOfferAssistant,
   createSellerOfferAssistantRequestIdentity,
   SellerOfferAssistantRequest,
   SellerOfferAssistantResult,
   SellerOfferAssistantSummary,
+  type SellerOfferAssistantImage,
 } from "@/src/services/purchase.offer.assistant.service";
 import { openPopup } from "@/src/services/popup.service";
-import {
-  getPurchaseRequestById,
-  PurchaseRequest,
-} from "@/src/services/purchase.request.service";
 import { Text } from "@/src/components/Text";
 import LoadingState from "@/src/components/loading/LoadingState";
-import { TextField } from "@/src/components/inputField/InputField";
-import TextArea from "@/src/components/textArea/TextArea";
-import TextFieldWithToggle from "@/src/components/textFieldWithToggle/TextFieldWithToggle";
 import { useTheme } from "@/src/themes";
-import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
+import { showError, showWarning } from "@/src/utils/useToast";
 import { MODAL_TOP_BAR_HEIGHT } from "./modal-top-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  useFocusEffect,
   useNavigation,
   usePreventRemove,
 } from "@react-navigation/native";
@@ -68,45 +46,9 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-type OfferPurchaseRequest = Pick<PurchaseRequest, "id" | "title">;
-
-function parsePurchaseRequestParam(
-  raw: string | string[] | undefined
-): OfferPurchaseRequest | null {
-  if (!raw) return null;
-  const value = Array.isArray(raw) ? raw[0] : raw;
-  try {
-    const parsed = JSON.parse(value) as Partial<PurchaseRequest>;
-    if (typeof parsed.id !== "string" || parsed.id.trim().length === 0) return null;
-
-    return {
-      id: parsed.id,
-      title: typeof parsed.title === "string" ? parsed.title : null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function normalize(value: string | null | undefined) {
-  return (value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function buildFallbackPurchaseRequest(
-  purchaseRequestId: string | null | undefined
-): OfferPurchaseRequest | null {
-  if (!purchaseRequestId) return null;
-  return { id: purchaseRequestId, title: null };
-}
 
 type AssistantMessage = {
   id: string;
@@ -224,6 +166,8 @@ function OfferSummaryCard({
   loading,
   onContinue,
   onPublish,
+  isEditMode = false,
+  changedFields = [],
 }: {
   summary: SellerOfferAssistantSummary | null;
   purchaseRequestTitle: string | null | undefined;
@@ -234,6 +178,8 @@ function OfferSummaryCard({
   loading: boolean;
   onContinue: () => void;
   onPublish: () => void;
+  isEditMode?: boolean;
+  changedFields?: string[];
 }) {
   const formattedPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
   const formattedShippingPrice = formatSummaryMoney(
@@ -278,6 +224,7 @@ function OfferSummaryCard({
   ].filter((item) => hasSummaryValue(item.value));
   const notices: AssistantReviewNotice[] = [];
   const isComplete = hasOfferPhoto && missingFields.length === 0;
+  if (isEditMode && changedFields.length) notices.push({ text: `Cambios: ${changedFields.join(", ")}.` });
 
   if (missingFields.length > 0) {
     notices.push({ text: `Falta completar: ${missingFields.join(", ")}` });
@@ -292,7 +239,7 @@ function OfferSummaryCard({
 
   return (
     <AssistantReviewCard
-      completionTitle={isComplete ? "Oferta lista" : "Oferta incompleta"}
+      completionTitle={isComplete ? isEditMode ? "Actualización lista" : "Oferta lista" : "Oferta incompleta"}
       completionDescription={isComplete
         ? "Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
         : "Completa los datos pendientes antes de enviar tu oferta."}
@@ -304,7 +251,7 @@ function OfferSummaryCard({
         value: String(item.value),
       }))}
       notices={notices}
-      primaryLabel="Enviar oferta"
+      primaryLabel={isEditMode ? "Actualizar oferta" : "Enviar oferta"}
       primaryDisabled={disabled || !isComplete}
       primaryLoading={loading}
       onPrimaryPress={onPublish}
@@ -319,12 +266,15 @@ function OfferAssistantScreen({
   conversationId,
   purchaseRequestTitle,
   requestReference,
+  mode = "create",
 }: {
   conversationId: string | null | undefined;
   purchaseRequestTitle: string | null | undefined;
   requestReference: RequestReference;
+  mode?: "create" | "edit";
 }) {
   const t = useTheme();
+  const isEditMode = mode === "edit";
   const insets = useSafeAreaInsets();
   const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
   const navigation = useNavigation();
@@ -335,7 +285,14 @@ function OfferAssistantScreen({
   const [isReadyToSend, setIsReadyToSend] = useState(false);
   const [summary, setSummary] = useState<SellerOfferAssistantSummary | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
-  const [successfulOfferPhotoCount, setSuccessfulOfferPhotoCount] = useState(0);
+  const [offerImages, setOfferImages] = useState<SellerOfferAssistantImage[]>([]);
+  const [hasChanges, setHasChanges] = useState(!isEditMode);
+  const [changedFields, setChangedFields] = useState<string[]>([]);
+  const [initialized, setInitialized] = useState(false);
+  const [conflict, setConflict] = useState<string | null>(null);
+  const versionRef = useRef<number | null>(null);
+  const offerRevisionRef = useRef<string | null>(null);
+  const successfulOfferPhotoCount = offerImages.length;
   const [showSummary, setShowSummary] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
@@ -346,13 +303,16 @@ function OfferAssistantScreen({
   const [pendingRetry, setPendingRetry] = useState<PendingAssistantRetry | null>(null);
   const [allowExit, setAllowExit] = useState(false);
   const activeRequestRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   const shownSuccessOfferIdRef = useRef<string | null>(null);
 
   const hasOfferPhoto = successfulOfferPhotoCount > 0;
   const visibleMessages = useMemo(() => getVisibleSellerOfferMessages(messages), [messages]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       const activeRequest = activeRequestRef.current;
       activeRequestRef.current = null;
       activeRequest?.abort();
@@ -401,7 +361,21 @@ function OfferAssistantScreen({
     ) => {
       if (!result.ok) {
         if (result.error.code === "PROFILE_SCOPED_REQUEST_ABORTED") return;
-        setPendingRetry({ input, successfulImageCount });
+        if (["offer_edit_unavailable", "offer_draft_closed", "offer_edit_not_allowed"].includes(result.error.code ?? "")) {
+          setAllowExit(true);
+          setStatus("cancelled");
+          showWarning("La oferta ya no se puede modificar", result.error.message);
+          router.replace({ pathname: "/(conversation)/offer", params: { conversationId, title: purchaseRequestTitle ?? "Conversación" } });
+          return;
+        }
+        if (["offer_draft_changed", "offer_changed"].includes(result.error.code ?? "")) {
+          clearReviewState();
+          if (result.conflictDraftId) setOfferDraftId(result.conflictDraftId);
+          if (result.conflictDraftVersion != null) versionRef.current = result.conflictDraftVersion;
+          setConflict(result.error.code ?? null);
+          setInitialized(false);
+          setPendingRetry(null);
+        } else setPendingRetry({ input, successfulImageCount });
         const retryText = result.retryAfterSeconds
           ? ` Puedes intentarlo de nuevo en ${result.retryAfterSeconds} segundo(s).`
           : "";
@@ -410,6 +384,13 @@ function OfferAssistantScreen({
       }
 
       setPendingRetry(null);
+      setConflict(null);
+      setInitialized(true);
+      versionRef.current = result.draftVersion;
+      offerRevisionRef.current = result.baseOfferRevision;
+      setOfferImages(result.offerImages ?? []);
+      setHasChanges(result.hasChanges);
+      setChangedFields(result.changedFields ?? []);
       if (input.uiAction === "RESTORE") {
         setMessages(
           result.messages.map((message) => ({
@@ -419,12 +400,7 @@ function OfferAssistantScreen({
             images: message.imageUrls.map((uri) => ({ uri })),
           }))
         );
-        setSuccessfulOfferPhotoCount(
-          result.messages.reduce(
-            (count, message) => count + message.imageUrls.length,
-            0
-          )
-        );
+
       }
       if (result.offerDraftId) setOfferDraftId(result.offerDraftId);
       if (result.status) setStatus(result.status);
@@ -440,9 +416,7 @@ function OfferAssistantScreen({
       } else if (result.summary) {
         setSummary(result.summary);
       }
-      if (successfulImageCount > 0) {
-        setSuccessfulOfferPhotoCount((current) => current + successfulImageCount);
-      }
+
 
       if (
         input.uiAction !== "RESTORE" &&
@@ -452,6 +426,7 @@ function OfferAssistantScreen({
       ) {
         appendAssistantMessage(result.assistantMessage);
       }
+      if (input.uiAction === "RESTORE") setShowSummary(result.uiState === "review" && isReadyResult);
       if (isSummaryAction) {
         setShowSummary(isReadyResult && result.summary !== null);
       }
@@ -471,7 +446,7 @@ function OfferAssistantScreen({
           const publishedConversationId = conversationId;
           openPopup({
             type: "success",
-            title: "¡Oferta enviada!",
+            title: isEditMode ? "¡Oferta actualizada!" : "¡Oferta enviada!",
             description:
               "El comprador ya puede revisarla. Puedes seguir su estado en la conversación.",
             actionLabel: "Ver conversación",
@@ -495,13 +470,18 @@ function OfferAssistantScreen({
         );
       }
     },
-    [appendAssistantMessage, conversationId, purchaseRequestTitle]
+    [appendAssistantMessage, clearReviewState, conversationId, purchaseRequestTitle, isEditMode]
   );
 
   const executeAssistantRequest = useCallback(
     async (input: SellerOfferAssistantRequest, successfulImageCount = 0) => {
-      if (activeRequestRef.current) return;
+      if (!mountedRef.current || activeRequestRef.current) return;
       const requestController = new AbortController();
+      const requestInput: SellerOfferAssistantRequest = {
+        ...input, mode,
+        expectedDraftVersion: input.expectedDraftVersion ?? versionRef.current,
+        expectedOfferRevision: input.expectedOfferRevision ?? offerRevisionRef.current,
+      };
       activeRequestRef.current = requestController;
       setIsBusy(true);
       setProcessingMode(
@@ -513,7 +493,7 @@ function OfferAssistantScreen({
       );
       try {
         const result = await callSellerOfferAssistant({
-          ...input,
+          ...requestInput,
           signal: requestController.signal,
         });
         if (
@@ -522,7 +502,8 @@ function OfferAssistantScreen({
         ) {
           return;
         }
-        applyAssistantResult(result, input, successfulImageCount);
+        applyAssistantResult(result, requestInput, successfulImageCount);
+        return result;
       } finally {
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
@@ -531,7 +512,7 @@ function OfferAssistantScreen({
         }
       }
     },
-    [applyAssistantResult]
+    [applyAssistantResult, mode]
   );
 
   useEffect(() => {
@@ -551,6 +532,7 @@ function OfferAssistantScreen({
         return;
       }
 
+      if (!initialized) return;
       const userText = text.trim();
       if (
         (!userText && images.length === 0) ||
@@ -591,7 +573,7 @@ function OfferAssistantScreen({
       }
 
       const input: SellerOfferAssistantRequest = {
-        prompt: userText || "Adjunto fotos reales de la oferta.",
+        prompt: userText,
         conversationId: offerDraftId ? null : conversationId,
         offerDraftId,
         uiAction: null,
@@ -603,6 +585,7 @@ function OfferAssistantScreen({
     },
     [
       clearReviewState,
+      initialized,
       conversationId,
       executeAssistantRequest,
       isReadyToSend,
@@ -614,7 +597,7 @@ function OfferAssistantScreen({
   );
 
   const handleContinue = useCallback(async () => {
-    if (!offerDraftId || activeRequestRef.current || status === "sent") return;
+    if (!initialized || conflict || !offerDraftId || activeRequestRef.current || status === "sent") return;
 
     await executeAssistantRequest({
       prompt: "",
@@ -622,9 +605,10 @@ function OfferAssistantScreen({
       uiAction: "CONTINUE",
       identity: createSellerOfferAssistantRequestIdentity("seller-offer-continue"),
     });
-  }, [executeAssistantRequest, offerDraftId, status]);
+  }, [conflict, executeAssistantRequest, initialized, offerDraftId, status]);
 
   const handlePublish = useCallback(async () => {
+    if (!initialized || conflict || !isReadyToSend || (isEditMode && !hasChanges)) return;
     if (!offerDraftId) {
       showWarning("No se pudo enviar", "Primero crea el borrador de la oferta.");
       return;
@@ -641,7 +625,7 @@ function OfferAssistantScreen({
       uiAction: "PUBLISH",
       identity: createSellerOfferAssistantRequestIdentity("seller-offer-publish"),
     });
-  }, [executeAssistantRequest, hasOfferPhoto, offerDraftId]);
+  }, [conflict, executeAssistantRequest, hasChanges, hasOfferPhoto, initialized, isEditMode, isReadyToSend, offerDraftId]);
 
   const handleRetry = useCallback(async () => {
     if (!pendingRetry) return;
@@ -649,7 +633,7 @@ function OfferAssistantScreen({
   }, [executeAssistantRequest, pendingRetry]);
 
   usePreventRemove(
-    Boolean(offerDraftId) && status !== "sent" && !allowExit,
+    Boolean(offerDraftId) && status !== "sent" && status !== "cancelled" && !allowExit,
     ({ data }) => {
       if (!offerDraftId) return;
 
@@ -659,12 +643,16 @@ function OfferAssistantScreen({
       };
 
       const discardDraft = async () => {
-        const result = await callSellerOfferAssistant({
+        const result = await executeAssistantRequest({
           prompt: "",
+          mode,
+          expectedDraftVersion: versionRef.current,
+          expectedOfferRevision: offerRevisionRef.current,
           offerDraftId,
           uiAction: "DISCARD",
           identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
         });
+        if (!result) return false;
         if (!result.ok) {
           showError("No se pudo descartar", result.error.message);
           return false;
@@ -677,7 +665,7 @@ function OfferAssistantScreen({
       Keyboard.dismiss();
       openPopup({
         type: "summary",
-        title: "¿Salir de la oferta?",
+        title: isEditMode ? "¿Salir de la modificación?" : "¿Salir de la oferta?",
         description: Platform.OS === "android" && hasComposerDraft
           ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
           : "Puedes salir y continuar después, o descartar este borrador.",
@@ -694,7 +682,7 @@ function OfferAssistantScreen({
           },
           {
             id: "discard-draft",
-            label: "Descartar",
+            label: isEditMode ? "Descartar cambios" : "Descartar",
             backgroundColorKey: "error",
             textColorKey: "backgroudWhite",
             iconColorKey: "backgroudWhite",
@@ -748,6 +736,9 @@ function OfferAssistantScreen({
         }}
       >
         <OfferRequestReference reference={requestReference} />
+        {isEditMode ? <Text variant="small" color="textMedium">
+          Cuéntame qué deseas cambiar. Los cambios son privados hasta que actualices la oferta. El comprador todavía puede aceptar la oferta actual.
+        </Text> : null}
 
         {visibleMessages.map((message) => (
           <AssistantMessageBubble key={message.id} message={message} />
@@ -781,6 +772,33 @@ function OfferAssistantScreen({
           </Pressable>
         ) : null}
 
+        {isEditMode && offerImages.length > 0 ? (
+          <View style={{ gap: t.spacing.sm }}>
+            <Text variant="small" color="textMedium">Fotos de tu oferta</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+              {offerImages.map((photo, index) => <View key={photo.storageRef} style={{ gap: t.spacing.xs }}>
+                <Image source={{ uri: photo.url }} accessibilityLabel={`Foto ${index + 1} de la oferta`}
+                  style={{ width: 96, height: 96, borderRadius: t.borders.md }} />
+                <Text variant="small">Foto {index + 1}</Text>
+              </View>)}
+            </View>
+          </View>
+        ) : null}
+        {conflict ? <View style={{ gap: t.spacing.sm }}>
+          <Text>{conflict === "offer_changed" ? "La oferta publicada cambió. Puedes descartar estos cambios y empezar con la oferta actual." : "El borrador cambió en otra sesión. Carga los últimos cambios para continuar."}</Text>
+          <Button title={conflict === "offer_changed" ? "Descartar cambios y cargar oferta" : "Cargar últimos cambios"}
+            disabled={isBusy} onPress={() => { void (async () => {
+              if (conflict === "offer_changed" && offerDraftId) {
+                const discarded = await executeAssistantRequest({ prompt: "", mode, offerDraftId,
+                  expectedDraftVersion: versionRef.current, uiAction: "DISCARD",
+                  identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard") });
+                if (!discarded) return;
+                if (!discarded.ok) { showError("No se pudo descartar", discarded.error.message); return; }
+              }
+              await executeAssistantRequest({ prompt: "", conversationId, uiAction: "RESTORE",
+                identity: createSellerOfferAssistantRequestIdentity("seller-offer-restore") });
+            })(); }} />
+        </View> : null}
         {showSummary ? (
           <OfferSummaryCard
             summary={summary}
@@ -788,8 +806,10 @@ function OfferAssistantScreen({
             offerPhotoCount={successfulOfferPhotoCount}
             missingFields={missingFields}
             hasOfferPhoto={hasOfferPhoto}
-            disabled={isBusy || !isReadyToSend}
+            disabled={isBusy || !initialized || Boolean(conflict) || !isReadyToSend || (isEditMode && !hasChanges)}
             loading={isBusy}
+            isEditMode={isEditMode}
+            changedFields={changedFields}
             onContinue={handleContinue}
             onPublish={handlePublish}
           />
@@ -811,7 +831,7 @@ function OfferAssistantScreen({
           onDraftChange={setHasComposerDraft}
           clearOnSendStart
           autoFocus={messages.length === 0}
-          disabled={isBusy}
+          disabled={isBusy || !initialized || status === "sent" || status === "cancelled"}
           busy={isBusy}
           onStop={processingMode ? handleStop : undefined}
           maxChars={4000}
@@ -819,7 +839,7 @@ function OfferAssistantScreen({
           placeholder={
             showSummary
               ? "Escribe un cambio"
-              : "Describe tu oferta o adjunta fotos reales"
+              : isEditMode ? "¿Qué deseas cambiar de tu oferta?" : "Describe tu oferta o adjunta fotos reales"
           }
           onSend={(payload) => {
             void handleSend(payload);
@@ -831,6 +851,11 @@ function OfferAssistantScreen({
 }
 
 export default function OfferScreen() {
+  const [profileId, setProfileId] = useState(() => getCurrentProfile()?.id ?? "");
+  useEffect(() => {
+    const unsubscribe = subscribeActiveProfile(() => setProfileId(getCurrentProfile()?.id ?? ""));
+    return () => { unsubscribe(); };
+  }, []);
   const params = useLocalSearchParams<{
     purchaseRequest?: string | string[];
     purchaseRequestId?: string | string[];
@@ -842,7 +867,7 @@ export default function OfferScreen() {
     : params.conversationId;
   const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
 
-  return <OfferScreenContent key={`${mode ?? "create"}:${conversationId ?? ""}`} params={params} />;
+  return <OfferScreenContent key={`${profileId}:${mode ?? "create"}:${conversationId ?? ""}`} params={params} />;
 }
 
 function OfferScreenContent({ params }: { params: {
@@ -852,550 +877,31 @@ function OfferScreenContent({ params }: { params: {
   mode?: string | string[];
 } }) {
   const t = useTheme();
-  const initialPurchaseRequest = useMemo(
-    () => parsePurchaseRequestParam(params.purchaseRequest),
-    [params.purchaseRequest]
-  );
-  const purchaseRequestId = Array.isArray(params.purchaseRequestId)
-    ? params.purchaseRequestId[0]
-    : params.purchaseRequestId;
-  const conversationId = Array.isArray(params.conversationId)
-    ? params.conversationId[0]
-    : params.conversationId;
-  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
-  const isEditMode = mode === "edit";
-  const [purchaseRequest, setPurchaseRequest] = useState<OfferPurchaseRequest | null>(
-    initialPurchaseRequest ?? buildFallbackPurchaseRequest(purchaseRequestId)
-  );
-  const [requestLoading, setRequestLoading] = useState(
-    !isEditMode || (!initialPurchaseRequest && !!purchaseRequestId)
-  );
-  const [requestReference, setRequestReference] = useState<RequestReference | null>(null);
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [requestRetry, setRequestRetry] = useState(0);
-  const [currencies, setCurrencies] = useState<Currency[]>([]);
-  const [deliveryCatalog, setDeliveryCatalog] = useState<DeliveryCatalog[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
-  const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [currencyId, setCurrencyId] = useState("");
-  const [files, setFiles] = useState<SelectedFile[]>([]);
-  const [deliveryMethods, setDeliveryMethods] = useState<string[]>([]);
-  const [pickupDelay, setPickupDelay] = useState("");
-  const [shippingCost, setShippingCost] = useState("");
-  const [shippingMaxTime, setShippingMaxTime] = useState("");
-  const [editDraft, setEditDraft] = useState<EditablePurchaseOfferDraft | null>(null);
-  const [editDraftLoading, setEditDraftLoading] = useState(isEditMode);
-  const [didApplyEditDraft, setDidApplyEditDraft] = useState(false);
-  const [initialEditValues, setInitialEditValues] = useState<string | null>(null);
-  const [isSavingOffer, setIsSavingOffer] = useState(false);
-  const editValues = JSON.stringify([
-    description, price, currencyId, files.map((file) => file.uri),
-    [...deliveryMethods].sort(), pickupDelay, shippingCost, shippingMaxTime,
-  ]);
+  const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
+  const rawMode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
+  const mode = rawMode === "edit" ? "edit" : "create";
+  const [reference, setReference] = useState<RequestReference | null>(null);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (didApplyEditDraft && initialEditValues === null) setInitialEditValues(editValues);
-  }, [didApplyEditDraft, editValues, initialEditValues]);
-  const allowNavigation = useAndroidLeaveGuard(
-    isEditMode && initialEditValues !== null && editValues !== initialEditValues,
-    isSavingOffer
-  );
-  const resolvedPurchaseRequestId = purchaseRequestId ?? editDraft?.purchaseRequestId ?? null;
-  const pickupCatalog = useMemo(
-    () => deliveryCatalog.find((item) => item.method_kind === "pickup") ?? null,
-    [deliveryCatalog]
-  );
-  const shippingCatalog = useMemo(
-    () => deliveryCatalog.find((item) => item.method_kind === "shipping") ?? null,
-    [deliveryCatalog]
-  );
-  const currencyToggleOptions = useMemo(() => {
-    return currencies.slice(0, 2).map((currency) => ({
-      label: currency.display_name ?? "-",
-      value: currency.id,
-    }));
-  }, [currencies]);
-  const canSubmitOffer =
-    description.trim().length > 0 &&
-    price.trim().length > 0 &&
-    files.length > 0 &&
-    deliveryMethods.length > 0 &&
-    currencyId.length > 0;
-
-  const loadCatalogs = useCallback(async () => {
-    setCatalogLoading(true);
-    const [currencyResult, deliveryResult] = await Promise.all([
-      getCurrencies(),
-      getDeliveryCatalog(),
-    ]);
-
-    if (currencyResult.ok) setCurrencies(currencyResult.data);
-    else setCurrencies([]);
-
-    if (deliveryResult.ok) setDeliveryCatalog(deliveryResult.data);
-    else setDeliveryCatalog([]);
-
-    setCatalogLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!isEditMode) {
-      let active = true;
-      setRequestLoading(true);
-      setRequestError(null);
-      const loadReference = async () => {
-        try {
-          const result = await getOfferRequestReference(conversationId ?? "");
-          if (!active) return;
-          if (result.ok) {
-            setPurchaseRequest(result.data);
-            setRequestReference(result.data);
-          } else {
-            setRequestError("No pudimos cargar la solicitud del comprador. Inténtalo de nuevo.");
-          }
-        } catch {
-          if (active) setRequestError("No pudimos cargar la solicitud del comprador. Inténtalo de nuevo.");
-        } finally {
-          if (active) setRequestLoading(false);
-        }
-      };
-      void loadReference();
-      return () => { active = false; };
-    }
-
-    if (initialPurchaseRequest) {
-      setPurchaseRequest(initialPurchaseRequest);
-      setRequestLoading(false);
-      return;
-    }
-
-    if (!resolvedPurchaseRequestId) {
-      setRequestLoading(false);
-      return;
-    }
-
-    setPurchaseRequest((current) =>
-      current?.id === resolvedPurchaseRequestId
-        ? current
-        : buildFallbackPurchaseRequest(resolvedPurchaseRequestId)
-    );
-
     let active = true;
-
-    const loadPurchaseRequest = async () => {
-      setRequestLoading(true);
-      const result = await getPurchaseRequestById(resolvedPurchaseRequestId);
+    setError(false);
+    setReference(null);
+    void getOfferRequestReference(conversationId ?? "").then((result) => {
       if (!active) return;
-
-      if (result?.ok) {
-        setPurchaseRequest(result.data);
-      }
-
-      setRequestLoading(false);
-    };
-
-    void loadPurchaseRequest();
-
-    return () => {
-      active = false;
-    };
-  }, [conversationId, initialPurchaseRequest, isEditMode, requestRetry, resolvedPurchaseRequestId]);
-
-  useEffect(() => {
-    void loadCatalogs();
-  }, [loadCatalogs]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadCatalogs();
-    }, [loadCatalogs])
-  );
-
-  useEffect(() => {
-    if (!isEditMode || !conversationId) {
-      setEditDraftLoading(false);
-      return;
-    }
-
-    let active = true;
-
-    const loadEditDraft = async () => {
-      setEditDraftLoading(true);
-      const result = await getEditablePurchaseOfferDraftByConversationId(conversationId);
-      if (!active) return;
-
-      if (result?.ok) {
-        setEditDraft(result.data);
-      } else if (result?.ok === false) {
-        showError("No se pudo cargar la oferta", result.error.message);
-      } else {
-        showError("No se pudo cargar la oferta", "No encontramos una oferta para editar.");
-      }
-
-      setEditDraftLoading(false);
-    };
-
-    void loadEditDraft();
-
-    return () => {
-      active = false;
-    };
-  }, [conversationId, isEditMode]);
-
-  useEffect(() => {
-    if (!isEditMode || !editDraft || didApplyEditDraft) return;
-    if (deliveryCatalog.length === 0) return;
-
-    const nextDeliveryMethodIds = [
-      editDraft.deliveryCatalogId,
-      editDraft.pickupCatalogId,
-    ].filter(
-      (id): id is string =>
-        typeof id === "string" && deliveryCatalog.some((item) => item.id === id)
-    );
-
-    setDescription(editDraft.description);
-    setPrice(
-      Number.isFinite(editDraft.price) && editDraft.price > 0
-        ? String(Math.trunc(editDraft.price))
-        : ""
-    );
-    setCurrencyId(editDraft.currencyId);
-    setFiles(editDraft.files as SelectedFile[]);
-    setDeliveryMethods(nextDeliveryMethodIds);
-    setPickupDelay(
-      editDraft.pickupAfterDays == null ? "" : String(editDraft.pickupAfterDays)
-    );
-    setShippingCost(
-      editDraft.shippingPrice == null ? "" : String(Math.trunc(editDraft.shippingPrice))
-    );
-    setShippingMaxTime(
-      editDraft.shippingMaxDays == null ? "" : String(editDraft.shippingMaxDays)
-    );
-    setDidApplyEditDraft(true);
-  }, [
-    deliveryCatalog,
-    didApplyEditDraft,
-    editDraft,
-    isEditMode,
-  ]);
-
-  useEffect(() => {
-    const firstCurrencyId = currencyToggleOptions[0]?.value ?? "";
-    if (firstCurrencyId.length === 0) return;
-
-    if (!currencyId || !currencyToggleOptions.some((option) => option.value === currencyId)) {
-      setCurrencyId(firstCurrencyId);
-    }
-  }, [currencyId, currencyToggleOptions]);
-
-  const handlePriceChange = (text: string) => {
-    setPrice(text.replace(/\D/g, ""));
-  };
-
-  const handleDeliveryMethodsChange = useCallback((selectedIds: string[]) => {
-    setDeliveryMethods(selectedIds);
-  }, []);
-
-  const selectedCurrency = currencies.find((currency) => currency.id === currencyId) ?? null;
-  const isColonCurrency = normalize(selectedCurrency?.currency_code) === "col";
-  const priceLabel = isColonCurrency ? `₡${price}` : `$${price}`;
-  const deliverySummary = deliveryMethods
-    .map((method) => {
-      const catalog = deliveryCatalog.find((item) => item.id === method);
-      const displayName = catalog?.display_name ?? "Entrega";
-      if (pickupCatalog && method === pickupCatalog.id) {
-        if (!pickupDelay) return displayName;
-        return `${displayName}: después de ${pickupDelay} día(s).`;
-      }
-      if (shippingCatalog && method === shippingCatalog.id) {
-        const details = [
-          shippingCost ? `${isColonCurrency ? "₡" : "$"}${shippingCost}` : null,
-          shippingMaxTime ? `tiempo máximo ${shippingMaxTime} día(s)` : null,
-        ].filter(Boolean);
-        return details.length ? `${displayName}: ${details.join(", ")}.` : displayName;
-      }
-      return displayName;
-    })
-    .join(" ");
-
-  const handleConfirmOffer = useCallback(async () => {
-    const isPickupSelected = Boolean(
-      pickupCatalog && deliveryMethods.includes(pickupCatalog.id)
-    );
-    const isShippingSelected = Boolean(
-      shippingCatalog && deliveryMethods.includes(shippingCatalog.id)
-    );
-    const pickupAfterDays =
-      isPickupSelected && pickupDelay ? Number(pickupDelay) : null;
-    const shippingCostValue =
-      isShippingSelected && shippingCost ? Number(shippingCost) : null;
-    const shippingMaxDays =
-      isShippingSelected && shippingMaxTime ? Number(shippingMaxTime) : null;
-
-    if (isEditMode) {
-      if (!conversationId || !editDraft?.purchaseOfferId || !editDraft.purchaseRequestId) {
-        showError("No se pudo guardar", "No encontramos la conversación de esta oferta.");
-        return;
-      }
-
-      const payload: UpdatePurchaseOfferInput = {
-        purchaseRequestId: editDraft.purchaseRequestId,
-        purchaseOfferId: editDraft.purchaseOfferId,
-        conversationId,
-        description,
-        price: Number(price),
-        currencyId,
-        deliveryCatalogId: isShippingSelected ? shippingCatalog?.id ?? null : null,
-        pickupCatalogId: isPickupSelected ? pickupCatalog?.id ?? null : null,
-        files,
-        pickupAfterDays,
-        shippingCost: shippingCostValue,
-        shippingMaxDays,
-      };
-
-      setIsSavingOffer(true);
-      try {
-        const result = await updatePurchaseOffer(payload);
-        if (!result.ok) {
-          showError("No se pudo guardar la oferta", result.error.message);
-          return;
-        }
-
-        showSuccess("Oferta actualizada");
-        await allowNavigation(() => router.replace({
-          pathname: "/(conversation)/offer",
-          params: {
-            conversationId,
-            title: purchaseRequest?.title ?? "Conversación",
-          },
-        }));
-      } finally {
-        setIsSavingOffer(false);
-      }
-      return;
-    }
-
-    showInfo("Creación desde el asistente", "La creación de ofertas ahora se hace con el asistente.");
-  }, [
-    allowNavigation,
-    conversationId,
-    currencyId,
-    deliveryMethods,
-    description,
-    editDraft?.purchaseOfferId,
-    editDraft?.purchaseRequestId,
-    files,
-    isEditMode,
-    pickupDelay,
-    pickupCatalog,
-    price,
-    purchaseRequest,
-    shippingCatalog,
-    shippingCost,
-    shippingMaxTime,
-  ]);
-
-  if (requestLoading || editDraftLoading) {
-    return (
-      <LoadingState
-        label={isEditMode ? "Cargando oferta..." : "Cargando solicitud..."}
-      />
-    );
-  }
-
-  if (requestError || !purchaseRequest) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: t.spacing.lg,
-          gap: t.spacing.md,
-        }}
-      >
-        <Text align="center" color="stateAnulated">
-          {requestError ?? "No encontramos la solicitud asociada."}
-        </Text>
-        {requestError ? <Button title="Reintentar" onPress={() => setRequestRetry((current) => current + 1)} /> : null}
-        <Button title="Volver" onPress={() => router.back()} />
-      </View>
-    );
-  }
-
-  if (!isEditMode && requestReference) {
-    return (
-      <OfferAssistantScreen
-        conversationId={conversationId}
-        purchaseRequestTitle={purchaseRequest?.title}
-        requestReference={requestReference}
-      />
-    );
-  }
-
-  return (
-    <View style={{ flex: 1 }}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingTop: t.spacing.md,
-            paddingBottom: t.spacing.xl,
-            gap: t.spacing.md,
-            flexGrow: 1,
-          }}
-        >
-        <ExpandableInfoCard
-          title="Validado por Luppit"
-          description="Luppit validará constantemente la información de la oferta, para asegurarnos de que ofreces el producto exacto de la solicitud."
-          backgroundColorKey="primary"
-          textColorKey="backgroudWhite"
-          initiallyExpanded
-        />
-
-        <TextArea
-          label="Descripción"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Describe el producto para que el comprador sepa exactamente qué recibirá. Ejemplo: Compresor original, usado, en buen estado con 3 meses de garantía."
-        />
-
-        {currencyToggleOptions.length >= 2 ? (
-          <TextFieldWithToggle<string>
-            label="Precio"
-            value={price}
-            onChangeText={handlePriceChange}
-            options={
-              currencyToggleOptions as [
-                { label: string; value: string },
-                { label: string; value: string },
-              ]
-            }
-            selectedOption={currencyId || currencyToggleOptions[0]?.value || ""}
-            onOptionChange={setCurrencyId}
-            keyboardType="number-pad"
-            inputMode="numeric"
-          />
-        ) : (
-          catalogLoading ? (
-            <LoadingState label="Cargando monedas..." variant="inline" />
-          ) : (
-            <Text color="stateAnulated">No hay monedas disponibles.</Text>
-          )
-        )}
-
-        <FilePicker
-          label="Imágenes"
-          mode="images"
-          accept={["image/*"]}
-          maxFiles={10}
-          value={files}
-          onChange={setFiles}
-        />
-
-        {deliveryCatalog.length > 0 ? (
-          <OptionsChecklistCard
-            icon="truck"
-            title="Métodos de entrega que ofreces"
-            description="Ofrece una o ambas opciones. El comprador deberá elegir y aceptar una."
-            allowMultiple
-            value={deliveryMethods}
-            onChange={handleDeliveryMethodsChange}
-            options={deliveryCatalog.map((delivery) => ({
-              id: delivery.id,
-              label: delivery.display_name ?? "-",
-              hint: delivery.hint ?? undefined,
-              content:
-                pickupCatalog && delivery.id === pickupCatalog.id ? (
-                  <View style={{ gap: t.spacing.xs }}>
-                    <TextField
-                      label="Disponible después de (días)"
-                      value={pickupDelay}
-                      onChangeText={(text) =>
-                        setPickupDelay(text.replace(/\D/g, ""))
-                      }
-                      keyboardType="number-pad"
-                      inputMode="numeric"
-                      baseContainerStyle={{ marginBottom: 0 }}
-                    />
-                  </View>
-                ) : shippingCatalog && delivery.id === shippingCatalog.id ? (
-                  <View style={{ gap: t.spacing.xs }}>
-                    <View style={{ gap: t.spacing.xs }}>
-                      <TextField
-                        label="Tiempo máximo de entrega (días)"
-                        value={shippingMaxTime}
-                        onChangeText={(text) =>
-                          setShippingMaxTime(text.replace(/\D/g, ""))
-                        }
-                        keyboardType="number-pad"
-                        inputMode="numeric"
-                        baseContainerStyle={{ marginBottom: 0 }}
-                      />
-                    </View>
-                  </View>
-                ) : undefined,
-            }))}
-          />
-        ) : (
-          catalogLoading ? (
-            <LoadingState label="Cargando métodos de entrega..." variant="inline" />
-          ) : (
-            <Text color="stateAnulated">
-              No hay métodos de entrega disponibles.
-            </Text>
-          )
-        )}
-
-        {canSubmitOffer ? (
-          <Button
-            variant="dark"
-            title={isEditMode ? "Guardar cambios" : "Enviar oferta"}
-            onPress={() =>
-              openPopup({
-                type: "summary",
-                title: isEditMode
-                  ? "Revisa la oferta antes de guardar"
-                  : "Revisa la oferta antes de publicarla",
-                icon: "file-text",
-                description:
-                  isEditMode
-                    ? "Revisa la información antes de guardar los cambios."
-                    : "Revisa la información antes de publicarla. Asegúrate de que la descripción y los detalles de la oferta sean correctos.",
-                rows: [
-                  { label: "Descripción", value: description },
-                  { label: "Precio", value: priceLabel },
-                  { label: "Método de entrega", value: deliverySummary },
-                ],
-                images: files.map((file) => ({ uri: file.uri })),
-                actions: [
-                  {
-                    id: "edit",
-                    label: "Editar",
-                    icon: "sliders-horizontal",
-                    backgroundColorKey: "backgroudWhite",
-                    textColorKey: "textDark",
-                    iconColorKey: "textDark",
-                  },
-                  {
-                    id: "publish",
-                    label: isEditMode ? "Guardar" : "Publicar",
-                    icon: "check",
-                    backgroundColorKey: "primary",
-                    textColorKey: "backgroudWhite",
-                    iconColorKey: "backgroudWhite",
-                    onPress: handleConfirmOffer,
-                  },
-                ],
-              })
-            }
-          />
-        ) : null}
-        </ScrollView>
-      </TouchableWithoutFeedback>
+      if (result.ok) setReference(result.data);
+      else setError(true);
+    }).catch(() => { if (active) setError(true); });
+    return () => { active = false; };
+  }, [conversationId, retry]);
+  if (error) return (
+    <View style={{ flex: 1, justifyContent: "center", gap: t.spacing.md }}>
+      <Text>No pudimos cargar la solicitud del comprador. Inténtalo de nuevo.</Text>
+      <Button title="Reintentar" onPress={() => setRetry((value) => value + 1)} />
+      <Button title="Volver" onPress={() => router.back()} />
     </View>
   );
+  if (!reference) return <LoadingState label="Cargando oferta..." />;
+  return <OfferAssistantScreen conversationId={conversationId} mode={mode}
+    purchaseRequestTitle={reference.title} requestReference={reference} />;
 }

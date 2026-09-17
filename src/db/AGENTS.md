@@ -49,7 +49,8 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 ## Required RPC Ownership
 - `get_or_create_seller_purchase_request_conversation` owns seller request open/reuse, buyer-profile alignment, first request summary message creation, and visualization insertion.
 - `create_seller_offer_fulfillment_from_conversation` and `update_seller_offer_fulfillment_from_conversation` own offer writes, normalized fulfillment, transition/history updates, and chat summary/image messages.
-- `get_seller_offer_edit_payload_v2` owns normalized shipping/pickup edit preload; do not add legacy or direct-table fallbacks.
+- Seller AI revisions use `begin_seller_offer_edit`, `get_seller_offer_edit_draft`, `save_seller_offer_edit_draft`, `discard_seller_offer_edit`, and `publish_seller_offer_revision`. An edit draft carries the published offer revision and its own optimistic version; it never changes the published offer until explicit publication. Preserve sent drafts and private transcripts.
+- Publication atomically writes the reviewed draft version, normalized UNIT/TOTAL pricing, fulfillment, selected photos, public summary and one update notification. Acceptance revisions include photos. The original creation draft is the only `mode=create` row per offer; revision history may contain many `mode=edit` rows.
 - `get_conversation_timeline` owns purchase-request detail timeline order, pending state, icons, and legible date labels.
 
 ## Transition Procedure Pattern

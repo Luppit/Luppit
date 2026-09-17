@@ -3,6 +3,10 @@ import { Row, TableName } from "../types";
 export const TB_OFFER_DRAFT = "offer_draft" as const satisfies TableName;
 
 export const COL_OFFER_DRAFT = {
+  mode: "mode",
+  base_offer_revision: "base_offer_revision",
+  published_offer_revision: "published_offer_revision",
+  draft_version: "draft_version",
   client_request_hash: "client_request_hash",
   client_request_id: "client_request_id",
   conversation_id: "conversation_id",

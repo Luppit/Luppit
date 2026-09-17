@@ -68,6 +68,11 @@ export const RPC_FUNCTIONS = {
     "get_seller_visible_buyer_profile" as FunctionName,
   GET_SELLER_MARKETPLACE_HUB: "get_seller_marketplace_hub",
   GET_SELLER_MARKETPLACE_HUB_ITEMS: "get_seller_marketplace_hub_items",
+  BEGIN_SELLER_OFFER_EDIT: "begin_seller_offer_edit",
+  GET_SELLER_OFFER_EDIT_DRAFT: "get_seller_offer_edit_draft",
+  SAVE_SELLER_OFFER_EDIT_DRAFT: "save_seller_offer_edit_draft",
+  DISCARD_SELLER_OFFER_EDIT: "discard_seller_offer_edit",
+  PUBLISH_SELLER_OFFER_REVISION: "publish_seller_offer_revision",
   GET_SELLER_OFFER_EDIT_PAYLOAD_V2: "get_seller_offer_edit_payload_v2",
   GET_SELLER_PURCHASE_REQUEST_FAVORITES:
     "get_seller_purchase_request_favorites",

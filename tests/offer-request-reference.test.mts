@@ -160,6 +160,7 @@ function screenFixture(params: Record<string, any> = {}) {
     "@/src/services/currency.service": { getCurrencies: async () => ({ ok: true, data: [] }) },
     "@/src/services/delivery.catalog.service": { getDeliveryCatalog: async () => ({ ok: true, data: [] }) },
     "@/src/services/popup.service": { openPopup() {} },
+    "@/src/services/active.profile.service": { getCurrentProfile: () => ({ id: "seller" }), subscribeActiveProfile: () => () => {} },
     "@/src/utils/useToast": { showError() {}, showInfo() {}, showSuccess() {}, showWarning() {} },
     "@/src/services/purchase.request.service": { getPurchaseRequestById: async (id: string) => { requestCalls.push(id); return { ok: true, data: { id, title: "Edit request" } }; } },
     "@/src/services/purchase.offer.service": { getEditablePurchaseOfferDraftByConversationId: async () => ({ ok: true, data: { purchaseRequestId: "edit-request" } }) },
@@ -177,7 +178,7 @@ function screenFixture(params: Record<string, any> = {}) {
     summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
     route: () => runtime.render(() => screen.default()),
     content: () => runtime.render(() => screen.OfferScreenContent({ params })),
-    assistant: () => runtime.render(() => screen.OfferAssistantScreen({ conversationId: "conversation-A", purchaseRequestTitle: reference.title, requestReference: reference })),
+    assistant: () => runtime.render(() => screen.OfferAssistantScreen({ conversationId: "conversation-A", purchaseRequestTitle: reference.title, requestReference: reference, mode: params.mode ?? "create" })),
   };
 }
 function aiSuccess(overrides: object = {}) {
@@ -193,6 +194,7 @@ test("seller summary control serializes the user's acknowledgement with its exis
   assert.deepEqual(body, {
     prompt: "Sí", conversation_id: null, offer_draft_id: "saved", ui_action: "SHOW_SUMMARY",
     client_request_id: identity.clientRequestId, idempotency_key: identity.idempotencyKey, active_profile_id: "seller",
+    mode: "create", expected_draft_version: null, expected_offer_revision: null,
   });
 });
 
@@ -246,11 +248,14 @@ test("changing conversation or mode remounts route state; late reads cannot appl
   assert.equal(pending.content().type, "LoadingState");
 });
 
-test("published-offer edit mode keeps its existing conversation-backed load", async () => {
+test("published-offer edit opens the same AI assistant using conversation-backed reference", async () => {
   const f = screenFixture({ conversationId: "conversation-A", mode: "edit" });
-  f.content(); await flush(); f.content(); await flush(); f.content();
-  assert.equal(f.referenceCalls.length, 0);
-  assert.deepEqual(f.requestCalls, ["edit-request"]);
+  f.content();
+  f.referenceCalls[0].response.resolve({ ok: true, data: reference });
+  await flush();
+  assert.equal(f.content().props.mode, "edit");
+  assert.equal(f.content().props.requestReference, reference);
+  assert.equal(f.requestCalls.length, 0);
 });
 
 test("reference persists through first message, images, review and corrections without entering AI input", async () => {
@@ -275,7 +280,7 @@ test("reference persists through first message, images, review and corrections w
   assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.onStop, undefined);
-  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", isReadyToSend: true, summary: { descripcion: "4 llantas" } })); await flush();
+  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", offerImages: [{ storageRef: "storage://offers/seller/photo", url: "https://example.test/photo" }], isReadyToSend: true, summary: { descripcion: "4 llantas" } })); await flush();
   assertReference();
   const review = nodes(f.assistant()).find((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard")!;
   assert.ok(review);
@@ -364,6 +369,8 @@ const offerInvitation = "Tu oferta está lista. ¿Deseas ver el resumen?";
 const offerReviewInstruction = "Aquí tienes el resumen de la oferta. ¿Deseas enviarla o seguir ajustando?";
 const readyOffer = {
   offerDraftId: "saved", status: "ready", isReadyToSend: true,
+  offerImages: [{ storageRef: "storage://offers/seller/photo", url: "https://example.test/photo" }],
+  hasChanges: true, draftVersion: 2, baseOfferRevision: "published-revision",
   summary: { descripcion: "3 llantas", precio: 55000, basePrecio: "UNIT", cantidadOfrecida: 3, precioTotal: 165000, moneda: "COL" },
 };
 const offerFailure = { ok: false, error: { type: "network", message: "Intenta de nuevo" } };
@@ -640,3 +647,86 @@ for (const outcome of ["failed", "stopped", "unmounted"] as const) {
     }
   });
 }
+
+test("edit initialization blocks composition and carries the reviewed draft version to publication", async () => {
+  const f = screenFixture({ mode: "edit" });
+  assert.equal(assistantView(f).composer.disabled, true);
+  assert.equal(f.aiCalls[0].input.mode, "edit");
+  assert.equal(f.aiCalls[0].input.uiAction, "RESTORE");
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, mode: "edit", uiState: "review", hasChanges: true }));
+  await flush();
+  const view = assistantView(f);
+  assert.equal(view.composer.disabled, false);
+  assert.ok(view.review);
+  assert.equal(view.review.isEditMode, true);
+  const pending = view.review.onPublish();
+  const call = f.aiCalls.at(-1)!;
+  assert.equal(call.input.mode, "edit");
+  assert.equal(call.input.uiAction, "PUBLISH");
+  assert.equal(call.input.expectedDraftVersion, 2);
+  assert.equal(call.input.expectedOfferRevision, "published-revision");
+  call.response.resolve(aiSuccess({ ...readyOffer, status: "sent" }));
+  await pending;
+});
+
+test("unchanged edit review cannot publish or infer photos from transcript attachments", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, hasChanges: false, offerImages: [], uiState: "review",
+    messages: [{ id: "reference-photo", role: "user", content: "Referencia", imageUrls: ["https://example.test/reference"] }] }));
+  await flush();
+  const review = assistantView(f).review;
+  assert.ok(review);
+  assert.equal(review.disabled, true);
+  assert.equal(review.offerPhotoCount, 0);
+  await review.onPublish();
+  assert.equal(f.aiCalls.length, 1);
+});
+
+test("stale edit clears review and blocks composition and publication until restored", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const publish = assistantView(f).review!.onPublish();
+  f.aiCalls.at(-1)!.response.resolve({ ok: false, error: { code: "offer_draft_changed", message: "Cambió" } });
+  await publish;
+  const view = assistantView(f);
+  assert.equal(view.composer.disabled, true);
+  assert.equal(view.review, undefined);
+  assert.ok(view.tree.some((node) => node.props.title === "Cargar últimos cambios"));
+});
+
+test("private transcript restores an attachment-only turn after that photo was removed from the offer", () => {
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": {}, "../lib/supabase/errors": {}, "./active.profile.service": {},
+  }, "\nexport { toSuccessPayload };\n");
+  const payload = service.toSuccessPayload({ mode: "edit", offer_images: [],
+    signed_images: [{ storage_ref: "storage://removed", signed_url: "https://example.test/removed" }],
+    messages: [{ id: "photo-turn", role: "user", content: "", metadata: { image_refs: ["storage://removed"] } }],
+  }, "request-1");
+  assert.equal(payload.offerImages.length, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(payload.messages)), [{ id: "photo-turn", role: "user", content: "", imageUrls: ["https://example.test/removed"] }]);
+});
+
+test("initial stale-offer conflict retains the authorized draft identity for discard and restart", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve({ ok: false, error: { code: "offer_changed", message: "La oferta cambió" }, conflictDraftId: "old-draft", conflictDraftVersion: 4 });
+  await flush();
+  const view = assistantView(f);
+  assert.equal(view.composer.disabled, true);
+  view.tree.find((node) => node.props.title === "Descartar cambios y cargar oferta")!.props.onPress();
+  const discard = f.aiCalls.at(-1)!;
+  assert.equal(discard.input.uiAction, "DISCARD");
+  assert.equal(discard.input.offerDraftId, "old-draft");
+  assert.equal(discard.input.expectedDraftVersion, 4);
+  discard.response.resolve(aiSuccess({ offerDraftId: "old-draft", status: "cancelled" }));
+  await flush();
+  const restore = f.aiCalls.at(-1)!;
+  assert.equal(restore.input.uiAction, "RESTORE");
+  assert.equal(restore.input.offerDraftId, undefined);
+  restore.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "new-draft", draftVersion: 0, hasChanges: false }));
+  await flush();
+  assert.equal(assistantView(f).composer.disabled, false);
+});

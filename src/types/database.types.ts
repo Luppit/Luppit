@@ -2431,14 +2431,18 @@ export type Database = {
       }
       offer_draft: {
         Row: {
+          base_offer_revision: string | null
           client_request_hash: string | null
           client_request_id: string | null
           conversation_id: string
           created_at: string
           data: Json
+          draft_version: number
           id: string
+          mode: string
           pending_action: string | null
           profile_id: string
+          published_offer_revision: string | null
           purchase_offer_id: string | null
           purchase_request_id: string | null
           status: string
@@ -2446,14 +2450,18 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          base_offer_revision?: string | null
           client_request_hash?: string | null
           client_request_id?: string | null
           conversation_id: string
           created_at?: string
           data: Json
+          draft_version?: number
           id?: string
+          mode?: string
           pending_action?: string | null
           profile_id: string
+          published_offer_revision?: string | null
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           status?: string
@@ -2461,14 +2469,18 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          base_offer_revision?: string | null
           client_request_hash?: string | null
           client_request_id?: string | null
           conversation_id?: string
           created_at?: string
           data?: Json
+          draft_version?: number
           id?: string
+          mode?: string
           pending_action?: string | null
           profile_id?: string
+          published_offer_revision?: string | null
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           status?: string
@@ -3939,6 +3951,46 @@ export type Database = {
       }
     }
     Functions: {
+      publish_seller_offer_revision: {
+        Args: {
+          p_expected_offer_revision: string
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      discard_seller_offer_edit: {
+        Args: {
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+        }
+        Returns: undefined
+      }
+      save_seller_offer_edit_draft: {
+        Args: {
+          p_client_request_id: string
+          p_data: Json
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+          p_prompt: string
+          p_request_hash: string
+          p_response: Json
+          p_status: string
+          p_ui_action: string
+        }
+        Returns: Json
+      }
+      get_seller_offer_edit_draft: {
+        Args: { p_offer_draft_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      begin_seller_offer_edit: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       accept_current_legal_documents: {
         Args: { p_source?: string }
         Returns: Json

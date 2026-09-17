@@ -54,7 +54,17 @@ export type SellerOfferAssistantSummary = {
   precioEnvio: number | null;
 };
 
+export type SellerOfferAssistantImage = { storageRef: string; url: string };
+
 export type SellerOfferAssistantSuccess = {
+  mode: "create" | "edit";
+  draftVersion: number | null;
+  baseOfferRevision: string | null;
+  publishedOfferRevision: string | null;
+  hasChanges: boolean;
+  changedFields: string[];
+  offerImages: SellerOfferAssistantImage[];
+  uiState: string | null;
   ok: true;
   offerDraftId: string | null;
   purchaseOfferId: string | null;
@@ -76,6 +86,8 @@ export type SellerOfferAssistantFailure = {
   requestId: string | null;
   retryAfterSeconds: number | null;
   backendMessage: string | null;
+  conflictDraftId?: string | null;
+  conflictDraftVersion?: number | null;
 };
 
 export type SellerOfferAssistantResult =
@@ -88,6 +100,9 @@ export type SellerOfferAssistantRequestIdentity = {
 };
 
 export type SellerOfferAssistantRequest = {
+  mode?: "create" | "edit";
+  expectedDraftVersion?: number | null;
+  expectedOfferRevision?: string | null;
   prompt: string;
   conversationId?: string | null;
   offerDraftId?: string | null;
@@ -245,8 +260,9 @@ function toSuccessPayload(
   requestId: string | null
 ): SellerOfferAssistantSuccess {
   const signedUrls = new Map<string, string>();
-  if (Array.isArray(payload.message_images)) {
-    payload.message_images.forEach((entry) => {
+  for (const entries of [payload.message_images, payload.signed_images]) {
+    if (!Array.isArray(entries)) continue;
+    entries.forEach((entry) => {
       if (!entry || typeof entry !== "object") return;
       const record = entry as Record<string, unknown>;
       const ref = normalizeString(record.storage_ref);
@@ -260,23 +276,38 @@ function toSuccessPayload(
         const record = entry as Record<string, unknown>;
         const role = normalizeString(record.role);
         const content = normalizeString(record.content);
-        if ((role !== "user" && role !== "assistant") || !content) return [];
+        if (role !== "user" && role !== "assistant") return [];
         const metadata = record.metadata && typeof record.metadata === "object"
           ? record.metadata as Record<string, unknown>
           : {};
         const imageUrls = normalizeStringArray(metadata.image_refs)
           .map((ref) => signedUrls.get(ref))
           .filter((url): url is string => Boolean(url));
+        if (!content && !imageUrls.length) return [];
         return [{
           id: normalizeString(record.id) ?? `restored-${index}`,
           role,
-          content,
+          content: content ?? "",
           imageUrls,
         }];
       })
     : [];
   return {
     ok: true,
+    mode: payload.mode === "edit" ? "edit" : "create",
+    draftVersion: normalizeNumber(payload.draft_version),
+    baseOfferRevision: normalizeString(payload.base_offer_revision),
+    publishedOfferRevision: normalizeString(payload.published_offer_revision),
+    hasChanges: payload.has_changes !== false,
+    changedFields: normalizeStringArray(payload.changed_fields),
+    uiState: normalizeString(payload.ui_state),
+    offerImages: Array.isArray(payload.offer_images) ? payload.offer_images.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const item = value as Record<string, unknown>;
+      const storageRef = normalizeString(item.storage_ref);
+      const url = normalizeString(item.signed_url);
+      return storageRef && url ? [{ storageRef, url }] : [];
+    }) : [],
     offerDraftId: normalizeString(payload.offer_draft_id),
     purchaseOfferId: normalizeString(payload.purchase_offer_id),
     status: (normalizeString(payload.status) as SellerOfferAssistantStatus | null) ?? null,
@@ -353,6 +384,9 @@ function buildJsonBody(
 ) {
   return JSON.stringify({
     prompt: input.prompt.trim(),
+    mode: input.mode ?? "create",
+    expected_draft_version: input.expectedDraftVersion ?? null,
+    expected_offer_revision: input.expectedOfferRevision ?? null,
     conversation_id: input.conversationId ?? null,
     offer_draft_id: input.offerDraftId ?? null,
     ui_action: input.uiAction ?? null,
@@ -369,6 +403,9 @@ function buildFormDataBody(
 ) {
   const formData = new FormData();
   formData.append("prompt", input.prompt.trim());
+  formData.append("mode", input.mode ?? "create");
+  if (input.expectedDraftVersion != null) formData.append("expected_draft_version", String(input.expectedDraftVersion));
+  if (input.expectedOfferRevision) formData.append("expected_offer_revision", input.expectedOfferRevision);
   if (input.conversationId) formData.append("conversation_id", input.conversationId);
   if (input.offerDraftId) formData.append("offer_draft_id", input.offerDraftId);
   if (input.uiAction) formData.append("ui_action", input.uiAction);
@@ -476,7 +513,8 @@ export async function callSellerOfferAssistant(
       const backendMessage = getBackendMessage(record);
       return {
         ok: false,
-        error: toStatusCodeError(response.status, backendMessage),
+        error: { ...toStatusCodeError(response.status, backendMessage),
+          code: normalizeString(record.code) ?? undefined },
         statusCode: response.status,
         requestId: requestId ?? normalizeString(record.request_id),
         retryAfterSeconds:
@@ -485,6 +523,8 @@ export async function callSellerOfferAssistant(
             ? record.retry_after_seconds
             : null),
         backendMessage,
+        conflictDraftId: normalizeString(record.offer_draft_id),
+        conflictDraftVersion: normalizeNumber(record.draft_version),
       };
     }
 
