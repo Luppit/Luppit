@@ -155,6 +155,7 @@ function screenFixture(params: Record<string, any> = {}) {
     "./modal-top-bar": { MODAL_TOP_BAR_HEIGHT: 44 },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({ borderRadius: 28 }) },
     "@/src/components/inputField/InputField": { TextField: "TextField" },
     "@/src/components/inputChat/ChatKeyboardAvoidingView": { useAndroidChatKeyboardVisible: () => false },
     "@/src/services/currency.service": { getCurrencies: async () => ({ ok: true, data: [] }) },
@@ -173,9 +174,10 @@ function screenFixture(params: Record<string, any> = {}) {
   for (const [path, name] of Object.entries({
     "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
   })) modules[`@/src/components/${path}`] = name;
-  const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard };\n");
+  const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard, OfferEditContext };\n");
   return { ...runtime, modules, referenceCalls, requestCalls, aiCalls,
     summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
+    context: (props: object) => runtime.render(() => screen.OfferEditContext({ reference, images: [], hasChanges: false, summary: null, ...props })),
     route: () => runtime.render(() => screen.default()),
     content: () => runtime.render(() => screen.OfferScreenContent({ params })),
     assistant: () => runtime.render(() => screen.OfferAssistantScreen({ conversationId: "conversation-A", purchaseRequestTitle: reference.title, requestReference: reference, mode: params.mode ?? "create" })),
@@ -729,4 +731,137 @@ test("initial stale-offer conflict retains the authorized draft identity for dis
   restore.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "new-draft", draftVersion: 0, hasChanges: false }));
   await flush();
   assert.equal(assistantView(f).composer.disabled, false);
+});
+
+test("edit context distinguishes saved private revisions and preserves UNIT versus TOTAL pricing", () => {
+  const f = screenFixture();
+  const texts = (tree: Element) => nodes(tree).filter((n) => n.type === "Text").map((n) => n.props.children.flat().join(""));
+  const summary = { ...readyOffer.summary, precio: 40000, cantidadOfrecida: 4, precioTotal: 160000 };
+  const initial = texts(f.context({ summary }));
+  assert.ok(initial.includes("Oferta actual"));
+  assert.ok(initial.includes("₡40,000 × 4"));
+  assert.ok(initial.includes("Total ₡160,000"));
+  const revised = texts(f.context({ summary: { ...summary, basePrecio: "TOTAL", precio: 150, moneda: "USD" }, hasChanges: true }));
+  assert.ok(revised.includes("Cambios propuestos"));
+  assert.ok(!revised.includes("Oferta actual"));
+  assert.ok(revised.includes("Total $150"));
+  assert.ok(!revised.some((text) => text.includes("×")), "Total pricing must not be multiplied by quantity");
+});
+
+test("edit disclosures preserve the full buyer request, conditions, fulfillment and authoritative photos", () => {
+  const f = screenFixture();
+  const photos = [...readyOffer.offerImages, { storageRef: "storage://second", url: "https://example.test/second" }];
+  const summary = { ...readyOffer.summary, descripcion: "Incluye alineado y tramado. ".repeat(20), entrega: "Envío", retiro: "Retiro", precioEnvio: null, envioMaximoDias: 3, retiroDespuesDeDias: 1 };
+  const context = () => nodes(f.context({ summary, images: photos, reference: { ...reference, text: snapshot.repeat(20) } }));
+  let tree = context();
+  assert.ok(!tree.some((n) => n.props.selectable));
+  assert.equal(tree.find((n) => n.type === "Image")?.props.source.uri, photos[0].url);
+  const request = tree.find((n) => n.props.accessibilityLabel === "Solicitud del comprador")!;
+  assert.equal(request.props.accessibilityState.expanded, false);
+  request.props.onPress();
+  tree = context();
+  assert.equal(tree.find((n) => n.props.accessibilityLabel === "Solicitud del comprador")?.props.accessibilityState.expanded, true);
+  const buyerText = tree.find((n) => n.props.selectable && n.props.children[0] === snapshot.repeat(20));
+  assert.ok(buyerText);
+  assert.equal(buyerText.props.maxLines, undefined);
+  tree.find((n) => n.props.accessibilityLabel === "Detalles de la oferta")!.props.onPress();
+  tree = context();
+  assert.ok(tree.some((n) => n.props.selectable && n.props.children[0] === summary.descripcion));
+  assert.ok(tree.some((n) => n.props.children?.includes("Envío · Retiro")));
+  assert.ok(!tree.some((n) => n.props.children?.includes("Costo de envío")));
+  assert.equal(tree.find((n) => typeof n.type === "function" && n.type.name === "OfferPhotos")?.props.images, photos);
+});
+
+test("saved edit context survives continuing or failed turns without becoming a publishable review", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, hasChanges: true, uiState: "review" }));
+  await flush();
+  const context = () => nodes(f.assistant()).find((n) => typeof n.type === "function" && n.type.name === "OfferEditContext")!.props;
+  assert.equal(context().hasChanges, true);
+  assert.equal(context().summary, readyOffer.summary);
+  const continueRequest = assistantView(f).review!.onContinue();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, uiState: "normal" }));
+  await continueRequest;
+  assert.equal(context().summary, readyOffer.summary);
+  assert.equal(assistantView(f).review, undefined);
+  assistantView(f).composer.onSend({ text: "Cambia el precio", images: [] });
+  f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await flush();
+  assert.equal(context().summary, readyOffer.summary);
+  assert.equal(assistantView(f).review, undefined);
+});
+
+test("edit disclosures do not trigger transcript scrolling, but incoming responses do", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, messages: [{ id: "old", role: "user", content: "Mensaje guardado", imageUrls: [] }] }));
+  await flush();
+  let scrolls = 0;
+  const scroll = () => nodes(f.assistant()).find((n) => n.type === "ScrollView")!.props;
+  scroll().ref.current = { scrollToEnd: () => { scrolls++; } };
+  scroll().onContentSizeChange();
+  scroll().onContentSizeChange();
+  assert.equal(scrolls, 1, "Expanding content alone must not jump to the end");
+  assistantView(f).composer.onSend({ text: "Cambia el precio", images: [] });
+  scroll().onContentSizeChange();
+  assert.equal(scrolls, 2);
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: "Precio cambiado." }));
+  await flush();
+  scroll().onContentSizeChange();
+  assert.equal(scrolls, 3);
+});
+
+test("exit popup can be dismissed to keep editing; leaving retains the draft and discard is explicit", async () => {
+  for (const action of ["exit-offer", "discard-draft"]) {
+    const f = screenFixture({ mode: "edit" });
+    let exitGuard: any;
+    let popup: any;
+    const navigations: any[] = [];
+    f.modules["@react-navigation/native"].useNavigation = () => ({ dispatch: (value: any) => navigations.push(value) });
+    f.modules["@react-navigation/native"].usePreventRemove = (enabled: boolean, callback: Function) => { exitGuard = { enabled, callback }; };
+    f.modules["@/src/services/popup.service"].openPopup = (value: any) => { popup = value; };
+    f.assistant();
+    f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer }));
+    await flush();
+    f.assistant();
+    assert.equal(exitGuard.enabled, true);
+    exitGuard.callback({ data: { action: "go-back" } });
+    assert.equal(popup.dismissOnBackdropPress, true);
+    assert.equal(popup.showCloseButton, true);
+    assert.equal(popup.actions.length, 2);
+    assert.equal(popup.actions.find((a: any) => a.id === "discard-draft").label, "Descartar");
+    assert.equal(f.aiCalls.length, 1, "Opening or dismissing the popup makes no draft mutation");
+    assert.equal(navigations.length, 0);
+    const result = popup.actions.find((a: any) => a.id === action).onPress();
+    if (action === "discard-draft") {
+      const discard = f.aiCalls.at(-1)!;
+      assert.equal(discard.input.uiAction, "DISCARD");
+      assert.equal(discard.input.expectedDraftVersion, 2);
+      discard.response.resolve(aiSuccess({ status: "cancelled" }));
+      await result;
+    } else assert.equal(f.aiCalls.length, 1, "Leaving must never discard or publish");
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    assert.deepEqual(navigations, ["go-back"]);
+    f.assistant();
+    assert.equal(exitGuard.enabled, false);
+  }
+});
+
+test("exit popup warns about unsent composer content on iOS as well as Android", async () => {
+  for (const os of ["ios", "android"]) {
+    const f = screenFixture({ mode: "edit" });
+    let exitGuard: Function;
+    let popup: any;
+    f.modules["react-native"].Platform.OS = os;
+    f.modules["@react-navigation/native"].usePreventRemove = (_enabled: boolean, callback: Function) => { exitGuard = callback; };
+    f.modules["@/src/services/popup.service"].openPopup = (value: any) => { popup = value; };
+    f.assistant();
+    f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer }));
+    await flush();
+    assistantView(f).composer.onDraftChange(true);
+    f.assistant();
+    exitGuard!({ data: { action: "go-back" } });
+    assert.match(popup.description, /todavía no hayas enviado se perderán/);
+  }
 });

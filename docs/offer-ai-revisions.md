@@ -68,3 +68,12 @@ Before deploying, source comparison found that the canonical Edge checkout lacke
 Hosted readback confirms both Modificar actions and both Cancelar actions are enabled. Runtime verification passed before and after deployment. All five new public revision RPCs allow authenticated callers and deny anonymous callers. The advisor delta consists of those five intentional authenticated SECURITY DEFINER entrypoints; ownership and eligibility are checked inside each RPC.
 
 Activation was explicitly requested to permit the user's end-to-end app testing; the remaining native and live-model checks above are still pending. No seed, database reset, user-offer mutation, app-store build, or Git remote push was performed by this deployment.
+
+
+## Offer editor UX — 2026-09-17
+
+The edit assistant leads with the saved offer photo, quantity and price. Its card is labelled **Oferta actual** while unchanged and **Cambios propuestos** after private revisions; it must never label revised draft terms as published. Offer details and the original buyer request expand independently. Expansion does not auto-scroll the transcript. The short composer prompt and initial assistant guidance stay separate from the private history. Review still shows the authoritative photo set and is the only place that can publish an update.
+
+The exit confirmation uses the existing shared summary popup without changing its component or horizontal action layout. **Descartar** is the quiet destructive action, and **Salir** retains the saved draft. The existing close control, backdrop and sheet dismissal return to editing. Unsent composer text/photos are explicitly called out on both platforms.
+
+Validation: 239 app unit tests passed, including pricing, restored draft labels, disclosures, scroll behavior, exit/discard callbacks and unsent-content copy. TypeScript, lint and diff checks passed. Native iPhone 17 Pro / iOS 26.5 inspection verified the compact editor, full conditions and buyer-request disclosures, horizontal popup, close/backdrop dismissal, leaving for the conversation and reopening the retained draft. No live message, discard or publication was performed. Android rendering, large accessibility text and software-keyboard layout remain device QA checks.

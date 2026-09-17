@@ -29,6 +29,8 @@ import {
 } from "@/src/services/purchase.offer.assistant.service";
 import { openPopup } from "@/src/services/popup.service";
 import { Text } from "@/src/components/Text";
+import { Icon } from "@/src/components/Icon";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useTheme } from "@/src/themes";
 import { showError, showWarning } from "@/src/utils/useToast";
@@ -156,31 +158,7 @@ function hasSummaryValue(value: string | number | null | undefined) {
   return value !== null && value !== undefined && value !== "";
 }
 
-function OfferSummaryCard({
-  summary,
-  purchaseRequestTitle,
-  offerPhotoCount,
-  missingFields,
-  hasOfferPhoto,
-  disabled,
-  loading,
-  onContinue,
-  onPublish,
-  isEditMode = false,
-  changedFields = [],
-}: {
-  summary: SellerOfferAssistantSummary | null;
-  purchaseRequestTitle: string | null | undefined;
-  offerPhotoCount: number;
-  missingFields: string[];
-  hasOfferPhoto: boolean;
-  disabled: boolean;
-  loading: boolean;
-  onContinue: () => void;
-  onPublish: () => void;
-  isEditMode?: boolean;
-  changedFields?: string[];
-}) {
+function getOfferSummaryDetails(summary: SellerOfferAssistantSummary | null, offerPhotoCount: number) {
   const formattedPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
   const formattedShippingPrice = formatSummaryMoney(
     summary?.precioEnvio,
@@ -195,7 +173,7 @@ function OfferSummaryCard({
   const shippingTimingText = summary?.envioMaximoDias != null
     ? `${summary.envioMaximoDias} día(s)`
     : null;
-  const details = [
+  return [
     {
       label: summary?.basePrecio === "UNIT" ? "Precio por unidad" : "Precio total",
       value: formattedPrice,
@@ -222,6 +200,151 @@ function OfferSummaryCard({
           : null,
     },
   ].filter((item) => hasSummaryValue(item.value));
+}
+
+function OfferEditContext({
+  summary,
+  images,
+  hasChanges,
+  reference,
+}: {
+  summary: SellerOfferAssistantSummary | null;
+  images: SellerOfferAssistantImage[];
+  hasChanges: boolean;
+  reference: RequestReference;
+}) {
+  const t = useTheme();
+  const [showDetails, setShowDetails] = useState(false);
+  const [showRequest, setShowRequest] = useState(false);
+  const price = formatSummaryMoney(summary?.precio, summary?.moneda);
+  const total = formatSummaryMoney(
+    summary?.basePrecio === "UNIT" ? summary.precioTotal : summary?.precio,
+    summary?.moneda
+  );
+  const quantity = summary?.cantidadOfrecida;
+  const firstPhoto = images[0];
+  const surfaceStyle = [createRoundedSurfaceStyle(t), {
+    borderWidth: 1,
+    borderColor: t.colors.border,
+    paddingHorizontal: t.spacing.md,
+  }];
+
+  return (
+    <View style={{ gap: t.spacing.md }}>
+      <View style={{ gap: t.spacing.sm }}>
+        <Text variant="small" color="textMedium" accessibilityRole="header">
+          {hasChanges ? "Cambios propuestos" : "Oferta actual"}
+        </Text>
+        <View style={surfaceStyle}>
+          <View style={{ flexDirection: "row", gap: t.spacing.md, paddingVertical: t.spacing.md }}>
+            {firstPhoto ? (
+              <View style={{ gap: t.spacing.xs, alignItems: "center" }}>
+                <Image source={{ uri: firstPhoto.url }} accessibilityLabel="Foto 1 de la oferta"
+                  resizeMode="contain" style={{ width: 96, height: 112, borderRadius: t.borders.md }} />
+                <Text variant="small" color="textMedium">Foto 1{images.length > 1 ? ` de ${images.length}` : ""}</Text>
+              </View>
+            ) : null}
+            <View style={{ flex: 1, gap: t.spacing.sm }}>
+              <Text variant="subtitle">{reference.title?.trim() || "Oferta"}</Text>
+              {summary ? (
+                <View style={{ gap: t.spacing.xs }}>
+                  {summary.basePrecio === "UNIT" && price ? (
+                    <Text>{price}{quantity != null ? ` × ${quantity}` : " por unidad"}</Text>
+                  ) : quantity != null ? <Text variant="small" color="textMedium">Cantidad: {quantity}</Text> : null}
+                  {total ? <Text variant="subtitle">Total {total}</Text> : <Text variant="small" color="textMedium">Precio pendiente</Text>}
+                </View>
+              ) : <Text variant="small" color="textMedium">Cargando detalles…</Text>}
+            </View>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Detalles de la oferta"
+            accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails((value) => !value)}
+            style={{ minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+              gap: t.spacing.sm, borderTopWidth: 1, borderTopColor: t.colors.border, paddingVertical: t.spacing.sm }}>
+            <Text>{showDetails ? "Ocultar detalles" : "Ver detalles"}</Text>
+            <Icon name={showDetails ? "chevron-up" : "chevron-down"} size={20} />
+          </Pressable>
+          {showDetails ? (
+            <View style={{ paddingBottom: t.spacing.md, gap: t.spacing.md }}>
+              <Text selectable>{summary?.descripcion || "Sin descripción todavía"}</Text>
+              {getOfferSummaryDetails(summary, images.length).map((detail) => (
+                <View key={detail.label} style={{ gap: t.spacing.xs }}>
+                  <Text variant="small" color="textMedium">{detail.label}</Text>
+                  <Text selectable>{detail.value}</Text>
+                </View>
+              ))}
+              {images.length > 1 ? <OfferPhotos images={images} /> : null}
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <View style={surfaceStyle}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Solicitud del comprador"
+          accessibilityState={{ expanded: showRequest }} onPress={() => setShowRequest((value) => !value)}
+          style={{ minHeight: 56, paddingVertical: t.spacing.sm, flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+          <Text style={{ flex: 1 }}>Solicitud del comprador</Text>
+          <Icon name={showRequest ? "chevron-up" : "chevron-down"} size={20} />
+        </Pressable>
+        {showRequest ? (
+          <View style={{ gap: t.spacing.sm, paddingBottom: t.spacing.md }}>
+            <Text variant="small" color="textMedium">
+              {reference.source === "conversation" ? "Referencia de la conversación" : "Referencia actual de la solicitud"}
+            </Text>
+            <Text selectable>{reference.text ?? "Esta solicitud no tiene título ni resumen disponibles."}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.spacing.sm }}>
+        <Icon name="lock" size={18} color={t.colors.textMedium} />
+        <View style={{ flex: 1, gap: t.spacing.xs }}>
+          <Text variant="small">Borrador privado</Text>
+          <Text variant="small" color="textMedium">El comprador todavía puede aceptar la oferta actual.</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function OfferPhotos({ images }: { images: SellerOfferAssistantImage[] }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
+      {images.map((photo, index) => (
+        <View key={photo.storageRef} style={{ gap: t.spacing.xs }}>
+          <Image source={{ uri: photo.url }} accessibilityLabel={`Foto ${index + 1} de la oferta`}
+            resizeMode="contain" style={{ width: 96, height: 96, borderRadius: t.borders.md }} />
+          <Text variant="small">Foto {index + 1}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function OfferSummaryCard({
+  summary,
+  purchaseRequestTitle,
+  offerPhotoCount,
+  missingFields,
+  hasOfferPhoto,
+  disabled,
+  loading,
+  onContinue,
+  onPublish,
+  isEditMode = false,
+  changedFields = [],
+}: {
+  summary: SellerOfferAssistantSummary | null;
+  purchaseRequestTitle: string | null | undefined;
+  offerPhotoCount: number;
+  missingFields: string[];
+  hasOfferPhoto: boolean;
+  disabled: boolean;
+  loading: boolean;
+  onContinue: () => void;
+  onPublish: () => void;
+  isEditMode?: boolean;
+  changedFields?: string[];
+}) {
+  const details = getOfferSummaryDetails(summary, offerPhotoCount);
   const notices: AssistantReviewNotice[] = [];
   const isComplete = hasOfferPhoto && missingFields.length === 0;
   if (isEditMode && changedFields.length) notices.push({ text: `Cambios: ${changedFields.join(", ")}.` });
@@ -279,11 +402,13 @@ function OfferAssistantScreen({
   const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
   const navigation = useNavigation();
   const scrollRef = useRef<ScrollView>(null);
+  const autoScrollPendingRef = useRef(true);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [offerDraftId, setOfferDraftId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isReadyToSend, setIsReadyToSend] = useState(false);
   const [summary, setSummary] = useState<SellerOfferAssistantSummary | null>(null);
+  const [contextSummary, setContextSummary] = useState<SellerOfferAssistantSummary | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [offerImages, setOfferImages] = useState<SellerOfferAssistantImage[]>([]);
   const [hasChanges, setHasChanges] = useState(!isEditMode);
@@ -383,12 +508,14 @@ function OfferAssistantScreen({
         return;
       }
 
+      autoScrollPendingRef.current = true;
       setPendingRetry(null);
       setConflict(null);
       setInitialized(true);
       versionRef.current = result.draftVersion;
       offerRevisionRef.current = result.baseOfferRevision;
       setOfferImages(result.offerImages ?? []);
+      if (result.summary) setContextSummary(result.summary);
       setHasChanges(result.hasChanges);
       setChangedFields(result.changedFields ?? []);
       if (input.uiAction === "RESTORE") {
@@ -483,6 +610,7 @@ function OfferAssistantScreen({
         expectedOfferRevision: input.expectedOfferRevision ?? offerRevisionRef.current,
       };
       activeRequestRef.current = requestController;
+      autoScrollPendingRef.current = true;
       setIsBusy(true);
       setProcessingMode(
         input.uiAction === "SHOW_SUMMARY"
@@ -666,29 +794,31 @@ function OfferAssistantScreen({
       openPopup({
         type: "summary",
         title: isEditMode ? "¿Salir de la modificación?" : "¿Salir de la oferta?",
-        description: Platform.OS === "android" && hasComposerDraft
+        description: hasComposerDraft
           ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
-          : "Puedes salir y continuar después, o descartar este borrador.",
-        dismissOnBackdropPress: false,
-        showCloseButton: Platform.OS === "android",
+          : "Tu borrador quedará guardado para continuar después.",
+        dismissOnBackdropPress: true,
+        showCloseButton: true,
         actions: [
-          {
-            id: "exit-offer",
-            label: "Salir",
-            backgroundColorKey: "backgroudWhite",
-            textColorKey: "textDark",
-            iconColorKey: "textDark",
-            onPress: closeAfterConfirmation,
-          },
           {
             id: "discard-draft",
             label: "Descartar",
-            backgroundColorKey: "error",
-            textColorKey: "backgroudWhite",
-            iconColorKey: "backgroudWhite",
+            accessibilityLabel: "Descartar borrador",
+            backgroundColorKey: "backgroudWhite",
+            textColorKey: "error",
+            iconColorKey: "error",
             disabled: isBusy,
             showPendingState: true,
             onPress: discardDraft,
+          },
+          {
+            id: "exit-offer",
+            label: "Salir",
+            accessibilityLabel: "Salir y conservar borrador",
+            backgroundColorKey: "textDark",
+            textColorKey: "backgroudWhite",
+            iconColorKey: "backgroudWhite",
+            onPress: closeAfterConfirmation,
           },
         ],
       });
@@ -722,6 +852,8 @@ function OfferAssistantScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         onContentSizeChange={() => {
+          if (!autoScrollPendingRef.current) return;
+          autoScrollPendingRef.current = false;
           if (messages.length === 0) {
             scrollRef.current?.scrollTo({ y: 0, animated: false });
           } else {
@@ -735,10 +867,19 @@ function OfferAssistantScreen({
           flexGrow: 1,
         }}
       >
-        <OfferRequestReference reference={requestReference} />
-        {isEditMode ? <Text variant="small" color="textMedium">
-          Cuéntame qué deseas cambiar. Los cambios son privados hasta que actualices la oferta. El comprador todavía puede aceptar la oferta actual.
-        </Text> : null}
+        {isEditMode ? (
+          <>
+            {initialized ? <OfferEditContext summary={contextSummary} images={offerImages}
+              hasChanges={hasChanges} reference={requestReference} /> : null}
+            {initialized && visibleMessages.length === 0 && !showSummary ? (
+              <View style={{ gap: t.spacing.sm, paddingTop: t.spacing.lg }}>
+                <Text variant="small" color="textMedium">Asistente de Luppit</Text>
+                <Text variant="subtitle">¿Qué quieres cambiar?</Text>
+                <Text>Puedes ajustar el precio, las condiciones, la entrega o las fotos.</Text>
+              </View>
+            ) : null}
+          </>
+        ) : <OfferRequestReference reference={requestReference} />}
 
         {visibleMessages.map((message) => (
           <AssistantMessageBubble key={message.id} message={message} />
@@ -772,16 +913,10 @@ function OfferAssistantScreen({
           </Pressable>
         ) : null}
 
-        {isEditMode && offerImages.length > 0 ? (
+        {isEditMode && showSummary && offerImages.length > 0 ? (
           <View style={{ gap: t.spacing.sm }}>
-            <Text variant="small" color="textMedium">Fotos de tu oferta</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-              {offerImages.map((photo, index) => <View key={photo.storageRef} style={{ gap: t.spacing.xs }}>
-                <Image source={{ uri: photo.url }} accessibilityLabel={`Foto ${index + 1} de la oferta`}
-                  style={{ width: 96, height: 96, borderRadius: t.borders.md }} />
-                <Text variant="small">Foto {index + 1}</Text>
-              </View>)}
-            </View>
+            <Text variant="small" color="textMedium">Fotos que verá el comprador</Text>
+            <OfferPhotos images={offerImages} />
           </View>
         ) : null}
         {conflict ? <View style={{ gap: t.spacing.sm }}>
@@ -830,7 +965,7 @@ function OfferAssistantScreen({
         <InputChat
           onDraftChange={setHasComposerDraft}
           clearOnSendStart
-          autoFocus={messages.length === 0}
+          autoFocus={!isEditMode && messages.length === 0}
           disabled={isBusy || !initialized || status === "sent" || status === "cancelled"}
           busy={isBusy}
           onStop={processingMode ? handleStop : undefined}
@@ -839,7 +974,7 @@ function OfferAssistantScreen({
           placeholder={
             showSummary
               ? "Escribe un cambio"
-              : isEditMode ? "¿Qué deseas cambiar de tu oferta?" : "Describe tu oferta o adjunta fotos reales"
+              : isEditMode ? "¿Qué quieres cambiar?" : "Describe tu oferta o adjunta fotos reales"
           }
           onSend={(payload) => {
             void handleSend(payload);
