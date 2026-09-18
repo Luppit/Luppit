@@ -475,3 +475,70 @@ test("an offer refresh leaves an unrelated popup open after acceptance was dismi
   f.hook({ conversationView: viewResult({ actions: [] }).data });
   assert.ok(!f.calls.includes("closePopup"));
 });
+
+function proposalAction() {
+  const action = pickupAction({ code: "BUYER_APPROVE_OFFER_CHANGE", ui_slot: "AUX" });
+  Object.assign(action.confirmation, {
+    code: "BUYER_APPROVE_OFFER_CHANGE_CONFIRMATION", title: "Cambios propuestos",
+    description_template: "La compra continuará en su etapa actual.",
+    cancel_label: "Volver", confirm_label: "Aceptar",
+    payload_defaults: { proposal_id: "proposal-one", review_revision: "review-one" },
+    fields: [{ label: "Oferta actual", value: "₡40,000 × 4" }, { label: "Oferta propuesta", value: "₡35,000 × 4" }],
+    images: [{ uri: "https://example.test/signed-proposal.jpg" }],
+  });
+  return action;
+}
+
+test("proposal review preserves comparison, photos, shared horizontal actions and server payload", async () => {
+  const f = fixture(); const action = proposalAction();
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  const popup = f.popups[0];
+  assert.deepEqual(Array.from(popup.rows, (row: any) => row.value), ["₡40,000 × 4", "₡35,000 × 4"]);
+  assert.equal(popup.images[0].uri, "https://example.test/signed-proposal.jpg");
+  assert.deepEqual(Array.from(popup.actions, (item: any) => item.label), ["Volver", "Aceptar"]);
+  assert.equal(popup.inputs.length, 0);
+  const pending = confirm(f).onPress();
+  assert.equal(executions(f)[0][1].payload.proposal_id, "proposal-one");
+  assert.equal(executions(f)[0][1].payload.review_revision, "review-one");
+  assert.equal(executions(f)[0][1].payload.fulfillment_catalog_id, undefined);
+  f.executions[0].resolve({ ok: true, data: { success_message: "Cambios aceptados" } });
+  assert.equal(await pending, true);
+});
+
+for (const change of ["replaced", "stage_changed", "closed"]) {
+  test(`open proposal review closes when ${change}`, () => {
+    const f = fixture(); const action = proposalAction();
+    f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+    const changed = { ...action, confirmation: { ...action.confirmation, payload_defaults: {
+      proposal_id: change === "replaced" ? "proposal-two" : "proposal-one", review_revision: "review-two",
+    } } };
+    f.hook({ conversationView: viewResult({ actions: change === "closed" ? [] : [changed] }).data });
+    assert.ok(f.calls.includes("closePopup"));
+    assert.equal(executions(f).length, 0);
+  });
+}
+
+for (const code of ["offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable"]) {
+  test(`proposal ${code} refreshes authoritative terms and closes stale review`, async () => {
+    const f = fixture(); const action = proposalAction();
+    f.hook().handleActionPress(action);
+    const pending = confirm(f).onPress();
+    f.executions[0].resolve({ ok: false, error: { code, message: "Revisa la compra" } });
+    assert.equal(await pending, false);
+    assert.ok(f.calls.includes("closePopup"));
+    assert.ok(f.calls.includes("refreshConversation"));
+  });
+}
+
+test("a proposal invalidated during an in-flight request closes after a generic failure", async () => {
+  const f = fixture(); const action = proposalAction();
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  const pending = confirm(f).onPress();
+  const closedView = viewResult({ actions: [] }).data;
+  f.hook({ conversationView: closedView });
+  assert.ok(!f.calls.includes("closePopup"));
+  f.executions[0].resolve({ ok: false, error: { code: "network", message: "Conexión interrumpida" } });
+  await pending;
+  f.hook({ conversationView: closedView });
+  assert.ok(f.calls.includes("closePopup"));
+});

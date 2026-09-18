@@ -143,6 +143,22 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     message:
       "Configura y verifica tu correo para recibir el código de retiro.",
   },
+  offer_proposal_changed: {
+    type: "validation",
+    message: "La propuesta o la compra cambió. Revisa los términos actuales antes de decidir.",
+  },
+  offer_proposal_closed: {
+    type: "validation",
+    message: "Esta propuesta ya se resolvió o dejó de estar disponible.",
+  },
+  offer_edit_unavailable: {
+    type: "validation",
+    message: "Esta compra ya no admite cambios. Revisa su estado en la conversación.",
+  },
+  offer_proposal_pending: {
+    type: "validation",
+    message: "Ya hay una propuesta pendiente. Retírala antes de preparar otra.",
+  },
   offer_changed: {
     type: "validation",
     message: "La oferta cambió. Revísala nuevamente antes de concretar la compra.",

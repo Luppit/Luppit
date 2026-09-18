@@ -2049,13 +2049,16 @@ export default function GlobalPopupHost() {
                               contentContainerStyle={s.summaryImageScrollContent}
                             >
                               {summaryConfig.images.map((image, index) => (
-                                <Pressable
-                                  key={`${image.uri}-${index}`}
-                                  style={s.summaryImageItem}
-                                  onPress={() => setPreviewUri(image.uri)}
-                                >
-                                  <Image source={{ uri: image.uri }} style={s.summaryImage} />
-                                </Pressable>
+                                <View key={`${image.uri}-${index}`}>
+                                  <Pressable
+                                    style={s.summaryImageItem}
+                                    onPress={() => setPreviewUri(image.uri)}
+                                    accessibilityLabel={image.caption}
+                                  >
+                                    <Image source={{ uri: image.uri }} style={s.summaryImage} />
+                                  </Pressable>
+                                  {image.caption ? <Text variant="small">{image.caption}</Text> : null}
+                                </View>
                               ))}
                             </ScrollView>
                           </View>

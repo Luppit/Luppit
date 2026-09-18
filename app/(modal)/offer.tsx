@@ -297,7 +297,7 @@ function OfferEditContext({
         <Icon name="lock" size={18} color={t.colors.textMedium} />
         <View style={{ flex: 1, gap: t.spacing.xs }}>
           <Text variant="small">Borrador privado</Text>
-          <Text variant="small" color="textMedium">El comprador todavía puede aceptar la oferta actual.</Text>
+          <Text variant="small" color="textMedium">La oferta actual sigue vigente hasta que el comprador acepte tus cambios.</Text>
         </View>
       </View>
     </View>
@@ -362,9 +362,11 @@ function OfferSummaryCard({
 
   return (
     <AssistantReviewCard
-      completionTitle={isComplete ? isEditMode ? "Actualización lista" : "Oferta lista" : "Oferta incompleta"}
+      completionTitle={isComplete ? isEditMode ? "Propuesta lista" : "Oferta lista" : "Oferta incompleta"}
       completionDescription={isComplete
-        ? "Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
+        ? isEditMode
+          ? "El comprador deberá aprobar estos cambios. La oferta actual seguirá vigente hasta entonces."
+          : "Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
         : "Completa los datos pendientes antes de enviar tu oferta."}
       isComplete={isComplete}
       title={purchaseRequestTitle?.trim() || "Oferta"}
@@ -374,7 +376,7 @@ function OfferSummaryCard({
         value: String(item.value),
       }))}
       notices={notices}
-      primaryLabel={isEditMode ? "Actualizar oferta" : "Enviar oferta"}
+      primaryLabel={isEditMode ? "Proponer cambios" : "Enviar oferta"}
       primaryDisabled={disabled || !isComplete}
       primaryLoading={loading}
       onPrimaryPress={onPublish}
@@ -486,7 +488,7 @@ function OfferAssistantScreen({
     ) => {
       if (!result.ok) {
         if (result.error.code === "PROFILE_SCOPED_REQUEST_ABORTED") return;
-        if (["offer_edit_unavailable", "offer_draft_closed", "offer_edit_not_allowed"].includes(result.error.code ?? "")) {
+        if (["offer_edit_unavailable", "offer_draft_closed", "offer_edit_not_allowed", "offer_proposal_pending"].includes(result.error.code ?? "")) {
           setAllowExit(true);
           setStatus("cancelled");
           showWarning("La oferta ya no se puede modificar", result.error.message);
@@ -573,9 +575,10 @@ function OfferAssistantScreen({
           const publishedConversationId = conversationId;
           openPopup({
             type: "success",
-            title: isEditMode ? "¡Oferta actualizada!" : "¡Oferta enviada!",
-            description:
-              "El comprador ya puede revisarla. Puedes seguir su estado en la conversación.",
+            title: isEditMode ? "¡Propuesta enviada!" : "¡Oferta enviada!",
+            description: isEditMode
+              ? "El comprador podrá aceptar o rechazar tus cambios. La oferta actual sigue vigente mientras decide."
+              : "El comprador ya puede revisarla. Puedes seguir su estado en la conversación.",
             actionLabel: "Ver conversación",
             actionBackgroundColorKey: "textDark",
             onAction: () => {

@@ -27,6 +27,7 @@ export type PopupSummaryRow = {
 
 export type PopupSummaryImage = {
   uri: string;
+  caption?: string;
 };
 
 export type PopupSummaryFeedback = {

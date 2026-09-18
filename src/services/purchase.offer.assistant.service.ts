@@ -61,6 +61,7 @@ export type SellerOfferAssistantSuccess = {
   draftVersion: number | null;
   baseOfferRevision: string | null;
   publishedOfferRevision: string | null;
+  submittedProposalId: string | null;
   hasChanges: boolean;
   changedFields: string[];
   offerImages: SellerOfferAssistantImage[];
@@ -298,6 +299,7 @@ function toSuccessPayload(
     draftVersion: normalizeNumber(payload.draft_version),
     baseOfferRevision: normalizeString(payload.base_offer_revision),
     publishedOfferRevision: normalizeString(payload.published_offer_revision),
+    submittedProposalId: normalizeString(payload.submitted_proposal_id),
     hasChanges: payload.has_changes !== false,
     changedFields: normalizeStringArray(payload.changed_fields),
     uiState: normalizeString(payload.ui_state),

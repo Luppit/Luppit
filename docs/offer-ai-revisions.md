@@ -1,79 +1,81 @@
-# Seller AI revisions before acceptance
+# Buyer-approved offer changes
 
-The seller opens `modal.offer.edit` from either **Modificar** action. The existing assistant restores a separate private edit draft from the current offer, including its real photos and normalized pricing/fulfillment. Negotiated obligations belong in the description. Leaving preserves the draft; discarding closes that draft only. Publication is an explicit **Actualizar oferta** action and retains the offer and conversation IDs.
+The seller opens **Modificar**, prepares a private AI draft, reviews it, and taps **Proponer cambios**. Submitting leaves the current offer unchanged until the buyer explicitly approves. Rejection or withdrawal preserves the existing agreement. Offer and conversation IDs remain the same.
 
-## Contracts and invariants
+## Lifecycle
 
-- The Edge request uses `mode: create | edit`, defaulting to creation. `RESTORE` begins/resumes editing without a model call. Turns carry `expected_draft_version`; publication also carries `expected_offer_revision`.
-- `offer_draft.mode`, `base_offer_revision`, `published_offer_revision`, and `draft_version` distinguish immutable historical sessions from the single active private draft. Creation uniqueness remains scoped to `mode=create`.
-- `begin_seller_offer_edit`, `get_seller_offer_edit_draft`, `save_seller_offer_edit_draft`, `discard_seller_offer_edit`, and `publish_seller_offer_revision` enforce ownership and version checks. Save and publish validate current lifecycle eligibility. Private messages never enter `conversation_message`.
-- Publication locks request → conversations → offer → draft, matching acceptance. It atomically writes the reviewed draft, UNIT/TOTAL pricing, quantity, fulfillment, selected photos, public summary and update notification. Repeated publication returns the sent draft without side effects.
-- Current photos are authoritative `offer_images`; historical attachments have separately signed URLs. Removing a current photo preserves public and private history. Restoring a removed photo requires a known canonical reference. Reference images do not satisfy readiness.
-- The acceptance revision hashes deterministic photo paths along with price, quantity, currency, description and fulfillment. A stale acceptance popup closes when the conversation refresh supplies a different revision. The buyer must review again and select a delivery method.
-- Publication emits a private `conversation_changed` invalidation for both `view` and `messages`. Offer/home lists reload through their existing focus handlers. Published summary/images share a message group starting at index 1 so the existing offer-update notification owns the push rather than generating a push per attachment.
-- Unchanged drafts cannot publish. Ineligible offers cannot be edited. A stale draft save requires restoration; an externally changed offer requires explicit discard/restart. No automatic merging or publication occurs.
+| State | Seller can propose | Effect of buyer approval |
+| --- | --- | --- |
+| OFFER_MADE | Yes | Apply proposed terms and accept the purchase with explicit delivery selection. |
+| OFFER_ACCEPTED | Yes | Amend the agreement; keep the current stage. |
+| SELLER_ACCEPTED | Yes | Amend the agreement; preserve confirmation and deadline. |
+| DELAYED_ACCEPTANCE | Yes | Amend the agreement; preserve overdue status and cancellation rights. |
+| Shipment, validated pickup, cancellation, terminal states | No | Pending proposals close; agreed history remains. |
 
-## Deployment sequence
+Eligibility also requires profile ownership, seller marketplace access, current legal acceptance, an eligible request and no interaction block. Only one pending proposal is allowed per conversation; withdraw before replacement. Before first acceptance, the buyer may accept the original offer, making a competing proposal obsolete.
 
-There are two database migrations in the sibling `luppit-supabase` repository. Keep them in separate production deployment stages:
+## Contracts
 
-1. Apply `20260917060718_offer_ai_revisions.sql` first. It creates the contracts and safeguards but leaves the edit actions disabled.
-2. Deploy the updated `ai-vendedor-completar` function from `ai-edge-functions` and the app code. Creation remains the default request mode.
-3. Complete authenticated seller/buyer end-to-end QA, including native iOS/Android input, photos, leave/resume/discard, acceptance conflicts, realtime refresh and notification navigation. Confirm actual model behavior for negotiated terms and ambiguous photos.
-4. Apply `20260917061013_enable_offer_ai_edit_actions.sql` last. It enables only the seller's two existing Modificar actions in OFFER_MADE; cancellation stays available. Fresh-install seed metadata matches this final state.
+- Edge requests use `mode: create | edit`, defaulting to creation. `RESTORE` begins/resumes without a model call. Private transcripts stay in `offer_draft_message`.
+- Draft saves use `draft_version` and `base_offer_revision`. Submission applies exactly the reviewed version. Stale saves fail; late AI responses cannot reopen sent/discarded drafts. Leaving retains the draft; **Descartar** closes only the draft.
+- `publish_seller_offer_revision` now submits an immutable `offer_change_proposal` and records `submitted_proposal_id` on the sent draft. Retries reuse the committed result. The older direct-update path cannot bypass buyer consent.
+- `resolve_offer_change_proposal` checks actor, action metadata, proposal identity, offer revision and a review token including stage and selected delivery. Proposal and agreement tables have RLS and no direct client/service-role grants; authorized RPCs expose participant-safe data.
+- Approval atomically applies UNIT/TOTAL pricing, quantity, currency, canonical description/conditions, fulfillment and photos. Immutable `offer_agreement_revision` snapshots record accepted versions. Initial purchase-acceptance side effects run once.
+- Delivery selection carries forward unless affected, then requires explicit buyer selection. Shipping cost remains optional. Pickup availability stays anchored to original seller confirmation. Operational deadlines never restart. Approval invalidates unconsumed pickup codes.
+- Transactions lock request, sibling conversations, offer, then draft/proposal. Stale acceptance/review and conflicting lifecycle actions fail safely. No automatic merge or publication occurs.
+- The offer revision includes deterministic current photo paths. Buyer review shows labelled current/proposed photos with signed references; missing photos block approval. Removing a current photo preserves historical attachments.
+- Submission/decisions broadcast both `view` and `messages`, append grouped public summaries/photos, and create one recipient notification. Pending proposals do not replace the header price. Existing focus services refresh listings.
+- Seller cancellation preserves proposal-bearing conversations/history, unlinks the cancelled offer and excludes retained offers from listings. Ordinary cancellation is preserved for conversations without proposal history.
 
-If the deployment workflow applies every pending migration, do not include the activation migration in the first release batch. Use the repository's existing protected deployment process; no production seed or database reset is needed. No old-build compatibility gate is required.
+## Presentation
 
-Rollback disables just these actions; retain published offers and all draft history:
+The existing editor, composer, disclosures and shared popup are reused. The draft card reads **Oferta actual** until edited, then **Cambios propuestos**. Review shows complete proposed terms and changed fields. Buyer review shows current/proposed terms/photos and unchanged deadline policy.
+
+Popup buttons retain the standard horizontal layout and styles. Exit uses **Salir** and **Descartar**; approval uses **Volver** and **Aceptar**. No new payment, refund, deposit, warranty or post-shipment workflow is introduced.
+
+## Deployment and rollback
+
+The initial direct-update implementation (migrations `20260917060718`, `20260917061013`, Edge v74) is superseded by `20260918005034_buyer_approved_offer_proposals.sql` and seller Edge v75. Both were deployed, database first, to the user-authorized test project `mesycgfytnbxpikcuqmb` on 2026-09-18 UTC / September 17 Costa Rica. JWT verification remains enabled. Local migration history matches the hosted timestamp. App changes are on canonical local main. No hosted seed/reset or Git remote push was performed; no older-build gate is required.
+
+Rollback disables the two seller edit actions across all states while retaining proposal/agreement data. Buyers can still resolve existing proposals:
 
 ```sql
 update public.conversation_status_role_action rule
 set is_enabled = false
 from public.conversation_action action, public.role actor
 where action.id = rule.action_id and actor.id = rule.role_id
-  and actor.role_code = 'SELLER' and rule.status_code = 'OFFER_MADE'
+  and actor.role_code = 'SELLER'
   and action.code in ('SELLER_MODIFY_OFFER', 'SELLER_MODIFY_OFFER_MENU');
 ```
 
 ## Verification
 
-App: `npm run test:unit`, `npx tsc --noEmit`, `npm run lint`, and `git diff --check`. The targeted editor tests cover initialization, reviewed-version publication, no-op drafts, stale recovery, attachment-only history, retries and stale acceptance confirmations.
+- App: 247 unit tests, TypeScript, changed-file ESLint and diff checks passed.
+- Edge: 116 seller/shared Deno tests passed with type checking.
+- Database: 1,313 pgTAP assertions across all 45 files passed on local Supabase, including 64 proposal assertions. Fixtures roll back; the test helper avoids the managed GraphQL `resolve` hook.
+- Eleven real concurrent scenarios passed: submission/acceptance both orders, GET-to-PUBLISH retry, competing draft saves, approval/rejection, approval/seller confirmation, approval/dispatch both orders, duplicate approval, withdrawal/approval, and approved proposal/stale original acceptance.
+- iOS and Android Hermes exports passed. Exports prove bundling, not device interaction.
+- Hosted readback confirmed the four action stages, RLS and absence of direct proposal/agreement table grants. Existing advisor categories remain; the authenticated resolver is an intentional SECURITY DEFINER entrypoint with internal checks.
 
-Edge: run the seller Deno tests and `deno check supabase/functions/ai-vendedor-completar/index.ts` from the Edge repository, plus `node --test supabase/tests/functions/*.test.mjs`. Model outputs are mocked in handler tests; these do not prove live model quality.
+Run app unit tests, TypeScript, changed-file ESLint and diff checks. Run seller and `_shared` Deno tests in `ai-edge-functions`. Run pgTAP and `python3 supabase/tests/concurrency/offer_ai_revisions.py` in sibling `luppit-supabase`. The concurrency runner clones/drops a disposable local database and never resets the source or connects to hosted data.
 
-Database: run `supabase test db supabase/tests/database/*.test.sql` in the sibling repository. `offer_ai_revisions.test.sql` covers price/quantity preservation, private save/replay, publication deduplication, permissions, photo replacement/history, notification/push counts, acceptance/cancellation and TOTAL quantity summaries. The activation assertions exercise both Modificar and Cancelar through the real conversation-view RPC.
+## Hosted QA fixtures
 
-Run `python3 supabase/tests/concurrency/offer_ai_revisions.py` for real simultaneous transactions. It clones the **local** Supabase database into a disposable database, preserves application functions and permissions, excludes managed cron/GraphQL extension metadata, and removes the copy afterward. It never resets the source database or connects to a hosted database. Cases: seller publication first, buyer acceptance first, duplicate publications, and competing draft saves.
+The buyer and verified **Negocio Demo Luppit S.A.** seller profiles belong to the same test account. Existing user offers were preserved. New fixture titles begin **QA · Cambios de oferta ·** and request contracts carry `qa_offer_proposals: true` for precise future cleanup. Initial terms: four tires at ₡40,000 each, shipping or pickup and an existing real tire photo.
 
-Local database testing initially found that the existing realtime stack lacked today's messages partition. A current-day partition was created only in that local stack to permit invalidation checks. This was not a production schema change. SQL tests prove event creation, not websocket receipt or OS push delivery.
+| Initial title suffix | Conversation ID |
+| --- | --- |
+| OFFER_MADE | 779fb088-1bde-42f9-b7ab-4ae198efba46 |
+| OFFER_ACCEPTED | f30ffa00-7252-4ae2-865e-fc65cc8e5aab |
+| SELLER_ACCEPTED | 87295d37-cc09-4603-9e2d-ca5e2a9be69c |
+| DELAYED_ACCEPTANCE | 4e8f7120-6aa7-471e-b153-bc998d5f28f3 |
 
-Native Expo exports verify iOS/Android bundling, not device interaction. No hosted database/Edge deployment, live model session, authenticated device end-to-end run or store build is implied by these checks.
+Titles describe initial stages; actual status may advance during testing. Android interaction and OS push receipt require separate device validation.
 
-Recorded validation for this implementation:
+## Live validation record
 
-- App: 233 unit tests passed; TypeScript and lint passed.
-- Edge: 76 seller tests and 23 shared function tests passed after integrating the existing deployed safeguards; seller function type check passed.
-- Database: 1,322 pgTAP assertions across 45 files passed, including 53 revision assertions and actual invalidation payload creation.
-- Four real concurrency scenarios passed in disposable local databases.
-- iOS and Android Hermes exports passed; this is bundle evidence only.
-- Both migrations were applied locally and subsequently deployed to the hosted project as recorded below.
-- Remaining release checks: live model behavior, authenticated native seller/buyer flows, websocket receipt, push receipt and notification navigation. An iOS simulator is available; no Android test device was connected.
+On iPhone 17 Pro / iOS 26.5, the authenticated seller restored the QA OFFER_MADE draft from the deployed function, changed unit price to ₡35,000 and added free balancing through the live AI, reviewed preserved quantity/photo/delivery and changed terms, then submitted with **Proponer cambios**. The success screen correctly stated that buyer approval is required. Hosted readback confirmed a pending proposal, current price still ₡40,000, proposed price ₡35,000 and exactly one buyer notification. The proposal is left pending for further UI testing.
 
-## Deployment record — 2026-09-17 UTC
+Role-authenticated hosted RPC smoke tests, rolled back afterward, verified approval in all four stages. Initial approval required explicit delivery selection and produced OFFER_ACCEPTED; later approvals preserved stage and the entire deadline record. Retry results and notification counts were stable; public history did not contain the private AI prompt. These are database execution checks, not mobile interaction evidence.
 
-At the user's explicit request to deploy for local-main testing, the authenticated Supabase connector applied `offer_ai_revisions` as version `20260917060718`, deployed `ai-vendedor-completar` version **74**, then applied `enable_offer_ai_edit_actions` as version `20260917061013` to `mesycgfytnbxpikcuqmb` (`LuppitDB`). The CLI lacked an access token; no credentials were copied or exposed. The migration filenames and local history were aligned with the connector-assigned versions without changing their tested SQL.
-
-Before deploying, source comparison found that the canonical Edge checkout lacked some changes already running in version 73. Those seller delivery, real-photo readiness, transcript restoration and retry safeguards were merged with the revision implementation, with their regression tests, before deploying version 74. All 14 deployed files match the final source. JWT verification remains enabled; OPTIONS returned 200 and unauthenticated POST returned 401.
-
-Hosted readback confirms both Modificar actions and both Cancelar actions are enabled. Runtime verification passed before and after deployment. All five new public revision RPCs allow authenticated callers and deny anonymous callers. The advisor delta consists of those five intentional authenticated SECURITY DEFINER entrypoints; ownership and eligibility are checked inside each RPC.
-
-Activation was explicitly requested to permit the user's end-to-end app testing; the remaining native and live-model checks above are still pending. No seed, database reset, user-offer mutation, app-store build, or Git remote push was performed by this deployment.
-
-
-## Offer editor UX — 2026-09-17
-
-The edit assistant leads with the saved offer photo, quantity and price. Its card is labelled **Oferta actual** while unchanged and **Cambios propuestos** after private revisions; it must never label revised draft terms as published. Offer details and the original buyer request expand independently. Expansion does not auto-scroll the transcript. The short composer prompt and initial assistant guidance stay separate from the private history. Review still shows the authoritative photo set and is the only place that can publish an update.
-
-The exit confirmation uses the existing shared summary popup without changing its component or horizontal action layout. Buttons match the other draft confirmations: **Salir** on the left with a white background and dark text; **Descartar** on the right with a red background and white text. **Salir** retains the saved draft. The existing close control, backdrop and sheet dismissal return to editing. Unsent composer text/photos are explicitly called out on both platforms.
-
-Validation: 239 app unit tests passed, including pricing, restored draft labels, disclosures, scroll behavior, exit/discard callbacks and unsent-content copy. TypeScript, lint and diff checks passed. Native iPhone 17 Pro / iOS 26.5 inspection verified the compact editor, full conditions and buyer-request disclosures, horizontal popup, close/backdrop dismissal, leaving for the conversation and reopening the retained draft. No live message, discard or publication was performed. Android rendering, large accessibility text and software-keyboard layout remain device QA checks.
+All 14 deployed seller function files exactly match the local source. Native buyer approval/photo comparison, cross-device websocket refresh and notification navigation remain unverified: the Mac locked after seller submission and automatic unlock failed. An unlock was requested; no lock bypass was attempted. Android interaction and OS push receipt remain separate device checks. The simulator also displayed an existing profile-switch navigation warning during QA; this change does not alter that navigation path.

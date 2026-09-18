@@ -6,6 +6,7 @@ export const COL_OFFER_DRAFT = {
   mode: "mode",
   base_offer_revision: "base_offer_revision",
   published_offer_revision: "published_offer_revision",
+  submitted_proposal_id: "submitted_proposal_id",
   draft_version: "draft_version",
   client_request_hash: "client_request_hash",
   client_request_id: "client_request_id",

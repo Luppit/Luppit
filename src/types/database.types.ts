@@ -2429,6 +2429,166 @@ export type Database = {
         }
         Relationships: []
       }
+      offer_agreement_revision: {
+        Row: {
+          accepted_by_profile_id: string | null
+          conversation_id: string
+          created_at: string
+          fulfillment_catalog_id: string
+          id: string
+          offer_revision: string
+          proposal_id: string | null
+          purchase_offer_id: string
+          terms: Json
+        }
+        Insert: {
+          accepted_by_profile_id?: string | null
+          conversation_id: string
+          created_at?: string
+          fulfillment_catalog_id: string
+          id?: string
+          offer_revision: string
+          proposal_id?: string | null
+          purchase_offer_id: string
+          terms: Json
+        }
+        Update: {
+          accepted_by_profile_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          fulfillment_catalog_id?: string
+          id?: string
+          offer_revision?: string
+          proposal_id?: string | null
+          purchase_offer_id?: string
+          terms?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_agreement_revision_accepted_by_profile_id_fkey"
+            columns: ["accepted_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_agreement_revision_accepted_by_profile_id_fkey"
+            columns: ["accepted_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_agreement_revision_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_agreement_revision_fulfillment_catalog_id_fkey"
+            columns: ["fulfillment_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_agreement_revision_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "offer_change_proposal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_agreement_revision_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_change_proposal: {
+        Row: {
+          base_offer_revision: string
+          conversation_id: string
+          created_at: string
+          current_terms: Json
+          id: string
+          offer_draft_id: string
+          proposed_terms: Json
+          purchase_offer_id: string
+          resolved_at: string | null
+          resolved_by_profile_id: string | null
+          result: Json | null
+          status: string
+        }
+        Insert: {
+          base_offer_revision: string
+          conversation_id: string
+          created_at?: string
+          current_terms: Json
+          id?: string
+          offer_draft_id: string
+          proposed_terms: Json
+          purchase_offer_id: string
+          resolved_at?: string | null
+          resolved_by_profile_id?: string | null
+          result?: Json | null
+          status?: string
+        }
+        Update: {
+          base_offer_revision?: string
+          conversation_id?: string
+          created_at?: string
+          current_terms?: Json
+          id?: string
+          offer_draft_id?: string
+          proposed_terms?: Json
+          purchase_offer_id?: string
+          resolved_at?: string | null
+          resolved_by_profile_id?: string | null
+          result?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_change_proposal_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_change_proposal_offer_draft_id_fkey"
+            columns: ["offer_draft_id"]
+            isOneToOne: true
+            referencedRelation: "offer_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_change_proposal_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_change_proposal_resolved_by_profile_id_fkey"
+            columns: ["resolved_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_change_proposal_resolved_by_profile_id_fkey"
+            columns: ["resolved_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profile_with_rating"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       offer_draft: {
         Row: {
           base_offer_revision: string | null
@@ -2446,6 +2606,7 @@ export type Database = {
           purchase_offer_id: string | null
           purchase_request_id: string | null
           status: string
+          submitted_proposal_id: string | null
           ui_state: string
           updated_at: string
         }
@@ -2465,6 +2626,7 @@ export type Database = {
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           status?: string
+          submitted_proposal_id?: string | null
           ui_state?: string
           updated_at?: string
         }
@@ -2484,6 +2646,7 @@ export type Database = {
           purchase_offer_id?: string | null
           purchase_request_id?: string | null
           status?: string
+          submitted_proposal_id?: string | null
           ui_state?: string
           updated_at?: string
         }
@@ -2521,6 +2684,13 @@ export type Database = {
             columns: ["purchase_request_id"]
             isOneToOne: false
             referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offer_draft_submitted_proposal_id_fkey"
+            columns: ["submitted_proposal_id"]
+            isOneToOne: false
+            referencedRelation: "offer_change_proposal"
             referencedColumns: ["id"]
           },
         ]
@@ -3896,6 +4066,63 @@ export type Database = {
         }
         Relationships: []
       }
+      tire_pre_registration_leads: {
+        Row: {
+          canton: string
+          client_hash: string
+          consent_version: string
+          created_at: string
+          email: string
+          id: string
+          intent_class: string | null
+          is_potential_demand: boolean | null
+          name: string
+          privacy_policy_sha256: string
+          privacy_policy_version: string
+          province: string
+          purchase_window: string
+          source: string
+          usage_intent: string
+          whatsapp: string | null
+        }
+        Insert: {
+          canton: string
+          client_hash: string
+          consent_version: string
+          created_at?: string
+          email: string
+          id?: string
+          intent_class?: string | null
+          is_potential_demand?: boolean | null
+          name: string
+          privacy_policy_sha256: string
+          privacy_policy_version: string
+          province: string
+          purchase_window: string
+          source?: string
+          usage_intent: string
+          whatsapp?: string | null
+        }
+        Update: {
+          canton?: string
+          client_hash?: string
+          consent_version?: string
+          created_at?: string
+          email?: string
+          id?: string
+          intent_class?: string | null
+          is_potential_demand?: boolean | null
+          name?: string
+          privacy_policy_sha256?: string
+          privacy_policy_version?: string
+          province?: string
+          purchase_window?: string
+          source?: string
+          usage_intent?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       ui_slot_catalog: {
         Row: {
           code: string
@@ -3951,46 +4178,6 @@ export type Database = {
       }
     }
     Functions: {
-      publish_seller_offer_revision: {
-        Args: {
-          p_expected_offer_revision: string
-          p_expected_version: number
-          p_offer_draft_id: string
-          p_profile_id: string
-        }
-        Returns: Json
-      }
-      discard_seller_offer_edit: {
-        Args: {
-          p_expected_version: number
-          p_offer_draft_id: string
-          p_profile_id: string
-        }
-        Returns: undefined
-      }
-      save_seller_offer_edit_draft: {
-        Args: {
-          p_client_request_id: string
-          p_data: Json
-          p_expected_version: number
-          p_offer_draft_id: string
-          p_profile_id: string
-          p_prompt: string
-          p_request_hash: string
-          p_response: Json
-          p_status: string
-          p_ui_action: string
-        }
-        Returns: Json
-      }
-      get_seller_offer_edit_draft: {
-        Args: { p_offer_draft_id: string; p_profile_id: string }
-        Returns: Json
-      }
-      begin_seller_offer_edit: {
-        Args: { p_conversation_id: string; p_profile_id: string }
-        Returns: Json
-      }
       accept_current_legal_documents: {
         Args: { p_source?: string }
         Returns: Json
@@ -4043,6 +4230,10 @@ export type Database = {
       }
       begin_current_user_seller_onboarding: {
         Args: { p_invitation_id?: string; p_source?: string }
+        Returns: Json
+      }
+      begin_seller_offer_edit: {
+        Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
       block_conversation_counterpart: {
@@ -4486,6 +4677,14 @@ export type Database = {
         Args: { p_invitation_id: string }
         Returns: boolean
       }
+      discard_seller_offer_edit: {
+        Args: {
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+        }
+        Returns: undefined
+      }
       dismiss_all_profile_notifications: {
         Args: { p_profile_id: string }
         Returns: Json
@@ -4609,12 +4808,12 @@ export type Database = {
           description: string
           id: string
           offer_currency_code: string
-          offer_price_summary: string | null
-          offer_product_subtotal: number | null
+          offer_price_summary: string
+          offer_product_subtotal: number
           price: number
-          price_basis: string | null
+          price_basis: string
           purchase_request_id: string
-          quantity_offered: number | null
+          quantity_offered: number
         }[]
       }
       get_buyer_purchase_request_offers_before_request_cancellation: {
@@ -4811,6 +5010,10 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_conversation_view_before_offer_proposals: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_conversation_view_before_report_inputs_20260727: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -4914,12 +5117,12 @@ export type Database = {
           description: string
           id: string
           offer_currency_code: string
-          offer_price_summary: string | null
-          offer_product_subtotal: number | null
+          offer_price_summary: string
+          offer_product_subtotal: number
           price: number
-          price_basis: string | null
+          price_basis: string
           purchase_request_id: string
-          quantity_offered: number | null
+          quantity_offered: number
           request_category_id: string
           request_category_name: string
           request_profile_name: string
@@ -5068,6 +5271,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_or_create_seller_conversation_before_winner_filter: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          privacy_purge_after: string | null
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_or_create_seller_conversation_impl_20260727: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: {
@@ -5192,6 +5415,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_seller_offer_edit_draft: {
+        Args: { p_offer_draft_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_seller_offer_edit_payload_v2: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -5302,6 +5529,15 @@ export type Database = {
         }
         Returns: string
       }
+      publish_seller_offer_revision: {
+        Args: {
+          p_expected_offer_revision: string
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       record_content_moderation_event: {
         Args: {
           p_categories?: Json
@@ -5377,9 +5613,33 @@ export type Database = {
         }
         Returns: Json
       }
+      resolve_offer_change_proposal: {
+        Args: {
+          p_action_code: string
+          p_conversation_id: string
+          p_payload?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
       revoke_current_user_business_invitation: {
         Args: { p_invitation_id: string; p_owner_profile_id: string }
         Returns: boolean
+      }
+      save_seller_offer_edit_draft: {
+        Args: {
+          p_client_request_id: string
+          p_data: Json
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+          p_prompt: string
+          p_request_hash: string
+          p_response: Json
+          p_status: string
+          p_ui_action: string
+        }
+        Returns: Json
       }
       search_category: {
         Args: { search_text: string }
@@ -5759,6 +6019,22 @@ export type Database = {
           p_profile_id: string
           p_rnp_number: string
           p_user_id: string
+        }
+        Returns: Json
+      }
+      service_submit_tire_pre_registration: {
+        Args: {
+          p_canton: string
+          p_client_hash: string
+          p_consent_version: string
+          p_email: string
+          p_name: string
+          p_privacy_policy_sha256: string
+          p_privacy_policy_version: string
+          p_province: string
+          p_purchase_window: string
+          p_usage_intent: string
+          p_whatsapp: string
         }
         Returns: Json
       }

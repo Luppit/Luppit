@@ -201,3 +201,6 @@ export { COL_ROLE, TB_ROLE } from "./role";
 export { COL_ROLE_MENU, TB_ROLE_MENU } from "./role_menu";
 export { COL_SEGMENT, TB_SEGMENT } from "./segment";
 export { COL_UI_SLOT_CATALOG, TB_UI_SLOT_CATALOG } from "./ui_slot_catalog";
+
+export { TB_OFFER_CHANGE_PROPOSAL, COL_OFFER_CHANGE_PROPOSAL } from "./offer_change_proposal";
+export { TB_OFFER_AGREEMENT_REVISION, COL_OFFER_AGREEMENT_REVISION } from "./offer_agreement_revision";

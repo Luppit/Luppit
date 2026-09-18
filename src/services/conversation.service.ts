@@ -4,6 +4,7 @@ import { FunctionName, Row } from "../db/types";
 import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
+import { getSignedStorageUrl, parseStorageImagePath, STORAGE_BUCKETS, toAbsoluteStorageUrl } from "../lib/supabase/storage";
 import { getCurrentProfileResult } from "./active.profile.service";
 
 export type Conversation = Row<"conversation">;
@@ -77,6 +78,8 @@ export type ConversationActionConfirmation = {
   fields: ConversationActionConfirmationField[];
   inputs: ConversationActionConfirmationInput[];
   payload_defaults: Record<string, unknown>;
+  review_images?: { storage_ref: string; caption: string | null }[];
+  images?: { uri: string; caption?: string }[];
   blocker: ConversationConfirmationBlocker | null;
 };
 
@@ -397,6 +400,10 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
         ? (value.payload_defaults as Record<string, unknown>)
         : {},
     blocker: parseConversationConfirmationBlocker(value.blocker),
+    review_images: Array.isArray(value.review_images) ? value.review_images.flatMap((image) => {
+      if (!image || typeof image !== "object" || typeof image.storage_ref !== "string") return [];
+      return [{ storage_ref: image.storage_ref, caption: toOptionalText(image.caption) }];
+    }) : [],
   };
 }
 
@@ -766,6 +773,25 @@ export async function getConversationView(
   const parsed = parseConversationView(data);
   if (!parsed) return { ok: false, error: fromAppError("unknown") };
 
+  await Promise.all(parsed.actions.map(async (action) => {
+    const confirmation = action.confirmation;
+    if (!confirmation?.review_images?.length) return;
+    const images = await Promise.all(confirmation.review_images.map(async (image) => {
+      const { bucket, path } = parseStorageImagePath(image.storage_ref, STORAGE_BUCKETS.offers);
+      const signed = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60);
+      const uri = signed.error ? null : toAbsoluteStorageUrl(getSignedStorageUrl(signed.data));
+      return uri ? { uri, caption: image.caption ?? undefined } : null;
+    }));
+    confirmation.images = images.filter((image): image is { uri: string; caption: string | undefined } => image !== null);
+    if (confirmation.images.length !== confirmation.review_images.length) {
+      confirmation.blocker = {
+        code: "proposal_images_unavailable",
+        message: "No se pudieron cargar todas las fotos. Actualiza la conversación antes de aceptar.",
+        action_label: null,
+        action_target: null,
+      };
+    }
+  }));
   return { ok: true, data: parsed };
 }
 

@@ -173,21 +173,20 @@ export function useConversationActions({
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const isExecutingActionRef = useRef(false);
-  const acceptancePopupRef = useRef<{ revision: unknown; config: PopupSummaryConfig } | null>(null);
+  const acceptancePopupRef = useRef<{ actionId: string; revision: string; config: PopupSummaryConfig } | null>(null);
   useEffect(() => subscribePopup(({ config }) => {
     if (config !== acceptancePopupRef.current?.config) acceptancePopupRef.current = null;
   }), []);
   useEffect(() => {
     const pending = acceptancePopupRef.current;
     if (!pending || !conversationView || isExecutingActionRef.current) return;
-    const acceptance = conversationView.actions.find((action) =>
-      action.confirmation?.code === "BUYER_ACCEPT_OFFER_CONFIRMATION");
-    if (acceptance?.confirmation?.payload_defaults.offer_revision !== pending.revision) {
+    const acceptance = conversationView.actions.find((action) => action.id === pending.actionId);
+    if (JSON.stringify(acceptance?.confirmation?.payload_defaults) !== pending.revision) {
       acceptancePopupRef.current = null;
       closePopup();
-      showWarning("La oferta cambió", "Revisa los términos actuales y vuelve a elegir el método de entrega.");
+      showWarning("La oferta cambió", "Revisa los términos actuales antes de continuar.");
     }
-  }, [conversationView]);
+  }, [conversationView, isExecutingAction]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
 
   const runAction = useCallback(
@@ -461,6 +460,7 @@ export function useConversationActions({
         descriptionPlacement: offerDescription ? "afterRows" : undefined,
         rows,
         inputs,
+        images: confirmation.images,
         blocker: confirmation.blocker
           ? {
               message: confirmation.blocker.message,
@@ -651,12 +651,12 @@ export function useConversationActions({
                 if (succeeded) return true;
 
                 const error = failure as ConversationActionFailure | null;
-                if (error?.code === "offer_changed") {
+                if (["offer_changed", "offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable"].includes(error?.code ?? "")) {
                   closePopup();
                   await refreshConversation();
                   showWarning(
                     "La oferta cambió",
-                    error.message ||
+                    error?.message ||
                       "Revísala nuevamente antes de concretar la compra."
                   );
                   return false;
@@ -698,8 +698,9 @@ export function useConversationActions({
           },
         ],
       };
-      acceptancePopupRef.current = isOfferAcceptance
-        ? { revision: confirmation.payload_defaults.offer_revision, config: popupConfig } : null;
+      acceptancePopupRef.current = typeof confirmation.payload_defaults.offer_revision === "string" ||
+        typeof confirmation.payload_defaults.review_revision === "string"
+        ? { actionId: action.id, revision: JSON.stringify(confirmation.payload_defaults), config: popupConfig } : null;
       openPopup(popupConfig);
     },
     [conversationView?.context, refreshConversation, runAction]

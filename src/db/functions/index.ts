@@ -73,6 +73,7 @@ export const RPC_FUNCTIONS = {
   SAVE_SELLER_OFFER_EDIT_DRAFT: "save_seller_offer_edit_draft",
   DISCARD_SELLER_OFFER_EDIT: "discard_seller_offer_edit",
   PUBLISH_SELLER_OFFER_REVISION: "publish_seller_offer_revision",
+  RESOLVE_OFFER_CHANGE_PROPOSAL: "resolve_offer_change_proposal",
   GET_SELLER_OFFER_EDIT_PAYLOAD_V2: "get_seller_offer_edit_payload_v2",
   GET_SELLER_PURCHASE_REQUEST_FAVORITES:
     "get_seller_purchase_request_favorites",
