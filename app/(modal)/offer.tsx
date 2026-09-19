@@ -27,10 +27,9 @@ import {
   SellerOfferAssistantSummary,
   type SellerOfferAssistantImage,
 } from "@/src/services/purchase.offer.assistant.service";
-import { openPopup } from "@/src/services/popup.service";
+import { closePopup, openPopup, subscribePopup, type PopupSummaryConfig } from "@/src/services/popup.service";
+import ConversationContextControls from "@/src/components/conversation/ConversationContextControls";
 import { Text } from "@/src/components/Text";
-import { Icon } from "@/src/components/Icon";
-import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useTheme } from "@/src/themes";
 import { showError, showWarning } from "@/src/utils/useToast";
@@ -38,6 +37,7 @@ import { MODAL_TOP_BAR_HEIGHT } from "./modal-top-bar";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  useFocusEffect,
   useNavigation,
   usePreventRemove,
 } from "@react-navigation/native";
@@ -207,100 +207,76 @@ function OfferEditContext({
   images,
   hasChanges,
   reference,
+  disabled = false,
 }: {
   summary: SellerOfferAssistantSummary | null;
   images: SellerOfferAssistantImage[];
   hasChanges: boolean;
   reference: RequestReference;
+  disabled?: boolean;
 }) {
-  const t = useTheme();
-  const [showDetails, setShowDetails] = useState(false);
-  const [showRequest, setShowRequest] = useState(false);
-  const price = formatSummaryMoney(summary?.precio, summary?.moneda);
+  const popup = useRef<PopupSummaryConfig | null>(null);
   const total = formatSummaryMoney(
     summary?.basePrecio === "UNIT" ? summary.precioTotal : summary?.precio,
     summary?.moneda
   );
-  const quantity = summary?.cantidadOfrecida;
-  const firstPhoto = images[0];
-  const surfaceStyle = [createRoundedSurfaceStyle(t), {
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    paddingHorizontal: t.spacing.md,
-  }];
+  useEffect(() => subscribePopup(({ config }) => {
+    if (config !== popup.current) popup.current = null;
+  }), []);
+  const closeContext = useCallback(() => {
+    if (popup.current) {
+      popup.current = null;
+      closePopup();
+    }
+  }, []);
+  useEffect(closeContext, [summary, images, hasChanges, reference, disabled, closeContext]);
+  useFocusEffect(useCallback(() => closeContext, [closeContext]));
+
+  const showContext = (kind: "offer" | "request") => {
+    if (disabled || (kind === "offer" && !summary)) return;
+    Keyboard.dismiss();
+    const config: PopupSummaryConfig = {
+      type: "summary",
+      title: kind === "request" ? "Solicitud del comprador" : hasChanges ? "Cambios propuestos" : "Resumen de la oferta",
+      ...(kind === "offer" ? {
+        rows: getOfferSummaryDetails(summary, 0).map((detail) => ({
+          label: detail.label,
+          value: detail.value ?? "",
+        })),
+        description: summary?.descripcion || undefined,
+        descriptionPlacement: "afterRows" as const,
+        images: images.map((photo) => ({ uri: photo.url })),
+      } : {
+        description: reference.text ?? "Esta solicitud no tiene título ni resumen disponibles.",
+      }),
+      androidBackActionId: "offer-context-close",
+      actions: [{
+        id: "offer-context-close",
+        label: "Cerrar",
+        backgroundColorKey: "backgroudWhite",
+        textColorKey: "textDark",
+      }],
+    };
+    popup.current = config;
+    openPopup(config);
+  };
 
   return (
-    <View style={{ gap: t.spacing.md }}>
-      <View style={{ gap: t.spacing.sm }}>
-        <Text variant="small" color="textMedium" accessibilityRole="header">
-          {hasChanges ? "Cambios propuestos" : "Oferta actual"}
-        </Text>
-        <View style={surfaceStyle}>
-          <View style={{ flexDirection: "row", gap: t.spacing.md, paddingVertical: t.spacing.md }}>
-            {firstPhoto ? (
-              <View style={{ gap: t.spacing.xs, alignItems: "center" }}>
-                <Image source={{ uri: firstPhoto.url }} accessibilityLabel="Foto 1 de la oferta"
-                  resizeMode="contain" style={{ width: 96, height: 112, borderRadius: t.borders.md }} />
-                <Text variant="small" color="textMedium">Foto 1{images.length > 1 ? ` de ${images.length}` : ""}</Text>
-              </View>
-            ) : null}
-            <View style={{ flex: 1, gap: t.spacing.sm }}>
-              <Text variant="subtitle">{reference.title?.trim() || "Oferta"}</Text>
-              {summary ? (
-                <View style={{ gap: t.spacing.xs }}>
-                  {summary.basePrecio === "UNIT" && price ? (
-                    <Text>{price}{quantity != null ? ` × ${quantity}` : " por unidad"}</Text>
-                  ) : quantity != null ? <Text variant="small" color="textMedium">Cantidad: {quantity}</Text> : null}
-                  {total ? <Text variant="subtitle">Total {total}</Text> : <Text variant="small" color="textMedium">Precio pendiente</Text>}
-                </View>
-              ) : <Text variant="small" color="textMedium">Cargando detalles…</Text>}
-            </View>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Detalles de la oferta"
-            accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails((value) => !value)}
-            style={{ minHeight: 48, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-              gap: t.spacing.sm, borderTopWidth: 1, borderTopColor: t.colors.border, paddingVertical: t.spacing.sm }}>
-            <Text>{showDetails ? "Ocultar detalles" : "Ver detalles"}</Text>
-            <Icon name={showDetails ? "chevron-up" : "chevron-down"} size={20} />
-          </Pressable>
-          {showDetails ? (
-            <View style={{ paddingBottom: t.spacing.md, gap: t.spacing.md }}>
-              <Text selectable>{summary?.descripcion || "Sin descripción todavía"}</Text>
-              {getOfferSummaryDetails(summary, images.length).map((detail) => (
-                <View key={detail.label} style={{ gap: t.spacing.xs }}>
-                  <Text variant="small" color="textMedium">{detail.label}</Text>
-                  <Text selectable>{detail.value}</Text>
-                </View>
-              ))}
-              {images.length > 1 ? <OfferPhotos images={images} /> : null}
-            </View>
-          ) : null}
-        </View>
-      </View>
-      <View style={surfaceStyle}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Solicitud del comprador"
-          accessibilityState={{ expanded: showRequest }} onPress={() => setShowRequest((value) => !value)}
-          style={{ minHeight: 56, paddingVertical: t.spacing.sm, flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
-          <Text style={{ flex: 1 }}>Solicitud del comprador</Text>
-          <Icon name={showRequest ? "chevron-up" : "chevron-down"} size={20} />
-        </Pressable>
-        {showRequest ? (
-          <View style={{ gap: t.spacing.sm, paddingBottom: t.spacing.md }}>
-            <Text variant="small" color="textMedium">
-              {reference.source === "conversation" ? "Referencia de la conversación" : "Referencia actual de la solicitud"}
-            </Text>
-            <Text selectable>{reference.text ?? "Esta solicitud no tiene título ni resumen disponibles."}</Text>
-          </View>
-        ) : null}
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.spacing.sm }}>
-        <Icon name="lock" size={18} color={t.colors.textMedium} />
-        <View style={{ flex: 1, gap: t.spacing.xs }}>
-          <Text variant="small">Borrador privado</Text>
-          <Text variant="small" color="textMedium">La oferta actual sigue vigente hasta que el comprador acepte tus cambios.</Text>
-        </View>
-      </View>
-    </View>
+    <ConversationContextControls
+      price={total}
+      primary={{
+        label: "Oferta",
+        accessibilityLabel: hasChanges ? "Resumen de los cambios propuestos" : "Resumen de la oferta",
+        onPress: () => showContext("offer"),
+        disabled: disabled || !summary,
+      }}
+      secondary={{
+        label: "Solicitud",
+        accessibilityLabel: "Solicitud del comprador",
+        onPress: () => showContext("request"),
+        disabled,
+      }}
+    />
   );
 }
 
@@ -312,7 +288,6 @@ function OfferPhotos({ images }: { images: SellerOfferAssistantImage[] }) {
         <View key={photo.storageRef} style={{ gap: t.spacing.xs }}>
           <Image source={{ uri: photo.url }} accessibilityLabel={`Foto ${index + 1} de la oferta`}
             resizeMode="contain" style={{ width: 96, height: 96, borderRadius: t.borders.md }} />
-          <Text variant="small">Foto {index + 1}</Text>
         </View>
       ))}
     </View>
@@ -848,6 +823,13 @@ function OfferAssistantScreen({
 
   return (
     <View style={{ flex: 1 }}>
+      {isEditMode ? (
+        <View style={{ paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.sm, paddingBottom: t.spacing.sm }}>
+          <OfferEditContext summary={contextSummary} images={offerImages}
+            hasChanges={hasChanges} reference={requestReference}
+            disabled={isBusy || !initialized || Boolean(conflict) || status === "sent" || status === "cancelled"} />
+        </View>
+      ) : null}
       <ScrollView
         ref={scrollRef}
         keyboardDismissMode="interactive"
@@ -863,24 +845,19 @@ function OfferAssistantScreen({
           }
         }}
         contentContainerStyle={{
-          paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
+          paddingTop: isEditMode ? t.spacing.lg : insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
           paddingBottom: t.spacing.lg,
           gap: t.spacing.md,
           flexGrow: 1,
         }}
       >
         {isEditMode ? (
-          <>
-            {initialized ? <OfferEditContext summary={contextSummary} images={offerImages}
-              hasChanges={hasChanges} reference={requestReference} /> : null}
-            {initialized && visibleMessages.length === 0 && !showSummary ? (
-              <View style={{ gap: t.spacing.sm, paddingTop: t.spacing.lg }}>
-                <Text variant="small" color="textMedium">Asistente de Luppit</Text>
-                <Text variant="subtitle">¿Qué quieres cambiar?</Text>
-                <Text>Puedes ajustar el precio, las condiciones, la entrega o las fotos.</Text>
-              </View>
-            ) : null}
-          </>
+          initialized && visibleMessages.length === 0 && !showSummary ? (
+            <View style={{ gap: t.spacing.md, paddingTop: t.spacing.lg }}>
+              <Text variant="title">¿Qué quieres cambiar?</Text>
+              <Text color="textMedium">Cuéntame el cambio. Mantendré el resto de la oferta.</Text>
+            </View>
+          ) : null
         ) : <OfferRequestReference reference={requestReference} />}
 
         {visibleMessages.map((message) => (
@@ -956,6 +933,7 @@ function OfferAssistantScreen({
       <View
         style={{
           paddingTop: t.spacing.sm,
+          gap: t.spacing.md,
           paddingBottom:
             Platform.OS === "ios"
               ? Math.max(insets.bottom + t.spacing.sm, t.spacing.lg)
@@ -964,6 +942,9 @@ function OfferAssistantScreen({
                 : t.spacing.sm,
         }}
       >
+        {isEditMode && initialized && visibleMessages.length === 0 && !showSummary ? (
+          <Text variant="small" color="textMedium">Solo tú ves este borrador. El comprador debe aceptar los cambios.</Text>
+        ) : null}
         <InputChat
           onDraftChange={setHasComposerDraft}
           clearOnSendStart

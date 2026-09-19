@@ -143,6 +143,9 @@ function screenFixture(params: Record<string, any> = {}) {
   const referenceCalls: { id: string; response: ReturnType<typeof deferred> }[] = [];
   const aiCalls: { input: any; response: ReturnType<typeof deferred> }[] = [];
   const requestCalls: string[] = [];
+  const popupListeners = new Set<(state: any) => void>();
+  let popup: any = null;
+  const setPopup = (config: any) => { popup = config; popupListeners.forEach((listener) => listener({ config })); };
   const modules: Record<string, any> = {
     react: runtime.react,
     "../../src/utils/assistantSummaryReply": assistantSummaryReply,
@@ -151,7 +154,7 @@ function screenFixture(params: Record<string, any> = {}) {
     "@/src/themes": { useTheme: () => theme },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
     "expo-router": { router: { back() {}, replace() {} }, useLocalSearchParams: () => params },
-    "@react-navigation/native": { useNavigation: () => ({}), useFocusEffect() {}, usePreventRemove() {} },
+    "@react-navigation/native": { useNavigation: () => ({}), useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]), usePreventRemove() {} },
     "./modal-top-bar": { MODAL_TOP_BAR_HEIGHT: 44 },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/Icon": { Icon: "Icon" },
@@ -160,7 +163,11 @@ function screenFixture(params: Record<string, any> = {}) {
     "@/src/components/inputChat/ChatKeyboardAvoidingView": { useAndroidChatKeyboardVisible: () => false },
     "@/src/services/currency.service": { getCurrencies: async () => ({ ok: true, data: [] }) },
     "@/src/services/delivery.catalog.service": { getDeliveryCatalog: async () => ({ ok: true, data: [] }) },
-    "@/src/services/popup.service": { openPopup() {} },
+    "@/src/services/popup.service": {
+      openPopup: setPopup,
+      closePopup: () => setPopup(null),
+      subscribePopup: (listener: (state: any) => void) => { popupListeners.add(listener); return () => popupListeners.delete(listener); },
+    },
     "@/src/services/active.profile.service": { getCurrentProfile: () => ({ id: "seller" }), subscribeActiveProfile: () => () => {} },
     "@/src/utils/useToast": { showError() {}, showInfo() {}, showSuccess() {}, showWarning() {} },
     "@/src/services/purchase.request.service": { getPurchaseRequestById: async (id: string) => { requestCalls.push(id); return { ok: true, data: { id, title: "Edit request" } }; } },
@@ -172,10 +179,10 @@ function screenFixture(params: Record<string, any> = {}) {
     },
   };
   for (const [path, name] of Object.entries({
-    "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
+    "conversation/ConversationContextControls": "ContextControls", "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
   })) modules[`@/src/components/${path}`] = name;
   const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard, OfferEditContext };\n");
-  return { ...runtime, modules, referenceCalls, requestCalls, aiCalls,
+  return { ...runtime, modules, referenceCalls, requestCalls, aiCalls, get popup() { return popup; },
     summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
     context: (props: object) => runtime.render(() => screen.OfferEditContext({ reference, images: [], hasChanges: false, summary: null, ...props })),
     route: () => runtime.render(() => screen.default()),
@@ -733,43 +740,68 @@ test("initial stale-offer conflict retains the authorized draft identity for dis
   assert.equal(assistantView(f).composer.disabled, false);
 });
 
-test("edit context distinguishes saved private revisions and preserves UNIT versus TOTAL pricing", () => {
+test("edit summaries preserve UNIT versus TOTAL pricing without turning context into a publish action", () => {
   const f = screenFixture();
-  const texts = (tree: Element) => nodes(tree).filter((n) => n.type === "Text").map((n) => n.props.children.flat().join(""));
   const summary = { ...readyOffer.summary, precio: 40000, cantidadOfrecida: 4, precioTotal: 160000 };
-  const initial = texts(f.context({ summary }));
-  assert.ok(initial.includes("Oferta actual"));
-  assert.ok(initial.includes("₡40,000 × 4"));
-  assert.ok(initial.includes("Total ₡160,000"));
-  const revised = texts(f.context({ summary: { ...summary, basePrecio: "TOTAL", precio: 150, moneda: "USD" }, hasChanges: true }));
-  assert.ok(revised.includes("Cambios propuestos"));
-  assert.ok(!revised.includes("Oferta actual"));
-  assert.ok(revised.includes("Total $150"));
-  assert.ok(!revised.some((text) => text.includes("×")), "Total pricing must not be multiplied by quantity");
+  const initial = f.context({ summary }).props;
+  assert.equal(initial.price, "₡160,000");
+  assert.equal(initial.primary.label, "Oferta");
+  initial.primary.onPress();
+  assert.equal(f.popup.title, "Resumen de la oferta");
+  assert.equal(f.popup.rows.find((r: any) => r.label === "Precio por unidad").value, "₡40,000");
+  assert.equal(f.popup.rows.find((r: any) => r.label === "Cantidad ofrecida").value, "4");
+  assert.equal(f.popup.rows.find((r: any) => r.label === "Total de productos").value, "₡160,000");
+  assert.equal(f.popup.actions.length, 1);
+  assert.equal(f.popup.actions[0].label, "Cerrar");
+  assert.equal(f.aiCalls.length, 0);
+  const revised = f.context({ summary: { ...summary, basePrecio: "TOTAL", precio: 150.25, moneda: "USD" }, hasChanges: true }).props;
+  assert.equal(revised.price, "$150.25");
+  revised.primary.onPress();
+  assert.equal(f.popup.title, "Cambios propuestos");
+  assert.equal(f.popup.rows.find((r: any) => r.label === "Precio total").value, "$150.25");
+  assert.ok(!f.popup.rows.some((r: any) => r.label === "Total de productos"));
 });
 
-test("edit disclosures preserve the full buyer request, conditions, fulfillment and authoritative photos", () => {
+test("context popups preserve the full buyer request, conditions, fulfillment and authoritative photos", () => {
   const f = screenFixture();
   const photos = [...readyOffer.offerImages, { storageRef: "storage://second", url: "https://example.test/second" }];
   const summary = { ...readyOffer.summary, descripcion: "Incluye alineado y tramado. ".repeat(20), entrega: "Envío", retiro: "Retiro", precioEnvio: null, envioMaximoDias: 3, retiroDespuesDeDias: 1 };
-  const context = () => nodes(f.context({ summary, images: photos, reference: { ...reference, text: snapshot.repeat(20) } }));
-  let tree = context();
-  assert.ok(!tree.some((n) => n.props.selectable));
-  assert.equal(tree.find((n) => n.type === "Image")?.props.source.uri, photos[0].url);
-  const request = tree.find((n) => n.props.accessibilityLabel === "Solicitud del comprador")!;
-  assert.equal(request.props.accessibilityState.expanded, false);
-  request.props.onPress();
-  tree = context();
-  assert.equal(tree.find((n) => n.props.accessibilityLabel === "Solicitud del comprador")?.props.accessibilityState.expanded, true);
-  const buyerText = tree.find((n) => n.props.selectable && n.props.children[0] === snapshot.repeat(20));
-  assert.ok(buyerText);
-  assert.equal(buyerText.props.maxLines, undefined);
-  tree.find((n) => n.props.accessibilityLabel === "Detalles de la oferta")!.props.onPress();
-  tree = context();
-  assert.ok(tree.some((n) => n.props.selectable && n.props.children[0] === summary.descripcion));
-  assert.ok(tree.some((n) => n.props.children?.includes("Envío · Retiro")));
-  assert.ok(!tree.some((n) => n.props.children?.includes("Costo de envío")));
-  assert.equal(tree.find((n) => typeof n.type === "function" && n.type.name === "OfferPhotos")?.props.images, photos);
+  const controls = f.context({ summary, images: photos, reference: { ...reference, text: snapshot.repeat(20) } }).props;
+  controls.secondary.onPress();
+  assert.equal(f.popup.title, "Solicitud del comprador");
+  assert.equal(f.popup.description, snapshot.repeat(20));
+  assert.equal(f.popup.androidBackActionId, f.popup.actions[0].id);
+  controls.primary.onPress();
+  assert.equal(f.popup.description, summary.descripcion);
+  assert.equal(f.popup.descriptionPlacement, "afterRows");
+  assert.equal(f.popup.metadata, undefined, "Do not repeat the request title below the popup title");
+  assert.equal(f.popup.rows.find((r: any) => r.label === "Opciones de entrega").value, "Envío · Retiro");
+  assert.ok(!f.popup.rows.some((r: any) => r.label === "Costo de envío" || r.label === "Fotos"));
+  assert.deepEqual(Array.from(f.popup.images, (image: any) => image.uri), photos.map((photo) => photo.url));
+  assert.ok(f.popup.images.every((image: any) => image.caption === undefined));
+});
+
+test("context popups close when source changes or editor leaves, without closing another popup", () => {
+  const f = screenFixture();
+  const summary = readyOffer.summary;
+  const images = readyOffer.offerImages;
+  f.context({ summary, images }).props.primary.onPress();
+  assert.ok(f.popup);
+  const disabled = f.context({ summary, images, disabled: true }).props;
+  assert.equal(f.popup, null);
+  disabled.primary.onPress();
+  disabled.secondary.onPress();
+  assert.equal(f.popup, null);
+  f.context({ summary, images }).props.secondary.onPress();
+  f.unmount();
+  assert.equal(f.popup, null);
+
+  const g = screenFixture();
+  g.context({ summary, images }).props.primary.onPress();
+  const exitPopup = { type: "summary", title: "¿Salir de la modificación?" };
+  g.modules["@/src/services/popup.service"].openPopup(exitPopup);
+  g.unmount();
+  assert.equal(g.popup, exitPopup, "Context cleanup must not dismiss a replacement confirmation");
 });
 
 test("saved edit context survives continuing or failed turns without becoming a publishable review", async () => {
@@ -792,11 +824,15 @@ test("saved edit context survives continuing or failed turns without becoming a 
   assert.equal(assistantView(f).review, undefined);
 });
 
-test("edit disclosures do not trigger transcript scrolling, but incoming responses do", async () => {
+test("edit context stays outside the transcript and only new messages trigger scrolling", async () => {
   const f = screenFixture({ mode: "edit" });
   f.assistant();
   f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, messages: [{ id: "old", role: "user", content: "Mensaje guardado", imageUrls: [] }] }));
   await flush();
+  const fullTree = nodes(f.assistant());
+  const transcript = fullTree.find((n) => n.type === "ScrollView")!;
+  assert.ok(!nodes(transcript).some((n) => typeof n.type === "function" && n.type.name === "OfferEditContext"));
+  assert.ok(fullTree.findIndex((n) => typeof n.type === "function" && n.type.name === "OfferEditContext") < fullTree.indexOf(transcript));
   let scrolls = 0;
   const scroll = () => nodes(f.assistant()).find((n) => n.type === "ScrollView")!.props;
   scroll().ref.current = { scrollToEnd: () => { scrolls++; } };

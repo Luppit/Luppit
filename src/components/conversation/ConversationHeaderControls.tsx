@@ -20,7 +20,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   findNodeHandle,
   Keyboard,
   Modal,
@@ -33,6 +32,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConversationActionButtonConfig } from "./ConversationActionButtons";
+import ConversationContextControls from "./ConversationContextControls";
 
 type Props = {
   view: ConversationView;
@@ -50,7 +50,7 @@ export default function ConversationHeaderControls({
   onPress,
 }: Props) {
   const t = useTheme();
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useActiveProfile();
   const trigger = useRef<View>(null);
@@ -184,12 +184,6 @@ export default function ConversationHeaderControls({
   };
 
   if (!offerId && buttons.length === 0) return null;
-  const stack = fontScale > 1.3 || width < 360 || (price?.length ?? 0) > 12;
-  const pillStyle = { borderRadius: t.glass.radius.chip };
-  const controlPadding = {
-    paddingHorizontal: t.spacing.md,
-    paddingVertical: t.spacing.sm,
-  };
 
   return (
     <View
@@ -199,111 +193,25 @@ export default function ConversationHeaderControls({
         paddingBottom: t.spacing.sm,
       }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: t.spacing.sm,
-        }}
-      >
-        {offerId ? (
-          <GlassSurface
-            variant="surface"
-            style={[
-              pillStyle,
-              {
-                flexGrow: buttons.length ? 1 : 0,
-                flexBasis: stack ? "100%" : buttons.length ? 0 : "auto",
-              },
-            ]}
-            clipStyle={pillStyle}
-            contentStyle={{ flexDirection: "row", alignItems: "center" }}
-          >
-            {price ? (
-              <>
-                <Text
-                  variant="body"
-                  accessibilityLabel={`Total de productos: ${price}`}
-                  style={{
-                    flex: buttons.length || stack ? 1 : undefined,
-                    paddingHorizontal: t.spacing.md,
-                    fontFamily: t.typography.subtitle.fontFamily,
-                  }}
-                >
-                  {price}
-                </Text>
-                <View
-                  style={{
-                    width: StyleSheet.hairlineWidth,
-                    height: 24,
-                    backgroundColor: t.colors.border,
-                  }}
-                />
-              </>
-            ) : null}
-            <Pressable
-              onPress={openSummary}
-              disabled={loadingSummary || disabled}
-              accessibilityRole="button"
-              accessibilityLabel="Resumen de la oferta"
-              accessibilityState={{
-                busy: loadingSummary,
-                disabled: loadingSummary || disabled,
-              }}
-              style={({ pressed }) => [
-                controlPadding,
-                {
-                  minHeight: 48,
-                  justifyContent: "center",
-                  opacity: pressed || disabled ? 0.6 : 1,
-                },
-              ]}
-            >
-              <Text variant="body" style={{ opacity: loadingSummary ? 0 : 1 }}>
-                Resumen
-              </Text>
-              {loadingSummary ? (
-                <ActivityIndicator
-                  size="small"
-                  color={t.colors.textDark}
-                  style={{ position: "absolute", alignSelf: "center" }}
-                />
-              ) : null}
-            </Pressable>
-          </GlassSurface>
-        ) : null}
-        {buttons.length > 0 ? (
-          <GlassSurface
-            variant="surface"
-            style={pillStyle}
-            clipStyle={pillStyle}
-          >
-            <Pressable
-              ref={trigger}
-              onPress={openMenu}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel="Acciones de la conversación"
-              accessibilityState={{ expanded: anchor !== null, disabled }}
-              style={({ pressed }) => [
-                controlPadding,
-                {
-                  minHeight: 48,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: t.spacing.sm,
-                  opacity: pressed || disabled ? 0.6 : 1,
-                },
-              ]}
-            >
-              <Text variant="body">Acciones</Text>
-              <Icon name={anchor ? "chevron-up" : "chevron-down"} size={18} />
-            </Pressable>
-          </GlassSurface>
-        ) : null}
-      </View>
+      <ConversationContextControls
+        price={price}
+        primary={offerId ? {
+          label: "Resumen",
+          accessibilityLabel: "Resumen de la oferta",
+          onPress: openSummary,
+          disabled,
+          busy: loadingSummary,
+        } : undefined}
+        secondary={buttons.length > 0 ? {
+          label: "Acciones",
+          accessibilityLabel: "Acciones de la conversación",
+          onPress: openMenu,
+          disabled,
+          expanded: anchor !== null,
+          icon: anchor ? "chevron-up" : "chevron-down",
+          triggerRef: trigger,
+        } : undefined}
+      />
       <Modal
         transparent
         visible={anchor !== null}

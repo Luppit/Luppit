@@ -10,10 +10,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function ModalLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const params = useGlobalSearchParams<{ title?: string | string[] }>();
+  const params = useGlobalSearchParams<{ title?: string | string[]; mode?: string | string[] }>();
   const pathname = usePathname();
   const title = Array.isArray(params.title) ? params.title[0] : params.title;
   const isOfferModal = pathname.includes("/offer");
+  const mode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const usesDetailTopBar = [
     "/business-location-edit",
     "/business-name-edit",
@@ -28,6 +29,7 @@ export default function ModalLayout() {
         <ModalTopBar
           title={title}
           glass
+          back={mode === "edit"}
           topInset={insets.top}
         />
       ) : usesDetailTopBar ? null : (

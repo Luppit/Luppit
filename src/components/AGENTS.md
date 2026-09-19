@@ -21,6 +21,10 @@ Applies to shared React Native UI components and app screens that consume shared
 - Accordion rows should feel like revealed detail inside the same group, not separate cards. Keep the question as `body`, use a small muted chevron, and put separators after expanded content.
 - Use app spacing tokens (`t.spacing.*`) rather than raw spacing values unless matching an existing local pattern.
 
+## Conversation Context Controls
+- Conversation headers and the seller offer-edit assistant share `conversation/ConversationContextControls.tsx` for their two compact bubbles. Reuse its glass surfaces, spacing, price divider, loading state, and narrow-screen wrapping.
+- In the edit assistant, keep `Oferta` and `Solicitud` above the transcript. Their read-only summaries use the shared popup; offer context reflects the saved private draft and never substitutes for the explicit review/publish flow. Close owned context popups when the source changes or the screen loses focus.
+
 ## Keyboard Handling
 - Give each screen or shared shell one keyboard-layout owner. Do not combine `KeyboardAvoidingView` with `automaticallyAdjustKeyboardInsets` in the same layout hierarchy.
 - Scroll-only forms may let their scroll container adjust keyboard insets. Screens with a fixed footer, composer, or popup action row should let the containing `KeyboardAvoidingView` resize the available area instead.

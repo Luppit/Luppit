@@ -10,6 +10,7 @@ type ModalTopBarProps = {
   title?: string;
   glass?: boolean;
   topInset?: number;
+  back?: boolean;
 };
 
 export const MODAL_TOP_BAR_HEIGHT = 56;
@@ -18,6 +19,7 @@ export default function ModalTopBar({
   title,
   glass = false,
   topInset = 0,
+  back = false,
 }: ModalTopBarProps) {
   const t = useTheme();
   useAndroidBackAction(goBackOrHome);
@@ -31,13 +33,23 @@ export default function ModalTopBar({
         paddingHorizontal: glass ? t.spacing.xl : 0,
       }}
     >
-      <View style={{ width: 40 }} />
+      {back ? (
+        <Pressable
+          onPress={goBackOrHome}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
+          hitSlop={12}
+          style={{ width: 40, minHeight: 44, justifyContent: "center" }}
+        >
+          <Icon name="arrow-left" size={28} />
+        </Pressable>
+      ) : <View style={{ width: 40 }} />}
 
       <Text variant="subtitle" align="center" maxLines={1} style={{ flex: 1 }}>
         {title ?? ""}
       </Text>
 
-      {glass ? (
+      {back ? <View style={{ width: 40 }} /> : glass ? (
         <Pressable
           onPress={goBackOrHome}
           hitSlop={12}
