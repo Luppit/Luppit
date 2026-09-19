@@ -6,6 +6,7 @@ import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getSignedStorageUrl, parseStorageImagePath, STORAGE_BUCKETS, toAbsoluteStorageUrl } from "../lib/supabase/storage";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { getPurchaseOfferImagePreviewFiles } from "./purchase.offer.service";
 
 export type Conversation = Row<"conversation">;
 
@@ -880,6 +881,33 @@ export async function getCurrentUserConversationView(
   if (!view.ok) return view;
 
   return { ok: true, data: view.data, profileId: profile.data.id };
+}
+
+export async function getCurrentConversationOfferSummary(conversationId: string) {
+  const before = await getCurrentUserConversationView(conversationId);
+  if (!before.ok) return before;
+  const offerId = before.data.conversation.purchase_offer_id;
+  if (!offerId) return { ok: false as const, error: fromAppError("not_found") };
+
+  const images = await getPurchaseOfferImagePreviewFiles(offerId);
+  if (!images.ok) return images;
+  const after = await getCurrentUserConversationView(conversationId);
+  if (!after.ok) return after;
+  if (before.profileId !== after.profileId ||
+      offerId !== after.data.conversation.purchase_offer_id ||
+      before.data.context.offer_revision !== after.data.context.offer_revision ||
+      before.data.conversation.selected_fulfillment_catalog_id !==
+        after.data.conversation.selected_fulfillment_catalog_id) {
+    return {
+      ok: false as const,
+      error: { ...fromAppError("validation"), code: "offer_changed",
+        message: "La oferta cambió. Vuelve a abrir el resumen para ver los detalles actuales." },
+    };
+  }
+  return {
+    ...after,
+    images: images.data.map((image, index) => ({ uri: image.uri, caption: `Foto ${index + 1}` })),
+  };
 }
 
 function normalizeRpcTarget(target: string): string {

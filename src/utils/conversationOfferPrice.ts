@@ -4,7 +4,7 @@ function displayText(value: unknown) {
   return text && text !== "-" ? text : null;
 }
 
-function formatAmount(amount: unknown, rawCurrencyCode: unknown) {
+export function formatOfferAmount(amount: unknown, rawCurrencyCode: unknown) {
   const currencyCode = displayText(rawCurrencyCode)?.toUpperCase();
   if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
 
@@ -20,13 +20,13 @@ export function formatConversationOfferPrice(context: Record<string, unknown>) {
     displayText(context.offer_price);
   if (summary) return summary;
 
-  const amount = formatAmount(context.offer_price_amount, context.offer_currency_code);
+  const amount = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
   if (!amount) return null;
   if (context.offer_price_basis === "TOTAL") return `Total de productos: ${amount}`;
   if (context.offer_price_basis !== "UNIT") return amount;
 
   const quantity = context.offer_quantity_offered;
-  const subtotal = formatAmount(context.offer_product_subtotal, context.offer_currency_code);
+  const subtotal = formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code);
   return [
     `${amount} por unidad`,
     typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0
@@ -34,6 +34,20 @@ export function formatConversationOfferPrice(context: Record<string, unknown>) {
       : null,
     subtotal ? `Total de productos: ${subtotal}` : null,
   ].filter(Boolean).join(" · ");
+}
+
+export function formatConversationOfferTotal(context: Record<string, unknown>) {
+  const subtotal = formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code);
+  if (subtotal) return subtotal;
+
+  const price = context.offer_price_amount;
+  if (context.offer_price_basis === "UNIT") {
+    const quantity = context.offer_quantity_offered;
+    return typeof price === "number" && typeof quantity === "number" && quantity > 0
+      ? formatOfferAmount(price * quantity, context.offer_currency_code)
+      : null;
+  }
+  return formatOfferAmount(price, context.offer_currency_code) ?? displayText(context.offer_price);
 }
 
 export function normalizePurchaseOfferPricing(value: Record<string, unknown>) {

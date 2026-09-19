@@ -8,9 +8,7 @@ import {
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { useFocusEffect } from "@react-navigation/native";
-import ConversationActionButtons, {
-  ConversationActionSummary,
-} from "@/src/components/conversation/ConversationActionButtons";
+import ConversationHeaderControls from "@/src/components/conversation/ConversationHeaderControls";
 import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
@@ -43,7 +41,6 @@ import {
   setToastBottomInset,
 } from "@/src/services/toast.service";
 import { Theme, useTheme } from "@/src/themes";
-import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
 import { showError } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, {
@@ -60,7 +57,6 @@ import {
   LayoutChangeEvent,
   Platform,
   Pressable,
-  StyleSheet,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -132,12 +128,6 @@ function createOptimisticMessageId(index: number) {
   return `optimistic-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`;
 }
 
-function toOptionalDisplayText(value: unknown) {
-  if (typeof value !== "string") return null;
-  const text = value.trim();
-  return text && text !== "-" ? text : null;
-}
-
 type ConversationRealtimeRefreshTarget = "view" | "messages";
 
 type ConversationRealtimePayload = {
@@ -177,7 +167,6 @@ export default function ConversationLayout() {
   const [loadError, setLoadError] = useState<AppError | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
-  const [headerChromeHeight, setHeaderChromeHeight] = useState(0);
   const [purchaseRequestTitle, setPurchaseRequestTitle] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
@@ -412,7 +401,7 @@ export default function ConversationLayout() {
     };
   }, [conversationId, refreshConversation]);
 
-  const { isExecutingAction, executingActionId, handleActionPress } =
+  const { isExecutingAction, handleActionPress } =
     useConversationActions({
       conversationId,
       profileId,
@@ -448,13 +437,6 @@ export default function ConversationLayout() {
     );
     setToastBottomInset(TOAST_INSET_SOURCE, nextHeight + t.spacing.sm);
   }, [t.spacing.sm]);
-
-  const handleHeaderChromeLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-    setHeaderChromeHeight((currentHeight) =>
-      currentHeight === nextHeight ? currentHeight : nextHeight
-    );
-  }, []);
 
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
@@ -501,11 +483,6 @@ export default function ConversationLayout() {
     (action) => (action.ui_slot ?? "").toUpperCase() === "TOP"
   );
   const topActions = rawTopActions.map(toTopButtonConfig);
-  const topActionsSignature = topActions
-    .map(
-      (action) => `${action.id}:${action.label}:${action.icon}:${action.tone}`
-    )
-    .join("|");
   const topActionsById = new Map(
     rawTopActions.map((action) => [action.id, action] as const)
   );
@@ -515,22 +492,10 @@ export default function ConversationLayout() {
   const menuActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
-  const showActionButtons = topActions.length > 0;
-  const offerPriceField = rawTopActions
-    .flatMap((action) => action.confirmation?.fields ?? [])
-    .find((field) => normalizeText(field.value_source) === "offer_price");
-  const offerPrice = formatConversationOfferPrice(conversationView.context);
-  const topActionSummary: ConversationActionSummary | undefined = offerPrice
-    ? {
-        label: toOptionalDisplayText(offerPriceField?.label) ?? "Precio",
-        value: offerPrice,
-      }
-    : undefined;
   const headerBarHeight = 56;
-  const headerChromeFallbackHeight = insets.top + 72;
   const composerOverlayFallbackHeight =
     showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
-  const contentTopInset = Math.max(headerChromeHeight, headerChromeFallbackHeight);
+  const contentTopInset = 0;
   const contentBottomInset = showComposer && Platform.OS !== "android"
     ? composerOverlayHeight || composerOverlayFallbackHeight
     : 0;
@@ -558,117 +523,107 @@ export default function ConversationLayout() {
         style={{ flex: 1, backgroundColor: t.colors.background }}
       >
         <View style={{ flex: 1 }}>
-          <GlassSurface
-            variant="chrome"
-            blur="chrome"
-            onLayout={handleHeaderChromeLayout}
+          <View
+            pointerEvents="box-none"
             style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
               zIndex: 10,
               elevation: Platform.OS === "android" ? 4 : 10,
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              borderBottomLeftRadius: t.glass.radius.chrome,
-              borderBottomRightRadius: t.glass.radius.chrome,
-            }}
-            clipStyle={{
-              borderTopLeftRadius: 0,
-              borderTopRightRadius: 0,
-              borderBottomLeftRadius: t.glass.radius.chrome,
-              borderBottomRightRadius: t.glass.radius.chrome,
-              overflow: "hidden",
-            }}
-            contentStyle={{
-              paddingTop: insets.top + t.spacing.xs,
-              paddingHorizontal: t.spacing.lg,
-              paddingBottom: showActionButtons ? t.spacing.md : t.spacing.xs,
             }}
           >
-            <View
+            <GlassSurface
+              variant="chrome"
+              blur="chrome"
               style={{
-                minHeight: headerBarHeight,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                paddingVertical: t.spacing.xs,
+                borderTopLeftRadius: 0,
+                borderTopRightRadius: 0,
+                borderBottomLeftRadius: t.glass.radius.chrome,
+                borderBottomRightRadius: t.glass.radius.chrome,
+              }}
+              clipStyle={{
+                borderTopLeftRadius: 0,
+                borderTopRightRadius: 0,
+                borderBottomLeftRadius: t.glass.radius.chrome,
+                borderBottomRightRadius: t.glass.radius.chrome,
+                overflow: "hidden",
+              }}
+              contentStyle={{
+                paddingTop: insets.top + t.spacing.xs,
+                paddingHorizontal: t.spacing.lg,
+                paddingBottom: t.spacing.xs,
               }}
             >
-              <Pressable
-                onPress={closeConversation}
-                accessibilityRole="button"
-                accessibilityLabel="Volver"
-                style={{
-                  width: 44,
-                  height: 44,
-                  alignItems: "flex-start",
-                  justifyContent: "center",
-                }}
-              >
-                <Icon name="arrow-left" size={28} />
-              </Pressable>
-
-              <Text
-                variant="subtitle"
-                align="center"
-                maxLines={2}
-                maxFontSizeMultiplier={2}
-                accessibilityRole="header"
-                style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
-              >
-                {title}
-              </Text>
-
-              {menuActions.length > 0 ? (
-                <Pressable
-                  onPress={() => openConversationMenu(menuActions)}
-                  disabled={isExecutingAction}
-                  accessibilityRole="button"
-                  accessibilityLabel="Más acciones"
-                  accessibilityState={{
-                    disabled: isExecutingAction,
-                    busy: isExecutingAction,
-                  }}
-                  style={({ pressed }) => ({
-                    width: 44,
-                    height: 44,
-                    alignItems: "flex-end",
-                    justifyContent: "center",
-                    opacity: isExecutingAction ? 0.6 : pressed ? 0.72 : 1,
-                  })}
-                >
-                  <Icon name="ellipsis" size={28} />
-                </Pressable>
-              ) : (
-                <View style={{ width: 44, height: 44 }} />
-              )}
-            </View>
-
-            {showActionButtons ? (
               <View
                 style={{
-                  paddingTop: t.spacing.sm,
-                  borderTopWidth: StyleSheet.hairlineWidth,
-                  borderTopColor: t.colors.border,
+                  minHeight: headerBarHeight,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: t.spacing.xs,
                 }}
               >
-                <ConversationActionButtons
-                  key={topActionsSignature}
-                  buttons={topActions}
-                  summary={topActionSummary}
-                  disabled={isExecutingAction}
-                  loadingButtonId={executingActionId}
-                  onPress={(id) => {
-                    const action = topActionsById.get(id);
-                    if (!action) return;
-                    handleActionPress(action);
+                <Pressable
+                  onPress={closeConversation}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    alignItems: "flex-start",
+                    justifyContent: "center",
                   }}
-                />
+                >
+                  <Icon name="arrow-left" size={28} />
+                </Pressable>
+
+                <Text
+                  variant="subtitle"
+                  align="center"
+                  maxLines={2}
+                  maxFontSizeMultiplier={2}
+                  accessibilityRole="header"
+                  style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
+                >
+                  {title}
+                </Text>
+
+                {menuActions.length > 0 ? (
+                  <Pressable
+                    onPress={() => openConversationMenu(menuActions)}
+                    disabled={isExecutingAction}
+                    accessibilityRole="button"
+                    accessibilityLabel="Más acciones"
+                    accessibilityState={{
+                      disabled: isExecutingAction,
+                      busy: isExecutingAction,
+                    }}
+                    style={({ pressed }) => ({
+                      width: 44,
+                      height: 44,
+                      alignItems: "flex-end",
+                      justifyContent: "center",
+                      opacity: isExecutingAction ? 0.6 : pressed ? 0.72 : 1,
+                    })}
+                  >
+                    <Icon name="ellipsis" size={28} />
+                  </Pressable>
+                ) : (
+                  <View style={{ width: 44, height: 44 }} />
+                )}
               </View>
-            ) : null}
-          </GlassSurface>
+
+            </GlassSurface>
+            <ConversationHeaderControls
+              view={conversationView}
+              profileId={profileId}
+              buttons={topActions}
+              disabled={isExecutingAction}
+              onPress={(id) => {
+                const action = topActionsById.get(id);
+                if (!action) return;
+                handleActionPress(action);
+              }}
+            />
+          </View>
 
           <View
             style={{

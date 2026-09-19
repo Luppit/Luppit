@@ -762,7 +762,7 @@ async function getOfferImagePreviewFiles(
   return files;
 }
 
-async function getPurchaseOfferImagePreviewFiles(
+export async function getPurchaseOfferImagePreviewFiles(
   purchaseOfferId: string
 ): Promise<{ ok: true; data: OfferFile[] } | { ok: false; error: AppError }> {
   const imageResult = await supabase

@@ -146,6 +146,7 @@ function fixture() {
   const conversation = load("../app/(conversation)/_layout.tsx", {
     ...modules,
     "@/src/components/conversation/useConversationActions": shared,
+    "@/src/components/conversation/ConversationHeaderControls": nativeComponent("ActionButtons"),
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: Function) => navigate() },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
     "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
@@ -448,7 +449,7 @@ test("actual conversation layout still routes TOP and MENU actions through the e
     f.reads.at(-1)!.resolve(viewResult({ actions: [] })); await flush();
     assert.equal(await pending, true);
     const refreshed = f.drawConversation();
-    assert.equal(buttons(refreshed), undefined);
+    assert.equal(buttons(refreshed)?.props.buttons.length, 0);
     assert.equal(refreshed.props.value.messageRefreshTick, 1);
   }
 });

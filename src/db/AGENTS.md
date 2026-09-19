@@ -30,6 +30,7 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 - `conversation`, `conversation_status`, `conversation_transition`, `conversation_status_history`, and role/action tables define the state machine.
 - `conversation_action.ui_slot` drives executable placement (`TOP`, `AUX`, `MENU` today); passive UI cards come from `get_conversation_view(...).slots[]` and currently use `STATUS`.
 - Confirmation templates, conditional branches, OTP/rating inputs, labels, icons, and styles are DB-driven and returned already resolved for the active context.
+- The read-only offer summary uses `get_conversation_view.context.offer_fulfillment_details` for current published delivery cost/timing, separate from simplified acceptance choice labels. Direct access to fulfillment tables remains denied; pending proposals never replace these details.
 - Rating actions should disappear through DB action resolution once the current participant has submitted the matching rating.
 - `conversation_message` open-state fields are updated only by `get_conversation_messages`; system messages are excluded from open-state tracking and may be role-targeted through `visible_to_role_id`.
 - Chat-list identity comes from `get_current_profile_conversations`: seller sees buyer profile name, buyer sees seller business name; request title remains separate.
