@@ -96,7 +96,6 @@ export function buildConversationOfferSummary(
   }
 
   return {
-    metadata: displayText(context.offer_name),
     description: displayText(context.offer_description),
     descriptionPlacement: "afterRows" as const,
     rows,

@@ -83,7 +83,7 @@ test("summary preserves published terms and ignores pending proposals and privat
     notes: "Private seller note",
   });
   assert.equal(summary.description, context.offer_description);
-  assert.equal(summary.metadata, "4 llantas");
+  assert.equal(summary.metadata, undefined);
   assert.deepEqual(
     Array.from(summary.rows, (row: any) => ({ ...row })),
     [
