@@ -796,7 +796,7 @@ for (const platform of ["ios", "android"] as const) {
     layout.render();
     const action = { type: "POP", source: "buyer-chat" };
     layout.attempt(action);
-    assert.equal(layout.popup.showCloseButton, platform === "android");
+    assert.equal(layout.popup.dismissOnAndroidBack, true);
     assert.equal(layout.popup.dismissOnBackdropPress, false);
     assert.match(layout.popup.description, /no hayas enviado se perderán/);
     assert.equal(layout.dispatched.length, 0, "Dismissing the popup keeps the draft open");

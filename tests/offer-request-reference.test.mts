@@ -828,7 +828,6 @@ test("exit popup can be dismissed to keep editing; leaving retains the draft and
     assert.equal(exitGuard.enabled, true);
     exitGuard.callback({ data: { action: "go-back" } });
     assert.equal(popup.dismissOnBackdropPress, true);
-    assert.equal(popup.showCloseButton, true);
     assert.equal(popup.actions.length, 2);
     assert.equal(popup.actions.find((a: any) => a.id === "discard-draft").label, "Descartar");
     assert.equal(f.aiCalls.length, 1, "Opening or dismissing the popup makes no draft mutation");

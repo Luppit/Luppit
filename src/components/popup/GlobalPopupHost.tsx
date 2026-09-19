@@ -1604,19 +1604,6 @@ export default function GlobalPopupHost() {
                           >
                             {summaryConfig.title}
                           </Text>
-                          {summaryConfig.showCloseButton ? (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel="Cerrar"
-                              accessibilityHint={Platform.OS === "android" ? "Cierra este diálogo." : "Cierra el detalle de la notificación."}
-                              disabled={pendingSummaryActionId != null}
-                              hitSlop={4}
-                              onPress={closePopup}
-                              style={s.summaryCloseButton}
-                            >
-                              <Icon name="x" size={22} color={t.colors.textDark} />
-                            </Pressable>
-                          ) : null}
                         </View>
                         {summaryConfig.metadata ? (
                           <Text variant="small" style={s.summaryMetadata}>
@@ -2053,7 +2040,8 @@ export default function GlobalPopupHost() {
                                   <Pressable
                                     style={s.summaryImageItem}
                                     onPress={() => setPreviewUri(image.uri)}
-                                    accessibilityLabel={image.caption}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={image.caption || `Imagen ${index + 1}`}
                                   >
                                     <Image source={{ uri: image.uri }} style={s.summaryImage} />
                                   </Pressable>

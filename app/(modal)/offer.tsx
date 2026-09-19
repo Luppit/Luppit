@@ -801,7 +801,6 @@ function OfferAssistantScreen({
           ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
           : "Tu borrador quedará guardado para continuar después.",
         dismissOnBackdropPress: true,
-        showCloseButton: true,
         actions: [
           {
             id: "exit-offer",

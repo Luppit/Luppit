@@ -266,7 +266,6 @@ export default function NotificationsScreen() {
         type: "summary",
         title,
         metadata,
-        showCloseButton: true,
         description: notification.message,
         actions: getNotificationActions(notification),
       });

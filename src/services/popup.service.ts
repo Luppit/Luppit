@@ -117,7 +117,7 @@ export type PopupSummaryConfig = {
   title: string;
   icon?: LucideIconName;
   metadata?: string;
-  showCloseButton?: boolean;
+  dismissOnAndroidBack?: boolean;
   androidBackActionId?: string;
   description?: string;
   descriptionPlacement?: "beforeRows" | "afterRows";

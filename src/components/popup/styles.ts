@@ -53,7 +53,6 @@ export type GlobalPopupStyles = {
   summaryHeaderBlock: ViewStyle;
   summaryHeader: ViewStyle;
   summaryHeaderSeparator: ViewStyle;
-  summaryCloseButton: ViewStyle;
   summaryTitle: TextStyle;
   summaryMetadata: TextStyle;
   summaryDescription: TextStyle;
@@ -370,15 +369,6 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     summaryHeaderSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: SOFT_SEPARATOR_COLOR,
-    },
-    summaryCloseButton: {
-      width: 44,
-      height: 44,
-      marginVertical: -4,
-      marginRight: -8,
-      borderRadius: 22,
-      alignItems: "center",
-      justifyContent: "center",
     },
     summaryTitle: {
       flex: 1,

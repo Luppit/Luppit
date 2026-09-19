@@ -417,7 +417,7 @@ test("popup Back resolves explicit safe action, not its position or label", () =
 test("Android offer close dismisses only its confirmation; locked unconfigured summaries stay locked", () => {
   const config: PopupSummaryConfig = { type: "summary", title: "Salir", dismissOnBackdropPress: false };
   assert.equal(resolveAndroidPopupBack(config, false, false).type, "blocked");
-  assert.equal(resolveAndroidPopupBack({ ...config, showCloseButton: true }, false, false).type, "close");
-  assert.equal(resolveAndroidPopupBack({ ...config, showCloseButton: true }, false, true).type, "blocked");
+  assert.equal(resolveAndroidPopupBack({ ...config, dismissOnAndroidBack: true }, false, false).type, "close");
+  assert.equal(resolveAndroidPopupBack({ ...config, dismissOnAndroidBack: true }, false, true).type, "blocked");
   assert.equal(resolveAndroidPopupBack(null, true, false).type, "close");
 });

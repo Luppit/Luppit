@@ -212,7 +212,7 @@ test("summary loads photos only after conversation access and checks the same re
   const result = await getSummary("conversation");
   assert.equal(result.ok, true);
   assert.equal(result.images[0].uri, "signed-photo");
-  assert.equal(result.images[0].caption, "Foto 1");
+  assert.equal(result.images[0].caption, undefined);
 });
 
 test("denied or missing offers never query photos", async () => {

@@ -163,7 +163,6 @@ export default function ConversationHeaderControls({
         title: "Resumen de la oferta",
         ...buildConversationOfferSummary(result.data.context),
         images: result.images,
-        showCloseButton: true,
         androidBackActionId: "offer-summary-close",
         actions: [
           {

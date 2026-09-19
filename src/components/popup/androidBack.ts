@@ -19,7 +19,7 @@ export function resolveAndroidPopupBack(
       ? { type: "action", action }
       : { type: "blocked" };
   }
-  return summary?.showCloseButton || canDismiss
+  return summary?.dismissOnAndroidBack || canDismiss
     ? { type: "close" }
     : { type: "blocked" };
 }

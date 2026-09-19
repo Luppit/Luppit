@@ -906,7 +906,7 @@ export async function getCurrentConversationOfferSummary(conversationId: string)
   }
   return {
     ...after,
-    images: images.data.map((image, index) => ({ uri: image.uri, caption: `Foto ${index + 1}` })),
+    images: images.data.map((image) => ({ uri: image.uri })),
   };
 }
 
