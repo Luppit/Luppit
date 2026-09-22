@@ -87,7 +87,8 @@ export default function DetailLayout() {
       <View
         style={{
           flex: 1,
-          paddingHorizontal: completedRequestsOwnsTopBar ? 0 : t.spacing.md,
+          paddingHorizontal:
+            completedRequestsOwnsTopBar || pathname === "/notifications" ? 0 : t.spacing.md,
         }}
       >
         <Stack

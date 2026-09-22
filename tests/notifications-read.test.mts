@@ -82,6 +82,7 @@ async function screenHarness(initial = [notification("one"), notification("two")
     "@react-navigation/native": { useFocusEffect: (callback: () => void) => { focus = callback; } },
     "expo-router": { router: { push() {} } },
     "./detail-top-bar": { DETAIL_TOP_BAR_VISIBLE_HEIGHT: 72 },
+    "@/src/components/chip/LuppitChip": { default: "LuppitChip", __esModule: true },
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/groupedList/GroupedList": { GroupedListSection: "GroupedListSection", GroupedListRow: "GroupedListRow" },
@@ -131,7 +132,7 @@ async function screenHarness(initial = [notification("one"), notification("two")
   await settle();
   return {
     render, errors, successes, popups,
-    action: () => render().find((node) => node.props.icon === "check-check"),
+    action: () => render().find((node) => node.props.testID === "mark-all-notifications-read"),
     items: () => render().filter((node) => node.props.notification).map((node) => node.props.notification as ProfileNotificationListItem),
     get unreadCount() { return unreadCount; },
     get bulkCalls() { return bulkCalls; },
@@ -170,8 +171,8 @@ test("pending bulk read rejects rapid repeated taps and disables cleanup", async
   press(); press();
   assert.equal(h.bulkCalls, 1);
   assert.equal(h.action()!.props.onPress, undefined);
-  assert.equal(h.action()!.props.label, "Marcando como leídas...");
-  assert.equal(h.render().find((node) => node.props.icon === "trash-2")!.props.onPress, undefined);
+  assert.equal(h.action()!.props.accessibilityState.busy, true);
+  assert.equal(h.render().find((node) => node.props.testID === "notification-options")!.props.onPress, undefined);
   assert.equal(h.unreadCount, 2);
   finish(failure);
   await settle();
@@ -254,6 +255,47 @@ test("finishing a bulk read after unmount does not update the screen", async () 
   await settle();
   assert.equal(h.readCalls, 1);
   assert.equal(h.successes.length, 0);
+});
+
+test("unread filter follows persisted read state and returns to the full history", async () => {
+  const h = await screenHarness([notification("unread"), notification("read", savedAt)]);
+  const filterChip = () => h.render().find((node) => node.type === "LuppitChip" && node.props.label === "Sin leer")!;
+  assert.equal(filterChip().props.count, 1);
+  filterChip().props.onPress();
+  assert.equal(filterChip().props.selected, true);
+  assert.deepEqual(h.items().map((item) => item.notificationId), ["unread"]);
+  h.render().find((node) => node.props.notification)!.props.onPress();
+  await settle();
+  assert.equal(h.items().length, 0);
+  assert.equal(filterChip().props.count, 0);
+  assert.ok(h.render().some((node) => node.props.title === "Todo al día"));
+  h.render().find((node) => node.type === "LuppitChip" && node.props.label === "Todas")!.props.onPress();
+  assert.equal(h.items().length, 2);
+});
+
+test("bulk read in the unread filter keeps read notifications available in all", async () => {
+  const h = await screenHarness();
+  h.render().find((node) => node.type === "LuppitChip" && node.props.label === "Sin leer")!.props.onPress();
+  h.action()!.props.onPress();
+  await settle();
+  assert.equal(h.items().length, 0);
+  assert.ok(h.render().some((node) => node.props.title === "Todo al día"));
+  h.render().find((node) => node.type === "LuppitChip" && node.props.label === "Todas")!.props.onPress();
+  assert.equal(h.items().length, 2);
+});
+
+test("activity groups use the local calendar date and retain older and invalid timestamps", async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today.getTime() - 1);
+  const h = await screenHarness([
+    { ...notification("today"), createdAt: today.toISOString() },
+    { ...notification("yesterday"), createdAt: yesterday.toISOString() },
+    { ...notification("unknown"), createdAt: "invalid" },
+  ]);
+  const headings = h.render().filter((node) => node.type === "Text" && ["Hoy", "Anteriores"].includes(node.props.children[0]));
+  assert.deepEqual(headings.map((node) => node.props.children[0]), ["Hoy", "Anteriores"]);
+  assert.equal(h.items().length, 3);
 });
 
 test("bulk service resolves the active profile and rejects RPC failure receipts", async () => {
