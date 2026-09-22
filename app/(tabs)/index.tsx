@@ -484,6 +484,9 @@ function MarketplaceHomeContent({
 
     return [selected, ...stages.filter((stage) => stage.code !== selectedStageCode)];
   }, [hub?.stages, selectedStageCode]);
+  const visibleStages = hasActiveFilters
+    ? orderedStages.filter((stage) => stage.count > 0 || stage.code === selectedStage?.code)
+    : orderedStages;
 
   useEffect(() => {
     if (!hub || hub.stages.some((stage) => stage.code === selectedStageCode)) return;
@@ -570,15 +573,16 @@ function MarketplaceHomeContent({
     >
       <View style={s.summaryBlock}>
         <Text variant="small" color="textMedium">
-          {hasActiveFilters ? "Resultados" : "Resumen"}
+          {hasActiveFilters && filters.searchValue
+            ? `Resultados para “${filters.searchValue}”`
+            : hasActiveFilters
+              ? "Resultados"
+              : "Resumen"}
         </Text>
         {hasActiveFilters ? (
-          <>
-            {filters.searchValue ? <Text variant="body">{`“${filters.searchValue}”`}</Text> : null}
-            <Text variant="body" color="textMedium" accessibilityLiveRegion="polite">
-              {hub.rail.total} {hub.rail.total === 1 ? "solicitud" : "solicitudes"} en {selectedStage?.name ?? hub.rail.title}
-            </Text>
-          </>
+          <Text variant="body" color="textMedium" accessibilityLiveRegion="polite">
+            {hub.rail.total} {hub.rail.total === 1 ? "solicitud" : "solicitudes"} en {selectedStage?.name ?? hub.rail.title}
+          </Text>
         ) : (
           <>
             <Text variant="subtitle">
@@ -643,41 +647,23 @@ function MarketplaceHomeContent({
         />
       ) : null}
 
-      {hasActiveFilters ? (
-        <View style={s.filteredStageList}>
-          {hub.stages.map((stage) => (
-            <LuppitChip
-              key={stage.code}
-              label={stage.name}
-              count={stage.count}
-              selected={stage.code === selectedStage?.code}
-              accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
-              onPress={() => onSelectStage(stage.code)}
-            />
-          ))}
-        </View>
-      ) : (
-        <ScrollView
-          ref={stageScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.stageListContent}
-        >
-          {orderedStages.map((stage) => {
-            const isSelected = stage.code === selectedStageCode;
-
-            return (
-              <LuppitChip
-                key={stage.code}
-                label={stage.name}
-                count={stage.count}
-                selected={isSelected}
-                onPress={() => onSelectStage(stage.code)}
-              />
-            );
-          })}
-        </ScrollView>
-      )}
+      <ScrollView
+        ref={stageScrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.stageListContent}
+      >
+        {visibleStages.map((stage) => (
+          <LuppitChip
+            key={stage.code}
+            label={stage.name}
+            count={stage.count}
+            selected={stage.code === selectedStage?.code}
+            accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
+            onPress={() => onSelectStage(stage.code)}
+          />
+        ))}
+      </ScrollView>
 
       <View style={s.railSection}>
         <View style={s.railHeader}>
@@ -976,12 +962,6 @@ function createMarketplaceHomeStyles(t: Theme) {
       paddingHorizontal: t.spacing.md,
     },
     stageListContent: {
-      gap: t.spacing.sm,
-      paddingHorizontal: t.spacing.md,
-    },
-    filteredStageList: {
-      flexDirection: "row",
-      flexWrap: "wrap",
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },

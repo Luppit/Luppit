@@ -216,20 +216,53 @@ test("category and segment changes retain server filter scope when revealing mat
   assert.deepEqual(plain(f.calls[2].args), [filters, "productos", "needs_attention"]);
 });
 
-test("filtered home exposes DB stage counts in order and carries criteria into Ver todas", (t) => {
+test("filtered home shows matching stages in one row and carries criteria into Ver todas", (t) => {
   const f = fixture("seller"); t.after(f.cleanup);
   const data = hub("needs_attention", { for_you: 0, needs_attention: 21, in_progress: 4 }, [item("a"), item("b", "office")]);
   const filters = { ...f.emptyFilters, searchValue: "silla", selectedCategoryIds: ["furniture", "office"] };
   const tree = f.render(f.exports.MarketplaceHomeContent, { role: "seller", hub: data, filters, selectedStageCode: "needs_attention", selectedSegmentSvgName: "productos", hasActiveFilters: true, hasFilterChip: true, onSelectStage() {}, onRetry() {} });
   const chips = nodes(tree).filter((node) => node.type === "LuppitChip");
-  assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["for_you", 0], ["needs_attention", 21], ["in_progress", 4]]);
-  assert.equal(nodes(tree).some((node) => node.type === "View" && node.props.style?.flexWrap === "wrap"), true);
-  assert.match(text(tree), /Resultados“silla”21 solicitudes en needs_attention/);
+  assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["needs_attention", 21], ["in_progress", 4]]);
+  const stageRow = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
+  assert.equal(stageRow?.props.contentContainerStyle?.flexWrap, undefined);
+  assert.deepEqual(nodes(stageRow).filter((node) => node.type === "LuppitChip").map((node) => node.props.label), ["needs_attention", "in_progress"]);
+  assert.match(text(tree), /Resultados para “silla”21 solicitudes en needs_attention/);
   assert.equal(nodes(tree).find((node) => node.type === "FlatList")!.props.data, data.rail.items);
   nodes(tree).find((node) => node.type === "Pressable" && text(node).includes("Ver todas"))!.props.onPress();
   assert.deepEqual(JSON.parse(f.routes[0].params.filters), filters);
   assert.equal(f.routes[0].params.stageCode, "needs_attention");
   assert.equal(f.routes[0].params.segmentSvgName, "productos");
+});
+
+test("filtered home keeps an explicitly selected empty stage beside the matching stage", (t) => {
+  const f = fixture("seller"); t.after(f.cleanup);
+  const tree = f.render(f.exports.MarketplaceHomeContent, {
+    role: "seller", hub: hub("for_you", { for_you: 0, needs_attention: 1, in_progress: 0 }),
+    filters: { ...f.emptyFilters, searchValue: "silla" }, selectedStageCode: "for_you",
+    selectedSegmentSvgName: "todas", hasActiveFilters: true, hasFilterChip: true,
+    onSelectStage() {}, onRetry() {},
+  });
+  const row = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
+  assert.deepEqual(nodes(row).filter((node) => node.type === "LuppitChip").map((node) => node.props.label), ["for_you", "needs_attention"]);
+});
+
+test("one matching stage and many empty stages render only one chip before the request", (t) => {
+  const f = fixture("seller"); t.after(f.cleanup);
+  const counts = {
+    for_you: 0, needs_attention: 1, in_progress: 0, best: 0,
+    low_competition: 0, active_offers: 0, favorites: 0, history: 0,
+  };
+  const tree = f.render(f.exports.MarketplaceHomeContent, {
+    role: "seller", hub: hub("needs_attention", counts, [item("march")]),
+    filters: { ...f.emptyFilters, searchValue: "March" }, selectedStageCode: "needs_attention",
+    selectedSegmentSvgName: "todas", hasActiveFilters: true, hasFilterChip: true,
+    onSelectStage() {}, onRetry() {},
+  });
+  const row = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
+  const chips = nodes(row).filter((node) => node.type === "LuppitChip");
+  assert.deepEqual(chips.map((node) => node.props.label), ["needs_attention"]);
+  assert.equal(nodes(tree).find((node) => node.type === "FlatList")?.props.data[0].id, "march");
+  assert.match(text(tree), /Resultados para “March”1 solicitud en needs_attention/);
 });
 
 test("empty copy distinguishes actual zero matches, other stages, omitted previews, and load errors", (t) => {
