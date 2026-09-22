@@ -184,11 +184,19 @@ function getRailEmptyMessage({
   role,
   selectedStage,
   hasActiveFilters,
+  hasOtherMatches,
+  hasRailMatches,
 }: {
   role: MarketplaceHubRole;
   selectedStage: MarketplaceHubStage | null;
   hasActiveFilters: boolean;
+  hasOtherMatches: boolean;
+  hasRailMatches: boolean;
 }) {
+  if (hasRailMatches) return "Selecciona Ver todas para consultar las solicitudes.";
+  if (hasActiveFilters && hasOtherMatches) {
+    return "Hay solicitudes que coinciden en otras etapas. Selecciona una etapa con resultados.";
+  }
   if (hasActiveFilters) return "No hay resultados para esta etapa.";
   if (selectedStage?.code === "needs_attention") return "Todo está al día por ahora.";
   return role === "buyer"
@@ -196,10 +204,20 @@ function getRailEmptyMessage({
     : "No hay oportunidades en esta etapa.";
 }
 
+function getMatchingStageCode(hub: MarketplaceHub, revealMatches: boolean) {
+  const selected = hub.stages.find((stage) => stage.is_selected);
+  if (revealMatches && hub.rail.total === 0 && hub.rail.items.length === 0) {
+    return hub.stages.find((stage) => stage.count > 0)?.code ?? selected?.code;
+  }
+  return selected?.code;
+}
+
 function BuyerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
+  const requestGenerationRef = useRef(0);
+  const loadedCriteriaRef = useRef<string | null>(null);
   const [filters, setFilters] = useState<BuyerHomeFilters>(getBuyerHomeFilters());
   const [selectedStageCode, setSelectedStageCode] = useState(BUYER_DEFAULT_STAGE);
   const [selectedSortCode, setSelectedSortCode] = useState(
@@ -208,10 +226,15 @@ function BuyerHomeContent() {
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
     getSelectedSegmentSvgName()
   );
+  const criteriaKey = JSON.stringify({ filters, selectedSegmentSvgName });
+  const hasActiveFilters =
+    hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME;
 
   const loadHub = useCallback(async () => {
+    const generation = ++requestGenerationRef.current;
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    if (generation !== requestGenerationRef.current) return;
     if (!emailSetupResult.ok) {
       setSetupRequirement(null);
       setHub(null);
@@ -233,9 +256,21 @@ function BuyerHomeContent() {
       selectedStageCode,
       selectedSortCode
     );
+    if (generation !== requestGenerationRef.current) return;
+    if (result.ok) {
+      const stageCode = getMatchingStageCode(
+        result.data,
+        hasActiveFilters && loadedCriteriaRef.current !== criteriaKey
+      );
+      loadedCriteriaRef.current = criteriaKey;
+      if (stageCode && stageCode !== selectedStageCode) {
+        setSelectedStageCode(stageCode);
+        return;
+      }
+    }
     setHub(result.ok ? result.data : null);
     setIsLoading(false);
-  }, [filters, selectedSegmentSvgName, selectedSortCode, selectedStageCode]);
+  }, [criteriaKey, filters, hasActiveFilters, selectedSegmentSvgName, selectedSortCode, selectedStageCode]);
 
   useEffect(
     () =>
@@ -256,7 +291,9 @@ function BuyerHomeContent() {
   useFocusEffect(
     useCallback(() => {
       void loadHub();
-      return () => {};
+      return () => {
+        requestGenerationRef.current += 1;
+      };
     }, [loadHub])
   );
 
@@ -271,11 +308,10 @@ function BuyerHomeContent() {
       selectedSortCode={selectedSortCode}
       selectedSegmentSvgName={selectedSegmentSvgName}
       hasFilterChip={hasBuyerHomeFilters(filters)}
-      hasActiveFilters={
-        hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
-      }
+      hasActiveFilters={hasActiveFilters}
       onSelectStage={setSelectedStageCode}
       onSelectSort={setSelectedSortCode}
+      onRetry={() => void loadHub()}
     />
   );
 }
@@ -284,15 +320,22 @@ function SellerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
+  const requestGenerationRef = useRef(0);
+  const loadedCriteriaRef = useRef<string | null>(null);
   const [filters, setFilters] = useState<SellerHomeFilters>(getSellerHomeFilters());
   const [selectedStageCode, setSelectedStageCode] = useState(SELLER_DEFAULT_STAGE);
   const [selectedSegmentSvgName, setSelectedSegmentSvgName] = useState(
     getSelectedSegmentSvgName()
   );
+  const criteriaKey = JSON.stringify({ filters, selectedSegmentSvgName });
+  const hasActiveFilters =
+    hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME;
 
   const loadHub = useCallback(async () => {
+    const generation = ++requestGenerationRef.current;
     setIsLoading(true);
     const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    if (generation !== requestGenerationRef.current) return;
     if (!emailSetupResult.ok) {
       setSetupRequirement(null);
       setHub(null);
@@ -308,6 +351,7 @@ function SellerHomeContent() {
     }
 
     const categorySetupResult = await getCurrentSellerBusinessCategorySetupStatus();
+    if (generation !== requestGenerationRef.current) return;
     if (!categorySetupResult.ok) {
       setSetupRequirement(null);
       setHub(null);
@@ -328,9 +372,21 @@ function SellerHomeContent() {
       selectedSegmentSvgName,
       selectedStageCode
     );
+    if (generation !== requestGenerationRef.current) return;
+    if (result.ok) {
+      const stageCode = getMatchingStageCode(
+        result.data,
+        hasActiveFilters && loadedCriteriaRef.current !== criteriaKey
+      );
+      loadedCriteriaRef.current = criteriaKey;
+      if (stageCode && stageCode !== selectedStageCode) {
+        setSelectedStageCode(stageCode);
+        return;
+      }
+    }
     setHub(result.ok ? result.data : null);
     setIsLoading(false);
-  }, [filters, selectedSegmentSvgName, selectedStageCode]);
+  }, [criteriaKey, filters, hasActiveFilters, selectedSegmentSvgName, selectedStageCode]);
 
   useEffect(() => subscribeSellerHomeFilters(setFilters), []);
   useEffect(() => subscribeSelectedSegment(setSelectedSegmentSvgName), []);
@@ -338,7 +394,9 @@ function SellerHomeContent() {
   useFocusEffect(
     useCallback(() => {
       void loadHub();
-      return () => {};
+      return () => {
+        requestGenerationRef.current += 1;
+      };
     }, [loadHub])
   );
 
@@ -353,11 +411,10 @@ function SellerHomeContent() {
       selectedSortCode={null}
       selectedSegmentSvgName={selectedSegmentSvgName}
       hasFilterChip={hasSellerHomeFilters(filters)}
-      hasActiveFilters={
-        hasSellerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME
-      }
+      hasActiveFilters={hasActiveFilters}
       onSelectStage={setSelectedStageCode}
       onSelectSort={undefined}
+      onRetry={() => void loadHub()}
     />
   );
 }
@@ -375,6 +432,7 @@ function MarketplaceHomeContent({
   hasActiveFilters,
   onSelectStage,
   onSelectSort,
+  onRetry,
 }: {
   role: MarketplaceHubRole;
   isLoading: boolean;
@@ -388,6 +446,7 @@ function MarketplaceHomeContent({
   hasActiveFilters: boolean;
   onSelectStage: (stageCode: string) => void;
   onSelectSort?: (sortCode: string) => void;
+  onRetry: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -399,8 +458,12 @@ function MarketplaceHomeContent({
     [hasFilterChip, t]
   );
   const selectedStage =
-    hub?.stages.find((stage) => stage.code === selectedStageCode) ?? hub?.stages[0] ?? null;
+    hub?.stages.find((stage) => stage.is_selected) ??
+    hub?.stages.find((stage) => stage.code === selectedStageCode) ?? null;
   const items = hub?.rail.items ?? [];
+  const hasMatches = Boolean(
+    items.length || hub?.rail.total || hub?.stages.some((stage) => stage.count > 0)
+  );
   const attentionCount = hub?.overview.attention_request_count ?? 0;
   const unreadConversationCount = hub?.overview.unread_conversation_count ?? 0;
   const unreadMessageCount = hub?.overview.unread_message_count ?? 0;
@@ -473,7 +536,17 @@ function MarketplaceHomeContent({
     );
   }
 
-  if (!hub || (hub.stages.length === 0 && items.length === 0)) {
+  if (!hub) {
+    return (
+      <HomeEmptyState
+        topContentInset={topContentInset}
+        message="No pudimos cargar las solicitudes. Intenta de nuevo."
+        onRetry={onRetry}
+      />
+    );
+  }
+
+  if ((hasActiveFilters && !hasMatches) || (hub.stages.length === 0 && !hasMatches)) {
     return (
       <HomeEmptyState
         topContentInset={topContentInset}
@@ -497,30 +570,41 @@ function MarketplaceHomeContent({
     >
       <View style={s.summaryBlock}>
         <Text variant="small" color="textMedium">
-          Resumen
+          {hasActiveFilters ? "Resultados" : "Resumen"}
         </Text>
-        <Text variant="subtitle">
-          {activeRequestCount}{" "}
-          {role === "buyer"
-            ? activeRequestCount === 1
-              ? "solicitud en movimiento"
-              : "solicitudes en movimiento"
-            : activeRequestCount === 1
-              ? "oportunidad disponible"
-              : "oportunidades disponibles"}
-        </Text>
-        <Text variant="body" color="stateAnulated">
-          {attentionCount > 0
-            ? attentionCount === 1
-              ? "Una necesita atención."
-              : `${attentionCount} necesitan atención.`
-            : role === "buyer"
-              ? "No tienes acciones pendientes."
-              : "No tienes negociaciones pendientes."}
-        </Text>
+        {hasActiveFilters ? (
+          <>
+            {filters.searchValue ? <Text variant="body">{`“${filters.searchValue}”`}</Text> : null}
+            <Text variant="body" color="textMedium" accessibilityLiveRegion="polite">
+              {hub.rail.total} {hub.rail.total === 1 ? "solicitud" : "solicitudes"} en {selectedStage?.name ?? hub.rail.title}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text variant="subtitle">
+              {activeRequestCount}{" "}
+              {role === "buyer"
+                ? activeRequestCount === 1
+                  ? "solicitud en movimiento"
+                  : "solicitudes en movimiento"
+                : activeRequestCount === 1
+                  ? "oportunidad disponible"
+                  : "oportunidades disponibles"}
+            </Text>
+            <Text variant="body" color="stateAnulated">
+              {attentionCount > 0
+                ? attentionCount === 1
+                  ? "Una necesita atención."
+                  : `${attentionCount} necesitan atención.`
+                : role === "buyer"
+                  ? "No tienes acciones pendientes."
+                  : "No tienes negociaciones pendientes."}
+            </Text>
+          </>
+        )}
       </View>
 
-      {attentionCount > 0 ? (
+      {!hasActiveFilters && attentionCount > 0 ? (
         <HomeShortcut
           icon="alert-circle"
           title={
@@ -546,7 +630,7 @@ function MarketplaceHomeContent({
         />
       ) : null}
 
-      {unreadConversationCount > 0 ? (
+      {!hasActiveFilters && unreadConversationCount > 0 ? (
         <HomeShortcut
           icon="message-circle"
           title={
@@ -559,26 +643,41 @@ function MarketplaceHomeContent({
         />
       ) : null}
 
-      <ScrollView
-        ref={stageScrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.stageListContent}
-      >
-        {orderedStages.map((stage) => {
-          const isSelected = stage.code === selectedStageCode;
-
-          return (
+      {hasActiveFilters ? (
+        <View style={s.filteredStageList}>
+          {hub.stages.map((stage) => (
             <LuppitChip
               key={stage.code}
               label={stage.name}
               count={stage.count}
-              selected={isSelected}
+              selected={stage.code === selectedStage?.code}
+              accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
               onPress={() => onSelectStage(stage.code)}
             />
-          );
-        })}
-      </ScrollView>
+          ))}
+        </View>
+      ) : (
+        <ScrollView
+          ref={stageScrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.stageListContent}
+        >
+          {orderedStages.map((stage) => {
+            const isSelected = stage.code === selectedStageCode;
+
+            return (
+              <LuppitChip
+                key={stage.code}
+                label={stage.name}
+                count={stage.count}
+                selected={isSelected}
+                onPress={() => onSelectStage(stage.code)}
+              />
+            );
+          })}
+        </ScrollView>
+      )}
 
       <View style={s.railSection}>
         <View style={s.railHeader}>
@@ -671,6 +770,10 @@ function MarketplaceHomeContent({
               role,
               selectedStage,
               hasActiveFilters,
+              hasOtherMatches: hub.stages.some(
+                (stage) => stage.code !== selectedStage?.code && stage.count > 0
+              ),
+              hasRailMatches: hub.rail.total > 0,
             })}
           />
         )}
@@ -824,9 +927,11 @@ function AccountSetupRequiredState({
 function HomeEmptyState({
   topContentInset,
   message,
+  onRetry,
 }: {
   topContentInset: number;
   message: string;
+  onRetry?: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -850,6 +955,7 @@ function HomeEmptyState({
       <Text align="center" variant="body">
         {message}
       </Text>
+      {onRetry ? <Button variant="dark" title="Reintentar" onPress={onRetry} /> : null}
     </View>
   );
 }
@@ -870,6 +976,12 @@ function createMarketplaceHomeStyles(t: Theme) {
       paddingHorizontal: t.spacing.md,
     },
     stageListContent: {
+      gap: t.spacing.sm,
+      paddingHorizontal: t.spacing.md,
+    },
+    filteredStageList: {
+      flexDirection: "row",
+      flexWrap: "wrap",
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },

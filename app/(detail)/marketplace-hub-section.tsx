@@ -307,6 +307,7 @@ export default function MarketplaceHubSectionScreen() {
   const filterButtonRef = useRef<View | null>(null);
   const sortButtonRef = useRef<View | null>(null);
   const requestGenerationRef = useRef(0);
+  const loadedCriteriaRef = useRef<string | null>(null);
   const lastAnnouncementRef = useRef("");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -360,6 +361,16 @@ export default function MarketplaceHubSectionScreen() {
         ? requestGenerationRef.current + 1
         : requestGenerationRef.current;
       if (replace) requestGenerationRef.current = generation;
+      if (replace && loadedCriteriaRef.current !== criteriaKey) {
+        loadedCriteriaRef.current = criteriaKey;
+        itemsRef.current = [];
+        setItems([]);
+        setTotal(0);
+        setHasMore(false);
+        setHasLoaded(false);
+        setIsRefreshing(false);
+        setIsLoadingMore(false);
+      }
       const hadItems = itemsRef.current.length > 0;
 
       if (replace) {
@@ -437,6 +448,7 @@ export default function MarketplaceHubSectionScreen() {
       setIsLoadingMore(false);
     },
     [
+      criteriaKey,
       effectiveFilters,
       effectiveSortCode,
       isSeller,
