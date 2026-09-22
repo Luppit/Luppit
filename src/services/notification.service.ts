@@ -190,6 +190,9 @@ export async function markAllCurrentProfileNotificationsRead(): Promise<
   );
 
   if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  if (!isRecord(result.data) || result.data.success !== true) {
+    return { ok: false, error: fromAppError("unknown") };
+  }
 
   return { ok: true, data: result.data };
 }

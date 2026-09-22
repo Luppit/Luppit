@@ -10,6 +10,7 @@ import { Text } from "@/src/components/Text";
 import {
   dismissAllCurrentProfileNotifications,
   getCurrentProfileNotifications,
+  markAllCurrentProfileNotificationsRead,
   markCurrentProfileNotificationRead,
   ProfileNotificationListItem,
 } from "@/src/services/notification.service";
@@ -19,7 +20,7 @@ import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -180,7 +181,7 @@ function getNotificationActions(
 export default function NotificationsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { applyUnreadNotificationCount, refreshUnreadNotificationCount } =
+  const { unreadNotificationCount, applyUnreadNotificationCount, refreshUnreadNotificationCount } =
     useActiveProfile();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = React.useMemo(
@@ -190,10 +191,15 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = React.useState<ProfileNotificationListItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [isMarkingAllRead, setIsMarkingAllRead] = React.useState(false);
   const isMountedRef = React.useRef(true);
+  const markingAllReadRef = React.useRef(false);
   const markingNotificationIdsRef = React.useRef(new Set<string>());
+  const hasUnreadNotifications =
+    unreadNotificationCount > 0 || notifications.some((item) => item.readAt == null);
 
   React.useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -203,25 +209,68 @@ export default function NotificationsScreen() {
     setIsLoading(true);
     setLoadError(null);
 
-    const result = await getCurrentProfileNotifications();
-    if (!isMountedRef.current) return;
+    try {
+      const [result, countRefreshed] = await Promise.all([
+        getCurrentProfileNotifications(),
+        refreshUnreadNotificationCount(),
+      ]);
+      if (!isMountedRef.current) return false;
 
-    if (!result.ok) {
-      setNotifications([]);
-      setLoadError(result.error.message);
-      setIsLoading(false);
-      showError("No se pudieron cargar tus notificaciones", result.error.message);
-      return;
+      if (!result.ok || !countRefreshed) {
+        const message = !result.ok
+          ? result.error.message
+          : "No se pudo actualizar el conteo de notificaciones sin leer.";
+        setNotifications([]);
+        setLoadError(message);
+        showError("No se pudieron cargar tus notificaciones", message);
+        return false;
+      }
+
+      setNotifications(result.data);
+      return true;
+    } catch {
+      if (isMountedRef.current) {
+        setLoadError("Inténtalo nuevamente.");
+        showError("No se pudieron cargar tus notificaciones", "Inténtalo nuevamente.");
+      }
+      return false;
+    } finally {
+      if (isMountedRef.current) setIsLoading(false);
     }
-
-    setNotifications(result.data);
-    void refreshUnreadNotificationCount();
-    setIsLoading(false);
   }, [refreshUnreadNotificationCount]);
+
+  const markAllNotificationsRead = React.useCallback(async () => {
+    if (markingAllReadRef.current || !hasUnreadNotifications) return;
+
+    markingAllReadRef.current = true;
+    setIsMarkingAllRead(true);
+    try {
+      const result = await markAllCurrentProfileNotificationsRead();
+      if (!isMountedRef.current) return;
+
+      if (!result.ok) {
+        showError("No se pudieron marcar como leídas", result.error.message);
+        return;
+      }
+
+      if (await loadNotifications()) {
+        showSuccess("Notificaciones marcadas como leídas");
+      }
+    } catch {
+      if (isMountedRef.current) {
+        showError("No se pudieron actualizar tus notificaciones", "Inténtalo nuevamente.");
+        setIsLoading(false);
+      }
+    } finally {
+      markingAllReadRef.current = false;
+      if (isMountedRef.current) setIsMarkingAllRead(false);
+    }
+  }, [hasUnreadNotifications, loadNotifications]);
 
   const markNotificationRead = React.useCallback(
     async (notification: ProfileNotificationListItem) => {
       if (
+        markingAllReadRef.current ||
         notification.readAt != null ||
         markingNotificationIdsRef.current.has(notification.notificationId)
       ) {
@@ -254,6 +303,7 @@ export default function NotificationsScreen() {
 
   const openNotificationDetail = React.useCallback(
     (notification: ProfileNotificationListItem) => {
+      if (markingAllReadRef.current) return;
       const title = notification.title?.trim() || "Novedad en Luppit";
       const metadata = [
         getNotificationTypeLabel(notification),
@@ -275,6 +325,7 @@ export default function NotificationsScreen() {
   );
 
   const openDismissAllConfirmation = React.useCallback(() => {
+    if (markingAllReadRef.current) return;
     openPopup({
       type: "summary",
       title: "Limpiar notificaciones",
@@ -381,13 +432,38 @@ export default function NotificationsScreen() {
       </GroupedListSection>
 
       <GroupedListSection title="Administrar">
+        <View
+          accessible={isMarkingAllRead || !hasUnreadNotifications}
+          accessibilityRole="button"
+          accessibilityLabel={isMarkingAllRead
+            ? "Marcando como leídas"
+            : "Marcar todas como leídas. No tienes notificaciones sin leer."}
+          accessibilityState={{ busy: isMarkingAllRead, disabled: isMarkingAllRead || !hasUnreadNotifications }}
+          accessibilityLiveRegion="polite"
+        >
+          <GroupedListRow
+            icon="check-check"
+            label={isMarkingAllRead ? "Marcando como leídas..." : "Marcar todas como leídas"}
+            labelMaxLines={2}
+            description={hasUnreadNotifications
+              ? "Conserva las notificaciones en tu lista."
+              : "No tienes notificaciones sin leer."}
+            showChevron={false}
+            rightAccessory={isMarkingAllRead
+              ? <ActivityIndicator size="small" color={t.colors.primary} />
+              : undefined}
+            onPress={isMarkingAllRead || !hasUnreadNotifications
+              ? undefined
+              : () => void markAllNotificationsRead()}
+          />
+        </View>
         <GroupedListRow
           icon="trash-2"
           label="Limpiar notificaciones"
           description="Oculta las notificaciones actuales de este perfil."
           destructive
           showSeparator={false}
-          onPress={openDismissAllConfirmation}
+          onPress={isMarkingAllRead ? undefined : openDismissAllConfirmation}
           accessibilityLabel="Limpiar todas las notificaciones"
         />
       </GroupedListSection>
