@@ -1,4 +1,5 @@
 import LuppitChip from "@/src/components/chip/LuppitChip";
+import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
@@ -12,6 +13,7 @@ import {
   ProfileNotificationListItem,
 } from "@/src/services/notification.service";
 import { openPopup, PopupSummaryAction } from "@/src/services/popup.service";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -412,72 +414,81 @@ export default function NotificationsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <View style={s.toolbar}>
-        <View style={s.filters}>
-          <LuppitChip
-            label="Todas"
-            selected={filter === "all"}
-            bordered
-            onPress={() => setFilter("all")}
-          />
-          <LuppitChip
-            label="Sin leer"
-            count={unreadNotificationCount}
-            selected={filter === "unread"}
-            bordered
-            accessibilityLabel={`Sin leer, ${unreadNotificationCount} notificaciones`}
-            onPress={() => setFilter("unread")}
-          />
+      <View style={s.controls}>
+        <View style={s.toolbar}>
+          <View style={s.filters}>
+            <LuppitChip
+              label="Todas"
+              selected={filter === "all"}
+              bordered
+              onPress={() => setFilter("all")}
+            />
+            <LuppitChip
+              label="Sin leer"
+              count={unreadNotificationCount}
+              selected={filter === "unread"}
+              bordered
+              accessibilityLabel={`Sin leer, ${unreadNotificationCount} notificaciones`}
+              onPress={() => setFilter("unread")}
+            />
+          </View>
+          <Pressable
+            testID="notification-options"
+            accessibilityRole="button"
+            accessibilityLabel="Opciones de notificaciones"
+            accessibilityState={{ disabled: isMarkingAllRead }}
+            disabled={isMarkingAllRead}
+            onPress={isMarkingAllRead ? undefined : () => openPopup({
+              options: [{
+                id: "clear-notifications",
+                label: "Limpiar notificaciones",
+                icon: "trash-2",
+                textColorKey: "error",
+                iconColorKey: "error",
+                onPress: openDismissAllConfirmation,
+              }],
+            })}
+            style={({ pressed }) => [
+              s.optionsButton,
+              pressed ? s.controlPressed : null,
+            ]}
+          >
+            <Icon name="ellipsis" size={22} color={t.colors.textMedium} />
+          </Pressable>
         </View>
         <Pressable
-          testID="notification-options"
+          testID="mark-all-notifications-read"
           accessibilityRole="button"
-          accessibilityLabel="Opciones de notificaciones"
-          accessibilityState={{ disabled: isMarkingAllRead }}
-          disabled={isMarkingAllRead}
-          onPress={isMarkingAllRead ? undefined : () => openPopup({
-            options: [{
-              id: "clear-notifications",
-              label: "Limpiar notificaciones",
-              icon: "trash-2",
-              textColorKey: "error",
-              iconColorKey: "error",
-              onPress: openDismissAllConfirmation,
-            }],
-          })}
-          style={s.optionsButton}
+          accessibilityLabel={isMarkingAllRead
+            ? "Marcando como leídas"
+            : hasUnreadNotifications
+              ? "Marcar todas como leídas"
+              : "Marcar todas como leídas. No tienes notificaciones sin leer."}
+          accessibilityState={{ busy: isMarkingAllRead, disabled: isMarkingAllRead || !hasUnreadNotifications }}
+          accessibilityLiveRegion="polite"
+          disabled={isMarkingAllRead || !hasUnreadNotifications}
+          onPress={isMarkingAllRead || !hasUnreadNotifications
+            ? undefined
+            : () => void markAllNotificationsRead()}
+          style={({ pressed }) => [
+            s.markAllButton,
+            !hasUnreadNotifications ? s.disabledAction : null,
+            pressed ? s.controlPressed : null,
+          ]}
         >
-          <Icon name="ellipsis" size={24} color={t.colors.textMedium} />
+          {isMarkingAllRead
+            ? <ActivityIndicator size="small" color={t.colors.primary} />
+            : <Icon name="check-check" size={18} color={t.colors.primary} />}
+          <Text variant="small" color="primary" style={s.markAllLabel}>
+            {isMarkingAllRead ? "Marcando como leídas..." : "Marcar todas como leídas"}
+          </Text>
         </Pressable>
       </View>
-      <Pressable
-        testID="mark-all-notifications-read"
-        accessibilityRole="button"
-        accessibilityLabel={isMarkingAllRead
-          ? "Marcando como leídas"
-          : hasUnreadNotifications
-            ? "Marcar todas como leídas"
-            : "Marcar todas como leídas. No tienes notificaciones sin leer."}
-        accessibilityState={{ busy: isMarkingAllRead, disabled: isMarkingAllRead || !hasUnreadNotifications }}
-        accessibilityLiveRegion="polite"
-        disabled={isMarkingAllRead || !hasUnreadNotifications}
-        onPress={isMarkingAllRead || !hasUnreadNotifications
-          ? undefined
-          : () => void markAllNotificationsRead()}
-        style={[s.markAllButton, !hasUnreadNotifications ? s.disabledAction : null]}
-      >
-        {isMarkingAllRead
-          ? <ActivityIndicator size="small" color={t.colors.primary} />
-          : <Icon name="check-check" size={20} color={t.colors.primary} />}
-        <Text variant="small" color="primary" style={s.markAllLabel}>
-          {isMarkingAllRead ? "Marcando como leídas..." : "Marcar todas como leídas"}
-        </Text>
-      </Pressable>
 
       {sections.map((section) => (
         <View key={section.title} style={s.activitySection}>
           <Text variant="small" color="textMedium" style={s.sectionTitle}>{section.title}</Text>
-          <View style={s.activityGroup}>
+          <GroupedList>
             {section.items.map((notification, index) => (
               <NotificationRow
                 key={notification.notificationId}
@@ -487,7 +498,7 @@ export default function NotificationsScreen() {
                 onPress={() => openNotificationDetail(notification)}
               />
             ))}
-          </View>
+          </GroupedList>
         </View>
       ))}
       {visibleNotifications.length === 0 ? (
@@ -518,7 +529,7 @@ function NotificationRow({
   const s = React.useMemo(() => createNotificationsStyles(t), [t]);
   const icon = getNotificationIcon(notification);
   const typeLabel = getNotificationTypeLabel(notification);
-  const typeColor = notification.typeCode.trim().toLowerCase() === "urgent" ? "error" : "secondary";
+  const typeColor = notification.typeCode.trim().toLowerCase() === "urgent" ? "error" : "textMedium";
   const isUnread = notification.readAt == null;
   const title = notification.title?.trim() || "Novedad en Luppit";
   const accessibleTime = formatNotificationAccessibleTime(notification.createdAt);
@@ -532,7 +543,7 @@ function NotificationRow({
       disabled={disabled}
       accessibilityState={{ disabled }}
       onPress={onPress}
-      style={s.row}
+      style={({ pressed }) => [s.row, pressed ? s.rowPressed : null]}
     >
       <View
         style={s.iconBadge}
@@ -542,20 +553,21 @@ function NotificationRow({
         <Icon name={icon} size={24} color={t.colors.primary} />
       </View>
       <View style={s.rowBody}>
-        <Text variant="body" maxLines={3}>
-          {notification.message.trim() || title}
-        </Text>
-        {notification.title?.trim() && notification.title.trim() !== notification.message.trim() ? (
-          <Text variant="small" color="textMedium" maxLines={2}>
-            {notification.title.trim()}
+        <View style={s.rowTitleLine}>
+          <Text
+            variant="body"
+            maxLines={2}
+            style={[s.rowTitle, isUnread ? s.rowTitleUnread : null]}
+          >
+            {title}
           </Text>
-        ) : null}
-        <View style={s.rowMetadata}>
-          {isUnread ? <View style={s.unreadDot} /> : null}
-          <Text variant="small" color="textMedium">
+          <Text variant="small" color="stateAnulated" maxLines={1} style={s.rowTime}>
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>
+        <Text variant="small" color="textMedium" maxLines={2}>
+          {notification.message}
+        </Text>
         {typeLabel ? (
           <Text variant="small" color={typeColor} maxLines={2}>
             {typeLabel}
@@ -572,8 +584,7 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     content: {
       paddingTop: topContentInset + t.spacing.md,
       paddingBottom: t.spacing.xl,
-      paddingHorizontal: t.spacing.md,
-      gap: t.spacing.md,
+      gap: t.spacing.lg,
     },
     loadingBox: {
       flex: 1,
@@ -583,14 +594,13 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       paddingTop: topContentInset,
     },
     activitySection: {
-      marginHorizontal: -t.spacing.md,
       gap: t.spacing.sm,
     },
     sectionTitle: {
       paddingHorizontal: t.spacing.md,
     },
-    activityGroup: {
-      backgroundColor: t.colors.backgroudWhite,
+    controls: {
+      gap: t.spacing.sm,
     },
     toolbar: {
       flexDirection: "row",
@@ -606,17 +616,21 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     optionsButton: {
       width: 44,
       height: 44,
+      borderRadius: 22,
+      ...createRoundedSurfaceStyle(t),
       alignItems: "center",
       justifyContent: "center",
     },
     markAllButton: {
       minHeight: 44,
       alignSelf: "flex-end",
+      borderRadius: 22,
+      ...createRoundedSurfaceStyle(t),
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "flex-end",
       gap: t.spacing.sm,
-      marginTop: -t.spacing.md,
+      paddingHorizontal: t.spacing.md,
     },
     markAllLabel: {
       flexShrink: 1,
@@ -624,44 +638,59 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     disabledAction: {
       opacity: 0.5,
     },
+    controlPressed: {
+      backgroundColor: t.colors.primaryLight,
+    },
     filteredEmptyState: {
       paddingVertical: t.spacing.xl,
     },
     row: {
       position: "relative",
-      minHeight: 104,
+      minHeight: 96,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: t.spacing.md,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.md,
     },
-    unreadDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: t.colors.primary,
+    rowPressed: {
+      backgroundColor: t.colors.primaryLight,
     },
     iconBadge: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.primaryLight,
     },
     rowBody: {
       flex: 1,
+      minWidth: 0,
       gap: t.spacing.xs,
     },
-    rowMetadata: {
+    rowTitleLine: {
+      minWidth: 0,
       flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.xs,
+      alignItems: "flex-start",
+      gap: t.spacing.sm,
+    },
+    rowTitle: {
+      flex: 1,
+      minWidth: 0,
+    },
+    rowTitleUnread: {
+      fontFamily: t.typography.subtitle.fontFamily,
+    },
+    rowTime: {
+      maxWidth: 64,
+      flexShrink: 1,
+      textAlign: "right",
+      paddingTop: 2,
     },
     rowSeparator: {
       position: "absolute",
-      left: t.spacing.md,
+      left: t.spacing.md + 44 + t.spacing.md,
       right: t.spacing.md,
       bottom: 0,
       height: StyleSheet.hairlineWidth,
