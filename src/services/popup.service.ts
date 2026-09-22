@@ -25,6 +25,20 @@ export type PopupSummaryRow = {
   value: string;
 };
 
+export type PopupSummaryComparison = {
+  currentLabel: string;
+  proposedLabel: string;
+  changedLabel: string;
+  fields: {
+    id: string;
+    label: string;
+    currentValue: string;
+    proposedValue: string;
+    changed: boolean;
+    layout: "inline" | "stacked";
+  }[];
+};
+
 export type PopupSummaryImage = {
   uri: string;
   caption?: string;
@@ -123,6 +137,7 @@ export type PopupSummaryConfig = {
   descriptionPlacement?: "beforeRows" | "afterRows";
   descriptionScroll?: boolean;
   rows?: PopupSummaryRow[];
+  comparison?: PopupSummaryComparison;
   inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];
   blocker?: PopupSummaryBlocker | null;

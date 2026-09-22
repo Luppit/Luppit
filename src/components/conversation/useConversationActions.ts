@@ -376,7 +376,7 @@ export function useConversationActions({
   );
 
   const handleActionPress = useCallback(
-    (action: ConversationViewAction) => {
+    (action: ConversationViewAction): void => {
       if (isExecutingActionRef.current) return;
       const confirmation = action.confirmation;
       if (!confirmation) {
@@ -406,6 +406,8 @@ export function useConversationActions({
       );
       const rows = confirmation.fields
         .filter((field) => field !== offerName && field !== offerDescription)
+        .filter((field) => !confirmation.comparison ||
+          !["current_terms", "proposed_terms"].includes(field.value_source))
         .map((field) => ({
           label: field.label,
           value: toStringValue(field.value),
@@ -443,6 +445,10 @@ export function useConversationActions({
       const ratingInputTitle =
         confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
+      const secondaryAction = confirmation.secondary_action_code
+        ? conversationView?.actions.find((candidate) =>
+            candidate.code === confirmation.secondary_action_code && candidate.id !== action.id)
+        : undefined;
       const hasUnavailableRequiredChoice = confirmation.inputs.some(
         (input) =>
           input.kind === "choice" &&
@@ -457,8 +463,17 @@ export function useConversationActions({
         description: offerDescription
           ? toStringValue(offerDescription.value)
           : description,
-        descriptionPlacement: offerDescription ? "afterRows" : undefined,
+        descriptionPlacement: offerDescription || confirmation.comparison ? "afterRows" : undefined,
         rows,
+        comparison: confirmation.comparison ? {
+          currentLabel: confirmation.comparison.current_label,
+          proposedLabel: confirmation.comparison.proposed_label,
+          changedLabel: confirmation.comparison.changed_label,
+          fields: confirmation.comparison.fields.map((field) => ({
+            id: field.id, label: field.label, currentValue: field.current_value,
+            proposedValue: field.proposed_value, changed: field.changed, layout: field.layout,
+          })),
+        } : undefined,
         inputs,
         images: confirmation.images,
         blocker: confirmation.blocker
@@ -477,11 +492,15 @@ export function useConversationActions({
         actions: [
           {
             id: `${action.id}-cancel`,
-            label: confirmation.cancel_label || "Volver",
+            label: secondaryAction?.confirmation?.confirm_label || secondaryAction?.label || confirmation.cancel_label || "Volver",
             icon: normalizeOptionalIcon(confirmation.cancel_icon),
             backgroundColorKey: "backgroudWhite",
             textColorKey: "textDark",
             iconColorKey: "textDark",
+            onPress: secondaryAction ? () => {
+              handleActionPress(secondaryAction);
+              return false;
+            } : undefined,
           },
           {
             id: `${action.id}-confirm`,
@@ -703,7 +722,7 @@ export function useConversationActions({
         ? { actionId: action.id, revision: JSON.stringify(confirmation.payload_defaults), config: popupConfig } : null;
       openPopup(popupConfig);
     },
-    [conversationView?.context, refreshConversation, runAction]
+    [conversationView?.context, conversationView?.actions, refreshConversation, runAction]
   );
 
   return { isExecutingAction, executingActionId, handleActionPress };

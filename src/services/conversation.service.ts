@@ -29,6 +29,20 @@ export type ConversationActionConfirmationField = {
   sort_order: number;
 };
 
+export type ConversationActionComparison = {
+  current_label: string;
+  proposed_label: string;
+  changed_label: string;
+  fields: {
+    id: string;
+    label: string;
+    current_value: string;
+    proposed_value: string;
+    changed: boolean;
+    layout: "inline" | "stacked";
+  }[];
+};
+
 export type ConversationChoiceOption = {
   value: string;
   method_kind: "shipping" | "pickup" | null;
@@ -77,6 +91,8 @@ export type ConversationActionConfirmation = {
   confirm_icon: string | null;
   confirm_style_code: string | null;
   fields: ConversationActionConfirmationField[];
+  comparison?: ConversationActionComparison;
+  secondary_action_code?: string;
   inputs: ConversationActionConfirmationInput[];
   payload_defaults: Record<string, unknown>;
   review_images?: { storage_ref: string; caption: string | null }[];
@@ -360,6 +376,37 @@ function parseConversationConfirmationBlocker(
   };
 }
 
+function parseConversationComparison(raw: unknown): ConversationActionComparison | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const value = raw as Record<string, unknown>;
+  const labels = [value.current_label, value.proposed_label, value.changed_label];
+  if (labels.some((label) => typeof label !== "string" || !label.trim()) ||
+      !Array.isArray(value.fields) || !value.fields.length) return undefined;
+
+  const fields: ConversationActionComparison["fields"] = [];
+  for (const rawField of value.fields) {
+    if (!rawField || typeof rawField !== "object" || Array.isArray(rawField)) return undefined;
+    const field = rawField as Record<string, unknown>;
+    if (typeof field.id !== "string" || !field.id.trim() ||
+        fields.some((item) => item.id === field.id) ||
+        typeof field.label !== "string" || !field.label.trim() ||
+        typeof field.current_value !== "string" || typeof field.proposed_value !== "string" ||
+        typeof field.changed !== "boolean" ||
+        (field.layout !== "inline" && field.layout !== "stacked")) return undefined;
+    fields.push({
+      id: field.id, label: field.label,
+      current_value: field.current_value, proposed_value: field.proposed_value,
+      changed: field.changed, layout: field.layout,
+    });
+  }
+  return {
+    current_label: value.current_label as string,
+    proposed_label: value.proposed_label as string,
+    changed_label: value.changed_label as string,
+    fields,
+  };
+}
+
 function parseConversationActionConfirmation(raw: unknown): ConversationActionConfirmation | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -393,6 +440,8 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
     confirm_style_code:
       typeof value.confirm_style_code === "string" ? value.confirm_style_code : null,
     fields,
+    comparison: parseConversationComparison(value.comparison),
+    secondary_action_code: toOptionalText(value.secondary_action_code) ?? undefined,
     inputs,
     payload_defaults:
       value.payload_defaults &&
