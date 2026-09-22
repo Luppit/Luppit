@@ -306,6 +306,7 @@ function OfferSummaryCard({
   onPublish,
   isEditMode = false,
   changedFields = [],
+  offerImages = [],
 }: {
   summary: SellerOfferAssistantSummary | null;
   purchaseRequestTitle: string | null | undefined;
@@ -318,8 +319,10 @@ function OfferSummaryCard({
   onPublish: () => void;
   isEditMode?: boolean;
   changedFields?: string[];
+  offerImages?: SellerOfferAssistantImage[];
 }) {
-  const details = getOfferSummaryDetails(summary, offerPhotoCount);
+  const t = useTheme();
+  const details = getOfferSummaryDetails(summary, isEditMode ? 0 : offerPhotoCount);
   const notices: AssistantReviewNotice[] = [];
   const isComplete = hasOfferPhoto && missingFields.length === 0;
   if (isEditMode && changedFields.length) notices.push({ text: `Cambios: ${changedFields.join(", ")}.` });
@@ -358,7 +361,14 @@ function OfferSummaryCard({
       secondaryLabel="Seguir ajustando"
       secondaryDisabled={loading}
       onSecondaryPress={onContinue}
-    />
+    >
+      {isEditMode && offerImages.length > 0 ? (
+        <View style={{ gap: t.spacing.sm }}>
+          <Text variant="small" color="textMedium">Fotos que verá el comprador</Text>
+          <OfferPhotos images={offerImages} />
+        </View>
+      ) : null}
+    </AssistantReviewCard>
   );
 }
 
@@ -892,12 +902,6 @@ function OfferAssistantScreen({
           </Pressable>
         ) : null}
 
-        {isEditMode && showSummary && offerImages.length > 0 ? (
-          <View style={{ gap: t.spacing.sm }}>
-            <Text variant="small" color="textMedium">Fotos que verá el comprador</Text>
-            <OfferPhotos images={offerImages} />
-          </View>
-        ) : null}
         {conflict ? <View style={{ gap: t.spacing.sm }}>
           <Text>{conflict === "offer_changed" ? "La oferta publicada cambió. Puedes descartar estos cambios y empezar con la oferta actual." : "El borrador cambió en otra sesión. Carga los últimos cambios para continuar."}</Text>
           <Button title={conflict === "offer_changed" ? "Descartar cambios y cargar oferta" : "Cargar últimos cambios"}
@@ -924,6 +928,7 @@ function OfferAssistantScreen({
             loading={isBusy}
             isEditMode={isEditMode}
             changedFields={changedFields}
+            offerImages={offerImages}
             onContinue={handleContinue}
             onPublish={handlePublish}
           />

@@ -23,6 +23,7 @@ type AssistantReviewCardProps = {
   title: string;
   description?: string | null;
   rows: AssistantReviewRow[];
+  children?: React.ReactNode;
   notices?: AssistantReviewNotice[];
   primaryLabel: string;
   primaryDisabled?: boolean;
@@ -40,6 +41,7 @@ export default function AssistantReviewCard({
   title,
   description,
   rows,
+  children,
   notices = [],
   primaryLabel,
   primaryDisabled = false,
@@ -137,6 +139,8 @@ export default function AssistantReviewCard({
             ))}
           </View>
         ) : null}
+
+        {children}
 
         {notices.map((notice, index) => {
           const isError = notice.tone === "error";

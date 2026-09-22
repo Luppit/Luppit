@@ -688,8 +688,81 @@ test("unchanged edit review cannot publish or infer photos from transcript attac
   assert.ok(review);
   assert.equal(review.disabled, true);
   assert.equal(review.offerPhotoCount, 0);
+  assert.equal(review.offerImages.length, 0);
   await review.onPublish();
   assert.equal(f.aiCalls.length, 1);
+});
+
+test("proposal photos appear once inside the review surface, without changing creation summaries", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const view = assistantView(f);
+  assert.equal(view.review!.offerImages, readyOffer.offerImages);
+  assert.ok(!view.tree.some((n) => typeof n.type === "function" && n.type.name === "OfferPhotos"));
+
+  const card = f.summary(readyOffer.summary, view.review!);
+  assert.ok(!card.props.rows.some((row: any) => row.label === "Fotos"));
+  const reviewCard = load("../src/components/assistant/AssistantReviewCard.tsx", f.modules).default;
+  const rendered = reviewCard(card.props);
+  const surface = rendered.props.children[0];
+  const photos = nodes(surface).filter((n) => typeof n.type === "function" && n.type.name === "OfferPhotos");
+  assert.equal(photos.length, 1);
+  assert.equal(photos[0].props.images, readyOffer.offerImages);
+  assert.equal(nodes(rendered).filter((n) => typeof n.type === "function" && n.type.name === "OfferPhotos").length, 1);
+  const thumbnails = nodes((photos[0].type as Function)(photos[0].props)).filter((n) => n.type === "Image");
+  assert.equal(thumbnails[0].props.source.uri, readyOffer.offerImages[0].url);
+  assert.equal(thumbnails[0].props.accessibilityLabel, "Foto 1 de la oferta");
+
+  const creation = f.summary(readyOffer.summary, { offerImages: readyOffer.offerImages });
+  assert.ok(creation.props.rows.some((row: any) => row.label === "Fotos"));
+  assert.ok(!nodes(creation).some((n) => typeof n.type === "function" && n.type.name === "OfferPhotos"));
+});
+
+test("proposal review keeps effective photos through adjustment, failed upload, retry and fresh restore", async () => {
+  const f = screenFixture({ mode: "edit" });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const continuing = assistantView(f).review!.onContinue();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, uiState: "normal" }));
+  await continuing;
+  assert.equal(assistantView(f).review, undefined);
+  const upload = { uri: "file:///new-product-photo.jpg" };
+  assistantView(f).composer.onSend({ text: "Agrega esta foto", images: [upload] });
+  const failedInput = f.aiCalls.at(-1)!.input;
+  f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await flush();
+  const context = () => assistantView(f).tree.find((n) => typeof n.type === "function" && n.type.name === "OfferEditContext")!.props;
+  assert.equal(context().images, readyOffer.offerImages);
+  const retry = assistantView(f).tree.find((n) => n.type === "Pressable")!.props.onPress();
+  assert.equal(f.aiCalls.at(-1)!.input.identity, failedInput.identity);
+  assert.equal(f.aiCalls.at(-1)!.input.images[0], upload);
+  const effective = [...readyOffer.offerImages, { storageRef: "storage://new", url: "https://example.test/new" }];
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, offerImages: effective, assistantMessage: offerInvitation }));
+  await retry;
+  assistantView(f).composer.onSend({ text: "Sí", images: [] });
+  assert.equal(f.aiCalls.at(-1)!.input.uiAction, "SHOW_SUMMARY");
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, offerImages: effective }));
+  await flush();
+  assert.equal(assistantView(f).review!.offerImages, effective);
+  assert.equal(assistantView(f).review!.offerPhotoCount, 2);
+  assert.equal(context().images, effective);
+  f.unmount();
+
+  const restored = screenFixture({ mode: "edit" });
+  restored.assistant();
+  // A removed photo remains in history, but only the effective photo belongs in review.
+  const refreshed = [{ ...effective[1], url: "https://example.test/new-refreshed" }];
+  restored.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review", offerImages: refreshed,
+    messages: [{ id: "old-photo", role: "user", content: "", imageUrls: [readyOffer.offerImages[0].url] }],
+  }));
+  await flush();
+  const view = assistantView(restored);
+  assert.equal(view.review!.offerImages, refreshed);
+  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.equal(view.messages[0].images[0].uri, readyOffer.offerImages[0].url);
 });
 
 test("stale edit clears review and blocks composition and publication until restored", async () => {
