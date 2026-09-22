@@ -36,7 +36,7 @@ export default function ConversationContextControls({ price, primary, secondary 
     <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: t.spacing.sm }}>
       {primary ? (
         <GlassSurface
-          variant="surface"
+          variant="control"
           style={[pillStyle, { flexGrow: secondary ? 1 : 0, flexBasis: stack ? "100%" : secondary ? 0 : "auto" }]}
           clipStyle={pillStyle}
           contentStyle={{ flexDirection: "row", alignItems: "center" }}
@@ -64,7 +64,7 @@ export default function ConversationContextControls({ price, primary, secondary 
         </GlassSurface>
       ) : null}
       {secondary ? (
-        <GlassSurface variant="surface" style={pillStyle} clipStyle={pillStyle}>
+        <GlassSurface variant="control" style={pillStyle} clipStyle={pillStyle}>
           <Pressable
             ref={secondary.triggerRef}
             onPress={secondary.onPress}
