@@ -85,10 +85,11 @@ async function screenHarness(initial = [notification("one"), notification("two")
     "@/src/components/chip/LuppitChip": { default: "LuppitChip", __esModule: true },
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/Text": { Text: "Text" },
-    "@/src/components/groupedList/GroupedList": { GroupedListSection: "GroupedListSection", GroupedListRow: "GroupedListRow" },
+    "@/src/components/groupedList/GroupedList": { GroupedList: "GroupedList" },
+    "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({}) },
     "@/src/components/loading/LoadingState": { default: "LoadingState", __esModule: true },
     "@/src/components/standaloneList/StandaloneListEmptyState": { default: "EmptyState", __esModule: true },
-    "@/src/themes": { useTheme: () => ({ colors: { primary: "green" }, spacing: { sm: 8, md: 16, lg: 24, xl: 32 } }), fontFamilies: { medium: "Poppins" } },
+    "@/src/themes": { useTheme: () => ({ colors: { primary: "green" }, spacing: { sm: 8, md: 16, lg: 24, xl: 32 }, typography: { subtitle: { fontFamily: "Poppins" } } }), fontFamilies: { medium: "Poppins" } },
     "@/src/utils/useToast": { showError: (...args: unknown[]) => errors.push(args), showSuccess: (...args: unknown[]) => successes.push(args) },
     "@/src/services/popup.service": { openPopup: (popup: unknown) => popups.push(popup) },
     "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({
