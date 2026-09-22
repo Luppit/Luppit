@@ -12,6 +12,7 @@ type MarketplaceCardFrameProps = {
   title: string;
   subtitle?: string | null;
   headerMeta?: ReactNode;
+  headerRight?: ReactNode;
   body?: ReactNode;
   footerLeft?: ReactNode;
   footerRight?: ReactNode;
@@ -30,6 +31,7 @@ export default function MarketplaceCardFrame({
   title,
   subtitle,
   headerMeta,
+  headerRight,
   body,
   footerLeft,
   footerRight,
@@ -49,24 +51,28 @@ export default function MarketplaceCardFrame({
 
   const content = (
     <>
-      <View style={[s.heading, headerMeta ? s.headingWithMeta : null]}>
-        {headerMeta}
-        <Text
-          variant={prominentTitle ? "subtitle" : "body"}
-          maxLines={fullText ? undefined : 2}
-          style={s.title}
-        >
-          {title}
-        </Text>
-        {subtitle ? (
+      <View style={s.header}>
+        <View style={[s.heading, headerMeta ? s.headingWithMeta : null]}>
+          {headerMeta}
           <Text
-            variant="small"
-            color="stateAnulated"
-            maxLines={fullText ? undefined : 1}
+            variant={prominentTitle ? "subtitle" : "body"}
+            maxLines={fullText ? undefined : 2}
+            style={s.title}
           >
-            {subtitle}
+            {title}
           </Text>
-        ) : null}
+          {subtitle ? (
+            <Text
+              variant="small"
+              color="stateAnulated"
+              maxLines={fullText ? undefined : 1}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        {headerRight}
       </View>
 
       {body}
@@ -175,7 +181,14 @@ function createMarketplaceCardFrameStyles(t: Theme, compact: boolean) {
       borderRadius: ROUNDED_SURFACE_RADIUS,
       flex: compact ? 1 : undefined,
     },
+    header: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.sm,
+    },
     heading: {
+      flex: 1,
+      minWidth: 0,
       gap: 4,
     },
     headingWithMeta: {

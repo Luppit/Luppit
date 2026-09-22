@@ -21,14 +21,14 @@ const history = [
 function nodes(value: any): Element[] {
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value?.props) return [];
-  return [value, ...nodes(value.props.children), ...nodes(value.props.body), ...nodes(value.props.footerLeft)];
+  return [value, ...nodes(value.props.children), ...nodes(value.props.body), ...nodes(value.props.footerLeft), ...nodes(value.props.headerRight)];
 }
 
 function visibleText(value: any): string[] {
   if (Array.isArray(value)) return value.flatMap(visibleText);
   if (typeof value === "string") return [value];
   if (!value?.props) return [];
-  return [value.props.children, value.props.body, value.props.footerLeft].flatMap(visibleText);
+  return [value.props.children, value.props.body, value.props.footerLeft, value.props.headerRight].flatMap(visibleText);
 }
 
 function fixture() {
@@ -48,6 +48,9 @@ function fixture() {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022,
     jsx: ts.JsxEmit.React, esModuleInterop: true,
   } });
+  const pricingExports: Record<string, any> = {};
+  const pricingSource = readFileSync(new URL("../src/utils/conversationOfferPrice.ts", import.meta.url), "utf8");
+  runInNewContext(ts.transpileModule(pricingSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: pricingExports });
   const modules: Record<string, any> = {
     react,
     "react-native": { View: "View", Pressable: "Pressable", StyleSheet: { create: (styles: object) => styles, hairlineWidth: 0.5 } },
@@ -61,7 +64,7 @@ function fixture() {
       typography: { subtitle: { fontFamily: "Poppins_600SemiBold" } },
       colors: { info: "blue", success: "green", textDark: "black", textMedium: "gray" },
     }) },
-    "@/src/utils/conversationOfferPrice": { formatConversationOfferPrice: () => "₡150.000" },
+    "@/src/utils/conversationOfferPrice": pricingExports,
   };
   const exports: Record<string, any> = {};
   runInNewContext(outputText, { exports, require(name: string) {
@@ -153,4 +156,22 @@ test("loading, errors, empty history, updated counts and existing callbacks rema
   tree = f.render();
   assert.equal(disclosure(tree), undefined);
   assert.ok(!visibleText(tree).includes("Seguimiento"));
+});
+
+test("price breakdown keeps the supplied subtotal and handles total-only and legacy offers", () => {
+  const f = fixture();
+  Object.assign(f.props.offer, { price_basis: "UNIT", price: 25000, quantity_offered: 4,
+    offer_product_subtotal: 90000, offer_currency_code: "CRC" });
+  let text = visibleText(f.render());
+  assert.ok(text.includes("4 unidades"));
+  assert.ok(text.includes("₡25,000"));
+  assert.ok(text.includes("₡90,000"));
+  assert.ok(!text.includes("₡100,000"));
+  Object.assign(f.props.offer, { price_basis: "TOTAL", price: 120, offer_product_subtotal: null, offer_currency_code: "USD" });
+  text = visibleText(f.render());
+  assert.ok(text.includes("$120"));
+  assert.ok(!text.includes("4 unidades"));
+  Object.assign(f.props.offer, { price_basis: null, offer_price_summary: "Precio acordado desde DB" });
+  text = visibleText(f.render());
+  assert.ok(text.includes("Precio acordado desde DB"));
 });
