@@ -853,9 +853,12 @@ function OfferAssistantScreen({
       >
         {isEditMode ? (
           initialized && visibleMessages.length === 0 && !showSummary ? (
-            <View style={{ gap: t.spacing.md, paddingTop: t.spacing.lg }}>
+            <View style={{ gap: t.spacing.md }}>
               <Text variant="title">¿Qué quieres cambiar?</Text>
               <Text color="textMedium">Cuéntame el cambio. Mantendré el resto de la oferta.</Text>
+              <Text variant="small" color="textMedium">
+                Solo tú ves este borrador. El comprador verá los cambios cuando los propongas y se aplicarán solo si los acepta.
+              </Text>
             </View>
           ) : null
         ) : <OfferRequestReference reference={requestReference} />}
@@ -942,9 +945,6 @@ function OfferAssistantScreen({
                 : t.spacing.sm,
         }}
       >
-        {isEditMode && initialized && visibleMessages.length === 0 && !showSummary ? (
-          <Text variant="small" color="textMedium">Solo tú ves este borrador. El comprador debe aceptar los cambios.</Text>
-        ) : null}
         <InputChat
           onDraftChange={setHasComposerDraft}
           clearOnSendStart
