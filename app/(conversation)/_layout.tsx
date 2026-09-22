@@ -151,6 +151,7 @@ export default function ConversationLayout() {
   const [loadError, setLoadError] = useState<AppError | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
   const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
+  const [headerControlsHeight, setHeaderControlsHeight] = useState(0);
   const [purchaseRequestTitle, setPurchaseRequestTitle] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
@@ -422,6 +423,13 @@ export default function ConversationLayout() {
     setToastBottomInset(TOAST_INSET_SOURCE, nextHeight + t.spacing.sm);
   }, [t.spacing.sm]);
 
+  const handleHeaderControlsLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setHeaderControlsHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight
+    );
+  }, []);
+
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
   if (isLoading) {
@@ -473,10 +481,15 @@ export default function ConversationLayout() {
   const menuActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
+  const showHeaderControls = Boolean(conversationView.conversation.purchase_offer_id) ||
+    headerActions.length > 0;
   const headerBarHeight = 56;
+  const headerControlsFallbackHeight = t.spacing.sm * 2 + 48;
   const composerOverlayFallbackHeight =
     showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
-  const contentTopInset = 0;
+  const contentTopInset = showHeaderControls
+    ? headerControlsHeight || headerControlsFallbackHeight
+    : 0;
   const contentBottomInset = showComposer && Platform.OS !== "android"
     ? composerOverlayHeight || composerOverlayFallbackHeight
     : 0;
@@ -501,116 +514,128 @@ export default function ConversationLayout() {
         style={{ flex: 1, backgroundColor: t.colors.background }}
       >
         <View style={{ flex: 1 }}>
-          <View
-            pointerEvents="box-none"
+          <GlassSurface
+            variant="chrome"
+            blur="chrome"
             style={{
               zIndex: 10,
               elevation: Platform.OS === "android" ? 4 : 10,
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+            }}
+            clipStyle={{
+              borderTopLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomLeftRadius: t.glass.radius.chrome,
+              borderBottomRightRadius: t.glass.radius.chrome,
+              overflow: "hidden",
+            }}
+            contentStyle={{
+              paddingTop: insets.top + t.spacing.xs,
+              paddingHorizontal: t.spacing.lg,
+              paddingBottom: t.spacing.xs,
             }}
           >
-            <GlassSurface
-              variant="chrome"
-              blur="chrome"
+            <View
               style={{
-                borderTopLeftRadius: 0,
-                borderTopRightRadius: 0,
-                borderBottomLeftRadius: t.glass.radius.chrome,
-                borderBottomRightRadius: t.glass.radius.chrome,
-              }}
-              clipStyle={{
-                borderTopLeftRadius: 0,
-                borderTopRightRadius: 0,
-                borderBottomLeftRadius: t.glass.radius.chrome,
-                borderBottomRightRadius: t.glass.radius.chrome,
-                overflow: "hidden",
-              }}
-              contentStyle={{
-                paddingTop: insets.top + t.spacing.xs,
-                paddingHorizontal: t.spacing.lg,
-                paddingBottom: t.spacing.xs,
+                minHeight: headerBarHeight,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: t.spacing.xs,
               }}
             >
-              <View
+              <Pressable
+                onPress={closeConversation}
+                accessibilityRole="button"
+                accessibilityLabel="Volver"
                 style={{
-                  minHeight: headerBarHeight,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingVertical: t.spacing.xs,
+                  width: 44,
+                  height: 44,
+                  alignItems: "flex-start",
+                  justifyContent: "center",
                 }}
               >
+                <Icon name="arrow-left" size={28} />
+              </Pressable>
+
+              <Text
+                variant="subtitle"
+                align="center"
+                maxLines={2}
+                maxFontSizeMultiplier={2}
+                accessibilityRole="header"
+                style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
+              >
+                {title}
+              </Text>
+
+              {menuActions.length > 0 ? (
                 <Pressable
-                  onPress={closeConversation}
+                  onPress={() => openConversationMenu(menuActions)}
+                  disabled={isExecutingAction}
                   accessibilityRole="button"
-                  accessibilityLabel="Volver"
-                  style={{
+                  accessibilityLabel="Más acciones"
+                  accessibilityState={{
+                    disabled: isExecutingAction,
+                    busy: isExecutingAction,
+                  }}
+                  style={({ pressed }) => ({
                     width: 44,
                     height: 44,
-                    alignItems: "flex-start",
+                    alignItems: "flex-end",
                     justifyContent: "center",
-                  }}
+                    opacity: isExecutingAction ? 0.6 : pressed ? 0.72 : 1,
+                  })}
                 >
-                  <Icon name="arrow-left" size={28} />
+                  <Icon name="ellipsis" size={28} />
                 </Pressable>
-
-                <Text
-                  variant="subtitle"
-                  align="center"
-                  maxLines={2}
-                  maxFontSizeMultiplier={2}
-                  accessibilityRole="header"
-                  style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
-                >
-                  {title}
-                </Text>
-
-                {menuActions.length > 0 ? (
-                  <Pressable
-                    onPress={() => openConversationMenu(menuActions)}
-                    disabled={isExecutingAction}
-                    accessibilityRole="button"
-                    accessibilityLabel="Más acciones"
-                    accessibilityState={{
-                      disabled: isExecutingAction,
-                      busy: isExecutingAction,
-                    }}
-                    style={({ pressed }) => ({
-                      width: 44,
-                      height: 44,
-                      alignItems: "flex-end",
-                      justifyContent: "center",
-                      opacity: isExecutingAction ? 0.6 : pressed ? 0.72 : 1,
-                    })}
-                  >
-                    <Icon name="ellipsis" size={28} />
-                  </Pressable>
-                ) : (
-                  <View style={{ width: 44, height: 44 }} />
-                )}
-              </View>
-
-            </GlassSurface>
-            <ConversationHeaderControls
-              view={conversationView}
-              profileId={profileId}
-              buttons={headerActions}
-              disabled={isExecutingAction}
-              onPress={(id) => {
-                const action = headerActionsById.get(id);
-                if (!action) return;
-                handleActionPress(action);
-              }}
-            />
-          </View>
+              ) : (
+                <View style={{ width: 44, height: 44 }} />
+              )}
+            </View>
+          </GlassSurface>
 
           <View
             style={{
               flex: 1,
-              paddingHorizontal: t.spacing.md,
             }}
-            onTouchStart={() => Keyboard.dismiss()}
           >
-            <Slot />
+            <View
+              style={{ flex: 1, paddingHorizontal: t.spacing.md }}
+              onTouchStart={() => Keyboard.dismiss()}
+            >
+              <Slot />
+            </View>
+
+            {showHeaderControls ? (
+              <View
+                pointerEvents="box-none"
+                onLayout={handleHeaderControlsLayout}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  zIndex: 9,
+                  backgroundColor: "transparent",
+                }}
+              >
+                <ConversationHeaderControls
+                  view={conversationView}
+                  profileId={profileId}
+                  buttons={headerActions}
+                  disabled={isExecutingAction}
+                  onPress={(id) => {
+                    const action = headerActionsById.get(id);
+                    if (!action) return;
+                    handleActionPress(action);
+                  }}
+                />
+              </View>
+            ) : null}
           </View>
 
           {showComposer ? (

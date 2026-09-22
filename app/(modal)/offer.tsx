@@ -403,6 +403,7 @@ function OfferAssistantScreen({
   const [missingFields, setMissingFields] = useState<string[]>([]);
   const [offerImages, setOfferImages] = useState<SellerOfferAssistantImage[]>([]);
   const [hasChanges, setHasChanges] = useState(!isEditMode);
+  const [editContextHeight, setEditContextHeight] = useState(0);
   const [changedFields, setChangedFields] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [conflict, setConflict] = useState<string | null>(null);
@@ -887,7 +888,23 @@ function OfferAssistantScreen({
   return (
     <View style={{ flex: 1 }}>
       {isEditMode ? (
-        <View style={{ paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.sm, paddingBottom: t.spacing.sm }}>
+        <View
+          onLayout={(event) => {
+            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+            setEditContextHeight((currentHeight) =>
+              currentHeight === nextHeight ? currentHeight : nextHeight
+            );
+          }}
+          style={{
+            position: "absolute",
+            top: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.sm,
+            left: 0,
+            right: 0,
+            zIndex: 9,
+            backgroundColor: "transparent",
+            paddingBottom: t.spacing.sm,
+          }}
+        >
           <OfferEditContext summary={contextSummary} images={offerImages}
             hasChanges={hasChanges} reference={requestReference}
             disabled={isBusy || !initialized || Boolean(conflict) || status === "sent" || status === "cancelled"} />
@@ -908,7 +925,10 @@ function OfferAssistantScreen({
           }
         }}
         contentContainerStyle={{
-          paddingTop: isEditMode ? t.spacing.lg : insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
+          paddingTop: isEditMode
+            ? insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.sm +
+              (editContextHeight || 48 + t.spacing.sm) + t.spacing.lg
+            : insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
           paddingBottom: t.spacing.lg,
           gap: t.spacing.md,
           flexGrow: 1,
