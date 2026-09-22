@@ -1,8 +1,5 @@
+import LuppitChip from "@/src/components/chip/LuppitChip";
 import { Icon } from "@/src/components/Icon";
-import {
-  GroupedListRow,
-  GroupedListSection,
-} from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
@@ -10,16 +7,17 @@ import { Text } from "@/src/components/Text";
 import {
   dismissAllCurrentProfileNotifications,
   getCurrentProfileNotifications,
+  markAllCurrentProfileNotificationsRead,
   markCurrentProfileNotificationRead,
   ProfileNotificationListItem,
 } from "@/src/services/notification.service";
 import { openPopup, PopupSummaryAction } from "@/src/services/popup.service";
-import { fontFamilies, Theme, useTheme } from "@/src/themes";
+import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -92,27 +90,12 @@ function getNotificationAccessiblePreview(message: string) {
   return `${normalized.slice(0, 97).trimEnd()}…`;
 }
 
-function getNotificationTone(t: Theme, typeCode: string) {
-  const code = typeCode.trim().toLowerCase();
-
-  if (code === "urgent") {
-    return {
-      icon: "alert-circle" as const,
-      color: t.colors.error,
-    };
-  }
-
-  if (code === "action_needed") {
-    return {
-      icon: "file-pen-line" as const,
-      color: t.colors.secondary,
-    };
-  }
-
-  return {
-    icon: "info" as const,
-    color: t.colors.info,
-  };
+function getNotificationIcon(notification: ProfileNotificationListItem) {
+  if (notification.typeCode.trim().toLowerCase() === "urgent") return "alert-circle";
+  if (notification.navigation?.kind === "conversation") return "message-circle";
+  if (notification.navigation?.kind === "purchaseRequest") return "file-text";
+  if (notification.navigation?.kind === "businessVerification") return "shield-check";
+  return "bell";
 }
 
 function getNotificationActions(
@@ -180,7 +163,7 @@ function getNotificationActions(
 export default function NotificationsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { applyUnreadNotificationCount, refreshUnreadNotificationCount } =
+  const { unreadNotificationCount, applyUnreadNotificationCount, refreshUnreadNotificationCount } =
     useActiveProfile();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = React.useMemo(
@@ -188,12 +171,33 @@ export default function NotificationsScreen() {
     [t, topContentInset]
   );
   const [notifications, setNotifications] = React.useState<ProfileNotificationListItem[]>([]);
+  const [filter, setFilter] = React.useState<"all" | "unread">("all");
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
+  const [isMarkingAllRead, setIsMarkingAllRead] = React.useState(false);
   const isMountedRef = React.useRef(true);
+  const markingAllReadRef = React.useRef(false);
   const markingNotificationIdsRef = React.useRef(new Set<string>());
+  const hasUnreadNotifications =
+    unreadNotificationCount > 0 || notifications.some((item) => item.readAt == null);
+
+  const visibleNotifications = notifications.filter(
+    (item) => filter === "all" || item.readAt == null
+  );
+  const today = new Date().toDateString();
+  const sections = [
+    {
+      title: "Hoy",
+      items: visibleNotifications.filter((item) => new Date(item.createdAt).toDateString() === today),
+    },
+    {
+      title: "Anteriores",
+      items: visibleNotifications.filter((item) => new Date(item.createdAt).toDateString() !== today),
+    },
+  ].filter((section) => section.items.length > 0);
 
   React.useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };
@@ -203,25 +207,68 @@ export default function NotificationsScreen() {
     setIsLoading(true);
     setLoadError(null);
 
-    const result = await getCurrentProfileNotifications();
-    if (!isMountedRef.current) return;
+    try {
+      const [result, countRefreshed] = await Promise.all([
+        getCurrentProfileNotifications(),
+        refreshUnreadNotificationCount(),
+      ]);
+      if (!isMountedRef.current) return false;
 
-    if (!result.ok) {
-      setNotifications([]);
-      setLoadError(result.error.message);
-      setIsLoading(false);
-      showError("No se pudieron cargar tus notificaciones", result.error.message);
-      return;
+      if (!result.ok || !countRefreshed) {
+        const message = !result.ok
+          ? result.error.message
+          : "No se pudo actualizar el conteo de notificaciones sin leer.";
+        setNotifications([]);
+        setLoadError(message);
+        showError("No se pudieron cargar tus notificaciones", message);
+        return false;
+      }
+
+      setNotifications(result.data);
+      return true;
+    } catch {
+      if (isMountedRef.current) {
+        setLoadError("Inténtalo nuevamente.");
+        showError("No se pudieron cargar tus notificaciones", "Inténtalo nuevamente.");
+      }
+      return false;
+    } finally {
+      if (isMountedRef.current) setIsLoading(false);
     }
-
-    setNotifications(result.data);
-    void refreshUnreadNotificationCount();
-    setIsLoading(false);
   }, [refreshUnreadNotificationCount]);
+
+  const markAllNotificationsRead = React.useCallback(async () => {
+    if (markingAllReadRef.current || !hasUnreadNotifications) return;
+
+    markingAllReadRef.current = true;
+    setIsMarkingAllRead(true);
+    try {
+      const result = await markAllCurrentProfileNotificationsRead();
+      if (!isMountedRef.current) return;
+
+      if (!result.ok) {
+        showError("No se pudieron marcar como leídas", result.error.message);
+        return;
+      }
+
+      if (await loadNotifications()) {
+        showSuccess("Notificaciones marcadas como leídas");
+      }
+    } catch {
+      if (isMountedRef.current) {
+        showError("No se pudieron actualizar tus notificaciones", "Inténtalo nuevamente.");
+        setIsLoading(false);
+      }
+    } finally {
+      markingAllReadRef.current = false;
+      if (isMountedRef.current) setIsMarkingAllRead(false);
+    }
+  }, [hasUnreadNotifications, loadNotifications]);
 
   const markNotificationRead = React.useCallback(
     async (notification: ProfileNotificationListItem) => {
       if (
+        markingAllReadRef.current ||
         notification.readAt != null ||
         markingNotificationIdsRef.current.has(notification.notificationId)
       ) {
@@ -254,6 +301,7 @@ export default function NotificationsScreen() {
 
   const openNotificationDetail = React.useCallback(
     (notification: ProfileNotificationListItem) => {
+      if (markingAllReadRef.current) return;
       const title = notification.title?.trim() || "Novedad en Luppit";
       const metadata = [
         getNotificationTypeLabel(notification),
@@ -275,6 +323,7 @@ export default function NotificationsScreen() {
   );
 
   const openDismissAllConfirmation = React.useCallback(() => {
+    if (markingAllReadRef.current) return;
     openPopup({
       type: "summary",
       title: "Limpiar notificaciones",
@@ -363,34 +412,93 @@ export default function NotificationsScreen() {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
-      <GroupedListSection
-        title={
-          notifications.length === 1
-            ? "1 notificación"
-            : `${notifications.length} notificaciones`
-        }
-      >
-        {notifications.map((notification, index) => (
-          <NotificationRow
-            key={notification.notificationId}
-            notification={notification}
-            showSeparator={index < notifications.length - 1}
-            onPress={() => openNotificationDetail(notification)}
+      <View style={s.toolbar}>
+        <View style={s.filters}>
+          <LuppitChip
+            label="Todas"
+            selected={filter === "all"}
+            bordered
+            onPress={() => setFilter("all")}
           />
-        ))}
-      </GroupedListSection>
+          <LuppitChip
+            label="Sin leer"
+            count={unreadNotificationCount}
+            selected={filter === "unread"}
+            bordered
+            accessibilityLabel={`Sin leer, ${unreadNotificationCount} notificaciones`}
+            onPress={() => setFilter("unread")}
+          />
+        </View>
+        <Pressable
+          testID="notification-options"
+          accessibilityRole="button"
+          accessibilityLabel="Opciones de notificaciones"
+          accessibilityState={{ disabled: isMarkingAllRead }}
+          disabled={isMarkingAllRead}
+          onPress={isMarkingAllRead ? undefined : () => openPopup({
+            options: [{
+              id: "clear-notifications",
+              label: "Limpiar notificaciones",
+              icon: "trash-2",
+              textColorKey: "error",
+              iconColorKey: "error",
+              onPress: openDismissAllConfirmation,
+            }],
+          })}
+          style={s.optionsButton}
+        >
+          <Icon name="ellipsis" size={24} color={t.colors.textMedium} />
+        </Pressable>
+      </View>
+      <Pressable
+        testID="mark-all-notifications-read"
+        accessibilityRole="button"
+        accessibilityLabel={isMarkingAllRead
+          ? "Marcando como leídas"
+          : hasUnreadNotifications
+            ? "Marcar todas como leídas"
+            : "Marcar todas como leídas. No tienes notificaciones sin leer."}
+        accessibilityState={{ busy: isMarkingAllRead, disabled: isMarkingAllRead || !hasUnreadNotifications }}
+        accessibilityLiveRegion="polite"
+        disabled={isMarkingAllRead || !hasUnreadNotifications}
+        onPress={isMarkingAllRead || !hasUnreadNotifications
+          ? undefined
+          : () => void markAllNotificationsRead()}
+        style={[s.markAllButton, !hasUnreadNotifications ? s.disabledAction : null]}
+      >
+        {isMarkingAllRead
+          ? <ActivityIndicator size="small" color={t.colors.primary} />
+          : <Icon name="check-check" size={20} color={t.colors.primary} />}
+        <Text variant="small" color="primary" style={s.markAllLabel}>
+          {isMarkingAllRead ? "Marcando como leídas..." : "Marcar todas como leídas"}
+        </Text>
+      </Pressable>
 
-      <GroupedListSection title="Administrar">
-        <GroupedListRow
-          icon="trash-2"
-          label="Limpiar notificaciones"
-          description="Oculta las notificaciones actuales de este perfil."
-          destructive
-          showSeparator={false}
-          onPress={openDismissAllConfirmation}
-          accessibilityLabel="Limpiar todas las notificaciones"
-        />
-      </GroupedListSection>
+      {sections.map((section) => (
+        <View key={section.title} style={s.activitySection}>
+          <Text variant="small" color="textMedium" style={s.sectionTitle}>{section.title}</Text>
+          <View style={s.activityGroup}>
+            {section.items.map((notification, index) => (
+              <NotificationRow
+                key={notification.notificationId}
+                notification={notification}
+                showSeparator={index < section.items.length - 1}
+                disabled={isMarkingAllRead}
+                onPress={() => openNotificationDetail(notification)}
+              />
+            ))}
+          </View>
+        </View>
+      ))}
+      {visibleNotifications.length === 0 ? (
+        <View style={s.filteredEmptyState}>
+          <StandaloneListEmptyState
+            icon="check-check"
+            title="Todo al día"
+            description="No tienes notificaciones sin leer."
+          />
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -398,15 +506,19 @@ export default function NotificationsScreen() {
 function NotificationRow({
   notification,
   showSeparator,
+  disabled,
   onPress,
 }: {
   notification: ProfileNotificationListItem;
   showSeparator: boolean;
+  disabled: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
   const s = React.useMemo(() => createNotificationsStyles(t), [t]);
-  const tone = getNotificationTone(t, notification.typeCode);
+  const icon = getNotificationIcon(notification);
+  const typeLabel = getNotificationTypeLabel(notification);
+  const typeColor = notification.typeCode.trim().toLowerCase() === "urgent" ? "error" : "secondary";
   const isUnread = notification.readAt == null;
   const title = notification.title?.trim() || "Novedad en Luppit";
   const accessibleTime = formatNotificationAccessibleTime(notification.createdAt);
@@ -417,43 +529,38 @@ function NotificationRow({
       accessibilityRole="button"
       accessibilityLabel={`${isUnread ? "Sin leer. " : ""}${title}. ${accessiblePreview}. Recibida ${accessibleTime}.`}
       accessibilityHint="Abre el detalle de la notificación."
+      disabled={disabled}
+      accessibilityState={{ disabled }}
       onPress={onPress}
       style={s.row}
     >
-      <View style={s.unreadSlot} accessibilityElementsHidden importantForAccessibility="no">
-        {isUnread ? <View style={s.unreadDot} /> : null}
-      </View>
       <View
         style={s.iconBadge}
         accessibilityElementsHidden
         importantForAccessibility="no"
       >
-        <Icon name={tone.icon} size={20} color={tone.color} />
+        <Icon name={icon} size={24} color={t.colors.primary} />
       </View>
       <View style={s.rowBody}>
-        <View style={s.rowHeader}>
-          <Text
-            variant="body"
-            color={isUnread ? "textDark" : "textMedium"}
-            maxLines={1}
-            style={[s.rowTitle, isUnread ? s.rowTitleUnread : null]}
-          >
-            {title}
+        <Text variant="body" maxLines={3}>
+          {notification.message.trim() || title}
+        </Text>
+        {notification.title?.trim() && notification.title.trim() !== notification.message.trim() ? (
+          <Text variant="small" color="textMedium" maxLines={2}>
+            {notification.title.trim()}
           </Text>
-          <Text variant="small" color="textMedium" maxLines={1}>
+        ) : null}
+        <View style={s.rowMetadata}>
+          {isUnread ? <View style={s.unreadDot} /> : null}
+          <Text variant="small" color="textMedium">
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>
-        <Text
-          variant="small"
-          color="textMedium"
-          maxLines={2}
-        >
-          {notification.message}
-        </Text>
-      </View>
-      <View accessibilityElementsHidden importantForAccessibility="no">
-        <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
+        {typeLabel ? (
+          <Text variant="small" color={typeColor} maxLines={2}>
+            {typeLabel}
+          </Text>
+        ) : null}
       </View>
       {showSeparator ? <View style={s.rowSeparator} /> : null}
     </Pressable>
@@ -465,7 +572,8 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     content: {
       paddingTop: topContentInset + t.spacing.md,
       paddingBottom: t.spacing.xl,
-      gap: t.spacing.lg,
+      paddingHorizontal: t.spacing.md,
+      gap: t.spacing.md,
     },
     loadingBox: {
       flex: 1,
@@ -474,57 +582,90 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
       gap: t.spacing.sm,
       paddingTop: topContentInset,
     },
-    row: {
-      position: "relative",
-      minHeight: 88,
+    activitySection: {
+      marginHorizontal: -t.spacing.md,
+      gap: t.spacing.sm,
+    },
+    sectionTitle: {
+      paddingHorizontal: t.spacing.md,
+    },
+    activityGroup: {
+      backgroundColor: t.colors.backgroudWhite,
+    },
+    toolbar: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.sm,
+    },
+    filters: {
+      flex: 1,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: t.spacing.sm,
+    },
+    optionsButton: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    markAllButton: {
+      minHeight: 44,
+      alignSelf: "flex-end",
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "flex-end",
       gap: t.spacing.sm,
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
+      marginTop: -t.spacing.md,
     },
-    unreadSlot: {
-      width: 8,
-      alignItems: "center",
+    markAllLabel: {
+      flexShrink: 1,
+    },
+    disabledAction: {
+      opacity: 0.5,
+    },
+    filteredEmptyState: {
+      paddingVertical: t.spacing.xl,
+    },
+    row: {
+      position: "relative",
+      minHeight: 104,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
+      paddingVertical: t.spacing.md,
     },
     unreadDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
+      width: 7,
+      height: 7,
+      borderRadius: 4,
       backgroundColor: t.colors.primary,
     },
     iconBadge: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: t.colors.background,
+      backgroundColor: t.colors.primaryLight,
     },
     rowBody: {
       flex: 1,
-      minHeight: 54,
-      justifyContent: "center",
-      gap: 3,
+      gap: t.spacing.xs,
     },
-    rowHeader: {
+    rowMetadata: {
       flexDirection: "row",
       alignItems: "center",
-      gap: t.spacing.sm,
-    },
-    rowTitle: {
-      flex: 1,
-    },
-    rowTitleUnread: {
-      fontFamily: fontFamilies.medium,
+      gap: t.spacing.xs,
     },
     rowSeparator: {
       position: "absolute",
-      left: t.spacing.md + 8 + t.spacing.sm + 36 + t.spacing.sm,
+      left: t.spacing.md,
       right: t.spacing.md,
       bottom: 0,
       height: StyleSheet.hairlineWidth,
-      backgroundColor: "rgba(0,0,0,0.08)",
+      backgroundColor: t.colors.border,
     },
     centerState: {
       flex: 1,
