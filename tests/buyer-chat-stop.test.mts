@@ -716,7 +716,9 @@ test("discard preserves state on failure, reuses retry identity, and clears only
   assert.equal(await retry, true);
   assert.equal(session.state.draftId, null);
   assert.equal(session.state.messages.length, 0);
-  assert.equal(session.state.showComposer, false);
+  assert.equal(session.state.showComposer, true);
+  assert.equal(session.state.canCompose, true);
+  assert.equal(session.state.status, null);
 });
 
 test("late control completion after unmount cannot apply publication", async () => {
@@ -743,9 +745,11 @@ test("an unsupported restored draft stays blocked but can be explicitly discarde
   session.calls[0].response.resolve(success({ draftId: "legacy", status: "cancelled", uiState: "cancelled", assistantMessage: null }));
   assert.equal(await discard, true);
   assert.equal(session.state.draftId, null);
+  assert.equal(session.state.sessionError, null);
+  assert.equal(session.state.canCompose, true);
 });
 
-function createLeaveLayout(platform: "ios" | "android") {
+function createLeaveLayout(platform: "ios" | "android", session?: Awaited<ReturnType<typeof createSession>>) {
   const runtime = createHooks();
   const state: Record<string, any> = { title: "Crear solicitud", messages: [], uiState: "normal", status: "ready", draftId: "saved", showComposer: true, canCompose: true, isSendingMessage: false, isExecutingControl: false, isRestoring: false, discardDraft: async () => discardResult };
   let discardResult = false;
@@ -765,7 +769,7 @@ function createLeaveLayout(platform: "ios" | "android") {
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: (...args: unknown[]) => androidGuards.push(args) },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
     "./chat-top-bar": "ChatTopBar",
-    "./chat-session.context": { useChatSession: () => state },
+    "./chat-session.context": { useChatSession: () => session?.state ?? state },
     "@/src/components/inputChat/inputChat": "InputChat",
     "@/src/components/inputChat/ChatKeyboardAvoidingView": "ChatKeyboardAvoidingView",
     "@/src/services/role.service": { Roles: { BUYER: "BUYER" } },
@@ -809,7 +813,7 @@ for (const platform of ["ios", "android"] as const) {
   });
 }
 
-test("leave waits for successful discard, blocks control races, and keeps the no-history home fallback", async () => {
+test("discard stays in chat, blocks control races, and preserves intentional close", async () => {
   const layout = createLeaveLayout("android");
   const tree = layout.render();
   elements(tree).find((element) => element.type === "ChatTopBar")!.props.onClose();
@@ -834,5 +838,126 @@ test("leave waits for successful discard, blocks control races, and keeps the no
   layout.setDiscardResult(true);
   assert.equal(await layout.popup.actions[1].onPress(), true);
   layout.render();
-  assert.deepEqual(layout.dispatched, [action]);
+  assert.deepEqual(layout.dispatched, []);
+});
+
+for (const platform of ["ios", "android"] as const) {
+  test(`${platform} confirmed buyer discard resets a restored review and composer in place and can start again`, async () => {
+    const session = await createSession({ restore: success({
+      draftId: "saved-review", status: "ready", uiState: "review", isReadyToPublish: true,
+      pendingAction: "ASK_SHOW_SUMMARY", requiredFields: ["cantidad"], optionalFields: ["marca"],
+      summary: { titulo: "Llantas", categoria: "Llantas", marca: [], atributos: { cantidad: 2 } }, summaryText: "2 llantas",
+      messages: [{ id: "saved-photo", role: "user", content: "Llantas", imageUrls: ["https://example.test/photo"], metadata: {} }],
+    }) });
+    const layout = createLeaveLayout(platform, session);
+    const composer = () => elements(layout.render()).find((node) => node.type === "InputChat")!.props;
+    const initialKey = composer().key;
+    composer().onDraftChange(true);
+    layout.render();
+    layout.attempt({ type: "POP" });
+    const confirm = layout.popup.actions[1].onPress;
+    const pending = confirm();
+    assert.equal(await confirm(), false, "Duplicate taps cannot send another discard");
+    assert.equal(session.calls.length, 1);
+    assert.equal(session.state.messages.length, 1, "Wait for persisted cancellation");
+    assert.equal(session.calls[0].input.draft_id, "saved-review");
+    assert.equal(session.calls[0].input.ui_action, "DISCARD");
+    session.calls[0].response.resolve(success({ status: "cancelled", uiState: "cancelled" }));
+    assert.equal(await pending, true);
+    assert.equal(composer().disabled, false);
+    assert.notEqual(composer().key, initialKey, "Remount clears unsent text, selected photos and pending picker state");
+    assert.equal(session.state.messages.length, 0);
+    assert.equal(session.state.summary, null);
+    assert.equal(session.state.summaryText, null);
+    assert.equal(session.state.pendingAction, null);
+    assert.equal(session.state.requiredFields.length, 0);
+    assert.equal(session.state.optionalFields.length, 0);
+    assert.equal(session.state.missingFields.length, 0);
+    assert.equal(session.state.categorySuggestions.length, 0);
+    assert.equal(session.state.purchaseRequestId, null);
+    assert.equal(session.state.uiState, "normal");
+    assert.equal(session.state.canPublish, false);
+    assert.equal(session.state.isReadyToPublish, false);
+    assert.equal(layout.prevented, false);
+    assert.deepEqual(layout.dispatched, []);
+    assert.deepEqual(layout.androidGuards.at(-1), [false, false]);
+    assert.equal(await confirm(), false, "An old confirmation cannot discard again");
+    const send = session.state.sendMessage({ text: "Ahora una mesa", images: [] });
+    assert.equal(session.calls[1].input.draft_id, null);
+    assert.equal(session.calls[1].input.ui_action, undefined);
+    session.calls[1].response.resolve(success({ draftId: "new-draft" }));
+    await send;
+    assert.equal(await confirm(), false, "An old confirmation cannot affect the new draft");
+    const again = session.state.discardDraft();
+    assert.equal(session.calls[2].input.draft_id, "new-draft");
+    assert.notEqual(session.calls[2].input.idempotency_key, session.calls[0].input.idempotency_key);
+    session.calls[2].response.resolve(success({ draftId: "new-draft", status: "cancelled" }));
+    assert.equal(await again, true);
+    assert.equal(session.state.canCompose, true);
+    assert.equal(session.state.messages.length, 0);
+  });
+}
+
+test("failed or unconfirmed buyer discard preserves review and composer; published requests cannot discard", async () => {
+  const session = await createSession({ restore: success({ draftId: "saved", status: "ready", uiState: "review", isReadyToPublish: true,
+    summaryText: "Original summary", messages: [{ id: "photo", role: "user", content: "", imageUrls: ["https://example.test/photo"], metadata: {} }] }) });
+  const before = session.state;
+  for (const result of [success({ status: "published", purchaseRequestId: "published" }), success({ status: "ready" }), null]) {
+    const pending = session.state.discardDraft();
+    if (result) session.calls.at(-1)!.response.resolve(result);
+    else session.calls.at(-1)!.response.reject(new Error("offline"));
+    assert.equal(await pending, false);
+    assert.equal(session.state.messages, before.messages);
+    assert.equal(session.state.uiState, before.uiState);
+    assert.equal(session.state.summaryText, before.summaryText);
+    assert.equal(session.state.draftResetKey, before.draftResetKey);
+    assert.equal(session.state.isExecutingControl, false);
+  }
+  const published = await createSession({ restore: success({ status: "published", purchaseRequestId: "published" }) });
+  assert.equal(await published.state.discardDraft(), false);
+  assert.equal(published.calls.length, 0);
+});
+
+test("buyer clear ignores a stopped image response even after a new draft has started", async () => {
+  const session = await createSession({ restore: success({ draftId: "saved" }) });
+  const oldSend = session.state.sendMessage({ text: "", images: [{ uri: "file:///old.jpg" }] });
+  session.state.stopAssistant();
+  const discard = session.state.discardDraft();
+  session.calls[1].response.resolve(success({ status: "cancelled" }));
+  assert.equal(await discard, true);
+  const nextSend = session.state.sendMessage({ text: "Una mesa", images: [] });
+  session.calls[0].response.resolve(success({ draftId: "saved", status: "ready", uiState: "review", assistantMessage: "Stale summary" }));
+  await oldSend;
+  assert.equal(session.state.messages.length, 1);
+  assert.equal(session.state.messages[0].text, "Una mesa");
+  assert.equal(session.state.messages[0].failedRequests, undefined);
+  assert.equal(session.state.isSendingMessage, true);
+  assert.equal(session.state.draftId, null);
+  session.calls[2].response.resolve(success({ draftId: "new" }));
+  await nextSend;
+  assert.equal(session.state.draftId, "new");
+});
+
+test("failed buyer discard preserves a stopped upload's retry and rejects callbacks after publication or unmount", async () => {
+  const session = await createSession({ restore: success({ draftId: "saved" }) });
+  const oldSend = session.state.sendMessage({ text: "", images: [{ uri: "file:///photo.jpg" }] });
+  session.state.stopAssistant();
+  const discard = session.state.discardDraft();
+  session.calls[1].response.reject(new Error("offline"));
+  assert.equal(await discard, false);
+  session.calls[0].response.resolve(success());
+  await oldSend;
+  assert.equal(session.state.messages[0].failedRequests?.[0].images?.[0].uri, "file:///photo.jpg");
+  const oldConfirm = session.state.discardDraft;
+  const publish = session.state.publishDraft();
+  session.calls[2].response.resolve(success({ status: "published", purchaseRequestId: "published" }));
+  await publish;
+  assert.equal(await oldConfirm(), false);
+  assert.equal(session.calls.length, 3);
+
+  const leaving = await createSession({ restore: success({ draftId: "saved" }) });
+  const confirmAfterLeaving = leaving.state.discardDraft;
+  leaving.unmount();
+  assert.equal(await confirmAfterLeaving(), false);
+  assert.equal(leaving.calls.length, 0);
 });

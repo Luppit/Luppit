@@ -44,6 +44,7 @@ function ChatLayoutContent() {
     isRestoring,
     status,
     discardDraft,
+    draftResetKey,
     draftId,
     stopAssistant,
   } = useChatSession();
@@ -76,7 +77,7 @@ function ChatLayoutContent() {
         { id: "discard-request-draft", label: "Descartar", backgroundColorKey: "error", textColorKey: "backgroudWhite", iconColorKey: "backgroudWhite", disabled: isSendingMessage || isRestoring, showPendingState: true,
           onPress: async () => {
             if (!await discardDraft()) return false;
-            setExitAction(data.action);
+            setHasComposerDraft(false);
             return true;
           },
         },
@@ -157,6 +158,7 @@ function ChatLayoutContent() {
             }}
           >
             <InputChat
+              key={draftResetKey}
               onDraftChange={setHasComposerDraft}
               clearOnSendStart
               sendOnReturn={false}
