@@ -7,7 +7,7 @@ import { LucideIconName } from "@/src/icons/lucide";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
 import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 export type OfferCardTimelineItem = {
@@ -72,6 +72,7 @@ export default function OfferCard({
 }: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const businessName = offer.business_name?.trim() || "Negocio";
   const province = offer.business_province?.trim();
   const rating = offer.business_rating;
@@ -92,12 +93,66 @@ export default function OfferCard({
   const methodIcon: LucideIconName =
     methodItem?.method_kind === "shipping" ? "truck" : "map-pin";
   const hasTimelineSection = timelineLoading || Boolean(timelineError) || timeline.length > 0 || Boolean(timelineActions);
+  const ongoingItems = timeline.filter((step) => step.is_next || !step.is_completed);
+  const summaryItems = ongoingItems.length > 0 ? ongoingItems : timeline.slice(0, 1);
+  const historyItems = timeline.filter((step) => !summaryItems.includes(step));
+  const showHistory = !timelineLoading && !timelineError && historyItems.length > 0;
+  const historyCountLabel = `${historyItems.length} ${historyItems.length === 1 ? "evento" : "eventos"}`;
+
+  const renderTimelineItem = (step: OfferCardTimelineItem, index: number, isSummary: boolean) => (
+    <View
+      key={`${step.code}-${index}`}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={step.accessibility_label?.trim() || [
+        step.pre_label,
+        step.label,
+        step.detail,
+        step.reached_at_label?.trim() || step.reached_at,
+      ].filter(Boolean).join(" ")}
+      style={s.timelineRow}
+    >
+      {!isSummary ? (
+        <View
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={s.markerColumn}
+        >
+          <View style={s.marker}>
+            <Icon name={step.icon} size={20} color={resolveTimelineColor(step.style_code, t)} />
+          </View>
+          {index < historyItems.length - 1 ? <View style={s.connector} /> : null}
+        </View>
+      ) : null}
+      <View style={[s.timelineContent, isSummary ? s.summaryContent : null]}>
+        {step.pre_label?.trim() ? (
+          <Text variant="small" color="textMedium" maxFontSizeMultiplier={2} style={s.eyebrow}>
+            {step.pre_label.trim()}
+          </Text>
+        ) : null}
+        <Text variant={isSummary ? "title" : "body"} maxFontSizeMultiplier={2}>
+          {step.label}
+        </Text>
+        {step.detail?.trim() ? (
+          <Text variant="body" color="textMedium" maxFontSizeMultiplier={2} style={s.timelineDetail}>
+            {step.detail.trim()}
+          </Text>
+        ) : null}
+        {step.reached_at_label?.trim() || step.reached_at?.trim() ? (
+          <Text variant="small" color="textMedium" maxFontSizeMultiplier={2} style={s.timelineDate}>
+            {step.reached_at_label?.trim() || step.reached_at?.trim()}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
 
   return (
     <MarketplaceCardFrame
       title={businessName}
       subtitle={province}
-      footerDivider={hasTimelineSection}
+      footerDivider={timelineLoading || Boolean(timelineError)}
       accessibilityLabel={`Oferta de ${businessName} por ${formattedPrice}`}
       body={
         <View style={s.body}>
@@ -179,79 +234,7 @@ export default function OfferCard({
                 </View>
               ) : (
                 <View style={s.timelineList}>
-                  {timeline.map((step, index) => {
-                    const isLast = index === timeline.length - 1;
-                    const markerColor = resolveTimelineColor(step.style_code, t);
-
-                    return (
-                      <View
-                        key={`${step.code}-${index}`}
-                        accessible
-                        accessibilityRole="text"
-                        accessibilityLabel={step.accessibility_label?.trim() || step.label}
-                        style={s.timelineRow}
-                      >
-                        <View
-                          accessible={false}
-                          accessibilityElementsHidden
-                          importantForAccessibility="no-hide-descendants"
-                          style={s.markerColumn}
-                        >
-                          <View style={s.marker}>
-                            <Icon
-                              name={step.icon}
-                              size={20}
-                              color={markerColor}
-                            />
-                          </View>
-                          {!isLast ? <View style={s.connector} /> : null}
-                        </View>
-
-                        <View style={s.timelineContent}>
-                          {step.pre_label?.trim() ? (
-                            <Text
-                              variant="small"
-                              color="textMedium"
-                              maxFontSizeMultiplier={2}
-                              style={s.eyebrow}
-                            >
-                              {step.pre_label.trim()}
-                            </Text>
-                          ) : null}
-                          <Text
-                            variant="body"
-                            maxFontSizeMultiplier={2}
-                            style={[
-                              s.timelineLabel,
-                              step.is_next ? s.timelineLabelActive : null,
-                            ]}
-                          >
-                            {step.label}
-                          </Text>
-                          {step.detail?.trim() ? (
-                            <Text
-                              variant="body"
-                              color="textMedium"
-                              maxFontSizeMultiplier={2}
-                              style={s.timelineDetail}
-                            >
-                              {step.detail.trim()}
-                            </Text>
-                          ) : null}
-                          {step.reached_at_label?.trim() || step.reached_at?.trim() ? (
-                            <Text
-                              variant="small"
-                              color="textMedium"
-                              maxFontSizeMultiplier={2}
-                              style={s.timelineDate}
-                            >
-                              {step.reached_at_label?.trim() || step.reached_at?.trim()}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </View>
-                    );
-                  })}
+                  {summaryItems.map((step, index) => renderTimelineItem(step, index, true))}
                 </View>
               )}
             </View>
@@ -259,21 +242,51 @@ export default function OfferCard({
         </View>
       }
       footerLeft={
-        <View style={s.footer}>
-          {onMenuPress ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Más opciones de la oferta"
-              onPress={onMenuPress}
-              style={s.menuButton}
-            >
-              <Icon name="ellipsis" size={22} color={t.colors.textDark} />
-            </Pressable>
-          ) : null}
+        <View style={s.footerContent}>
+          <View style={s.footer}>
+            {onMenuPress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Más opciones de la oferta"
+                onPress={onMenuPress}
+                style={s.menuButton}
+              >
+                <Icon name="ellipsis" size={22} color={t.colors.textDark} />
+              </Pressable>
+            ) : null}
 
-          <View style={s.connectButtonSlot}>
-            <Button title={connectLabel} icon="message-circle" onPress={onConnect} />
+            <View style={s.connectButtonSlot}>
+              <Button title={connectLabel} icon="message-circle" onPress={onConnect} />
+            </View>
           </View>
+          {showHistory ? (
+            <View style={s.historySection}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Historial de la compra, ${historyCountLabel}`}
+                accessibilityState={{ expanded: historyExpanded }}
+                accessibilityHint="Muestra u oculta los eventos anteriores de la compra."
+                onPress={() => setHistoryExpanded((expanded) => !expanded)}
+                style={s.historyToggle}
+              >
+                <Icon name="clock" size={22} color={t.colors.textMedium} />
+                <View style={s.historyHeading}>
+                  <Text variant="body" maxFontSizeMultiplier={2} style={s.historyTitle}>
+                    Historial de la compra
+                  </Text>
+                  <Text variant="small" color="textMedium" maxFontSizeMultiplier={2}>
+                    {historyCountLabel}
+                  </Text>
+                </View>
+                <Icon name={historyExpanded ? "chevron-down" : "chevron-right"} size={18} color={t.colors.textMedium} />
+              </Pressable>
+              {historyExpanded ? (
+                <View style={s.timelineList}>
+                  {historyItems.map((step, index) => renderTimelineItem(step, index, false))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       }
     />
@@ -349,13 +362,10 @@ function createOfferCardStyles(t: Theme) {
       gap: t.spacing.xs,
       paddingTop: t.spacing.xs,
     },
+    summaryContent: {
+      paddingTop: 0,
+    },
     eyebrow: {
-      fontFamily: t.typography.subtitle.fontFamily,
-    },
-    timelineLabel: {
-      color: t.colors.textDark,
-    },
-    timelineLabelActive: {
       fontFamily: t.typography.subtitle.fontFamily,
     },
     timelineDetail: {
@@ -386,6 +396,34 @@ function createOfferCardStyles(t: Theme) {
     },
     retryLabel: {
       color: t.colors.primary,
+    },
+    footerContent: {
+      gap: t.spacing.md,
+    },
+    historySection: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.colors.border,
+      gap: t.spacing.sm,
+      paddingTop: t.spacing.sm,
+    },
+    historyToggle: {
+      minHeight: 54,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.sm,
+      paddingVertical: t.spacing.sm,
+    },
+    historyHeading: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: t.spacing.sm,
+    },
+    historyTitle: {
+      flexGrow: 1,
+      maxWidth: "100%",
     },
     footer: {
       flexDirection: "row",
