@@ -143,6 +143,9 @@ function screenFixture(params: Record<string, any> = {}) {
   const referenceCalls: { id: string; response: ReturnType<typeof deferred> }[] = [];
   const aiCalls: { input: any; response: ReturnType<typeof deferred> }[] = [];
   const requestCalls: string[] = [];
+  const navigations: any[] = [];
+  const errors: any[] = [];
+  let exitGuard: { enabled: boolean; callback: Function };
   const popupListeners = new Set<(state: any) => void>();
   let popup: any = null;
   const setPopup = (config: any) => { popup = config; popupListeners.forEach((listener) => listener({ config })); };
@@ -153,8 +156,8 @@ function screenFixture(params: Record<string, any> = {}) {
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: () => void | Promise<void>) => { await navigate(); } },
     "@/src/themes": { useTheme: () => theme },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 50, bottom: 34 }) },
-    "expo-router": { router: { back() {}, replace() {} }, useLocalSearchParams: () => params },
-    "@react-navigation/native": { useNavigation: () => ({}), useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]), usePreventRemove() {} },
+    "expo-router": { router: { back: () => navigations.push("back"), replace: (route: any) => navigations.push(route) }, useLocalSearchParams: () => params },
+    "@react-navigation/native": { useNavigation: () => ({ dispatch: (action: any) => navigations.push(action) }), useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]), usePreventRemove: (enabled: boolean, callback: Function) => { exitGuard = { enabled, callback }; } },
     "./modal-top-bar": { MODAL_TOP_BAR_HEIGHT: 44 },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/Icon": { Icon: "Icon" },
@@ -169,7 +172,7 @@ function screenFixture(params: Record<string, any> = {}) {
       subscribePopup: (listener: (state: any) => void) => { popupListeners.add(listener); return () => popupListeners.delete(listener); },
     },
     "@/src/services/active.profile.service": { getCurrentProfile: () => ({ id: "seller" }), subscribeActiveProfile: () => () => {} },
-    "@/src/utils/useToast": { showError() {}, showInfo() {}, showSuccess() {}, showWarning() {} },
+    "@/src/utils/useToast": { showError: (...args: any[]) => errors.push(args), showInfo() {}, showSuccess() {}, showWarning() {} },
     "@/src/services/purchase.request.service": { getPurchaseRequestById: async (id: string) => { requestCalls.push(id); return { ok: true, data: { id, title: "Edit request" } }; } },
     "@/src/services/purchase.offer.service": { getEditablePurchaseOfferDraftByConversationId: async () => ({ ok: true, data: { purchaseRequestId: "edit-request" } }) },
     "@/src/services/purchase.offer.reference.service": { getOfferRequestReference: (id: string) => { const response = deferred(); referenceCalls.push({ id, response }); return response.promise; } },
@@ -182,7 +185,8 @@ function screenFixture(params: Record<string, any> = {}) {
     "conversation/ConversationContextControls": "ContextControls", "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
   })) modules[`@/src/components/${path}`] = name;
   const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard, OfferEditContext };\n");
-  return { ...runtime, modules, referenceCalls, requestCalls, aiCalls, get popup() { return popup; },
+  return { ...runtime, modules, referenceCalls, requestCalls, aiCalls, navigations, errors, get popup() { return popup; },
+    get exitGuard() { return exitGuard; },
     summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
     context: (props: object) => runtime.render(() => screen.OfferEditContext({ reference, images: [], hasChanges: false, summary: null, ...props })),
     route: () => runtime.render(() => screen.default()),
@@ -848,7 +852,7 @@ test("edit context stays outside the transcript and only new messages trigger sc
   assert.equal(scrolls, 3);
 });
 
-test("exit popup can be dismissed to keep editing; leaving retains the draft and discard is explicit", async () => {
+test("exit retains the offer draft; confirmed discard starts again in the same editor", async () => {
   for (const action of ["exit-offer", "discard-draft"]) {
     const f = screenFixture({ mode: "edit" });
     let exitGuard: any;
@@ -874,12 +878,19 @@ test("exit popup can be dismissed to keep editing; leaving retains the draft and
       assert.equal(discard.input.uiAction, "DISCARD");
       assert.equal(discard.input.expectedDraftVersion, 2);
       discard.response.resolve(aiSuccess({ status: "cancelled" }));
-      await result;
+      await flush();
+      const restore = f.aiCalls.at(-1)!;
+      assert.equal(restore.input.uiAction, "RESTORE");
+      assert.equal(restore.input.conversationId, "conversation-A");
+      assert.equal(restore.input.expectedDraftVersion, null);
+      assert.equal(restore.input.expectedOfferRevision, null);
+      restore.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "new-edit", hasChanges: false }));
+      assert.equal(await result, true);
     } else assert.equal(f.aiCalls.length, 1, "Leaving must never discard or publish");
     await new Promise((resolve) => setTimeout(resolve, 5));
-    assert.deepEqual(navigations, ["go-back"]);
+    assert.deepEqual(navigations, action === "exit-offer" ? ["go-back"] : []);
     f.assistant();
-    assert.equal(exitGuard.enabled, false);
+    assert.equal(exitGuard.enabled, action === "discard-draft");
   }
 });
 
@@ -899,4 +910,178 @@ test("exit popup warns about unsent composer content on iOS as well as Android",
     exitGuard!({ data: { action: "go-back" } });
     assert.match(popup.description, /todavía no hayas enviado se perderán/);
   }
+});
+
+function confirmOfferDiscard(f: ReturnType<typeof screenFixture>) {
+  f.assistant();
+  assert.equal(f.exitGuard.enabled, true);
+  f.exitGuard.callback({ data: { action: "go-back" } });
+  return f.popup.actions.find((action: any) => action.id === "discard-draft").onPress;
+}
+
+for (const platform of ["ios", "android"]) {
+  test(`${platform} offer discard clears a restored review, photos and composer while retaining the buyer request`, async () => {
+    const f = screenFixture();
+    f.modules["react-native"].Platform.OS = platform;
+    f.assistant();
+    f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review", messages: [
+      { id: "photo", role: "user", content: "Oferta anterior", imageUrls: ["https://example.test/photo"] },
+    ] }));
+    await flush();
+    const before = assistantView(f);
+    before.composer.onDraftChange(true);
+    const confirm = confirmOfferDiscard(f);
+    const pending = confirm();
+    assert.equal(await confirm(), false);
+    assert.equal(f.aiCalls.length, 2);
+    assert.equal(assistantView(f).messages.length, 1);
+    assert.equal(f.aiCalls[1].input.offerDraftId, "saved");
+    assert.equal(f.aiCalls[1].input.uiAction, "DISCARD");
+    f.aiCalls[1].response.resolve(aiSuccess({ status: "cancelled" }));
+    assert.equal(await pending, true);
+    const cleared = assistantView(f);
+    assert.equal(cleared.messages.length, 0);
+    assert.equal(cleared.review, undefined);
+    assert.equal(cleared.composer.disabled, false);
+    assert.notEqual(cleared.composer.key, before.composer.key);
+    assert.equal(cleared.tree.find((n) => n.type === "OfferRequestReference")!.props.reference, reference);
+    assert.equal(f.exitGuard.enabled, false);
+    assert.deepEqual(f.navigations, []);
+    assert.equal(await confirm(), false);
+    cleared.composer.onSend({ text: "Una oferta nueva", images: [] });
+    const newCall = f.aiCalls[2];
+    assert.equal(newCall.input.offerDraftId, null);
+    assert.equal(newCall.input.conversationId, "conversation-A");
+    assert.equal(newCall.input.expectedDraftVersion, null);
+    assert.equal(newCall.input.expectedOfferRevision, null);
+    assert.equal(newCall.input.images.length, 0);
+    newCall.response.resolve(aiSuccess({ offerDraftId: "new-draft", draftVersion: 1 }));
+    await flush();
+    assert.equal(await confirm(), false, "Old popup callbacks cannot discard a newer draft");
+    const again = confirmOfferDiscard(f)();
+    assert.equal(f.aiCalls[3].input.offerDraftId, "new-draft");
+    assert.notEqual(f.aiCalls[3].input.identity.idempotencyKey, f.aiCalls[1].input.identity.idempotencyKey);
+    f.aiCalls[3].response.resolve(aiSuccess({ status: "cancelled" }));
+    assert.equal(await again, true);
+    assert.equal(assistantView(f).composer.disabled, false);
+    assert.deepEqual(f.navigations, []);
+  });
+}
+
+test("failed offer discards preserve UI and retry identity, including lifecycle errors and unconfirmed responses", async () => {
+  const f = screenFixture();
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review", messages: [
+    { id: "photo", role: "user", content: "Anterior", imageUrls: ["https://example.test/photo"] },
+  ] }));
+  await flush();
+  const before = assistantView(f);
+  const confirm = confirmOfferDiscard(f);
+  for (const response of [offerFailure, { ok: false, error: { code: "offer_draft_closed", message: "No disponible" } }, aiSuccess({ status: "sent", purchaseOfferId: "published" }), aiSuccess({ status: "draft" }), null]) {
+    const pending = confirm();
+    const call = f.aiCalls.at(-1)!;
+    assert.equal(call.input.identity.idempotencyKey, f.aiCalls[1].input.identity.idempotencyKey);
+    if (response) call.response.resolve(response);
+    else call.response.reject(new Error("offline"));
+    assert.equal(await pending, false);
+    const after = assistantView(f);
+    assert.equal(after.composer.key, before.composer.key);
+    assert.equal(after.composer.disabled, false);
+    assert.equal(after.messages[0], before.messages[0]);
+    assert.equal(after.review!.summary, before.review!.summary);
+    assert.equal(after.review!.offerPhotoCount, 1);
+    assert.deepEqual(f.navigations, []);
+  }
+  const retry = confirm();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ status: "cancelled" }));
+  assert.equal(await retry, true);
+  assert.equal(assistantView(f).messages.length, 0);
+  assert.ok(f.errors.length >= 5);
+});
+
+test("offer discard removes failed upload retries and ignores stopped image replies in the next draft", async () => {
+  for (const stopped of [false, true]) {
+    const f = screenFixture();
+    await restoreReadyOffer(f);
+    assistantView(f).composer.onSend({ text: "", images: [{ uri: "file:///old-photo.jpg" }] });
+    const old = f.aiCalls.at(-1)!;
+    if (stopped) assistantView(f).composer.onStop();
+    else {
+      old.response.resolve(offerFailure);
+      await flush();
+    }
+    const discard = confirmOfferDiscard(f)();
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({ status: "cancelled" }));
+    assert.equal(await discard, true);
+    const cleared = assistantView(f);
+    assert.ok(!cleared.tree.some((n) => n.props.children?.includes("Reintentar último mensaje")));
+    cleared.composer.onSend({ text: "Nueva oferta", images: [] });
+    if (stopped) {
+      old.response.resolve(aiSuccess({ ...readyOffer, uiState: "review", assistantMessage: "Respuesta vieja" }));
+      await flush();
+    }
+    assert.equal(assistantView(f).messages.length, 1);
+    assert.equal(assistantView(f).messages[0].text, "Nueva oferta");
+    assert.equal(assistantView(f).review, undefined);
+    assert.equal(assistantView(f).composer.busy, true);
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({ offerDraftId: "new-draft" }));
+    await flush();
+    assert.equal(assistantView(f).composer.disabled, false);
+  }
+});
+
+for (const restoreFailure of [offerFailure, { ok: false, error: { code: "offer_edit_unavailable", message: "No disponible" } }]) {
+  test(`discarding an edit restores published terms; ${restoreFailure.error.message} can retry without another discard or navigation`, async () => {
+    const f = screenFixture({ mode: "edit" });
+    await restoreReadyOffer(f);
+    const discard = confirmOfferDiscard(f)();
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({ status: "cancelled", purchaseOfferId: "existing-published-offer" }));
+    await flush();
+    const restore = f.aiCalls.at(-1)!;
+    assert.equal(restore.input.uiAction, "RESTORE");
+    assert.equal(restore.input.mode, "edit");
+    restore.response.resolve(restoreFailure);
+    assert.equal(await discard, true);
+    const cleared = assistantView(f);
+    assert.equal(cleared.messages.length, 0);
+    assert.equal(cleared.composer.disabled, true);
+    const retry = cleared.tree.find((n) => n.type === "Pressable" && typeof n.props.onPress === "function")!.props.onPress();
+    assert.equal(f.aiCalls.at(-1)!.input.uiAction, "RESTORE");
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "new-edit", draftVersion: 0, hasChanges: false, changedFields: [] }));
+    await retry;
+    const restored = assistantView(f);
+    assert.equal(restored.composer.disabled, false);
+    assert.equal(restored.messages.length, 0);
+    const context = restored.tree.find((n) => typeof n.type === "function" && n.type.name === "OfferEditContext")!.props;
+    assert.equal(context.hasChanges, false);
+    assert.equal(context.reference, reference);
+    assert.equal(context.summary, readyOffer.summary);
+    assert.equal(f.aiCalls.filter((call) => call.input.uiAction === "DISCARD").length, 1);
+    assert.deepEqual(f.navigations, []);
+  });
+}
+
+test("a late offer discard after unmount cannot restore, and a published offer rejects an old discard callback", async () => {
+  const f = screenFixture({ mode: "edit" });
+  await restoreReadyOffer(f);
+  const discard = confirmOfferDiscard(f)();
+  const call = f.aiCalls.at(-1)!;
+  f.unmount();
+  assert.equal(call.input.signal.aborted, true);
+  call.response.resolve(aiSuccess({ status: "cancelled" }));
+  assert.equal(await discard, false);
+  assert.equal(f.aiCalls.length, 2);
+  assert.deepEqual(f.navigations, []);
+
+  const published = screenFixture();
+  published.assistant();
+  published.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const oldConfirm = confirmOfferDiscard(published);
+  const publish = assistantView(published).review!.onPublish();
+  published.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, status: "sent", purchaseOfferId: "published" }));
+  await publish;
+  assert.equal(await oldConfirm(), false);
+  assert.equal(published.aiCalls.length, 2);
+  assert.equal(assistantView(published).composer.disabled, true);
 });

@@ -53,6 +53,7 @@ type ChatSessionContextValue = {
   sessionError: string | null;
   restoreDraft: () => Promise<void>;
   discardDraft: () => Promise<boolean>;
+  draftResetKey: number;
   isSendingMessage: boolean;
   isGeneratingSummary: boolean;
   isExecutingControl: boolean;
@@ -85,6 +86,7 @@ const ChatSessionContext = createContext<ChatSessionContextValue>({
   sessionError: null,
   restoreDraft: async () => {},
   discardDraft: async () => false,
+  draftResetKey: 0,
   isSendingMessage: false,
   isGeneratingSummary: false,
   isExecutingControl: false,
@@ -110,6 +112,8 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   const pendingControlRef = useRef<PurchaseRequestAssistantRequest | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draftId, setDraftId] = useState<string | null>(null);
+  const currentDraftIdRef = useRef<string | null>(null);
+  const [draftResetKey, setDraftResetKey] = useState(0);
   const [status, setStatus] = useState<PurchaseRequestAssistantStatus | null>(null);
   const [uiState, setUiState] = useState<PurchaseRequestAssistantUiState>("normal");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -132,6 +136,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     return () => {
+      currentDraftIdRef.current = null;
       const activeRequest = activeRequestRef.current;
       activeRequestRef.current = null;
       activeRequest?.abort();
@@ -190,7 +195,11 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         });
       }
 
-      if (next.draftId) setDraftId(next.draftId);
+      if (next.draftId) {
+        currentDraftIdRef.current = next.draftId;
+        setDraftId(next.draftId);
+      }
+      if (next.status === "published" || next.status === "cancelled") currentDraftIdRef.current = null;
       setStatus(next.status);
       setIsReadyToPublish(isPurchaseRequestReadyToPublish(next));
       setUiState(next.uiState ?? (next.status === "published" ? "published" : "normal"));
@@ -258,10 +267,14 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       });
       if (controller.signal.aborted || activeRequestRef.current !== controller) return;
       if (!result.ok) {
-        if (result.recoverableDraftId) setDraftId(result.recoverableDraftId);
+        if (result.recoverableDraftId) {
+          currentDraftIdRef.current = result.recoverableDraftId;
+          setDraftId(result.recoverableDraftId);
+        }
         setSessionError(result.error.message);
         return;
       }
+      currentDraftIdRef.current = result.draftId;
       setDraftId(result.draftId);
       setMessages(result.messages.filter((message) =>
         !(message.role === "assistant" && result.uiState === "review" && isAssistantReviewInstruction(message.content))
@@ -450,7 +463,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
   );
 
   const executeControl = useCallback(async (action: "CONTINUE" | "PUBLISH" | "DISCARD") => {
-    if (!draftId || activeRequestRef.current || (!sessionReadyRef.current && action !== "DISCARD") || status === "published" || status === "cancelled") return false;
+    if (!draftId || currentDraftIdRef.current !== draftId || activeRequestRef.current || (!sessionReadyRef.current && action !== "DISCARD") || status === "published" || status === "cancelled") return false;
     const controller = new AbortController();
     activeRequestRef.current = controller;
     setIsExecutingControl(true);
@@ -461,15 +474,40 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
     try {
       const result = await callPurchaseRequestAssistant({ ...input, signal: controller.signal });
       if (controller.signal.aborted || activeRequestRef.current !== controller) return false;
-      await syncAssistantState(result, { appendAssistantMessage: action === "PUBLISH" });
-      if (!result.ok) return false;
-      pendingControlRef.current = null;
       if (action === "DISCARD") {
-        if (result.status !== "cancelled") return false;
+        if (!result.ok || result.status !== "cancelled" || result.purchaseRequestId) {
+          if (result.ok || result.error.code !== "PROFILE_SCOPED_REQUEST_ABORTED") {
+            showError("No se pudo descartar", result.ok ? "No se confirmó el descarte. Reintenta en un momento." : result.error.message);
+          }
+          return false;
+        }
+        requestSequenceRef.current += 1;
+        currentDraftIdRef.current = null;
         setDraftId(null);
         setMessages([]);
-        sessionReadyRef.current = false;
+        setStatus(null);
+        setUiState("normal");
+        setPendingAction(null);
+        setRequiredFields([]);
+        setOptionalFields([]);
+        setMissingFields([]);
+        setCategorySuggestions([]);
+        setSummary(null);
+        setSummaryText(null);
+        setPurchaseRequestId(null);
+        setIsReadyToPublish(false);
+        setSessionError(null);
+        setIsRestoring(false);
+        setIsSendingMessage(false);
+        setIsGeneratingSummary(false);
+        shownSuccessRequestIdRef.current = null;
+        sessionReadyRef.current = true;
+        setDraftResetKey((value) => value + 1);
+      } else {
+        await syncAssistantState(result, { appendAssistantMessage: action === "PUBLISH" });
+        if (!result.ok) return false;
       }
+      pendingControlRef.current = null;
       return true;
     } catch {
       if (!controller.signal.aborted && activeRequestRef.current === controller) {
@@ -495,6 +533,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       sessionError,
       restoreDraft,
       discardDraft,
+      draftResetKey,
       title: "Crear solicitud",
       draftId,
       status,
@@ -537,6 +576,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
       sessionError,
       restoreDraft,
       discardDraft,
+      draftResetKey,
       continueClarifying,
       draftId,
       isExecutingControl,

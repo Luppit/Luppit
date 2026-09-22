@@ -382,6 +382,10 @@ function OfferAssistantScreen({
   const autoScrollPendingRef = useRef(true);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [offerDraftId, setOfferDraftId] = useState<string | null>(null);
+  const currentDraftIdRef = useRef<string | null>(null);
+  const pendingDiscardRef = useRef<SellerOfferAssistantRequest | null>(null);
+  const restoreAfterDiscardRef = useRef(false);
+  const [draftResetKey, setDraftResetKey] = useState(0);
   const [status, setStatus] = useState<string | null>(null);
   const [isReadyToSend, setIsReadyToSend] = useState(false);
   const [summary, setSummary] = useState<SellerOfferAssistantSummary | null>(null);
@@ -415,6 +419,7 @@ function OfferAssistantScreen({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      currentDraftIdRef.current = null;
       const activeRequest = activeRequestRef.current;
       activeRequestRef.current = null;
       activeRequest?.abort();
@@ -463,7 +468,7 @@ function OfferAssistantScreen({
     ) => {
       if (!result.ok) {
         if (result.error.code === "PROFILE_SCOPED_REQUEST_ABORTED") return;
-        if (["offer_edit_unavailable", "offer_draft_closed", "offer_edit_not_allowed", "offer_proposal_pending"].includes(result.error.code ?? "")) {
+        if (!restoreAfterDiscardRef.current && ["offer_edit_unavailable", "offer_draft_closed", "offer_edit_not_allowed", "offer_proposal_pending"].includes(result.error.code ?? "")) {
           setAllowExit(true);
           setStatus("cancelled");
           showWarning("La oferta ya no se puede modificar", result.error.message);
@@ -472,7 +477,10 @@ function OfferAssistantScreen({
         }
         if (["offer_draft_changed", "offer_changed"].includes(result.error.code ?? "")) {
           clearReviewState();
-          if (result.conflictDraftId) setOfferDraftId(result.conflictDraftId);
+          if (result.conflictDraftId) {
+            currentDraftIdRef.current = result.conflictDraftId;
+            setOfferDraftId(result.conflictDraftId);
+          }
           if (result.conflictDraftVersion != null) versionRef.current = result.conflictDraftVersion;
           setConflict(result.error.code ?? null);
           setInitialized(false);
@@ -486,6 +494,7 @@ function OfferAssistantScreen({
       }
 
       autoScrollPendingRef.current = true;
+      restoreAfterDiscardRef.current = false;
       setPendingRetry(null);
       setConflict(null);
       setInitialized(true);
@@ -506,7 +515,11 @@ function OfferAssistantScreen({
         );
 
       }
-      if (result.offerDraftId) setOfferDraftId(result.offerDraftId);
+      if (result.offerDraftId) {
+        currentDraftIdRef.current = result.offerDraftId;
+        setOfferDraftId(result.offerDraftId);
+      }
+      if (result.status === "sent" || result.status === "cancelled") currentDraftIdRef.current = null;
       if (result.status) setStatus(result.status);
       const isContinueAction = input.uiAction === "CONTINUE";
       const isSummaryAction = input.uiAction === "SHOW_SUMMARY";
@@ -608,8 +621,15 @@ function OfferAssistantScreen({
         ) {
           return;
         }
-        applyAssistantResult(result, requestInput, successfulImageCount);
+        if (input.uiAction !== "DISCARD") {
+          applyAssistantResult(result, requestInput, successfulImageCount);
+        }
         return result;
+      } catch {
+        if (!requestController.signal.aborted && activeRequestRef.current === requestController) {
+          if (input.uiAction !== "DISCARD") setPendingRetry({ input: requestInput, successfulImageCount });
+          showError("No se pudo continuar", "Reintenta en un momento.");
+        }
       } finally {
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
@@ -738,34 +758,67 @@ function OfferAssistantScreen({
     await executeAssistantRequest(pendingRetry.input, pendingRetry.successfulImageCount);
   }, [executeAssistantRequest, pendingRetry]);
 
+  const discardDraft = useCallback(async () => {
+    if (
+      !offerDraftId || currentDraftIdRef.current !== offerDraftId ||
+      activeRequestRef.current || status === "sent" || status === "cancelled"
+    ) return false;
+    const previous = pendingDiscardRef.current;
+    const input: SellerOfferAssistantRequest = previous?.offerDraftId === offerDraftId &&
+      previous.expectedDraftVersion === versionRef.current &&
+      previous.expectedOfferRevision === offerRevisionRef.current ? previous : {
+      prompt: "", mode, offerDraftId, uiAction: "DISCARD",
+      expectedDraftVersion: versionRef.current,
+      expectedOfferRevision: offerRevisionRef.current,
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
+    };
+    pendingDiscardRef.current = input;
+    const result = await executeAssistantRequest(input);
+    if (!result) return false;
+    if (
+      !result.ok || result.status !== "cancelled" ||
+      result.submittedProposalId || (!isEditMode && result.purchaseOfferId)
+    ) {
+      if (result.ok || result.error.code !== "PROFILE_SCOPED_REQUEST_ABORTED") {
+        showError("No se pudo descartar", result.ok ? "No se confirmó el descarte. Reintenta en un momento." : result.error.message);
+      }
+      return false;
+    }
+
+    currentDraftIdRef.current = null;
+    pendingDiscardRef.current = null;
+    versionRef.current = null;
+    offerRevisionRef.current = null;
+    shownSuccessOfferIdRef.current = null;
+    setOfferDraftId(null);
+    setMessages([]);
+    setStatus(null);
+    clearReviewState();
+    setContextSummary(null);
+    setOfferImages([]);
+    setHasChanges(!isEditMode);
+    setChangedFields([]);
+    setConflict(null);
+    setInitialized(!isEditMode);
+    setHasComposerDraft(false);
+    setDraftResetKey((value) => value + 1);
+    autoScrollPendingRef.current = true;
+    if (isEditMode) {
+      restoreAfterDiscardRef.current = true;
+      await executeAssistantRequest({ prompt: "", conversationId, uiAction: "RESTORE",
+        identity: createSellerOfferAssistantRequestIdentity("seller-offer-restore") });
+    }
+    return true;
+  }, [clearReviewState, conversationId, executeAssistantRequest, isEditMode, mode, offerDraftId, status]);
+
   usePreventRemove(
     Boolean(offerDraftId) && status !== "sent" && status !== "cancelled" && !allowExit,
     ({ data }) => {
-      if (!offerDraftId) return;
+      if (!offerDraftId || (activeRequestRef.current && !processingMode)) return;
 
       const closeAfterConfirmation = () => {
         setAllowExit(true);
         setTimeout(() => navigation.dispatch(data.action), 0);
-      };
-
-      const discardDraft = async () => {
-        const result = await executeAssistantRequest({
-          prompt: "",
-          mode,
-          expectedDraftVersion: versionRef.current,
-          expectedOfferRevision: offerRevisionRef.current,
-          offerDraftId,
-          uiAction: "DISCARD",
-          identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard"),
-        });
-        if (!result) return false;
-        if (!result.ok) {
-          showError("No se pudo descartar", result.error.message);
-          return false;
-        }
-
-        closeAfterConfirmation();
-        return true;
       };
 
       Keyboard.dismiss();
@@ -903,11 +956,8 @@ function OfferAssistantScreen({
           <Button title={conflict === "offer_changed" ? "Descartar cambios y cargar oferta" : "Cargar últimos cambios"}
             disabled={isBusy} onPress={() => { void (async () => {
               if (conflict === "offer_changed" && offerDraftId) {
-                const discarded = await executeAssistantRequest({ prompt: "", mode, offerDraftId,
-                  expectedDraftVersion: versionRef.current, uiAction: "DISCARD",
-                  identity: createSellerOfferAssistantRequestIdentity("seller-offer-discard") });
-                if (!discarded) return;
-                if (!discarded.ok) { showError("No se pudo descartar", discarded.error.message); return; }
+                await discardDraft();
+                return;
               }
               await executeAssistantRequest({ prompt: "", conversationId, uiAction: "RESTORE",
                 identity: createSellerOfferAssistantRequestIdentity("seller-offer-restore") });
@@ -946,6 +996,7 @@ function OfferAssistantScreen({
           <Text variant="small" color="textMedium">Solo tú ves este borrador. El comprador debe aceptar los cambios.</Text>
         ) : null}
         <InputChat
+          key={draftResetKey}
           onDraftChange={setHasComposerDraft}
           clearOnSendStart
           autoFocus={!isEditMode && messages.length === 0}
