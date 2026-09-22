@@ -12,7 +12,8 @@ const savedAt = "2026-09-22T04:00:00.000Z";
 const notification = (id: string, readAt: string | null = null): ProfileNotificationListItem => ({
   notificationId: id, profileId: "active-profile", title: "Nueva oferta", message: "Revisa tu oferta",
   typeCode: "information", typeLabel: null, typeDescription: null, eventCode: null,
-  navigation: null, createdAt: "2026-09-21T22:00:00.000Z", readAt,
+  navigation: null, conversationId: null, counterpartName: null, counterpartImagePath: null,
+  createdAt: "2026-09-21T22:00:00.000Z", readAt,
 });
 
 function loadModule(path: string, modules: Record<string, unknown>) {
@@ -37,7 +38,10 @@ function loadModule(path: string, modules: Record<string, unknown>) {
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 // Execute real screen callbacks with controlled service responses, not native layout.
-async function screenHarness(initial = [notification("one"), notification("two")]) {
+async function screenHarness(
+  initial = [notification("one"), notification("two")],
+  role: "buyer" | "seller" = "buyer"
+) {
   const values: unknown[] = [];
   let cursor = 0;
   let mounted = false;
@@ -84,6 +88,7 @@ async function screenHarness(initial = [notification("one"), notification("two")
     "./detail-top-bar": { DETAIL_TOP_BAR_VISIBLE_HEIGHT: 72 },
     "@/src/components/chip/LuppitChip": { default: "LuppitChip", __esModule: true },
     "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/profile/ProfilePicture": { default: "ProfilePicture", __esModule: true },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/groupedList/GroupedList": { GroupedList: "GroupedList" },
     "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({}) },
@@ -93,6 +98,7 @@ async function screenHarness(initial = [notification("one"), notification("two")
     "@/src/utils/useToast": { showError: (...args: unknown[]) => errors.push(args), showSuccess: (...args: unknown[]) => successes.push(args) },
     "@/src/services/popup.service": { openPopup: (popup: unknown) => popups.push(popup) },
     "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({
+      activeProfile: { role },
       unreadNotificationCount: unreadCount,
       applyUnreadNotificationCount: (count: number) => { unreadCount = count; },
       refreshUnreadNotificationCount: async () => {
@@ -148,6 +154,40 @@ async function screenHarness(initial = [notification("one"), notification("two")
     unmount() { cleanup?.(); },
   };
 }
+
+test("notification rows show the role-specific counterpart photo and name", async () => {
+  for (const [role, expectedKind, name, imagePath] of [
+    ["buyer", "business", "Tienda Central", "business/photo.jpg"],
+    ["seller", "buyer", "Ana Compradora", "buyer/photo.jpg"],
+  ] as const) {
+    const item = {
+      ...notification("one"),
+      conversationId: "conversation-one",
+      counterpartName: name,
+      counterpartImagePath: imagePath,
+    };
+    const h = await screenHarness([item], role);
+    const row = h.render().find((node) => node.props.notification);
+    assert.equal(row?.props.counterpartKind, expectedKind);
+    const rendered = (row?.type as (props: unknown) => Element)(row.props);
+    assert.match(rendered.props.accessibilityLabel, new RegExp(name));
+    const picture = rendered.props.children.find((child: Element) => child?.type === "ProfilePicture");
+    assert.equal(picture?.props.kind, expectedKind);
+    assert.equal(picture?.props.imagePath, imagePath);
+    row?.props.onPress();
+    await settle();
+    assert.match((h.popups[0] as { metadata: string }).metadata, new RegExp(name));
+  }
+
+  const fallback = await screenHarness([{
+    ...notification("missing-photo"), conversationId: "conversation-two",
+  }], "seller");
+  const fallbackRow = fallback.render().find((node) => node.props.notification);
+  const fallbackRendered = (fallbackRow?.type as (props: unknown) => Element)(fallbackRow?.props);
+  assert.match(fallbackRendered.props.accessibilityLabel, /Comprador/);
+  const fallbackPicture = fallbackRendered.props.children.find((child: Element) => child?.type === "ProfilePicture");
+  assert.equal(fallbackPicture?.props.imagePath, null);
+});
 
 test("bulk read reloads persisted timestamps and badge count, preserves items, and survives refocus", async () => {
   const h = await screenHarness();
@@ -232,6 +272,7 @@ test("opening a detail still reads only its notification", async () => {
   h.render().find((node) => node.props.notification)!.props.onPress();
   await settle();
   assert.equal(h.popups.length, 1);
+  assert.match((h.popups[0] as { metadata: string }).metadata, /^Luppit · /);
   assert.equal(h.items()[0].readAt, savedAt);
   assert.equal(h.items()[1].readAt, null);
   assert.equal(h.unreadCount, 1);
@@ -311,6 +352,7 @@ test("bulk service resolves the active profile and rejects RPC failure receipts"
     } },
     "../lib/supabase/errors": { fromAppError: (type: string) => ({ type }), fromSupabaseError: (error: unknown) => error },
     "./active.profile.service": { getCurrentProfileResult: async () => ({ ok: true, data: { id: "active-profile" } }) },
+    "./conversation.service": { getCurrentProfileConversations: async () => ({ ok: true, data: [] }) },
   });
   assert.equal((await service.markAllCurrentProfileNotificationsRead()).ok, true);
   assert.equal(calls[0][0], "mark_all_profile_notifications_read");
@@ -319,4 +361,76 @@ test("bulk service resolves the active profile and rejects RPC failure receipts"
     receipt = invalid;
     assert.equal((await service.markAllCurrentProfileNotificationsRead()).ok, false);
   }
+});
+
+test("notification service uses counterpart metadata from the conversation list", async () => {
+  let conversationResult: unknown = {
+    ok: true,
+    data: [{
+      conversation_id: "conversation-one",
+      display_name: "Tienda Central",
+      counterpart_image_path: "business/photo.jpg",
+    }],
+  };
+  let conversationCalls = 0;
+  let notificationSelect = "";
+  const rows = [
+    {
+      profile_id: "active-profile", read_at: null,
+      notification: {
+        id: "one", title: "Oferta aceptada", message: "Listo", type_code: "information",
+        event_code: "offer_accepted", payload: {}, conversation_id: "conversation-one",
+        created_at: "2026-09-22T04:00:00.000Z",
+      },
+    },
+    {
+      profile_id: "active-profile", read_at: null,
+      notification: {
+        id: "two", title: "Verificación", message: "Revisa tu cuenta", type_code: "information",
+        event_code: "verification", payload: {}, conversation_id: null,
+        created_at: "2026-09-22T03:00:00.000Z",
+      },
+    },
+  ];
+  const service = loadModule("../src/services/notification.service.ts", {
+    "../db/functions": { RPC_FUNCTIONS: {} },
+    "../db/tables": {
+      TB_PROFILE_NOTIFICATION: "profile_notification",
+      TB_NOTIFICATION_TYPE_CATALOG: "notification_type_catalog",
+      COL_PROFILE_NOTIFICATION: { profile_id: "profile_id", dismissed_at: "dismissed_at" },
+      COL_NOTIFICATION_TYPE_CATALOG: { code: "code" },
+    },
+    "../lib/supabase/client": { supabase: {
+      auth: { getSession: async () => ({ data: { session: { user: { id: "account" } } }, error: null }) },
+      from: (table: string) => ({
+        select: (columns: string) => {
+          if (table === "profile_notification") {
+            notificationSelect = columns;
+            return { eq: () => ({ is: async () => ({ data: rows, error: null }) }) };
+          }
+          return { in: async () => ({ data: [{ code: "information", label: "Información" }], error: null }) };
+        },
+      }),
+    } },
+    "../lib/supabase/errors": { fromAppError: (type: string) => ({ type }), fromSupabaseError: (error: unknown) => error },
+    "./active.profile.service": { getCurrentProfileResult: async () => ({ ok: true, data: { id: "active-profile" } }) },
+    "./conversation.service": { getCurrentProfileConversations: async () => {
+      conversationCalls++;
+      return conversationResult;
+    } },
+  });
+
+  const first = await service.getCurrentProfileNotifications();
+  assert.equal(first.ok, true);
+  assert.match(notificationSelect, /conversation_id/);
+  assert.equal(conversationCalls, 1);
+  assert.equal(first.data[0].counterpartName, "Tienda Central");
+  assert.equal(first.data[0].counterpartImagePath, "business/photo.jpg");
+  assert.equal(first.data[1].counterpartName, null);
+
+  conversationResult = { ok: false, error: failure.error };
+  const fallback = await service.getCurrentProfileNotifications();
+  assert.equal(fallback.ok, true);
+  assert.equal(fallback.data[0].counterpartName, null);
+  assert.equal(fallback.data[0].message, "Listo");
 });

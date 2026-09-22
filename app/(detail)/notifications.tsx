@@ -2,6 +2,7 @@ import LuppitChip from "@/src/components/chip/LuppitChip";
 import { GroupedList } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
+import ProfilePicture, { ProfilePictureKind } from "@/src/components/profile/ProfilePicture";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
@@ -100,6 +101,15 @@ function getNotificationIcon(notification: ProfileNotificationListItem) {
   return "bell";
 }
 
+function getNotificationSenderName(
+  notification: ProfileNotificationListItem,
+  counterpartKind: ProfilePictureKind | null
+) {
+  if (!notification.conversationId || !counterpartKind) return "Luppit";
+  return notification.counterpartName?.trim() ||
+    (counterpartKind === "business" ? "Negocio" : "Comprador");
+}
+
 function getNotificationActions(
   notification: ProfileNotificationListItem
 ): PopupSummaryAction[] {
@@ -165,8 +175,13 @@ function getNotificationActions(
 export default function NotificationsScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { unreadNotificationCount, applyUnreadNotificationCount, refreshUnreadNotificationCount } =
+  const { activeProfile, unreadNotificationCount, applyUnreadNotificationCount, refreshUnreadNotificationCount } =
     useActiveProfile();
+  const counterpartKind: ProfilePictureKind | null = activeProfile?.role === "buyer"
+    ? "business"
+    : activeProfile?.role === "seller"
+      ? "buyer"
+      : null;
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = React.useMemo(
     () => createNotificationsStyles(t, topContentInset),
@@ -306,6 +321,7 @@ export default function NotificationsScreen() {
       if (markingAllReadRef.current) return;
       const title = notification.title?.trim() || "Novedad en Luppit";
       const metadata = [
+        getNotificationSenderName(notification, counterpartKind),
         getNotificationTypeLabel(notification),
         formatNotificationReceivedAt(notification.createdAt),
       ]
@@ -321,7 +337,7 @@ export default function NotificationsScreen() {
       });
       void markNotificationRead(notification);
     },
-    [markNotificationRead]
+    [counterpartKind, markNotificationRead]
   );
 
   const openDismissAllConfirmation = React.useCallback(() => {
@@ -493,6 +509,7 @@ export default function NotificationsScreen() {
               <NotificationRow
                 key={notification.notificationId}
                 notification={notification}
+                counterpartKind={counterpartKind}
                 showSeparator={index < section.items.length - 1}
                 disabled={isMarkingAllRead}
                 onPress={() => openNotificationDetail(notification)}
@@ -516,11 +533,13 @@ export default function NotificationsScreen() {
 
 function NotificationRow({
   notification,
+  counterpartKind,
   showSeparator,
   disabled,
   onPress,
 }: {
   notification: ProfileNotificationListItem;
+  counterpartKind: ProfilePictureKind | null;
   showSeparator: boolean;
   disabled: boolean;
   onPress: () => void;
@@ -534,24 +553,36 @@ function NotificationRow({
   const title = notification.title?.trim() || "Novedad en Luppit";
   const accessibleTime = formatNotificationAccessibleTime(notification.createdAt);
   const accessiblePreview = getNotificationAccessiblePreview(notification.message);
+  const hasCounterpart = Boolean(notification.conversationId && counterpartKind);
+  const senderName = getNotificationSenderName(notification, counterpartKind);
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${isUnread ? "Sin leer. " : ""}${title}. ${accessiblePreview}. Recibida ${accessibleTime}.`}
+      accessibilityLabel={`${isUnread ? "Sin leer. " : ""}${senderName}. ${title}. ${accessiblePreview}. Recibida ${accessibleTime}.`}
       accessibilityHint="Abre el detalle de la notificación."
       disabled={disabled}
       accessibilityState={{ disabled }}
       onPress={onPress}
       style={({ pressed }) => [s.row, pressed ? s.rowPressed : null]}
     >
-      <View
-        style={s.iconBadge}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        <Icon name={icon} size={24} color={t.colors.primary} />
-      </View>
+      {hasCounterpart && counterpartKind ? (
+        <ProfilePicture
+          kind={counterpartKind}
+          name={senderName}
+          imagePath={notification.counterpartImagePath}
+          size={44}
+          accessible={false}
+        />
+      ) : (
+        <View
+          style={s.iconBadge}
+          accessibilityElementsHidden
+          importantForAccessibility="no"
+        >
+          <Icon name={icon} size={24} color={t.colors.primary} />
+        </View>
+      )}
       <View style={s.rowBody}>
         <View style={s.rowTitleLine}>
           <Text
@@ -565,6 +596,9 @@ function NotificationRow({
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>
+        <Text variant="small" color="textDark" maxLines={2}>
+          {senderName}
+        </Text>
         <Text variant="small" color="textMedium" maxLines={2}>
           {notification.message}
         </Text>
@@ -623,12 +657,11 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     },
     markAllButton: {
       minHeight: 44,
-      alignSelf: "flex-end",
-      borderRadius: 22,
+      alignSelf: "stretch",
       ...createRoundedSurfaceStyle(t),
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "flex-end",
+      justifyContent: "center",
       gap: t.spacing.sm,
       paddingHorizontal: t.spacing.md,
     },

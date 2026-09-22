@@ -9,6 +9,7 @@ import { Row } from "../db/types";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { getCurrentProfileConversations } from "./conversation.service";
 
 type ProfileNotification = Row<"profile_notification">;
 type NotificationRow = Row<"notification">;
@@ -28,6 +29,9 @@ export type ProfileNotificationListItem = {
   typeDescription: string | null;
   eventCode: string | null;
   navigation: ProfileNotificationNavigation | null;
+  conversationId: string | null;
+  counterpartName: string | null;
+  counterpartImagePath: string | null;
   createdAt: string;
   readAt: string | null;
 };
@@ -117,7 +121,7 @@ export async function getCurrentProfileNotifications(): Promise<
         "profile_id",
         "read_at",
         "created_at",
-        "notification:notification_id(id,title,message,type_code,event_code,payload,created_at)",
+        "notification:notification_id(id,title,message,type_code,event_code,payload,conversation_id,created_at)",
       ].join(",")
     )
     .eq(COL_PROFILE_NOTIFICATION.profile_id, profileResult.data)
@@ -128,6 +132,10 @@ export async function getCurrentProfileNotifications(): Promise<
   const rows = ((data ?? []) as unknown as ProfileNotificationRecord[]).filter(
     (row) => row.notification != null
   );
+  const hasConversationNotifications = rows.some((row) => row.notification?.conversation_id);
+  const conversationResultPromise = hasConversationNotifications
+    ? getCurrentProfileConversations().catch(() => null)
+    : Promise.resolve(null);
   const typeCodes = Array.from(
     new Set(
       rows
@@ -150,10 +158,23 @@ export async function getCurrentProfileNotifications(): Promise<
     }
   }
 
+  const conversationResult = await conversationResultPromise;
+  const counterpartByConversation = new Map(
+    conversationResult?.ok
+      ? conversationResult.data.map((conversation) => [
+          conversation.conversation_id,
+          conversation,
+        ] as const)
+      : []
+  );
+
   const notifications = rows
     .map((row) => {
       const notification = row.notification as NotificationRow;
       const type = typeByCode.get(notification.type_code);
+      const counterpart = notification.conversation_id
+        ? counterpartByConversation.get(notification.conversation_id)
+        : null;
 
       return {
         notificationId: notification.id,
@@ -165,6 +186,9 @@ export async function getCurrentProfileNotifications(): Promise<
         typeDescription: type?.description ?? null,
         eventCode: notification.event_code,
         navigation: parseNotificationNavigation(notification.payload),
+        conversationId: notification.conversation_id,
+        counterpartName: counterpart?.display_name ?? null,
+        counterpartImagePath: counterpart?.counterpart_image_path ?? null,
         createdAt: notification.created_at,
         readAt: row.read_at,
       };
