@@ -6,7 +6,7 @@ import { Text } from "@/src/components/Text";
 import { LucideIconName } from "@/src/icons/lucide";
 import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
-import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
+import { formatConversationOfferPrice, formatConversationOfferTotal, formatOfferAmount } from "@/src/utils/conversationOfferPrice";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
@@ -83,6 +83,17 @@ export default function OfferCard({
     offer_price_basis: offer.price_basis,
     offer_quantity_offered: offer.quantity_offered,
   }) ?? "Precio no disponible";
+  const unitPrice = offer.price_basis === "UNIT"
+    ? formatOfferAmount(offer.price, offer.offer_currency_code)
+    : null;
+  const productTotal = offer.price_basis === "UNIT" || offer.price_basis === "TOTAL"
+    ? formatConversationOfferTotal({
+        ...offer,
+        offer_price_amount: offer.price,
+        offer_price_basis: offer.price_basis,
+        offer_quantity_offered: offer.quantity_offered,
+      })
+    : null;
   const description = offer.description?.trim();
   const methodItem = timeline.find(
     (item) =>
@@ -105,6 +116,7 @@ export default function OfferCard({
       accessible
       accessibilityRole="text"
       accessibilityLabel={step.accessibility_label?.trim() || [
+        isSummary && index === 0 && methodLabel ? `Método de entrega: ${methodLabel}.` : null,
         step.pre_label,
         step.label,
         step.detail,
@@ -126,12 +138,24 @@ export default function OfferCard({
         </View>
       ) : null}
       <View style={[s.timelineContent, isSummary ? s.summaryContent : null]}>
-        {step.pre_label?.trim() ? (
+        {isSummary && index === 0 ? (
+          <View style={s.timelineHeader}>
+            {step.pre_label?.trim() ? (
+              <Text variant="small" color="textMedium" maxFontSizeMultiplier={2} style={s.headerLabel}>
+                {step.pre_label.trim()}
+              </Text>
+            ) : null}
+            {methodLabel ? (
+              <LuppitChip label={methodLabel} icon={methodIcon} bordered labelMaxLines={2}
+                accessibilityLabel={`Método de entrega: ${methodLabel}`} style={s.methodChip} />
+            ) : null}
+          </View>
+        ) : step.pre_label?.trim() ? (
           <Text variant="small" color="textMedium" maxFontSizeMultiplier={2} style={s.eyebrow}>
             {step.pre_label.trim()}
           </Text>
         ) : null}
-        <Text variant={isSummary ? "title" : "body"} maxFontSizeMultiplier={2}>
+        <Text variant="body" maxFontSizeMultiplier={2} style={isSummary ? s.summaryLabel : undefined}>
           {step.label}
         </Text>
         {step.detail?.trim() ? (
@@ -152,55 +176,64 @@ export default function OfferCard({
     <MarketplaceCardFrame
       title={businessName}
       subtitle={province}
+      fullText
+      headerRight={onMenuPress ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="Más opciones de la oferta"
+          onPress={onMenuPress} style={s.menuButton}>
+          <Icon name="ellipsis" size={22} color={t.colors.textDark} />
+        </Pressable>
+      ) : null}
       footerDivider={timelineLoading || Boolean(timelineError)}
       accessibilityLabel={`Oferta de ${businessName} por ${formattedPrice}`}
       body={
         <View style={s.body}>
-          <View style={s.priceRow}>
-            <Text variant="subtitle" style={s.price}>
-              {formattedPrice}
-            </Text>
+          {description ? (
+            <Text variant="body" color="textMedium">{description}</Text>
+          ) : null}
+          <View style={s.pricing}>
+            {productTotal ? (
+              <>
+                {unitPrice ? (
+                  <View style={s.priceRow}>
+                    <Text variant="small" color="textMedium" style={s.priceLabel}>
+                      {offer.quantity_offered != null
+                        ? `${offer.quantity_offered} ${offer.quantity_offered === 1 ? "unidad" : "unidades"}`
+                        : "Precio por unidad"}
+                    </Text>
+                    <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice} c/u</Text>
+                  </View>
+                ) : null}
+                <View style={s.priceRow}>
+                  <Text variant="small" color="textMedium" style={s.priceLabel}>Total de productos</Text>
+                  <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
+                </View>
+              </>
+            ) : (
+              <Text variant="body" style={s.price}>{formattedPrice}</Text>
+            )}
             {rating != null ? (
               <View style={s.ratingRow}>
                 <Icon name="star" size={16} color={t.colors.accentYellow} />
-                <Text variant="body" maxLines={1}>
-                  {rating.toFixed(1)}
-                  {numRatings != null ? ` (${numRatings})` : ""}
+                <Text variant="small">
+                  {rating.toFixed(1)}{numRatings != null ? ` (${numRatings})` : ""}
                 </Text>
               </View>
             ) : null}
           </View>
 
-          {description ? (
-            <Text variant="body" color="textMedium" maxLines={2}>
-              {description}
-            </Text>
-          ) : null}
-
           {hasTimelineSection ? (
             <View style={s.timelineSection}>
-              <View style={s.timelineHeader}>
-                <Text
-                  variant="small"
-                  color="textMedium"
-                  accessibilityRole="header"
-                  maxFontSizeMultiplier={2}
-                >
-                  Seguimiento
-                </Text>
-                {methodLabel ? (
-                  <LuppitChip
-                    label={methodLabel}
-                    icon={methodIcon}
-                    bordered
-                    labelMaxLines={2}
-                    accessibilityLabel={`Método de entrega: ${methodLabel}`}
-                    style={s.methodChip}
-                  />
-                ) : null}
-              </View>
-
               {timelineActions}
+              {(timelineLoading || timelineError || summaryItems.length === 0) && methodLabel ? (
+                <LuppitChip
+                  label={methodLabel}
+                  icon={methodIcon}
+                  bordered
+                  labelMaxLines={2}
+                  accessibilityLabel={`Método de entrega: ${methodLabel}`}
+                  style={s.methodChip}
+                />
+              ) : null}
 
               {timelineLoading ? (
                 <View style={s.timelineState} accessibilityRole="text">
@@ -244,17 +277,6 @@ export default function OfferCard({
       footerLeft={
         <View style={s.footerContent}>
           <View style={s.footer}>
-            {onMenuPress ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Más opciones de la oferta"
-                onPress={onMenuPress}
-                style={s.menuButton}
-              >
-                <Icon name="ellipsis" size={22} color={t.colors.textDark} />
-              </Pressable>
-            ) : null}
-
             <View style={s.connectButtonSlot}>
               <Button title={connectLabel} icon="message-circle" onPress={onConnect} />
             </View>
@@ -298,7 +320,19 @@ function createOfferCardStyles(t: Theme) {
     body: {
       gap: t.spacing.md,
     },
+    pricing: {
+      gap: t.spacing.sm,
+    },
+    priceLabel: {
+      flexShrink: 1,
+    },
+    priceValue: {
+      flexShrink: 1,
+      textAlign: "right",
+      marginLeft: "auto",
+    },
     priceRow: {
+      flexWrap: "wrap",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -306,7 +340,7 @@ function createOfferCardStyles(t: Theme) {
     },
     price: {
       color: t.colors.primary,
-      flex: 1,
+      fontFamily: t.typography.subtitle.fontFamily,
     },
     ratingRow: {
       flexDirection: "row",
@@ -325,6 +359,13 @@ function createOfferCardStyles(t: Theme) {
       alignItems: "center",
       justifyContent: "space-between",
       gap: t.spacing.sm,
+      marginBottom: t.spacing.sm,
+    },
+    headerLabel: {
+      flexShrink: 1,
+    },
+    summaryLabel: {
+      fontFamily: t.typography.subtitle.fontFamily,
     },
     methodChip: {
       alignSelf: "flex-start",
@@ -364,6 +405,7 @@ function createOfferCardStyles(t: Theme) {
     },
     summaryContent: {
       paddingTop: 0,
+      gap: t.spacing.sm,
     },
     eyebrow: {
       fontFamily: t.typography.subtitle.fontFamily,
