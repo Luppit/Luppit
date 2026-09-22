@@ -1,7 +1,6 @@
 import {
   normalizeOptionalIcon,
   normalizeStyleFlags,
-  normalizeText,
   toTopButtonConfig,
   useConversationActions,
 } from "@/src/components/conversation/useConversationActions";
@@ -40,7 +39,7 @@ import {
   clearToastBottomInset,
   setToastBottomInset,
 } from "@/src/services/toast.service";
-import { Theme, useTheme } from "@/src/themes";
+import { useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { Redirect, Slot, router, useGlobalSearchParams } from "expo-router";
 import React, {
@@ -71,10 +70,7 @@ type ConversationLayoutContextValue = {
   conversationId: string;
   profileId: string;
   conversationView: ConversationView;
-  auxActions: ConversationViewAction[];
   showComposer: boolean;
-  onActionPress: (action: ConversationViewAction) => void;
-  isExecutingAction: boolean;
   refreshConversation: () => Promise<void>;
   messageRefreshTick: number;
   optimisticMessages: ConversationMessage[];
@@ -110,18 +106,6 @@ function toMenuOptionConfig(action: ConversationViewAction): PopupOption {
     textColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
   };
-}
-
-function getAuxActionTextColor(styleCode: string | null, theme: Theme) {
-  const { isDanger, isPrimary } = normalizeStyleFlags(styleCode);
-
-  if (isDanger) return theme.colors.error;
-  if (isPrimary) return theme.colors.primary;
-  return theme.colors.textDark;
-}
-
-function isBlackAuxAction(styleCode: string | null) {
-  return normalizeText(styleCode).includes("black");
 }
 
 function createOptimisticMessageId(index: number) {
@@ -479,15 +463,12 @@ export default function ConversationLayout() {
     );
   }
 
-  const rawTopActions = conversationView.actions.filter(
-    (action) => (action.ui_slot ?? "").toUpperCase() === "TOP"
+  const rawHeaderActions = conversationView.actions.filter(
+    (action) => ["TOP", "AUX"].includes((action.ui_slot ?? "").toUpperCase())
   );
-  const topActions = rawTopActions.map(toTopButtonConfig);
-  const topActionsById = new Map(
-    rawTopActions.map((action) => [action.id, action] as const)
-  );
-  const auxActions = conversationView.actions.filter(
-    (action) => (action.ui_slot ?? "").toUpperCase() === "AUX"
+  const headerActions = rawHeaderActions.map(toTopButtonConfig);
+  const headerActionsById = new Map(
+    rawHeaderActions.map((action) => [action.id, action] as const)
   );
   const menuActions = conversationView.actions.filter(
     (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
@@ -505,10 +486,7 @@ export default function ConversationLayout() {
     conversationId,
     profileId,
     conversationView,
-    auxActions,
     showComposer,
-    onActionPress: handleActionPress,
-    isExecutingAction,
     refreshConversation,
     messageRefreshTick,
     optimisticMessages,
@@ -615,10 +593,10 @@ export default function ConversationLayout() {
             <ConversationHeaderControls
               view={conversationView}
               profileId={profileId}
-              buttons={topActions}
+              buttons={headerActions}
               disabled={isExecutingAction}
               onPress={(id) => {
-                const action = topActionsById.get(id);
+                const action = headerActionsById.get(id);
                 if (!action) return;
                 handleActionPress(action);
               }}
@@ -649,53 +627,10 @@ export default function ConversationLayout() {
                 backgroundColor: t.colors.background,
               }}
             >
-              {auxActions.length > 0 ? (
-                <View
-                  style={{
-                    paddingHorizontal: t.spacing.md,
-                    paddingTop: t.spacing.sm,
-                    paddingBottom: t.spacing.sm,
-                    gap: t.spacing.sm,
-                  }}
-                >
-                  {auxActions.map((action) =>
-                    isBlackAuxAction(action.style_code) ? (
-                      <Button
-                        key={action.id}
-                        title={action.label}
-                        onPress={() => handleActionPress(action)}
-                        disabled={isExecutingAction}
-                        variant="dark"
-                      />
-                    ) : (
-                      <Pressable
-                        key={action.id}
-                        onPress={() => handleActionPress(action)}
-                        disabled={isExecutingAction}
-                        hitSlop={8}
-                        style={{
-                          alignSelf: "center",
-                          paddingVertical: t.spacing.xs,
-                          opacity: isExecutingAction ? 0.6 : 1,
-                        }}
-                      >
-                        <Text
-                          variant="body"
-                          align="center"
-                          style={{ color: getAuxActionTextColor(action.style_code, t) }}
-                        >
-                          {action.label}
-                        </Text>
-                      </Pressable>
-                    )
-                  )}
-                </View>
-              ) : null}
-
               <View
                 style={{
                   paddingHorizontal: t.spacing.md,
-                  paddingTop: auxActions.length > 0 ? 0 : t.spacing.sm,
+                  paddingTop: t.spacing.sm,
                   paddingBottom: isAndroidKeyboardVisible
                     ? t.spacing.sm
                     : Math.max(insets.bottom, t.spacing.sm),

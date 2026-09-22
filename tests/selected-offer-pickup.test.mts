@@ -430,14 +430,14 @@ for (const methods of [["shipping"], ["pickup"], ["shipping", "pickup"]]) {
   });
 }
 
-test("actual conversation layout still routes TOP and MENU actions through the extracted handler", async () => {
-  for (const slot of ["TOP", "MENU"]) {
+test("actual conversation layout routes TOP, AUX and MENU actions through the extracted handler", async () => {
+  for (const slot of ["TOP", "AUX", "MENU"]) {
     const f = fixture(); f.drawConversation();
     const action = pickupAction({ ui_slot: slot });
     f.reads[0].resolve(viewResult({ actions: [action] })); await flush();
     const tree = f.drawConversation();
     assert.equal(executions(f).length, 0);
-    if (slot === "TOP") buttons(tree)!.props.onPress(action.id);
+    if (slot !== "MENU") buttons(tree)!.props.onPress(action.id);
     else {
       nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones")!.props.onPress();
       f.popups.at(-1).options[0].onPress();
@@ -451,6 +451,30 @@ test("actual conversation layout still routes TOP and MENU actions through the e
     const refreshed = f.drawConversation();
     assert.equal(buttons(refreshed)?.props.buttons.length, 0);
     assert.equal(refreshed.props.value.messageRefreshTick, 1);
+  }
+});
+
+test("conversation action bubble includes ordered TOP and AUX actions independently of the composer", async () => {
+  for (const canSend of [false, true]) {
+    const f = fixture();
+    f.drawConversation();
+    const actions = [
+      pickupAction({ id: "review", ui_slot: "AUX", label: "Revisar cambios" }),
+      pickupAction({ id: "edit", ui_slot: "TOP", label: "Modificar" }),
+      pickupAction({ id: "overflow", ui_slot: "MENU", label: "Ver perfil" }),
+      pickupAction({ id: "cancel", ui_slot: "AUX", label: "Cancelar compra", style_code: "danger" }),
+    ];
+    f.reads[0].resolve(viewResult({ actions, permissions: { can_send_messages: canSend } }));
+    await flush();
+    const tree = f.drawConversation();
+    const controls = buttons(tree)!.props.buttons;
+    assert.deepEqual(Array.from(controls, (item: any) => item.id), ["review", "edit", "cancel"]);
+    assert.equal(controls[2].tone, "danger");
+    assert.equal(nodes(tree).filter((n) => n.type === "InputChat").length, canSend ? 1 : 0);
+    assert.ok(!nodes(tree).some((n) => n.props.children?.flat().some((child: any) => child === "Revisar cambios" || child === "Cancelar compra")), "Do not repeat actions as standalone footer controls");
+    buttons(tree)!.props.onPress("cancel");
+    assert.equal(executions(f).length, 0, "The same configured confirmation must still run first");
+    assert.equal(f.popups.at(-1).title, actions[3].confirmation.title);
   }
 });
 

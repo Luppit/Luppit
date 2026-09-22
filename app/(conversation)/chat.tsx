@@ -1,4 +1,3 @@
-import Button from "@/src/components/button/Button";
 import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -60,9 +59,6 @@ export default function ConversationChatScreen() {
     profileId,
     conversationView,
     messageRefreshTick,
-    auxActions,
-    onActionPress,
-    isExecutingAction,
     optimisticMessages,
     clearOptimisticMessages,
     contentTopInset,
@@ -79,7 +75,6 @@ export default function ConversationChatScreen() {
   const scrollViewRef = React.useRef<ScrollView | null>(null);
   const prefetchedPreviewUrisRef = React.useRef<Set<string>>(new Set());
   const imageMessageWidth = 230;
-  const showComposer = conversationView.permissions.can_send_messages;
   const statusSlots = useMemo(
     () =>
       conversationView.slots.filter(
@@ -224,28 +219,6 @@ export default function ConversationChatScreen() {
 
     return `${day} ${month}, ${year}`.trim();
   };
-
-  const getAuxActionTextColor = (styleCode: string | null) => {
-    const value = (styleCode ?? "").toLowerCase().trim();
-    const isDanger =
-      value.includes("error") ||
-      value.includes("danger") ||
-      value.includes("destructive") ||
-      value.includes("reject") ||
-      value.includes("cancel");
-    const isPrimary =
-      value.includes("primary") ||
-      value.includes("success") ||
-      value.includes("positive") ||
-      value.includes("confirm");
-
-    if (isDanger) return t.colors.error;
-    if (isPrimary) return t.colors.primary;
-    return t.colors.textDark;
-  };
-
-  const isBlackAuxAction = (styleCode: string | null) =>
-    (styleCode ?? "").toLowerCase().trim().includes("black");
 
   const prefetchPreviewImages = useCallback(
     (images: ConversationImagePreview[], centerIndex = 0) => {
@@ -603,53 +576,6 @@ export default function ConversationChatScreen() {
         {statusSlots.map((slot) => (
           <ConversationStatusSlotCard key={slot.code} slot={slot} />
         ))}
-
-        {!showComposer
-          ? auxActions.map((action, index) => {
-              const isLastAuxAction = index === auxActions.length - 1;
-              const auxBottomSpacing =
-                showComposer && isLastAuxAction ? t.spacing.sm : 0;
-
-              return isBlackAuxAction(action.style_code) ? (
-                <View
-                  key={action.id}
-                  style={{
-                    alignSelf: "stretch",
-                    paddingTop: t.spacing.xs,
-                    marginBottom: auxBottomSpacing,
-                  }}
-                >
-                  <Button
-                    title={action.label}
-                    onPress={() => onActionPress(action)}
-                    disabled={isExecutingAction}
-                    variant="dark"
-                  />
-                </View>
-              ) : (
-                <Pressable
-                  key={action.id}
-                  onPress={() => onActionPress(action)}
-                  disabled={isExecutingAction}
-                  hitSlop={8}
-                  style={{
-                    alignSelf: "center",
-                    paddingVertical: t.spacing.xs,
-                    marginBottom: auxBottomSpacing,
-                    opacity: isExecutingAction ? 0.6 : 1,
-                  }}
-                >
-                  <Text
-                    variant="body"
-                    align="center"
-                    style={{ color: getAuxActionTextColor(action.style_code) }}
-                  >
-                    {action.label}
-                  </Text>
-                </Pressable>
-              );
-            })
-          : null}
       </ScrollView>
 
       <Modal

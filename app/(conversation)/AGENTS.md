@@ -5,10 +5,10 @@ Applies to conversation screens and conversation UI behavior.
 
 ## Conversation Contract
 - Visible chat actions come from `public.get_conversation_view(...).actions[]`; passive deadline/status cards come from `slots[]`.
-- Render placement from DB `ui_slot`: `TOP`, `AUX`, `MENU`, and passive `STATUS` today. Do not deduplicate actions by label/behavior; DB may intentionally expose similar actions in multiple slots.
+- DB `ui_slot` determines grouping: `TOP` and `AUX` actions share the header `Acciones` bubble; `MENU` stays in the overflow menu and passive `STATUS` stays in the transcript. Preserve returned ordering and do not deduplicate actions by label/behavior.
 - Confirmation title, description, fields, buttons, icons, conditional inputs, and rating/OTP metadata come from the DB payload.
 - Action visibility, including double-rating prevention, is DB-resolved. Refresh and trust returned `actions[]` after execution.
-- `permissions.can_send_messages=true` shows the composer even when AUX actions exist. AUX actions and composer can coexist in the fixed bottom area.
+- `permissions.can_send_messages=true` shows the composer independently of available actions. Do not repeat AUX actions below the messages or above the composer.
 - `STATUS` slots render inside the scrollable message thread after messages, like passive system items; they are not executable actions.
 
 ## Implementation Rules
@@ -19,7 +19,7 @@ Applies to conversation screens and conversation UI behavior.
 - Use DB-provided slot/card copy and preformatted due dates when available; apply only safe presentational fallbacks.
 - Do not mark messages opened in client code; loading messages must go through `public.get_conversation_messages(...)`.
 - Header title should be the purchase request title, not counterpart display name.
-- Conversation chrome keeps two separate controls below the title: published product total with `Resumen`, and `Acciones` for DB `TOP` actions. Preserve DB ordering and the existing action executor; `MENU` and `AUX` placements remain separate. Keep the header in layout flow so messages cannot scroll behind the controls.
+- Conversation chrome keeps two separate controls below the title: published product total with `Resumen`, and `Acciones` for DB `TOP`/`AUX` actions. Preserve DB ordering and the existing action executor; `MENU` placement remains separate. Keep the header in layout flow so messages cannot scroll behind the controls.
 - `Resumen` exists only with a linked offer and uses the shared `GlobalPopupHost` summary config and existing trailing image strip. Load canonical published terms and current offer photos, never private drafts or proposal terms. Invalidate open summaries on offer revision, selection, profile, conversation, or lifecycle changes. Do not change the shared popup shell or its horizontal footer for this screen.
 - Message bubble labels should use real buyer profile name or seller business name, with generic role labels only as last-resort fallback.
 - Shared composer sizing lives in `src/components/inputChat/AGENTS.md`; do not rebuild autosize behavior here.
