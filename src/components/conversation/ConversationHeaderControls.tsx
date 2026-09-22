@@ -33,6 +33,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ConversationActionButtonConfig } from "./ConversationActionButtons";
 import ConversationContextControls from "./ConversationContextControls";
+import { getConversationActionsMenuLayout } from "./actionsMenuLayout";
 
 type Props = {
   view: ConversationView;
@@ -50,7 +51,7 @@ export default function ConversationHeaderControls({
   onPress,
 }: Props) {
   const t = useTheme();
-  const { width, height } = useWindowDimensions();
+  const { width, height, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useActiveProfile();
   const trigger = useRef<View>(null);
@@ -58,9 +59,12 @@ export default function ConversationHeaderControls({
   const pendingAction = useRef<string | null>(null);
   const requestId = useRef(0);
   const summaryPopup = useRef<PopupSummaryConfig | null>(null);
-  const [anchor, setAnchor] = useState<{ right: number; top: number } | null>(
-    null,
-  );
+  const [anchor, setAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const offerId = view.conversation.purchase_offer_id;
   const revision = view.context.offer_revision;
@@ -103,7 +107,16 @@ export default function ConversationHeaderControls({
 
   useEffect(() => {
     setAnchor(null);
-  }, [width, disabled]);
+  }, [
+    width,
+    height,
+    fontScale,
+    insets.top,
+    insets.right,
+    insets.bottom,
+    insets.left,
+    disabled,
+  ]);
 
   const restoreMenuFocus = () => {
     const handle = findNodeHandle(trigger.current);
@@ -124,8 +137,11 @@ export default function ConversationHeaderControls({
     Keyboard.dismiss();
     trigger.current?.measureInWindow((x, y, measuredWidth, measuredHeight) => {
       setAnchor({
-        right: Math.max(t.spacing.md, width - x - measuredWidth),
-        top: y + measuredHeight + t.spacing.sm,
+        x,
+        // Android window measurements exclude the status bar; this Modal covers it.
+        y: y + (Platform.OS === "android" ? insets.top : 0),
+        width: measuredWidth,
+        height: measuredHeight,
       });
     });
   };
@@ -185,6 +201,17 @@ export default function ConversationHeaderControls({
 
   if (!offerId && buttons.length === 0) return null;
 
+  const menuLayout = anchor
+    ? getConversationActionsMenuLayout({
+        anchor,
+        width,
+        height,
+        insets,
+        margin: t.spacing.md,
+        gap: t.spacing.sm,
+      })
+    : null;
+
   return (
     <View
       style={{
@@ -231,21 +258,21 @@ export default function ConversationHeaderControls({
             onPress={() => closeMenu()}
             accessible={false}
           />
-          {anchor ? (
+          {menuLayout ? (
             <GlassSurface
               variant="sheet"
               style={{
                 position: "absolute",
-                top: anchor.top,
-                right: anchor.right,
-                width: Math.min(width - t.spacing.md * 2, 280),
+                top: menuLayout.top,
+                left: menuLayout.left,
+                width: menuLayout.width,
               }}
             >
               <ScrollView
                 style={{
                   maxHeight: Math.max(
-                    48,
-                    height - anchor.top - insets.bottom - t.spacing.md,
+                    0,
+                    menuLayout.maxHeight - t.glass.sheet.borderWidth * 2,
                   ),
                 }}
                 keyboardShouldPersistTaps="handled"
