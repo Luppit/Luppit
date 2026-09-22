@@ -8,6 +8,8 @@ user is explicitly allowlisted.
 
 - Human text and image messages.
 - Offer created, updated, accepted, rejected, or withdrawn.
+- Offer change proposal submitted, accepted, rejected, or withdrawn. Submission
+  alerts the buyer to review pending changes and leaves the current offer valid.
 - Seller confirmation, shipment, pickup completion, receipt confirmation,
   non-receipt, purchase/request cancellation, expired critical deadlines, and
   participant deletion.
