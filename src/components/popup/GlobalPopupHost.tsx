@@ -221,6 +221,7 @@ export default function GlobalPopupHost() {
   const [filterConfig, setFilterConfig] = useState<PopupFilterConfig | null>(null);
   const [sortConfig, setSortConfig] = useState<PopupSortConfig | null>(null);
   const [summaryConfig, setSummaryConfig] = useState<PopupSummaryConfig | null>(null);
+  const [showComparisonDetails, setShowComparisonDetails] = useState(false);
   const [helperConfig, setHelperConfig] = useState<PopupHelperConfig | null>(null);
   const [inlineHelperConfig, setInlineHelperConfig] =
     useState<PopupHelperConfig | null>(null);
@@ -337,6 +338,10 @@ export default function GlobalPopupHost() {
       setActiveSummaryChoiceInputId(null);
       return;
     }
+    if (showComparisonDetails) {
+      setShowComparisonDetails(false);
+      return;
+    }
     closePopup();
   };
 
@@ -406,6 +411,7 @@ export default function GlobalPopupHost() {
             setFilterConfig(null);
             setSortConfig(null);
             setSummaryConfig(null);
+            setShowComparisonDetails(false);
             setHelperConfig(null);
             setInlineHelperConfig(null);
             setExpandedHelperSectionIds([]);
@@ -425,6 +431,7 @@ export default function GlobalPopupHost() {
 
       setInlineHelperConfig(null);
       setExpandedHelperSectionIds([]);
+      setShowComparisonDetails(false);
       if (config.type === "summary") {
         setSummaryConfig(config);
         setSuccessConfig(null);
@@ -978,6 +985,10 @@ export default function GlobalPopupHost() {
       dismissCurrentLayer();
       return;
     }
+    if (showComparisonDetails) {
+      dismissCurrentLayer();
+      return;
+    }
     const action = resolveAndroidPopupBack(
       summaryConfig,
       canDismissPopup,
@@ -1004,7 +1015,7 @@ export default function GlobalPopupHost() {
           ? handleAndroidBack
           : successConfig
             ? () => undefined
-            : activeSummaryChoiceInputId
+            : activeSummaryChoiceInputId || showComparisonDetails
               ? dismissCurrentLayer
               : canDismissPopup
                 ? closePopup
@@ -1017,11 +1028,11 @@ export default function GlobalPopupHost() {
         onAccessibilityEscape={
           successConfig
             ? () => void handleSuccessActionPress()
-            : activeSummaryChoiceInputId
+            : activeSummaryChoiceInputId || showComparisonDetails
               ? dismissCurrentLayer
-            : canDismissPopup
-              ? closePopup
-              : undefined
+              : canDismissPopup
+                ? closePopup
+                : undefined
         }
       >
         <Animated.View style={[StyleSheet.absoluteFillObject, { opacity }]}>
@@ -1031,7 +1042,7 @@ export default function GlobalPopupHost() {
               activeSummaryChoiceInputId
                 ? dismissCurrentLayer
                 : canDismissPopup
-                  ? closePopup
+                  ? dismissCurrentLayer
                   : undefined
             }
           />
@@ -1601,14 +1612,14 @@ export default function GlobalPopupHost() {
                           ref={sheetHeadingRef}
                           accessible
                           accessibilityRole="header"
-                          accessibilityLabel={summaryConfig.title}
+                          accessibilityLabel={showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
                           style={s.summaryHeader}
                         >
                           <Text
                             variant="subtitle"
                             style={s.summaryTitle}
                           >
-                            {summaryConfig.title}
+                            {showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
                           </Text>
                         </View>
                         {summaryConfig.metadata ? (
@@ -1619,15 +1630,23 @@ export default function GlobalPopupHost() {
                         <View style={s.summaryHeaderSeparator} />
                       </View>
 
-                      {summaryConfig.descriptionPlacement === "afterRows"
+                      {showComparisonDetails || summaryConfig.descriptionPlacement === "afterRows"
                         ? null
                         : renderSummaryDescription()}
 
                       {summaryConfig.comparison ? (
-                        <SummaryComparison comparison={summaryConfig.comparison} />
+                        <SummaryComparison
+                          comparison={summaryConfig.comparison}
+                          showFull={showComparisonDetails}
+                          onShowFull={() => {
+                            setShowComparisonDetails(true);
+                            summaryScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                          }}
+                        />
                       ) : null}
 
-                      {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
+                      {(!summaryConfig.comparison || showComparisonDetails) &&
+                      summaryConfig.rows && summaryConfig.rows.length > 0 ? (
                         <View style={s.summaryRowsList}>
                           {summaryConfig.rows.map((row, index) => (
                             <React.Fragment key={`${row.label}-${row.value}`}>
@@ -1651,11 +1670,11 @@ export default function GlobalPopupHost() {
                         </View>
                       ) : null}
 
-                      {summaryConfig.descriptionPlacement === "afterRows"
+                      {!showComparisonDetails && summaryConfig.descriptionPlacement === "afterRows"
                         ? renderSummaryDescription()
                         : null}
 
-                      {summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
+                      {!showComparisonDetails && summaryConfig.inputs && summaryConfig.inputs.length > 0 ? (
                         <View style={s.summaryInputsList}>
                           {summaryConfig.inputs.map((input) => {
                             if (input.kind === "otp") {
@@ -2034,7 +2053,8 @@ export default function GlobalPopupHost() {
                         </View>
                       ) : null}
 
-                      {summaryConfig.images && summaryConfig.images.length > 0 ? (
+                      {(!summaryConfig.comparison || showComparisonDetails) &&
+                      summaryConfig.images && summaryConfig.images.length > 0 ? (
                         <View style={s.summaryImageBlock}>
                           <Text variant="body" style={s.summaryRowLabel}>
                             Imágenes
@@ -2115,7 +2135,23 @@ export default function GlobalPopupHost() {
                     </View>
                   ) : null}
 
-                  {summaryConfig.actions && summaryConfig.actions.length > 0 ? (
+                  {showComparisonDetails ? (
+                    <View style={s.summaryActionsRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Volver a los cambios"
+                        style={[s.summaryActionButton, s.summaryActionButtonSingle]}
+                        onPress={() => {
+                          setShowComparisonDetails(false);
+                          summaryScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                        }}
+                      >
+                        <Text variant="body" style={s.summaryActionLabel}>
+                          Volver a los cambios
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : summaryConfig.actions && summaryConfig.actions.length > 0 ? (
                     <View
                       style={s.summaryActionsRow}
                       onLayout={(event) => {
