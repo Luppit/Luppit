@@ -178,6 +178,68 @@ function fixture() {
 }
 function buttons(tree: any) { return nodes(tree).find((n) => n.type === "ActionButtons"); }
 function confirm(f: ReturnType<typeof fixture>) { return f.popups.at(-1).actions.at(-1); }
+
+test("structured proposal review replaces legacy term blocks but retains policy, photos and explicit choices", () => {
+  const f = fixture(); const action = proposalAction();
+  Object.assign(action.confirmation, {
+    fields: [
+      { label: "Oferta actual", value_source: "current_terms", value: "Old long paragraph" },
+      { label: "Oferta propuesta", value_source: "proposed_terms", value: "New long paragraph" },
+      { label: "Plazos", value_source: "deadline_policy", value: "Keep deadlines" },
+    ],
+    comparison: {
+      current_label: "Actual", proposed_label: "Propuesta", changed_label: "Con cambios",
+      fields: [{ id: "description", label: "Descripción", current_value: "Full original",
+        proposed_value: "Full proposed", changed: true, layout: "stacked" }],
+    },
+    inputs: [{ id: "delivery", kind: "choice", label: "Elige entrega", payload_key: "fulfillment_catalog_id",
+      is_required: true, options: [{ value: "shipping", label: "Envío" }] }],
+  });
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  const popup = f.popups.at(-1);
+  assert.deepEqual(Array.from(popup.rows, (row: any) => row.value), ["Keep deadlines"]);
+  assert.equal(popup.comparison.fields[0].proposedValue, "Full proposed");
+  assert.equal(popup.images[0].uri, "https://example.test/signed-proposal.jpg");
+  assert.equal(popup.inputs[0].payload_key, "fulfillment_catalog_id");
+  assert.ok(!confirm(f).onPress().shouldClose);
+  assert.equal(executions(f).length, 0);
+});
+
+test("review rejection opens the existing configured confirmation and executes only after confirmation", async () => {
+  const f = fixture(); const approve = proposalAction();
+  Object.assign(approve.confirmation, { secondary_action_code: "BUYER_REJECT_OFFER_CHANGE" });
+  const reject = pickupAction({ id: "reject-proposal", code: "BUYER_REJECT_OFFER_CHANGE", ui_slot: "MENU" });
+  Object.assign(reject.confirmation, { title: "¿Rechazar los cambios?", cancel_label: "Volver", confirm_label: "Rechazar",
+    inputs: [], payload_defaults: approve.confirmation.payload_defaults });
+  f.hook({ conversationView: viewResult({ actions: [approve, reject] }).data }).handleActionPress(approve);
+  const review = f.popups.at(-1);
+  assert.equal(review.actions[0].label, "Rechazar");
+  assert.equal(review.actions[0].onPress(), false);
+  assert.equal(f.popups.at(-1).title, "¿Rechazar los cambios?");
+  assert.equal(executions(f).length, 0);
+  const pending = confirm(f).onPress();
+  assert.equal(executions(f)[0][1].actionCode, "BUYER_REJECT_OFFER_CHANGE");
+  assert.equal(executions(f)[0][1].payload.review_revision, "review-one");
+  f.executions[0].resolve({ ok: true, data: { success_message: "Cambios rechazados" } });
+  assert.equal(await pending, true);
+});
+
+test("unavailable secondary action falls back to dismissal and rejecting reviews still invalidate on replacement", () => {
+  const f = fixture(); const approve = proposalAction();
+  Object.assign(approve.confirmation, { secondary_action_code: "BUYER_REJECT_OFFER_CHANGE" });
+  f.hook({ conversationView: viewResult({ actions: [approve] }).data }).handleActionPress(approve);
+  assert.equal(f.popups.at(-1).actions[0].label, "Volver");
+  assert.equal(f.popups.at(-1).actions[0].onPress, undefined);
+  const reject = pickupAction({ id: "reject-proposal", code: "BUYER_REJECT_OFFER_CHANGE" });
+  Object.assign(reject.confirmation, { payload_defaults: approve.confirmation.payload_defaults });
+  f.hook({ conversationView: viewResult({ actions: [approve, reject] }).data }).handleActionPress(reject);
+  f.hook({ conversationView: viewResult({ actions: [approve, {
+    ...reject, confirmation: { ...reject.confirmation, payload_defaults: { proposal_id: "replacement", review_revision: "two" } },
+  }] }).data });
+  assert.ok(f.calls.includes("closePopup"));
+  assert.equal(executions(f).length, 0);
+});
+
 const executions = (f: ReturnType<typeof fixture>) => f.calls.filter((c) => c[0] === "execute");
 async function ready(f: ReturnType<typeof fixture>, result = viewResult()) {
   assert.equal(buttons(f.draw()), undefined);

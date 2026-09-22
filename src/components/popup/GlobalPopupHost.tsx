@@ -5,6 +5,7 @@ import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
 import RatingInput from "@/src/components/popup/RatingInput";
+import SummaryComparison from "@/src/components/popup/SummaryComparison";
 import ProfilePicture from "@/src/components/profile/ProfilePicture";
 import SuccessPopupContent from "@/src/components/popup/SuccessPopupContent";
 import SuccessScreenConfetti from "@/src/components/popup/SuccessScreenConfetti";
@@ -1621,6 +1622,10 @@ export default function GlobalPopupHost() {
                       {summaryConfig.descriptionPlacement === "afterRows"
                         ? null
                         : renderSummaryDescription()}
+
+                      {summaryConfig.comparison ? (
+                        <SummaryComparison comparison={summaryConfig.comparison} />
+                      ) : null}
 
                       {summaryConfig.rows && summaryConfig.rows.length > 0 ? (
                         <View style={s.summaryRowsList}>
