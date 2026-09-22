@@ -59,16 +59,6 @@ function resolveTimelineColor(styleCode: string | null | undefined, t: Theme) {
   return t.colors.info;
 }
 
-function toTint(color: string) {
-  const normalized = color.trim();
-  if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) return null;
-
-  const red = Number.parseInt(normalized.slice(1, 3), 16);
-  const green = Number.parseInt(normalized.slice(3, 5), 16);
-  const blue = Number.parseInt(normalized.slice(5, 7), 16);
-  return `rgba(${red}, ${green}, ${blue}, 0.14)`;
-}
-
 export default function OfferCard({
   offer,
   onConnect,
@@ -136,10 +126,10 @@ export default function OfferCard({
             <View style={s.timelineSection}>
               <View style={s.timelineHeader}>
                 <Text
-                  variant="body"
+                  variant="small"
+                  color="textMedium"
                   accessibilityRole="header"
                   maxFontSizeMultiplier={2}
-                  style={s.timelineTitle}
                 >
                   Seguimiento
                 </Text>
@@ -192,7 +182,6 @@ export default function OfferCard({
                   {timeline.map((step, index) => {
                     const isLast = index === timeline.length - 1;
                     const markerColor = resolveTimelineColor(step.style_code, t);
-                    const activeTint = toTint(markerColor);
 
                     return (
                       <View
@@ -208,33 +197,23 @@ export default function OfferCard({
                           importantForAccessibility="no-hide-descendants"
                           style={s.markerColumn}
                         >
-                          <View style={[s.marker, { backgroundColor: markerColor }]}>
+                          <View style={s.marker}>
                             <Icon
                               name={step.icon}
-                              size={16}
-                              color={t.colors.backgroudWhite}
+                              size={20}
+                              color={markerColor}
                             />
                           </View>
                           {!isLast ? <View style={s.connector} /> : null}
                         </View>
 
-                        <View
-                          style={[
-                            s.timelineContent,
-                            step.is_next ? s.timelineContentActive : null,
-                            step.is_next
-                              ? {
-                                  backgroundColor:
-                                    activeTint ?? t.colors.background,
-                                }
-                              : null,
-                          ]}
-                        >
+                        <View style={s.timelineContent}>
                           {step.pre_label?.trim() ? (
                             <Text
                               variant="small"
+                              color="textMedium"
                               maxFontSizeMultiplier={2}
-                              style={[s.eyebrow, { color: markerColor }]}
+                              style={s.eyebrow}
                             >
                               {step.pre_label.trim()}
                             </Text>
@@ -328,19 +307,18 @@ function createOfferCardStyles(t: Theme) {
       gap: t.spacing.md,
     },
     timelineHeader: {
-      alignItems: "flex-start",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      justifyContent: "space-between",
       gap: t.spacing.sm,
-    },
-    timelineTitle: {
-      color: t.colors.textDark,
-      fontFamily: t.typography.subtitle.fontFamily,
     },
     methodChip: {
       alignSelf: "flex-start",
       flexShrink: 1,
     },
     timelineList: {
-      gap: t.spacing.md,
+      gap: t.spacing.lg,
     },
     timelineRow: {
       flexDirection: "row",
@@ -355,27 +333,21 @@ function createOfferCardStyles(t: Theme) {
     marker: {
       width: 28,
       height: 28,
-      borderRadius: 14,
       alignItems: "center",
       justifyContent: "center",
     },
     connector: {
       position: "absolute",
-      top: 34,
-      bottom: -t.spacing.md,
-      width: 2,
-      borderRadius: 1,
+      top: 28 + t.spacing.xs,
+      bottom: -t.spacing.lg + t.spacing.xs,
+      width: StyleSheet.hairlineWidth,
       backgroundColor: t.colors.border,
     },
     timelineContent: {
       flex: 1,
-      borderRadius: 14,
+      minWidth: 0,
       gap: t.spacing.xs,
-      paddingHorizontal: t.spacing.sm,
-      paddingVertical: t.spacing.sm,
-    },
-    timelineContentActive: {
-      paddingVertical: t.spacing.md,
+      paddingTop: t.spacing.xs,
     },
     eyebrow: {
       fontFamily: t.typography.subtitle.fontFamily,
