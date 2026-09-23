@@ -250,17 +250,27 @@ export function useConversationActions({
               showError("No se pudo abrir la oferta", activeDraft.error.message);
               return false;
             }
+            let draftConversationId = conversationId;
+            if (activeDraft.data === "batch") {
+              const seed = await getOrCreateCurrentSellerOfferSeedConversation(purchaseRequestId);
+              if (!seed.ok) {
+                showError("No se pudo abrir la oferta", seed.error.message);
+                return false;
+              }
+              draftConversationId = seed.data.id;
+            }
 
             router.push({
               pathname: "/(modal)/offer",
               params: {
                 title: "Crear oferta",
                 purchaseRequestId,
-                conversationId,
-                mode: activeDraft.data === "create" ? "create" : "batch",
+                conversationId: draftConversationId,
+                mode: "create",
               },
             });
-          } else if (action.executor.target === "modal.offer.batch.new") {
+          } else if (action.executor.target === "modal.offer.create.new" ||
+                     action.executor.target === "modal.offer.batch.new") {
             if (!purchaseRequestId) {
               showError("No se pudo abrir la oferta", "La conversación no tiene una solicitud asociada.");
               return false;
@@ -272,7 +282,7 @@ export function useConversationActions({
             }
             router.push({ pathname: "/(modal)/offer", params: {
               title: "Agregar otra oferta", purchaseRequestId,
-              conversationId: seed.data.id, mode: "batch",
+              conversationId: seed.data.id, mode: "create",
             } });
           } else if (action.executor.target === "modal.offer.edit") {
             router.push({

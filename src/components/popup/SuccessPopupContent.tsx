@@ -35,12 +35,14 @@ type SuccessPopupContentProps = {
   config: PopupSuccessConfig;
   pending: boolean;
   onAction: () => void;
+  onSecondaryAction: () => void;
 };
 
 export default function SuccessPopupContent({
   config,
   pending,
   onAction,
+  onSecondaryAction,
 }: SuccessPopupContentProps) {
   const t = useTheme();
   const s = useMemo(() => createSuccessPopupContentStyles(t), [t]);
@@ -182,7 +184,6 @@ export default function SuccessPopupContent({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={config.actionLabel}
-        accessibilityHint="Abre el detalle recién creado"
         accessibilityState={{ busy: pending, disabled: pending }}
         disabled={pending}
         onPress={onAction}
@@ -206,6 +207,19 @@ export default function SuccessPopupContent({
           </>
         )}
       </Pressable>
+      {config.secondaryActionLabel && config.onSecondaryAction ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={config.secondaryActionLabel}
+          accessibilityState={{ busy: pending, disabled: pending }}
+          disabled={pending}
+          onPress={onSecondaryAction}
+          style={({ pressed }) => [s.action, s.secondaryAction,
+            pressed && !pending ? s.actionPressed : null]}
+        >
+          <Text variant="body">{config.secondaryActionLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -274,6 +288,11 @@ function createSuccessPopupContentStyles(t: Theme) {
     actionPressed: {
       opacity: 0.9,
       transform: [{ scale: 0.99 }],
+    },
+    secondaryAction: {
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.backgroudWhite,
     },
   });
 }

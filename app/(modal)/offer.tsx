@@ -581,10 +581,22 @@ function OfferAssistantScreen({
             title: isEditMode ? "¡Propuesta enviada!" : "¡Oferta enviada!",
             description: isEditMode
               ? "El comprador podrá aceptar o rechazar tus cambios. La oferta actual sigue vigente mientras decide."
-              : "El comprador ya puede revisarla. Puedes seguir su estado en la conversación.",
-            actionLabel: "Ver conversación",
+              : "El comprador ya puede revisarla en su propia conversación. Puedes agregar otra alternativa a esta solicitud.",
+            actionLabel: isEditMode ? "Ver conversación" : "Agregar otra oferta",
             actionBackgroundColorKey: "textDark",
-            onAction: () => {
+            onAction: async () => {
+              if (!isEditMode) {
+                const seed = await getOrCreateCurrentSellerOfferSeedConversation(requestReference.id);
+                if (!seed.ok) {
+                  showError("No se pudo agregar otra oferta", seed.error.message);
+                  return false;
+                }
+                router.replace({ pathname: "/(modal)/offer", params: {
+                  title: "Agregar otra oferta", purchaseRequestId: requestReference.id,
+                  conversationId: seed.data.id, mode: "create",
+                } });
+                return;
+              }
               router.replace({
                 pathname: "/(conversation)/offer",
                 params: {
@@ -593,6 +605,15 @@ function OfferAssistantScreen({
                 },
               });
             },
+            ...(!isEditMode ? {
+              secondaryActionLabel: "Ver conversación",
+              onSecondaryAction: () => {
+                router.replace({ pathname: "/(conversation)/offer", params: {
+                  conversationId: publishedConversationId,
+                  title: purchaseRequestTitle ?? "Conversación",
+                } });
+              },
+            } : {}),
           });
           return;
         }
@@ -603,7 +624,7 @@ function OfferAssistantScreen({
         );
       }
     },
-    [appendAssistantMessage, clearReviewState, conversationId, purchaseRequestTitle, isEditMode]
+    [appendAssistantMessage, clearReviewState, conversationId, purchaseRequestTitle, requestReference.id, isEditMode]
   );
 
   const executeAssistantRequest = useCallback(
@@ -1182,7 +1203,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
           }
           router.replace({ pathname: "/(modal)/offer", params: {
             title: "Agregar otra oferta", conversationId: seed.data.id,
-            purchaseRequestId: requestReference.id, mode: "batch",
+            purchaseRequestId: requestReference.id, mode: "create",
           } });
         })(); }} />
       </View> : options.length > 0 ? <View style={{ gap: t.spacing.md }}>

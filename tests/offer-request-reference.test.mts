@@ -505,6 +505,38 @@ async function restoreReadyOffer(f: ReturnType<typeof screenFixture>, messages =
   f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, messages }));
   await flush();
 }
+
+test("published single offer can open its chat or start another independent draft", async () => {
+  const f = screenFixture();
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const publishing = assistantView(f).review!.onPublish();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, status: "sent", purchaseOfferId: "offer-one" }));
+  await publishing;
+  assert.equal(f.popup.actionLabel, "Agregar otra oferta");
+  assert.equal(f.popup.secondaryActionLabel, "Ver conversación");
+  await f.popup.onAction();
+  assert.equal(f.navigations.at(-1).params.conversationId, "next-seed");
+  assert.equal(f.navigations.at(-1).params.mode, "create");
+  f.popup.onSecondaryAction();
+  assert.equal(f.navigations.at(-1).params.conversationId, "conversation-A");
+});
+
+test("failed next-offer seed keeps the sent offer available", async () => {
+  const f = screenFixture();
+  f.modules["@/src/services/seller.request.offers.service"].getOrCreateCurrentSellerOfferSeedConversation =
+    async () => ({ ok: false, error: { message: "Intenta de nuevo" } });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const publishing = assistantView(f).review!.onPublish();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, status: "sent", purchaseOfferId: "offer-one" }));
+  await publishing;
+  assert.equal(await f.popup.onAction(), false);
+  assert.equal(f.navigations.length, 0);
+  assert.equal(f.errors.length, 1);
+});
 async function openOfferSummary(f: ReturnType<typeof screenFixture>, text = "Sí") {
   assistantView(f).composer.onSend({ text, images: [] });
   const call = f.aiCalls.at(-1)!;
