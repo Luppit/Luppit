@@ -389,18 +389,24 @@ test("restoring an existing offer draft keeps the reference separate from restor
   assert.equal(messages[0].props.message.text, "Mi oferta guardada");
 });
 
-test("reference rendering preserves long content with no truncation and names missing/current states", () => {
+test("reference starts compact and reveals the full original snapshot on demand", () => {
   const f = screenFixture();
   const component = load("../src/components/assistant/OfferRequestReference.tsx", f.modules).default;
   const long = snapshot.repeat(25);
-  const tree = nodes(component({ reference: { ...reference, text: long } }));
+  const props = { reference: { ...reference, text: long } };
+  const collapsed = nodes(f.render(() => component(props)));
+  assert.ok(!collapsed.some((n) => n.props.selectable));
+  assert.equal(collapsed.find((n) => n.type === "Pressable")?.props.accessibilityState.expanded, false);
+  collapsed.find((n) => n.type === "Pressable")!.props.onPress();
+  const tree = nodes(f.render(() => component(props)));
   const body = tree.find((n) => n.props.selectable)!;
   assert.equal(body.props.children[0], long);
   assert.equal(body.props.maxLines, undefined);
   assert.equal(body.props.numberOfLines, undefined);
-  const empty = nodes(component({ reference: { ...reference, source: "request", text: null } }));
-  assert.ok(empty.some((n) => n.props.children.includes("Referencia actual de la solicitud")));
-  assert.ok(empty.some((n) => n.props.children.includes("Esta solicitud no tiene título ni resumen disponibles.")));
+  assert.equal(tree.find((n) => n.type === "Pressable")?.props.accessibilityState.expanded, true);
+  const expandedEmpty = nodes(f.render(() => component({ reference: { ...reference, source: "request", text: null } })));
+  assert.ok(expandedEmpty.some((n) => n.props.children.includes("Referencia actual de la solicitud")));
+  assert.ok(expandedEmpty.some((n) => n.props.children.includes("Esta solicitud no tiene título ni resumen disponibles.")));
 });
 
 const offerInvitation = "Tu oferta está lista. ¿Deseas ver el resumen?";
