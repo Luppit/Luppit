@@ -16,6 +16,10 @@ import {
   addCurrentBuyerPurchaseRequestFavorite,
   addCurrentSellerPurchaseRequestFavorite,
 } from "@/src/services/purchase.request.service";
+import {
+  getActiveSellerOfferDraftMode,
+  getOrCreateCurrentSellerOfferSeedConversation,
+} from "@/src/services/seller.request.offers.service";
 import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -241,14 +245,35 @@ export function useConversationActions({
               return false;
             }
 
+            const activeDraft = await getActiveSellerOfferDraftMode(conversationId);
+            if (!activeDraft.ok) {
+              showError("No se pudo abrir la oferta", activeDraft.error.message);
+              return false;
+            }
+
             router.push({
               pathname: "/(modal)/offer",
               params: {
                 title: "Crear oferta",
                 purchaseRequestId,
                 conversationId,
+                mode: activeDraft.data === "create" ? "create" : "batch",
               },
             });
+          } else if (action.executor.target === "modal.offer.batch.new") {
+            if (!purchaseRequestId) {
+              showError("No se pudo abrir la oferta", "La conversación no tiene una solicitud asociada.");
+              return false;
+            }
+            const seed = await getOrCreateCurrentSellerOfferSeedConversation(purchaseRequestId);
+            if (!seed.ok) {
+              showError("No se pudo abrir la oferta", seed.error.message);
+              return false;
+            }
+            router.push({ pathname: "/(modal)/offer", params: {
+              title: "Agregar otra oferta", purchaseRequestId,
+              conversationId: seed.data.id, mode: "batch",
+            } });
           } else if (action.executor.target === "modal.offer.edit") {
             router.push({
               pathname: "/(modal)/offer",

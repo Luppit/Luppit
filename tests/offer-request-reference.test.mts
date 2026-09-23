@@ -172,6 +172,7 @@ function screenFixture(params: Record<string, any> = {}) {
       subscribePopup: (listener: (state: any) => void) => { popupListeners.add(listener); return () => popupListeners.delete(listener); },
     },
     "@/src/services/active.profile.service": { getCurrentProfile: () => ({ id: "seller" }), subscribeActiveProfile: () => () => {} },
+    "@/src/services/seller.request.offers.service": { getOrCreateCurrentSellerOfferSeedConversation: async () => ({ ok: true, data: { id: "next-seed" } }) },
     "@/src/utils/useToast": { showError: (...args: any[]) => errors.push(args), showInfo() {}, showSuccess() {}, showWarning() {} },
     "@/src/services/purchase.request.service": { getPurchaseRequestById: async (id: string) => { requestCalls.push(id); return { ok: true, data: { id, title: "Edit request" } }; } },
     "@/src/services/purchase.offer.service": { getEditablePurchaseOfferDraftByConversationId: async () => ({ ok: true, data: { purchaseRequestId: "edit-request" } }) },
@@ -209,6 +210,30 @@ test("seller summary control serializes the user's acknowledgement with its exis
     client_request_id: identity.clientRequestId, idempotency_key: identity.idempotencyKey, active_profile_id: "seller",
     mode: "create", expected_draft_version: null, expected_offer_revision: null,
   });
+});
+
+test("batch publication sends selected option IDs and parses independent reviews", () => {
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": {}, "../lib/supabase/errors": {}, "./active.profile.service": {},
+  }, "\nexport { buildJsonBody, toSuccessPayload };\n");
+  const body = JSON.parse(service.buildJsonBody({ prompt: "", mode: "batch", offerDraftId: "draft",
+    uiAction: "PUBLISH", expectedDraftVersion: 2,
+    selectedOptionIds: ["michelin", "other"] },
+  { clientRequestId: "publish", idempotencyKey: "retry" }, "seller"));
+  assert.deepEqual(body.selected_option_ids, ["michelin", "other"]);
+  assert.equal(body.expected_draft_version, 2);
+  const result = service.toSuccessPayload({ mode: "batch", options: [
+    { id: "michelin", is_ready_to_send: true, missing_fields: [],
+      summary: { descripcion: "Michelin" }, offer_images: [
+        { storage_ref: "photo-a", signed_url: "https://example.test/a" }] },
+    { id: "other", is_ready_to_send: false, missing_fields: ["precio"],
+      summary: { descripcion: "Other" }, review_reason: "Falta confirmar el precio." },
+  ], publications: [{ option_id: "michelin", conversation_id: "chat-a", purchase_offer_id: "offer-a" }] }, null);
+  assert.equal(result.mode, "batch");
+  assert.equal(result.options[0].offerImages[0].storageRef, "photo-a");
+  assert.equal(result.options[1].isReadyToSend, false);
+  assert.equal(result.options[1].reviewReason, "Falta confirmar el precio.");
+  assert.equal(result.publications[0].conversationId, "chat-a");
 });
 
 test("creation ignores serialized request metadata and supports conversation-only entry", async () => {

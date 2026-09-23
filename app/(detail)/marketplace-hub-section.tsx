@@ -5,6 +5,7 @@ import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
+import { openSellerRequest } from "@/src/components/marketplaceHub/openSellerRequest";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
@@ -12,7 +13,6 @@ import {
   BuyerHomeFilters,
   EMPTY_BUYER_HOME_FILTERS,
 } from "@/src/services/buyer.home.filters.service";
-import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
@@ -31,7 +31,6 @@ import {
   SellerHomeInteractionState,
 } from "@/src/services/seller.home.filters.service";
 import { Theme, useTheme } from "@/src/themes";
-import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useGlobalSearchParams } from "expo-router";
 import React, {
@@ -182,37 +181,6 @@ function openBuyerRequest(item: MarketplaceHubItem) {
     params: {
       title: item.title ?? "Detalle de solicitud",
       purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
-    },
-  });
-}
-
-async function openSellerRequest(item: MarketplaceHubItem) {
-  if (item.navigation?.target === "conversation" && item.navigation.conversation_id) {
-    router.push({
-      pathname: "/(conversation)/offer",
-      params: {
-        conversationId: item.navigation.conversation_id,
-        title: item.title ?? "Conversación",
-      },
-    });
-    return;
-  }
-
-  const conversation =
-    await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
-  if (!conversation?.ok) {
-    showError(
-      "No se pudo abrir la conversación",
-      conversation?.error.message ?? "Ocurrió un error, intenta de nuevo."
-    );
-    return;
-  }
-
-  router.push({
-    pathname: "/(conversation)/offer",
-    params: {
-      conversationId: conversation.data.id,
-      title: item.title ?? "Conversación",
     },
   });
 }

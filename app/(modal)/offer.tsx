@@ -1,4 +1,5 @@
 import { getCurrentProfile, subscribeActiveProfile } from "@/src/services/active.profile.service";
+import { getOrCreateCurrentSellerOfferSeedConversation } from "@/src/services/seller.request.offers.service";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import {
   getVisibleSellerOfferMessages,
@@ -25,11 +26,14 @@ import {
   SellerOfferAssistantRequest,
   SellerOfferAssistantResult,
   SellerOfferAssistantSummary,
+  type SellerOfferBatchOption,
+  type SellerOfferBatchPublication,
   type SellerOfferAssistantImage,
 } from "@/src/services/purchase.offer.assistant.service";
 import { closePopup, openPopup, subscribePopup, type PopupSummaryConfig } from "@/src/services/popup.service";
 import ConversationContextControls from "@/src/components/conversation/ConversationContextControls";
 import { Text } from "@/src/components/Text";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useTheme } from "@/src/themes";
 import { showError, showWarning } from "@/src/utils/useToast";
@@ -1044,6 +1048,199 @@ function OfferAssistantScreen({
   );
 }
 
+function BatchOfferAssistantScreen({ conversationId, requestReference }: {
+  conversationId: string;
+  requestReference: RequestReference;
+}) {
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [options, setOptions] = useState<SellerOfferBatchOption[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [publications, setPublications] = useState<SellerOfferBatchPublication[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [initialized, setInitialized] = useState(false);
+  const [pendingRetry, setPendingRetry] = useState<SellerOfferAssistantRequest | null>(null);
+  const draftIdRef = useRef<string | null>(null);
+  const versionRef = useRef<number | null>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const activeInputRef = useRef<SellerOfferAssistantRequest | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const run = useCallback(async (input: SellerOfferAssistantRequest) => {
+    if (activeRequestRef.current) return;
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    activeInputRef.current = input;
+    setBusy(true);
+    const request: SellerOfferAssistantRequest = {
+      ...input, mode: "batch",
+      conversationId: input.offerDraftId ? null : conversationId,
+      expectedDraftVersion: input.expectedDraftVersion ?? versionRef.current,
+      signal: controller.signal,
+    };
+    try {
+      const result = await callSellerOfferAssistant(request);
+      if (controller.signal.aborted) return;
+      if (!result.ok) {
+        setPendingRetry(input);
+        showError("No se pudieron preparar las ofertas", result.error.message);
+        return;
+      }
+      setPendingRetry(null);
+      setInitialized(true);
+      draftIdRef.current = result.offerDraftId;
+      versionRef.current = result.draftVersion;
+      setStatus(result.status);
+      setOptions(result.options);
+      setSelectedIds((current) => input.uiAction == null ? [] : current.filter((id) =>
+        result.options.some((option) => option.id === id && option.isReadyToSend)));
+      if (input.uiAction === "RESTORE") {
+        setMessages(result.messages.map((message) => ({
+          id: message.id, sender: message.role, text: message.content,
+          images: message.imageUrls.map((uri) => ({ uri })),
+        })));
+      } else if (result.assistantMessage && input.uiAction !== "PUBLISH") {
+        setMessages((current) => [...current, {
+          id: createLocalId("assistant"), sender: "assistant",
+          text: result.assistantMessage ?? "",
+        }]);
+      }
+      if (result.status === "sent") setPublications(result.publications);
+      if (result.status === "cancelled") router.back();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    } catch {
+      if (!controller.signal.aborted) {
+        setPendingRetry(input);
+        showError("No se pudieron preparar las ofertas", "Reintenta en un momento.");
+      }
+    } finally {
+      if (activeRequestRef.current === controller) {
+        activeRequestRef.current = null;
+        activeInputRef.current = null;
+        setBusy(false);
+      }
+    }
+  }, [conversationId]);
+
+  useEffect(() => {
+    void run({ prompt: "", conversationId, uiAction: "RESTORE",
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-batch-restore") });
+    return () => { activeRequestRef.current?.abort(); };
+  }, [conversationId, run]);
+
+  const handleSend = ({ text, images }: { text: string; images: ChatImage[] }) => {
+    if (!initialized || status === "sent") return;
+    const prompt = text.trim();
+    if (!prompt && !images.length) return;
+    setMessages((current) => [...current, {
+      id: createLocalId("user"), sender: "user", text: prompt, images,
+    }]);
+    void run({ prompt, images, offerDraftId: draftIdRef.current,
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-batch-message") });
+  };
+
+  const publish = () => {
+    if (!draftIdRef.current || !selectedIds.length || busy) return;
+    void run({ prompt: "", offerDraftId: draftIdRef.current,
+      uiAction: "PUBLISH", selectedOptionIds: selectedIds,
+      identity: createSellerOfferAssistantRequestIdentity("seller-offer-batch-publish") });
+  };
+
+  return <View style={{ flex: 1 }}>
+    <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive" contentContainerStyle={{
+        paddingTop: insets.top + MODAL_TOP_BAR_HEIGHT + t.spacing.lg,
+        paddingBottom: t.spacing.lg, paddingHorizontal: t.spacing.md,
+        gap: t.spacing.md, flexGrow: 1,
+      }}>
+      <OfferRequestReference reference={requestReference} />
+      {messages.map((message) => <AssistantMessageBubble key={message.id} message={message} />)}
+      {busy ? <AssistantProcessingProgress title="Preparando tus ofertas"
+        steps={[]} variant="thinking" /> : null}
+      {pendingRetry ? <Button title="Reintentar" disabled={busy}
+        onPress={() => { void run(pendingRetry); }} /> : null}
+      {status === "sent" ? <View style={{ gap: t.spacing.md }}>
+        <Text variant="subtitle">Ofertas enviadas</Text>
+        <Text color="textMedium">Cada oferta tiene su propia conversación con el comprador.</Text>
+        {publications.map((publication) => {
+          const option = options.find((item) => item.id === publication.optionId);
+          return <Button key={publication.optionId}
+            title={`Ver ${option?.summary?.descripcion ?? "oferta"}`}
+            onPress={() => router.replace({ pathname: "/(conversation)/offer", params: {
+              conversationId: publication.conversationId,
+              title: requestReference.title ?? "Conversación",
+            } })} />;
+        })}
+        <Button title="Agregar otra oferta" onPress={() => { void (async () => {
+          const seed = await getOrCreateCurrentSellerOfferSeedConversation(requestReference.id);
+          if (!seed.ok) {
+            showError("No se pudo agregar otra oferta", seed.error.message);
+            return;
+          }
+          router.replace({ pathname: "/(modal)/offer", params: {
+            title: "Agregar otra oferta", conversationId: seed.data.id,
+            purchaseRequestId: requestReference.id, mode: "batch",
+          } });
+        })(); }} />
+      </View> : options.length > 0 ? <View style={{ gap: t.spacing.md }}>
+        <Text variant="subtitle">Revisa y selecciona tus ofertas</Text>
+        <Text variant="small" color="textMedium">
+          Puedes enviar solo las opciones completas. Las que no selecciones se descartarán al publicar.
+        </Text>
+        {options.map((option, index) => {
+          const selected = selectedIds.includes(option.id);
+          const rows = getOfferSummaryDetails(option.summary, option.offerImages.length)
+            .filter((row) => row.value != null && row.value !== "")
+            .map((row) => ({ label: row.label, value: String(row.value) }));
+          return <Pressable key={option.id} accessibilityRole="checkbox"
+            accessibilityState={{ checked: selected, disabled: !option.isReadyToSend }}
+            disabled={!option.isReadyToSend || busy}
+            onPress={() => setSelectedIds((current) => selected
+              ? current.filter((id) => id !== option.id) : [...current, option.id])}
+            style={[createRoundedSurfaceStyle(t), {
+              padding: t.spacing.md, gap: t.spacing.sm,
+              borderWidth: 1, borderColor: selected ? t.colors.primary : t.colors.border,
+              opacity: option.isReadyToSend ? 1 : 0.75,
+            }]}>
+            <Text variant="subtitle">{selected ? "☑" : "☐"} Opción {index + 1}</Text>
+            <Text>{option.summary?.descripcion ?? "Descripción pendiente"}</Text>
+            {rows.map((row) => <View key={row.label} style={{ flexDirection: "row", gap: t.spacing.sm }}>
+              <Text variant="small" color="textMedium" style={{ flex: 1 }}>{row.label}</Text>
+              <Text variant="small" style={{ flex: 1, textAlign: "right" }}>{row.value}</Text>
+            </View>)}
+            <OfferPhotos images={option.offerImages} />
+            {option.missingFields.length ? <Text variant="small" color="error">
+              Falta: {option.missingFields.join(", ")}
+            </Text> : null}
+            {option.reviewReason ? <Text variant="small" color="error">{option.reviewReason}</Text> : null}
+          </Pressable>;
+        })}
+        <Button title={`Enviar ${selectedIds.length} oferta${selectedIds.length === 1 ? "" : "s"}`}
+          disabled={busy || selectedIds.length === 0} loading={busy} onPress={publish} />
+      </View> : initialized ? <Text color="textMedium">
+        Cuéntame las opciones que puedes ofrecer, sus precios y qué fotos corresponden a cada una.
+      </Text> : null}
+    </ScrollView>
+    {status !== "sent" ? <View style={{ paddingTop: t.spacing.sm,
+      paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, t.spacing.md)
+        : Platform.OS === "android" && !isAndroidKeyboardVisible ? Math.max(insets.bottom, t.spacing.sm) : t.spacing.sm,
+    }}><InputChat disabled={!initialized || busy} busy={busy} clearOnSendStart
+      onStop={() => {
+        if (activeInputRef.current) setPendingRetry(activeInputRef.current);
+        activeRequestRef.current?.abort();
+        activeRequestRef.current = null;
+        activeInputRef.current = null;
+        setBusy(false);
+      }}
+      maxChars={4000} maxImages={6}
+      placeholder="Describe las opciones y adjunta fotos reales"
+      onSend={handleSend} /></View> : null}
+  </View>;
+}
+
 export default function OfferScreen() {
   const [profileId, setProfileId] = useState(() => getCurrentProfile()?.id ?? "");
   useEffect(() => {
@@ -1073,7 +1270,7 @@ function OfferScreenContent({ params }: { params: {
   const t = useTheme();
   const conversationId = Array.isArray(params.conversationId) ? params.conversationId[0] : params.conversationId;
   const rawMode = Array.isArray(params.mode) ? params.mode[0] : params.mode;
-  const mode = rawMode === "edit" ? "edit" : "create";
+  const mode = rawMode === "edit" ? "edit" : rawMode === "batch" ? "batch" : "create";
   const [reference, setReference] = useState<RequestReference | null>(null);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -1096,6 +1293,8 @@ function OfferScreenContent({ params }: { params: {
     </View>
   );
   if (!reference) return <LoadingState label="Cargando oferta..." />;
+  if (mode === "batch") return <BatchOfferAssistantScreen
+    conversationId={conversationId ?? ""} requestReference={reference} />;
   return <OfferAssistantScreen conversationId={conversationId} mode={mode}
     purchaseRequestTitle={reference.title} requestReference={reference} />;
 }

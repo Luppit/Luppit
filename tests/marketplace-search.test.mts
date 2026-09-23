@@ -95,6 +95,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     "@/src/components/notifications/PushNotificationProvider": { usePushNotifications: () => ({ presentInitialPushPermissionPrompt() {} }) },
     "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({ activeProfile: {} }) },
     "@/src/components/marketplaceHub/openPurchaseRequestCardMenu": { openPurchaseRequestCardMenu() {} },
+    "@/src/components/marketplaceHub/openSellerRequest": { openSellerRequest() {} },
     "@/src/components/marketplaceHub/usePurchaseRequestFavorites": () => ({ favoriteIds: new Set(), toggle() {} }),
     "@/src/services/buyer.home.filters.service": buyerFilters,
     "@/src/services/seller.home.filters.service": sellerFilters,
