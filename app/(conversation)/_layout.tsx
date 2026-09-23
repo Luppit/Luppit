@@ -142,6 +142,7 @@ export default function ConversationLayout() {
   const params = useGlobalSearchParams<{
     conversationId?: string | string[];
     title?: string | string[];
+    offerPublishedAt?: string | string[];
   }>();
   const [conversationView, setConversationView] = useState<ConversationView | null>(
     null
@@ -159,6 +160,7 @@ export default function ConversationLayout() {
   const realtimeRefreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const viewRefreshGenerationRef = useRef(0);
   const realtimeRefreshTargetsRef = useRef<Set<ConversationRealtimeRefreshTarget>>(
     new Set()
   );
@@ -168,6 +170,11 @@ export default function ConversationLayout() {
     [params.conversationId]
   );
   const routeTitle = useMemo(() => parseStringParam(params.title), [params.title]);
+  const offerPublishedAt = useMemo(
+    () => parseStringParam(params.offerPublishedAt),
+    [params.offerPublishedAt]
+  );
+  const lastOfferPublishedAtRef = useRef(offerPublishedAt);
   const showComposer = conversationView?.permissions.can_send_messages ?? false;
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
@@ -287,8 +294,10 @@ export default function ConversationLayout() {
 
   const refreshConversation = useCallback(async () => {
     if (!conversationId) return;
+    const generation = ++viewRefreshGenerationRef.current;
 
     const result = await getCurrentUserConversationView(conversationId);
+    if (generation !== viewRefreshGenerationRef.current) return;
     if (!result.ok) {
       setLoadError(result.error);
       setConversationView(null);
@@ -309,6 +318,14 @@ export default function ConversationLayout() {
       void refreshConversation();
     }, [refreshConversation])
   );
+
+  useEffect(() => {
+    if (lastOfferPublishedAtRef.current === offerPublishedAt) return;
+    lastOfferPublishedAtRef.current = offerPublishedAt;
+    if (!offerPublishedAt) return;
+    setIsLoading(true);
+    void refreshConversation();
+  }, [offerPublishedAt, refreshConversation]);
 
   useEffect(() => {
     if (!conversationId) return;

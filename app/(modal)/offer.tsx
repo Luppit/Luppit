@@ -602,6 +602,7 @@ function OfferAssistantScreen({
                 params: {
                   conversationId: publishedConversationId,
                   title: purchaseRequestTitle ?? "Conversación",
+                  offerPublishedAt: String(Date.now()),
                 },
               });
             },
@@ -611,6 +612,7 @@ function OfferAssistantScreen({
                 router.replace({ pathname: "/(conversation)/offer", params: {
                   conversationId: publishedConversationId,
                   title: purchaseRequestTitle ?? "Conversación",
+                  offerPublishedAt: String(Date.now()),
                 } });
               },
             } : {}),
@@ -1193,6 +1195,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
             onPress={() => router.replace({ pathname: "/(conversation)/offer", params: {
               conversationId: publication.conversationId,
               title: requestReference.title ?? "Conversación",
+              offerPublishedAt: String(Date.now()),
             } })} />;
         })}
         <Button title="Agregar otra oferta" onPress={() => { void (async () => {
