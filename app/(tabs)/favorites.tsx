@@ -9,6 +9,7 @@ import { Icon } from "@/src/components/Icon";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import { Text } from "@/src/components/Text";
 import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
+import { getCurrentSellerRequestOfferConversations } from "@/src/services/seller.request.offers.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   getCurrentBuyerPurchaseRequestFavorites,
@@ -228,6 +229,18 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
   const openFavorite = React.useCallback(
     async (item: PurchaseRequestFavoriteItem) => {
       if (role === "seller") {
+        const offers = await getCurrentSellerRequestOfferConversations(item.id);
+        if (!offers.ok) {
+          showError("No se pudieron cargar las ofertas", offers.error.message);
+          return;
+        }
+        if (offers.data.length > 0) {
+          router.push({ pathname: "/(detail)/seller-request-offers", params: {
+            purchaseRequestId: item.id,
+            title: item.title ?? "Tus ofertas",
+          } });
+          return;
+        }
         const conversation =
           await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
 

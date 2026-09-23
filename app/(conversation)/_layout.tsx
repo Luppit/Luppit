@@ -561,16 +561,38 @@ export default function ConversationLayout() {
                 <Icon name="arrow-left" size={28} />
               </Pressable>
 
-              <Text
-                variant="subtitle"
-                align="center"
-                maxLines={2}
-                maxFontSizeMultiplier={2}
-                accessibilityRole="header"
-                style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
-              >
-                {title}
-              </Text>
+              {conversationView.role_code === "SELLER" &&
+              conversationView.conversation.purchase_offer_id &&
+              conversationView.conversation.purchase_request_id ? (
+                <Pressable
+                  onPress={() => router.push({
+                    pathname: "/(detail)/seller-request-offers",
+                    params: {
+                      purchaseRequestId: conversationView.conversation.purchase_request_id!,
+                      title,
+                    },
+                  })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${title}. Ver solicitud y ofertas`}
+                  style={{ flex: 1, paddingHorizontal: t.spacing.sm, alignItems: "center" }}
+                >
+                  <Text variant="subtitle" align="center" maxLines={2} maxFontSizeMultiplier={2}>
+                    {title}
+                  </Text>
+                  <Text variant="small" color="textMedium">Ver solicitud y ofertas</Text>
+                </Pressable>
+              ) : (
+                <Text
+                  variant="subtitle"
+                  align="center"
+                  maxLines={2}
+                  maxFontSizeMultiplier={2}
+                  accessibilityRole="header"
+                  style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
+                >
+                  {title}
+                </Text>
+              )}
 
               {menuActions.length > 0 ? (
                 <Pressable

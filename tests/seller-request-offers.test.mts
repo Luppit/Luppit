@@ -9,11 +9,9 @@ const ts = require("typescript");
 
 function fixture(offers: { conversationId: string; description: string; priceSummary: string | null }[]) {
   const routes: any[] = [];
-  let popup: any = null;
   let seedCalls = 0;
   const modules: Record<string, any> = {
     "expo-router": { router: { push: (route: any) => routes.push(route) } },
-    "../../services/popup.service": { openPopup: (value: any) => { popup = value; } },
     "../../services/seller.request.offers.service": {
       getCurrentSellerRequestOfferConversations: async () => ({ ok: true, data: offers }),
       getOrCreateCurrentSellerOfferSeedConversation: async () => {
@@ -32,7 +30,7 @@ function fixture(offers: { conversationId: string; description: string; priceSum
     return modules[name];
   } });
   return { open: exports.openSellerRequest as (item: any) => Promise<void>, routes,
-    get popup() { return popup; }, get seedCalls() { return seedCalls; } };
+    get seedCalls() { return seedCalls; } };
 }
 
 const item = { id: "request-1", title: "Llantas", status: "active", navigation: null };
@@ -44,39 +42,28 @@ test("one seller request opens its empty conversation before any offer", async (
   assert.equal(f.routes[0].params.conversationId, "new-seed");
 });
 
-test("one published offer offers its chat and another single-offer draft", async () => {
+test("one published offer opens the seller request detail", async () => {
   const f = fixture([{ conversationId: "michelin-chat", description: "Michelin", priceSummary: "₡100" }]);
   await f.open(item);
-  assert.equal(f.routes.length, 0);
-  assert.equal(f.popup.options.length, 2);
-  f.popup.options[0].onPress();
-  assert.equal(f.routes[0].params.conversationId, "michelin-chat");
-  f.popup.options[1].onPress();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(f.routes[1].pathname, "/(modal)/offer");
-  assert.equal(f.routes[1].params.mode, "create");
-  assert.equal(f.routes[1].params.conversationId, "new-seed");
+  assert.equal(f.routes.length, 1);
+  assert.equal(f.routes[0].pathname, "/(detail)/seller-request-offers");
+  assert.equal(f.routes[0].params.purchaseRequestId, item.id);
+  assert.equal(f.seedCalls, 0);
 });
 
-test("multiple offers show every chat and an action to add another", async () => {
+test("multiple offers still open one request detail", async () => {
   const f = fixture([
     { conversationId: "michelin-chat", description: "Michelin", priceSummary: "₡100" },
     { conversationId: "other-chat", description: "Otra marca", priceSummary: "₡70" },
   ]);
   await f.open(item);
-  assert.equal(f.routes.length, 0);
-  assert.equal(f.popup.options.length, 3);
-  f.popup.options[1].onPress();
-  assert.equal(f.routes[0].params.conversationId, "other-chat");
-  f.popup.options[2].onPress();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.equal(f.routes[1].params.conversationId, "new-seed");
-  assert.equal(f.routes[1].params.mode, "create");
+  assert.equal(f.routes.length, 1);
+  assert.equal(f.routes[0].pathname, "/(detail)/seller-request-offers");
+  assert.equal(f.seedCalls, 0);
 });
 
-test("inactive request with one offer still opens its existing chat", async () => {
+test("inactive request with one offer still opens its request detail", async () => {
   const f = fixture([{ conversationId: "michelin-chat", description: "Michelin", priceSummary: "₡100" }]);
   await f.open({ ...item, status: "closed" });
-  assert.equal(f.popup, null);
-  assert.equal(f.routes[0].params.conversationId, "michelin-chat");
+  assert.equal(f.routes[0].pathname, "/(detail)/seller-request-offers");
 });

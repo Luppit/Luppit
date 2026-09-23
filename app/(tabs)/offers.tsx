@@ -6,14 +6,13 @@ import LoadingState from "@/src/components/loading/LoadingState";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import StandaloneListEmptyState from "@/src/components/standaloneList/StandaloneListEmptyState";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
-import SellerOfferCard from "@/src/components/sellerOfferCard/SellerOfferCard";
+import SellerOfferedRequestCard from "@/src/components/sellerOfferCard/SellerOfferedRequestCard";
 import { Text } from "@/src/components/Text";
 import { Icon } from "@/src/components/Icon";
 import {
   getCurrentSellerPurchaseOffers,
   SellerPurchaseOfferCardData,
 } from "@/src/services/purchase.offer.service";
-import { getConversationByPurchaseOfferId } from "@/src/services/conversation.service";
 import { openPopup } from "@/src/services/popup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
@@ -21,7 +20,7 @@ import { router } from "expo-router";
 import React from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { showError, showInfo } from "@/src/utils/useToast";
+import { showError } from "@/src/utils/useToast";
 
 const SELLER_OFFER_SORT_OPTIONS = [
   { id: "newly_listed", label: "Oferta más reciente" },
@@ -147,44 +146,22 @@ function SellerOffersContent() {
       isMountedRef.current = false;
     };
   }, []);
-  const openOfferConversation = React.useCallback(
-    async (offer: SellerPurchaseOfferCardData) => {
-      if (offer.conversation_id) {
-        router.push({
-          pathname: "/(conversation)/offer",
-          params: {
-            conversationId: offer.conversation_id,
-            title: offer.request_title ?? "Conversación",
-          },
-        });
-        return;
-      }
-
-      const conversation = await getConversationByPurchaseOfferId(offer.id);
-      if (!conversation) {
-        showInfo("Sin conversación", "Esta oferta todavía no tiene conversación.");
-        return;
-      }
-      if (!conversation.ok) {
-        showError("No se pudo abrir la conversación", conversation.error.message);
-        return;
-      }
-
-      router.push({
-        pathname: "/(conversation)/offer",
-        params: {
-          conversationId: conversation.data.id,
-          title: offer.request_title ?? "Conversación",
-        },
-      });
-    },
-    []
-  );
+  const openRequestOffers = React.useCallback((offer: SellerPurchaseOfferCardData) => {
+    if (!offer.purchase_request_id) return;
+    router.push({
+      pathname: "/(detail)/seller-request-offers",
+      params: {
+        purchaseRequestId: offer.purchase_request_id,
+        title: offer.request_title ?? "Tus ofertas",
+      },
+    });
+  }, []);
 
   const loadFilterOptions = React.useCallback(async () => {
     const result = await getCurrentSellerPurchaseOffers(
       EMPTY_SELLER_OFFER_FILTERS,
-      DEFAULT_SELLER_OFFER_SORT_ID
+      DEFAULT_SELLER_OFFER_SORT_ID,
+      "all"
     );
     if (!isMountedRef.current || !result.ok) return;
     setFilterOptionsSource(result.data);
@@ -195,7 +172,8 @@ function SellerOffersContent() {
     setLoadError(null);
     const result = await getCurrentSellerPurchaseOffers(
       filters,
-      selectedSortId
+      selectedSortId,
+      "all"
     );
     if (!isMountedRef.current) return;
 
@@ -274,7 +252,21 @@ function SellerOffersContent() {
     });
   }, [filterOptionsSource]);
 
-  const visibleOffers = offers;
+  const visibleRequests = React.useMemo(() => {
+    const counts = new Map<string, number>();
+    filterOptionsSource.forEach((offer) => {
+      if (offer.purchase_request_id) {
+        counts.set(offer.purchase_request_id, (counts.get(offer.purchase_request_id) ?? 0) + 1);
+      }
+    });
+    const requests = new Map<string, { offer: SellerPurchaseOfferCardData; count: number }>();
+    offers.forEach((offer) => {
+      const id = offer.purchase_request_id;
+      if (!id) return;
+      if (!requests.has(id)) requests.set(id, { offer, count: counts.get(id) ?? 1 });
+    });
+    return Array.from(requests.values());
+  }, [filterOptionsSource, offers]);
 
   const hasActiveFilters = React.useMemo(() => hasSellerOfferFilters(filters), [filters]);
   const activeFilterCount = React.useMemo(
@@ -460,11 +452,12 @@ function SellerOffersContent() {
           </View>
         ) : null}
 
-        {visibleOffers.map((offer) => (
-          <SellerOfferCard
-            key={offer.id}
+        {visibleRequests.map(({ offer, count }) => (
+          <SellerOfferedRequestCard
+            key={offer.purchase_request_id}
             offer={offer}
-            onPress={() => void openOfferConversation(offer)}
+            offerCount={count}
+            onPress={() => openRequestOffers(offer)}
             onLongPress={
               offer.purchase_request_id
                 ? () =>
