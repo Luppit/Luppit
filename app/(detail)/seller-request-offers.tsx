@@ -102,12 +102,13 @@ export default function SellerRequestOffersScreen() {
         return (
           <MarketplaceCardFrame
             key={offer.id}
-            title={`${index + 1}. ${offer.description?.trim() || "Oferta"}`}
+            title={`Oferta ${index + 1}`}
             headerRight={offer.conversation_status_label ? (
               <StatusChip label={offer.conversation_status_label}
                 styleCode={offer.conversation_status_style_code} allowWrap />
             ) : null}
             body={<View style={s.optionBody}>
+              <Text variant="body">{offer.description?.trim() || "Sin descripción"}</Text>
               {price ? <Text variant="body">{price}</Text> : null}
               <Text variant="small" color="textMedium">Ver conversación →</Text>
             </View>}
