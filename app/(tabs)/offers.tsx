@@ -161,7 +161,7 @@ function SellerOffersContent() {
     const result = await getCurrentSellerPurchaseOffers(
       EMPTY_SELLER_OFFER_FILTERS,
       DEFAULT_SELLER_OFFER_SORT_ID,
-      "all"
+      "active"
     );
     if (!isMountedRef.current || !result.ok) return;
     setFilterOptionsSource(result.data);
@@ -173,7 +173,7 @@ function SellerOffersContent() {
     const result = await getCurrentSellerPurchaseOffers(
       filters,
       selectedSortId,
-      "all"
+      "active"
     );
     if (!isMountedRef.current) return;
 
