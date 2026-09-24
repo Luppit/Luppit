@@ -172,6 +172,7 @@ function screenFixture(params: Record<string, any> = {}) {
       subscribePopup: (listener: (state: any) => void) => { popupListeners.add(listener); return () => popupListeners.delete(listener); },
     },
     "@/src/services/active.profile.service": { getCurrentProfile: () => ({ id: "seller" }), subscribeActiveProfile: () => () => {} },
+    "@/src/services/seller.request.offers.service": { getOrCreateCurrentSellerOfferSeedConversation: async () => ({ ok: true, data: { id: "next-seed" } }) },
     "@/src/utils/useToast": { showError: (...args: any[]) => errors.push(args), showInfo() {}, showSuccess() {}, showWarning() {} },
     "@/src/services/purchase.request.service": { getPurchaseRequestById: async (id: string) => { requestCalls.push(id); return { ok: true, data: { id, title: "Edit request" } }; } },
     "@/src/services/purchase.offer.service": { getEditablePurchaseOfferDraftByConversationId: async () => ({ ok: true, data: { purchaseRequestId: "edit-request" } }) },
@@ -209,6 +210,30 @@ test("seller summary control serializes the user's acknowledgement with its exis
     client_request_id: identity.clientRequestId, idempotency_key: identity.idempotencyKey, active_profile_id: "seller",
     mode: "create", expected_draft_version: null, expected_offer_revision: null,
   });
+});
+
+test("batch publication sends selected option IDs and parses independent reviews", () => {
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": {}, "../lib/supabase/errors": {}, "./active.profile.service": {},
+  }, "\nexport { buildJsonBody, toSuccessPayload };\n");
+  const body = JSON.parse(service.buildJsonBody({ prompt: "", mode: "batch", offerDraftId: "draft",
+    uiAction: "PUBLISH", expectedDraftVersion: 2,
+    selectedOptionIds: ["michelin", "other"] },
+  { clientRequestId: "publish", idempotencyKey: "retry" }, "seller"));
+  assert.deepEqual(body.selected_option_ids, ["michelin", "other"]);
+  assert.equal(body.expected_draft_version, 2);
+  const result = service.toSuccessPayload({ mode: "batch", options: [
+    { id: "michelin", is_ready_to_send: true, missing_fields: [],
+      summary: { descripcion: "Michelin" }, offer_images: [
+        { storage_ref: "photo-a", signed_url: "https://example.test/a" }] },
+    { id: "other", is_ready_to_send: false, missing_fields: ["precio"],
+      summary: { descripcion: "Other" }, review_reason: "Falta confirmar el precio." },
+  ], publications: [{ option_id: "michelin", conversation_id: "chat-a", purchase_offer_id: "offer-a" }] }, null);
+  assert.equal(result.mode, "batch");
+  assert.equal(result.options[0].offerImages[0].storageRef, "photo-a");
+  assert.equal(result.options[1].isReadyToSend, false);
+  assert.equal(result.options[1].reviewReason, "Falta confirmar el precio.");
+  assert.equal(result.publications[0].conversationId, "chat-a");
 });
 
 test("creation ignores serialized request metadata and supports conversation-only entry", async () => {
@@ -364,18 +389,24 @@ test("restoring an existing offer draft keeps the reference separate from restor
   assert.equal(messages[0].props.message.text, "Mi oferta guardada");
 });
 
-test("reference rendering preserves long content with no truncation and names missing/current states", () => {
+test("reference starts compact and reveals the full original snapshot on demand", () => {
   const f = screenFixture();
   const component = load("../src/components/assistant/OfferRequestReference.tsx", f.modules).default;
   const long = snapshot.repeat(25);
-  const tree = nodes(component({ reference: { ...reference, text: long } }));
+  const props = { reference: { ...reference, text: long } };
+  const collapsed = nodes(f.render(() => component(props)));
+  assert.ok(!collapsed.some((n) => n.props.selectable));
+  assert.equal(collapsed.find((n) => n.type === "Pressable")?.props.accessibilityState.expanded, false);
+  collapsed.find((n) => n.type === "Pressable")!.props.onPress();
+  const tree = nodes(f.render(() => component(props)));
   const body = tree.find((n) => n.props.selectable)!;
   assert.equal(body.props.children[0], long);
   assert.equal(body.props.maxLines, undefined);
   assert.equal(body.props.numberOfLines, undefined);
-  const empty = nodes(component({ reference: { ...reference, source: "request", text: null } }));
-  assert.ok(empty.some((n) => n.props.children.includes("Referencia actual de la solicitud")));
-  assert.ok(empty.some((n) => n.props.children.includes("Esta solicitud no tiene título ni resumen disponibles.")));
+  assert.equal(tree.find((n) => n.type === "Pressable")?.props.accessibilityState.expanded, true);
+  const expandedEmpty = nodes(f.render(() => component({ reference: { ...reference, source: "request", text: null } })));
+  assert.ok(expandedEmpty.some((n) => n.props.children.includes("Referencia actual de la solicitud")));
+  assert.ok(expandedEmpty.some((n) => n.props.children.includes("Esta solicitud no tiene título ni resumen disponibles.")));
 });
 
 const offerInvitation = "Tu oferta está lista. ¿Deseas ver el resumen?";
@@ -480,6 +511,38 @@ async function restoreReadyOffer(f: ReturnType<typeof screenFixture>, messages =
   f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, messages }));
   await flush();
 }
+
+test("published single offer can open its chat or start another independent draft", async () => {
+  const f = screenFixture();
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const publishing = assistantView(f).review!.onPublish();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, status: "sent", purchaseOfferId: "offer-one" }));
+  await publishing;
+  assert.equal(f.popup.actionLabel, "Agregar otra oferta");
+  assert.equal(f.popup.secondaryActionLabel, "Ver conversación");
+  await f.popup.onAction();
+  assert.equal(f.navigations.at(-1).params.conversationId, "next-seed");
+  assert.equal(f.navigations.at(-1).params.mode, "create");
+  f.popup.onSecondaryAction();
+  assert.equal(f.navigations.at(-1).params.conversationId, "conversation-A");
+});
+
+test("failed next-offer seed keeps the sent offer available", async () => {
+  const f = screenFixture();
+  f.modules["@/src/services/seller.request.offers.service"].getOrCreateCurrentSellerOfferSeedConversation =
+    async () => ({ ok: false, error: { message: "Intenta de nuevo" } });
+  f.assistant();
+  f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
+  await flush();
+  const publishing = assistantView(f).review!.onPublish();
+  f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, status: "sent", purchaseOfferId: "offer-one" }));
+  await publishing;
+  assert.equal(await f.popup.onAction(), false);
+  assert.equal(f.navigations.length, 0);
+  assert.equal(f.errors.length, 1);
+});
 async function openOfferSummary(f: ReturnType<typeof screenFixture>, text = "Sí") {
   assistantView(f).composer.onSend({ text, images: [] });
   const call = f.aiCalls.at(-1)!;

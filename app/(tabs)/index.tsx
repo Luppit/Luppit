@@ -5,6 +5,7 @@ import LuppitChip from "@/src/components/chip/LuppitChip";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
+import { openSellerRequest } from "@/src/components/marketplaceHub/openSellerRequest";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
@@ -17,7 +18,6 @@ import {
   hasBuyerHomeFilters,
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
-import { getOrCreateCurrentSellerConversationByPurchaseRequestId } from "@/src/services/conversation.service";
 import {
   getCurrentSellerBusinessCategorySetupStatus,
   getCurrentProfileEmailSetupStatus,
@@ -44,7 +44,6 @@ import {
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
 import { type Theme, useTheme } from "@/src/themes";
-import { showError } from "@/src/utils/useToast";
 import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
@@ -114,36 +113,6 @@ function openBuyerRequest(item: MarketplaceHubItem) {
     params: {
       title: item.title ?? "Detalle de solicitud",
       purchaseRequest: JSON.stringify(toPurchaseRequestParam(item)),
-    },
-  });
-}
-
-async function openSellerRequest(item: MarketplaceHubItem) {
-  if (item.navigation?.target === "conversation" && item.navigation.conversation_id) {
-    router.push({
-      pathname: "/(conversation)/offer",
-      params: {
-        conversationId: item.navigation.conversation_id,
-        title: item.title ?? "Conversación",
-      },
-    });
-    return;
-  }
-
-  const conversation = await getOrCreateCurrentSellerConversationByPurchaseRequestId(item.id);
-  if (!conversation?.ok) {
-    showError(
-      "No se pudo abrir la conversación",
-      conversation?.error.message ?? "Ocurrió un error, intenta de nuevo."
-    );
-    return;
-  }
-
-  router.push({
-    pathname: "/(conversation)/offer",
-    params: {
-      conversationId: conversation.data.id,
-      title: item.title ?? "Conversación",
     },
   });
 }

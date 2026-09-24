@@ -96,7 +96,7 @@ const viewResult = (overrides: Record<string, any> = {}) => ({
   },
 });
 
-function fixture() {
+function fixture(draftMode: "create" | "batch" | null = null) {
   const h = hooks();
   const calls: any[] = [];
   const popups: any[] = [];
@@ -122,6 +122,12 @@ function fixture() {
     "@/src/services/purchase.request.service": {
       addCurrentBuyerPurchaseRequestFavorite: async () => ({ ok: true, data: {} }),
       addCurrentSellerPurchaseRequestFavorite: async () => ({ ok: true, data: {} }),
+    },
+    "@/src/services/seller.request.offers.service": {
+      getActiveSellerOfferDraftMode: async () => ({ ok: true, data: draftMode }),
+      getOrCreateCurrentSellerOfferSeedConversation: async () => ({
+        ok: true, data: { id: "conversation-new" },
+      }),
     },
     "@/src/utils/useToast": Object.fromEntries(["showError", "showInfo", "showSuccess", "showWarning"].map((key) => [key, (...args: any[]) => calls.push([key, ...args])])),
     "expo-router": { router: { push: (route: any) => calls.push(["push", route]) } },
@@ -388,8 +394,27 @@ test("shared conversation commands preserve offer creation and editing routes", 
     assert.equal(f.calls.at(-1)[1].pathname, "/(modal)/offer");
     assert.equal(f.calls.at(-1)[1].params.conversationId, "conversation-A");
     assert.equal(f.calls.at(-1)[1].params.purchaseRequestId, "request-A");
+    assert.equal(f.calls.at(-1)[1].params.mode, target === "modal.offer" ? "create" : "edit");
     assert.equal(executions(f).length, 0);
   }
+});
+
+test("add another offer opens a new seed conversation", async () => {
+  const f = fixture();
+  f.hook().handleActionPress(pickupAction({ confirmation: null,
+    executor: { target: "modal.offer.create.new", execution_type: "client_command", requires_refresh: false } }));
+  await flush();
+  assert.equal(f.calls.at(-1)[1].params.conversationId, "conversation-new");
+  assert.equal(f.calls.at(-1)[1].params.mode, "create");
+});
+
+test("an unfinished legacy batch does not reopen the batch assistant", async () => {
+  const f = fixture("batch");
+  f.hook().handleActionPress(pickupAction({ confirmation: null,
+    executor: { target: "modal.offer", execution_type: "client_command", requires_refresh: false } }));
+  await flush();
+  assert.equal(f.calls.at(-1)[1].params.conversationId, "conversation-new");
+  assert.equal(f.calls.at(-1)[1].params.mode, "create");
 });
 
 test("return from email setup reloads blocker metadata and foreground refresh invalidates unavailable actions", async () => {

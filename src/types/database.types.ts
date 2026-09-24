@@ -5311,6 +5311,26 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_or_create_seller_offer_seed_conversation: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          buyer_profile_id: string | null
+          created_at: string
+          id: string
+          privacy_purge_after: string | null
+          purchase_offer_id: string | null
+          purchase_request_id: string | null
+          selected_fulfillment_catalog_id: string | null
+          seller_profile_id: string | null
+          status_code: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_or_create_seller_purchase_request_conversation: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: {
@@ -5422,6 +5442,17 @@ export type Database = {
       get_seller_offer_edit_payload_v2: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
+      }
+      get_seller_request_offer_conversations: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          conversation_id: string
+          purchase_offer_id: string
+          status_code: string
+          description: string
+          price_summary: string | null
+          created_at: string
+        }[]
       }
       get_seller_purchase_request_favorites: {
         Args: {
@@ -5535,6 +5566,15 @@ export type Database = {
           p_expected_version: number
           p_offer_draft_id: string
           p_profile_id: string
+        }
+        Returns: Json
+      }
+      publish_seller_offer_batch: {
+        Args: {
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
+          p_selected_option_ids: string[]
         }
         Returns: Json
       }

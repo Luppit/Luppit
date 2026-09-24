@@ -56,8 +56,23 @@ export type SellerOfferAssistantSummary = {
 
 export type SellerOfferAssistantImage = { storageRef: string; url: string };
 
+export type SellerOfferBatchOption = {
+  id: string;
+  summary: SellerOfferAssistantSummary | null;
+  missingFields: string[];
+  isReadyToSend: boolean;
+  reviewReason: string | null;
+  offerImages: SellerOfferAssistantImage[];
+};
+
+export type SellerOfferBatchPublication = {
+  optionId: string;
+  conversationId: string;
+  purchaseOfferId: string;
+};
+
 export type SellerOfferAssistantSuccess = {
-  mode: "create" | "edit";
+  mode: "create" | "edit" | "batch";
   draftVersion: number | null;
   baseOfferRevision: string | null;
   publishedOfferRevision: string | null;
@@ -78,6 +93,8 @@ export type SellerOfferAssistantSuccess = {
   controlAction: SellerOfferAssistantControlAction | null;
   requestId: string | null;
   messages: SellerOfferAssistantMessage[];
+  options: SellerOfferBatchOption[];
+  publications: SellerOfferBatchPublication[];
 };
 
 export type SellerOfferAssistantFailure = {
@@ -101,13 +118,14 @@ export type SellerOfferAssistantRequestIdentity = {
 };
 
 export type SellerOfferAssistantRequest = {
-  mode?: "create" | "edit";
+  mode?: "create" | "edit" | "batch";
   expectedDraftVersion?: number | null;
   expectedOfferRevision?: string | null;
   prompt: string;
   conversationId?: string | null;
   offerDraftId?: string | null;
   uiAction?: SellerOfferAssistantUiAction | null;
+  selectedOptionIds?: string[];
   images?: ChatImage[];
   identity?: SellerOfferAssistantRequestIdentity;
   signal?: AbortSignal;
@@ -295,7 +313,7 @@ function toSuccessPayload(
     : [];
   return {
     ok: true,
-    mode: payload.mode === "edit" ? "edit" : "create",
+    mode: payload.mode === "edit" ? "edit" : payload.mode === "batch" ? "batch" : "create",
     draftVersion: normalizeNumber(payload.draft_version),
     baseOfferRevision: normalizeString(payload.base_offer_revision),
     publishedOfferRevision: normalizeString(payload.published_offer_revision),
@@ -325,6 +343,35 @@ function toSuccessPayload(
       null,
     requestId,
     messages,
+    options: Array.isArray(payload.options) ? payload.options.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const option = value as Record<string, unknown>;
+      const id = normalizeString(option.id);
+      if (!id) return [];
+      return [{
+        id,
+        summary: normalizeSummary(option.summary),
+        missingFields: normalizeStringArray(option.missing_fields),
+        isReadyToSend: option.is_ready_to_send === true,
+        reviewReason: normalizeString(option.review_reason),
+        offerImages: Array.isArray(option.offer_images) ? option.offer_images.flatMap((image) => {
+          if (!image || typeof image !== "object") return [];
+          const record = image as Record<string, unknown>;
+          const storageRef = normalizeString(record.storage_ref);
+          const url = normalizeString(record.signed_url);
+          return storageRef && url ? [{ storageRef, url }] : [];
+        }) : [],
+      }];
+    }) : [],
+    publications: Array.isArray(payload.publications) ? payload.publications.flatMap((value) => {
+      if (!value || typeof value !== "object") return [];
+      const publication = value as Record<string, unknown>;
+      const optionId = normalizeString(publication.option_id);
+      const conversationId = normalizeString(publication.conversation_id);
+      const purchaseOfferId = normalizeString(publication.purchase_offer_id);
+      return optionId && conversationId && purchaseOfferId
+        ? [{ optionId, conversationId, purchaseOfferId }] : [];
+    }) : [],
   };
 }
 
@@ -392,6 +439,7 @@ function buildJsonBody(
     conversation_id: input.conversationId ?? null,
     offer_draft_id: input.offerDraftId ?? null,
     ui_action: input.uiAction ?? null,
+    ...(input.selectedOptionIds ? { selected_option_ids: input.selectedOptionIds } : {}),
     client_request_id: identity.clientRequestId,
     idempotency_key: identity.idempotencyKey,
     active_profile_id: activeProfileId,
@@ -411,6 +459,7 @@ function buildFormDataBody(
   if (input.conversationId) formData.append("conversation_id", input.conversationId);
   if (input.offerDraftId) formData.append("offer_draft_id", input.offerDraftId);
   if (input.uiAction) formData.append("ui_action", input.uiAction);
+  (input.selectedOptionIds ?? []).forEach((id) => formData.append("selected_option_ids[]", id));
   formData.append("client_request_id", identity.clientRequestId);
   formData.append("idempotency_key", identity.idempotencyKey);
   formData.append("active_profile_id", activeProfileId);

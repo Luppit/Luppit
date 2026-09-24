@@ -707,13 +707,13 @@ export default function GlobalPopupHost() {
     }
   };
 
-  const handleSuccessActionPress = async () => {
+  const handleSuccessActionPress = async (secondary = false) => {
     if (!successConfig || isSuccessActionPending) return;
 
     setSuccessActionPending(true);
     try {
-      await successConfig.onAction();
-      closePopup();
+      const action = secondary ? successConfig.onSecondaryAction : successConfig.onAction;
+      if (action && (await action()) !== false) closePopup();
     } finally {
       setSuccessActionPending(false);
     }
@@ -1086,6 +1086,7 @@ export default function GlobalPopupHost() {
                     config={successConfig}
                     pending={isSuccessActionPending}
                     onAction={() => void handleSuccessActionPress()}
+                    onSecondaryAction={() => void handleSuccessActionPress(true)}
                   />
                 </GlassSurface>
               </Animated.View>

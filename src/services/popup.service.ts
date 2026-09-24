@@ -238,7 +238,9 @@ export type PopupSuccessConfig = {
   description: string;
   actionLabel: string;
   actionBackgroundColorKey?: ThemeColorKey;
-  onAction: () => void | Promise<void>;
+  onAction: () => void | boolean | Promise<void | boolean>;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void | boolean | Promise<void | boolean>;
 };
 
 export type PopupConfig =

@@ -58,6 +58,10 @@ export const RPC_FUNCTIONS = {
   GET_NAVBAR_ITEMS_BY_PROFILE: "get_navbar_items_by_profile",
   GET_OR_CREATE_SELLER_PURCHASE_REQUEST_CONVERSATION:
     "get_or_create_seller_purchase_request_conversation",
+  GET_OR_CREATE_SELLER_OFFER_SEED_CONVERSATION:
+    "get_or_create_seller_offer_seed_conversation",
+  GET_SELLER_REQUEST_OFFER_CONVERSATIONS:
+    "get_seller_request_offer_conversations",
   GET_PURCHASE_REQUEST_STATUS_UI_OPTIONS:
     "get_purchase_request_status_ui_options",
   GET_PURCHASE_REQUEST_VISUALIZATION_COUNT:
