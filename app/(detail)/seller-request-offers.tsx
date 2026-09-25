@@ -1,5 +1,5 @@
-import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MarketplaceCardFrame from "@/src/components/marketplaceHub/MarketplaceCardFrame";
@@ -15,9 +15,11 @@ import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
+
+const ADD_OFFER_BAR_HEIGHT = 60;
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -27,15 +29,21 @@ export default function SellerRequestOffersScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const s = React.useMemo(() => StyleSheet.create({
+    screen: { flex: 1 },
+    scroll: { flex: 1 },
     content: { gap: t.spacing.lg, paddingTop: insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT + t.spacing.md,
       paddingBottom: insets.bottom + t.spacing.xl },
+    contentWithAction: { paddingBottom: Math.max(insets.bottom, Platform.OS === "android" ? 10 : 12)
+      + ADD_OFFER_BAR_HEIGHT + t.spacing.xl + t.spacing.md },
     summaryCard: { ...createRoundedSurfaceStyle(t), padding: t.spacing.md },
     offersSection: { gap: t.spacing.md },
     offersList: { gap: t.spacing.md },
     sectionTitle: { paddingLeft: t.spacing.md },
-    action: { ...createRoundedSurfaceStyle(t), borderWidth: 1, borderColor: t.colors.textMedium,
-      minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "center",
-      gap: t.spacing.sm, padding: t.spacing.sm },
+    actionBar: { position: "absolute", left: 0, right: 0,
+      bottom: Math.max(insets.bottom, Platform.OS === "android" ? 10 : 12), alignItems: "center" },
+    actionGlass: { width: "100%", maxWidth: 430 },
+    actionGlassClip: { borderRadius: t.glass.radius.nav },
+    actionGlassContent: { padding: t.spacing.sm },
     optionBody: { gap: t.spacing.md },
     pricing: { gap: t.spacing.sm },
     priceRow: { flexWrap: "wrap", flexDirection: "row", alignItems: "center",
@@ -93,107 +101,113 @@ export default function SellerRequestOffersScreen() {
     } });
   }, [purchaseRequestId]);
 
+  const canAddOffer = request?.status === "active" && offers.length > 0;
+
   if (loading) return <View style={{ paddingTop: insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT }}>
     <LoadingState label="Cargando ofertas..." />
   </View>;
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.content}>
-      {request?.summary_text ? (
-        <View style={s.summaryCard}>
-          <Text variant="body" color="textMedium">{request.summary_text}</Text>
-        </View>
-      ) : null}
-
-      {request ? (
-        <GroupedListSection title="Categoría">
-          <GroupedListRow
-            icon="tag"
-            label={request.category_name ?? "Sin categoría"}
-            description="Ver cómo Luppit usa esta categoría"
-            showSeparator={false}
-            onPress={openCategoryInfo}
-          />
-        </GroupedListSection>
-      ) : null}
-
-      <View style={s.offersSection}>
-        <Text variant="small" color="textMedium" style={s.sectionTitle}>
-          Tus ofertas ({offers.length}):
-        </Text>
-        {offers.length === 0 ? (
-          <Text variant="body" color="textMedium">No hay ofertas disponibles para esta solicitud.</Text>
+    <View style={s.screen}>
+      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}
+        contentContainerStyle={[s.content, canAddOffer && s.contentWithAction]}>
+        {request?.summary_text ? (
+          <View style={s.summaryCard}>
+            <Text variant="body" color="textMedium">{request.summary_text}</Text>
+          </View>
         ) : null}
-        <View style={s.offersList}>
-          {offers.map((offer, index) => {
-            const priceContext = {
-              ...offer,
-              offer_price_amount: offer.price,
-              offer_price_basis: offer.price_basis,
-              offer_quantity_offered: offer.quantity_offered,
-            };
-            const formattedPrice = formatConversationOfferPrice(priceContext) ?? "Precio no disponible";
-            const unitPrice = offer.price_basis === "UNIT"
-              ? formatOfferAmount(offer.price, offer.offer_currency_code)
-              : null;
-            const productTotal = offer.price_basis === "UNIT" || offer.price_basis === "TOTAL"
-              ? formatConversationOfferTotal(priceContext)
-              : null;
-            const conversationId = offer.conversation_id;
-            return (
-              <MarketplaceCardFrame
-                key={offer.id}
-                title={`Oferta ${index + 1}`}
-                headerRight={offer.conversation_status_label ? (
-                  <StatusChip label={offer.conversation_status_label}
-                    styleCode={offer.conversation_status_style_code} allowWrap />
-                ) : null}
-                body={<View style={s.optionBody}>
-                  <Text variant="body" color="textMedium">{offer.description?.trim() || "Sin descripción"}</Text>
-                  <View style={s.pricing}>
-                    {productTotal ? (
-                      <>
-                        {unitPrice ? (
+
+        {request ? (
+          <GroupedListSection title="Categoría">
+            <GroupedListRow
+              icon="tag"
+              label={request.category_name ?? "Sin categoría"}
+              description="Ver cómo Luppit usa esta categoría"
+              showSeparator={false}
+              onPress={openCategoryInfo}
+            />
+          </GroupedListSection>
+        ) : null}
+
+        <View style={s.offersSection}>
+          <Text variant="small" color="textMedium" style={s.sectionTitle}>
+            Tus ofertas ({offers.length}):
+          </Text>
+          {offers.length === 0 ? (
+            <Text variant="body" color="textMedium">No hay ofertas disponibles para esta solicitud.</Text>
+          ) : null}
+          <View style={s.offersList}>
+            {offers.map((offer, index) => {
+              const priceContext = {
+                ...offer,
+                offer_price_amount: offer.price,
+                offer_price_basis: offer.price_basis,
+                offer_quantity_offered: offer.quantity_offered,
+              };
+              const formattedPrice = formatConversationOfferPrice(priceContext) ?? "Precio no disponible";
+              const unitPrice = offer.price_basis === "UNIT"
+                ? formatOfferAmount(offer.price, offer.offer_currency_code)
+                : null;
+              const productTotal = offer.price_basis === "UNIT" || offer.price_basis === "TOTAL"
+                ? formatConversationOfferTotal(priceContext)
+                : null;
+              const conversationId = offer.conversation_id;
+              return (
+                <MarketplaceCardFrame
+                  key={offer.id}
+                  title={`Oferta ${index + 1}`}
+                  headerRight={offer.conversation_status_label ? (
+                    <StatusChip label={offer.conversation_status_label}
+                      styleCode={offer.conversation_status_style_code} allowWrap />
+                  ) : null}
+                  body={<View style={s.optionBody}>
+                    <Text variant="body" color="textMedium">{offer.description?.trim() || "Sin descripción"}</Text>
+                    <View style={s.pricing}>
+                      {productTotal ? (
+                        <>
+                          {unitPrice ? (
+                            <View style={s.priceRow}>
+                              <Text variant="small" color="textMedium" style={s.priceLabel}>
+                                {offer.quantity_offered != null
+                                  ? `${offer.quantity_offered} ${offer.quantity_offered === 1 ? "unidad" : "unidades"}`
+                                  : "Precio por unidad"}
+                              </Text>
+                              <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice} c/u</Text>
+                            </View>
+                          ) : null}
                           <View style={s.priceRow}>
-                            <Text variant="small" color="textMedium" style={s.priceLabel}>
-                              {offer.quantity_offered != null
-                                ? `${offer.quantity_offered} ${offer.quantity_offered === 1 ? "unidad" : "unidades"}`
-                                : "Precio por unidad"}
-                            </Text>
-                            <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice} c/u</Text>
+                            <Text variant="small" color="textMedium" style={s.priceLabel}>Total de productos</Text>
+                            <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
                           </View>
-                        ) : null}
-                        <View style={s.priceRow}>
-                          <Text variant="small" color="textMedium" style={s.priceLabel}>Total de productos</Text>
-                          <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
-                        </View>
-                      </>
-                    ) : (
-                      <Text variant="body" style={s.price}>{formattedPrice}</Text>
-                    )}
-                  </View>
-                </View>}
-                footerLeft={<Button title="Ver conversación" icon="message-circle"
-                  disabled={!conversationId} onPress={conversationId ? () => router.push({
-                    pathname: "/(conversation)/offer", params: {
-                      conversationId,
-                      title: request?.title ?? offer.request_title ?? "Conversación",
-                    },
-                  }) : undefined} />}
-                fullText
-                accessibilityLabel={`Oferta ${index + 1}. ${offer.description || "Sin descripción"}. ${formattedPrice}.`}
-              />
-            );
-          })}
+                        </>
+                      ) : (
+                        <Text variant="body" style={s.price}>{formattedPrice}</Text>
+                      )}
+                    </View>
+                  </View>}
+                  footerLeft={<Button title="Ver conversación" icon="message-circle"
+                    disabled={!conversationId} onPress={conversationId ? () => router.push({
+                      pathname: "/(conversation)/offer", params: {
+                        conversationId,
+                        title: request?.title ?? offer.request_title ?? "Conversación",
+                      },
+                    }) : undefined} />}
+                  fullText
+                  accessibilityLabel={`Oferta ${index + 1}. ${offer.description || "Sin descripción"}. ${formattedPrice}.`}
+                />
+              );
+            })}
+          </View>
         </View>
-        {request?.status === "active" && offers.length > 0 ? (
-          <Pressable style={s.action} onPress={() => void addOffer()} accessibilityRole="button"
-            accessibilityLabel="Agregar otra oferta">
-            <Icon name="plus" size={20} color={t.colors.textDark} />
-            <Text variant="body">Agregar otra oferta</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </ScrollView>
+      </ScrollView>
+      {canAddOffer ? (
+        <View style={s.actionBar}>
+          <GlassSurface variant="nav" blur="nav" style={s.actionGlass}
+            clipStyle={s.actionGlassClip} contentStyle={s.actionGlassContent}>
+            <Button title="Agregar otra oferta" icon="plus" onPress={() => void addOffer()} />
+          </GlassSurface>
+        </View>
+      ) : null}
+    </View>
   );
 }
