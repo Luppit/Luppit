@@ -35,6 +35,8 @@ import {
   getCurrentProfileConversationById,
   getCurrentUserConversationView,
 } from "@/src/services/conversation.service";
+import { getCurrentSellerPurchaseOffers } from "@/src/services/purchase.offer.service";
+import { getPurchaseRequestById } from "@/src/services/purchase.request.service";
 import {
   clearToastBottomInset,
   setToastBottomInset,
@@ -161,6 +163,7 @@ export default function ConversationLayout() {
     null
   );
   const viewRefreshGenerationRef = useRef(0);
+  const isClosingRef = useRef(false);
   const realtimeRefreshTargetsRef = useRef<Set<ConversationRealtimeRefreshTarget>>(
     new Set()
   );
@@ -178,17 +181,9 @@ export default function ConversationLayout() {
   const showComposer = conversationView?.permissions.can_send_messages ?? false;
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
-  const closeConversation = useCallback(() => {
-    if (!router.canGoBack()) {
-      router.replace("/(tabs)");
-      return;
-    }
-    router.back();
-  }, []);
-  useAndroidBackAction(closeConversation, {
-    enabled: Boolean(conversationId) && !isLoading &&
-      (Boolean(conversationView && profileId) || isUnavailableConversationError(loadError)),
-  });
+  useEffect(() => {
+    isClosingRef.current = false;
+  }, [conversationId]);
 
   useEffect(() => {
     if (!showComposer) {
@@ -416,6 +411,67 @@ export default function ConversationLayout() {
   const allowNavigation = useAndroidLeaveGuard(
     showComposer && hasComposerDraft, isExecutingAction || pendingMessageCount > 0
   );
+  const closeConversation = useCallback(async () => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
+    const requestId = conversationView?.conversation.purchase_request_id;
+    if (!conversationView || !requestId) {
+      isClosingRef.current = false;
+      if (!router.canGoBack()) {
+        router.replace("/(tabs)");
+      } else {
+        router.back();
+      }
+      return;
+    }
+
+    if (conversationView.role_code.toUpperCase().includes("BUYER")) {
+      const request = await getPurchaseRequestById(requestId).catch(() => null);
+      isClosingRef.current = false;
+      await allowNavigation(() => router.replace({
+        pathname: "/(detail)/purchase-request",
+        params: {
+          title: purchaseRequestTitle ?? routeTitle ?? "Detalle de solicitud",
+          purchaseRequest: JSON.stringify(request?.ok ? request.data : { id: requestId }),
+          fromConversation: "true",
+        },
+      }));
+      return;
+    }
+
+    if (conversationView.role_code.toUpperCase().includes("SELLER")) {
+      const offers = await getCurrentSellerPurchaseOffers(undefined, "newly_listed", "active")
+        .catch(() => null);
+      if (!offers?.ok) {
+        isClosingRef.current = false;
+        showError("No se pudieron cargar las ofertas", offers?.error.message ?? "Intenta de nuevo.");
+        return;
+      }
+      if (offers.data.some((offer) => offer.purchase_request_id === requestId)) {
+        isClosingRef.current = false;
+        await allowNavigation(() => router.replace({
+          pathname: "/(detail)/seller-request-offers",
+          params: {
+            purchaseRequestId: requestId,
+            title: purchaseRequestTitle ?? routeTitle ?? "Tus ofertas",
+            fromConversation: "true",
+          },
+        }));
+      } else {
+        isClosingRef.current = false;
+        await allowNavigation(() => router.dismissTo("/(tabs)"));
+      }
+      return;
+    }
+
+    isClosingRef.current = false;
+    router.back();
+  }, [allowNavigation, conversationView, purchaseRequestTitle, routeTitle]);
+  useAndroidBackAction(() => { void closeConversation(); }, {
+    enabled: Boolean(conversationId) && !isLoading &&
+      (Boolean(conversationView && profileId) || isUnavailableConversationError(loadError)),
+  });
 
   const openConversationMenu = useCallback(
     (actions: ConversationViewAction[]) => {

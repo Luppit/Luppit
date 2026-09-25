@@ -96,7 +96,7 @@ const viewResult = (overrides: Record<string, any> = {}) => ({
   },
 });
 
-function fixture(draftMode: "create" | "batch" | null = null) {
+function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[] = []) {
   const h = hooks();
   const calls: any[] = [];
   const popups: any[] = [];
@@ -122,6 +122,13 @@ function fixture(draftMode: "create" | "batch" | null = null) {
     "@/src/services/purchase.request.service": {
       addCurrentBuyerPurchaseRequestFavorite: async () => ({ ok: true, data: {} }),
       addCurrentSellerPurchaseRequestFavorite: async () => ({ ok: true, data: {} }),
+      getPurchaseRequestById: async (id: string) => ({ ok: true, data: { id, title: "Synthetic request", status: "active" } }),
+    },
+    "@/src/services/purchase.offer.service": {
+      getCurrentSellerPurchaseOffers: async (...args: any[]) => {
+        calls.push(["sellerOffers", ...args]);
+        return { ok: true, data: activeOffers };
+      },
     },
     "@/src/services/seller.request.offers.service": {
       getActiveSellerOfferDraftMode: async () => ({ ok: true, data: draftMode }),
@@ -130,7 +137,13 @@ function fixture(draftMode: "create" | "batch" | null = null) {
       }),
     },
     "@/src/utils/useToast": Object.fromEntries(["showError", "showInfo", "showSuccess", "showWarning"].map((key) => [key, (...args: any[]) => calls.push([key, ...args])])),
-    "expo-router": { router: { push: (route: any) => calls.push(["push", route]) } },
+    "expo-router": { router: {
+      push: (route: any) => calls.push(["push", route]),
+      replace: (route: any) => calls.push(["replace", route]),
+      dismissTo: (route: any) => calls.push(["dismissTo", route]),
+      back: () => calls.push(["back"]),
+      canGoBack: () => true,
+    } },
     "@react-navigation/native": { useFocusEffect: (cb: Function) => h.react.useEffect(() => {
       focus = () => { blur = cb(); };
       focus(); return () => blur?.();
@@ -539,6 +552,82 @@ test("actual conversation layout routes TOP, AUX and MENU actions through the ex
     assert.equal(buttons(refreshed)?.props.buttons.length, 0);
     assert.equal(refreshed.props.value.messageRefreshTick, 1);
   }
+});
+
+test("buyer conversation back opens its request detail regardless of the previous route", async () => {
+  const f = fixture();
+  f.drawConversation();
+  f.reads[0].resolve(viewResult({ actions: [] }));
+  await flush();
+  nodes(f.drawConversation()).find((node) => node.props.accessibilityLabel === "Volver")!.props.onPress();
+  await flush();
+  const route = f.calls.find((call) => call[0] === "replace")?.[1];
+  assert.equal(route.pathname, "/(detail)/purchase-request");
+  assert.equal(JSON.parse(route.params.purchaseRequest).id, "request-A");
+  assert.equal(route.params.fromConversation, "true");
+  assert.ok(!f.calls.some((call) => call[0] === "back"));
+});
+
+test("seller conversation back uses active offers for the request across independent conversations", async () => {
+  for (const activeOffers of [
+    [{ purchase_request_id: "request-A", conversation_id: "conversation-A" }],
+    [{ purchase_request_id: "request-A", conversation_id: "conversation-B" }],
+    [{ purchase_request_id: "request-A", conversation_id: "conversation-A" },
+      { purchase_request_id: "request-A", conversation_id: "conversation-B" }],
+  ]) {
+    const f = fixture(null, activeOffers);
+    f.drawConversation();
+    f.reads[0].resolve(viewResult({ role_code: "SELLER", actions: [] }));
+    await flush();
+    nodes(f.drawConversation()).find((node) => node.props.accessibilityLabel === "Volver")!.props.onPress();
+    await flush();
+    assert.equal(f.calls.find((call) => call[0] === "sellerOffers")?.[3], "active");
+    const route = f.calls.find((call) => call[0] === "replace")?.[1];
+    assert.equal(route.pathname, "/(detail)/seller-request-offers");
+    assert.equal(route.params.purchaseRequestId, "request-A");
+    assert.equal(route.params.fromConversation, "true");
+    assert.ok(!f.calls.some((call) => call[0] === "back"));
+  }
+});
+
+test("seller conversation back returns home without an active offer on its request", async () => {
+  const f = fixture(null, [{ purchase_request_id: "other-request", conversation_id: "conversation-B" }]);
+  f.drawConversation();
+  f.reads[0].resolve(viewResult({ role_code: "SELLER", actions: [] }));
+  await flush();
+  nodes(f.drawConversation()).find((node) => node.props.accessibilityLabel === "Volver")!.props.onPress();
+  await flush();
+  assert.deepEqual(f.calls.find((call) => call[0] === "dismissTo"), ["dismissTo", "/(tabs)"]);
+  assert.ok(!f.calls.some((call) => call[0] === "replace" || call[0] === "back"));
+});
+
+test("detail reached from conversation returns home on its next back action", () => {
+  const h = hooks();
+  const calls: any[] = [];
+  let nativeBack: Function | undefined;
+  const detail = load("../app/(detail)/detail-top-bar.tsx", {
+    react: h.react,
+    "@/src/utils/useAndroidBackAction": { useAndroidBackAction: (callback: Function) => { nativeBack = callback; } },
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/Text": { Text: "Text" },
+    "@/src/components/glass/GlassSurface": { default: "GlassSurface", __esModule: true },
+    "@/src/services/popup.service": { openPopup() {} },
+    "@/src/services/purchase.request.service": {},
+    "@/src/themes": { useTheme: () => theme },
+    "@/src/utils/useToast": {},
+    "@/src/utils/purchaseRequestLink": {},
+    "expo-router": { router: {
+      dismissTo: (route: any) => calls.push(["dismissTo", route]),
+      back: () => calls.push(["back"]),
+      canGoBack: () => true,
+    } },
+    "react-native": { Platform: { OS: "ios" }, Pressable: "Pressable", View: "View", Share: {} },
+  }).default;
+  const tree = h.render(() => detail({ title: "Synthetic request", hideMenu: true,
+    returnToHome: true, topInset: 0 }));
+  nodes(tree).find((node) => node.props.accessibilityLabel === "Volver")!.props.onPress();
+  nativeBack?.();
+  assert.deepEqual(calls, [["dismissTo", "/(tabs)"], ["dismissTo", "/(tabs)"]]);
 });
 
 test("conversation action bubble includes ordered TOP and AUX actions independently of the composer", async () => {

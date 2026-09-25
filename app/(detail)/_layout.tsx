@@ -68,10 +68,14 @@ export default function DetailLayout() {
     title?: string | string[];
     hideMenu?: string | string[];
     purchaseRequest?: string | string[];
+    fromConversation?: string | string[];
   }>();
   const titleParam = Array.isArray(params.title) ? params.title[0] : params.title;
   const title = titleParam?.trim() || DEFAULT_DETAIL_TITLES[pathname];
   const hideMenuParam = Array.isArray(params.hideMenu) ? params.hideMenu[0] : params.hideMenu;
+  const fromConversation = Array.isArray(params.fromConversation)
+    ? params.fromConversation[0]
+    : params.fromConversation;
   const purchaseRequestId = getPurchaseRequestId(params.purchaseRequest);
   const purchaseRequestStatus = getPurchaseRequestStatus(params.purchaseRequest);
   const hideMenu =
@@ -100,6 +104,7 @@ export default function DetailLayout() {
       {marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar ? null : (
         <DetailTopBar
           title={title}
+          returnToHome={fromConversation === "true"}
           hideMenu={hideMenu}
           hideBack={pathname === "/business-verification"}
           purchaseRequestId={purchaseRequestId}
