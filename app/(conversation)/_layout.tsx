@@ -179,13 +179,12 @@ export default function ConversationLayout() {
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   const closeConversation = useCallback(() => {
-    if (!router.canGoBack() &&
-      (Platform.OS === "android" || isUnavailableConversationError(loadError))) {
-      router.replace("/(tabs)/chats");
+    if (!router.canGoBack()) {
+      router.replace("/(tabs)");
       return;
     }
     router.back();
-  }, [loadError]);
+  }, []);
   useAndroidBackAction(closeConversation, {
     enabled: Boolean(conversationId) && !isLoading &&
       (Boolean(conversationView && profileId) || isUnavailableConversationError(loadError)),
