@@ -581,7 +581,7 @@ function OfferAssistantScreen({
             title: isEditMode ? "¡Propuesta enviada!" : "¡Oferta enviada!",
             description: isEditMode
               ? "El comprador podrá aceptar o rechazar tus cambios. La oferta actual sigue vigente mientras decide."
-              : "El comprador ya puede revisarla en su propia conversación. Puedes agregar otra alternativa a esta solicitud.",
+              : "El comprador ya puede revisar tu oferta. Si quieres, puedes agregar otra a esta solicitud.",
             actionLabel: isEditMode ? "Ver conversación" : "Agregar otra oferta",
             actionBackgroundColorKey: "textDark",
             onAction: async () => {
