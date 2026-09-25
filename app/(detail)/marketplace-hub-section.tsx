@@ -12,6 +12,8 @@ import { Text } from "@/src/components/Text";
 import {
   BuyerHomeFilters,
   EMPTY_BUYER_HOME_FILTERS,
+  countBuyerHomeFilterGroups,
+  hasBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
@@ -20,9 +22,11 @@ import {
   getCurrentBuyerMarketplaceHubItems,
   getCurrentSellerHomeFilterCategoryOptions,
   getCurrentSellerMarketplaceHubItems,
+  getPurchaseRequestStatusUiOptions,
   MarketplaceHubItem,
   MarketplaceHubRole,
   MarketplaceHubSortConfig,
+  PurchaseRequestStatusUiOption,
   SellerHomeFilterCategoryOption,
 } from "@/src/services/purchase.request.service";
 import {
@@ -51,10 +55,9 @@ import {
   findNodeHandle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 const PAGE_SIZE = 20;
-const SELLER_TOP_BAR_VISIBLE_HEIGHT = 128;
+const TOP_BAR_VISIBLE_HEIGHT = 128;
 const SELLER_SORT_ROLLOUT_FALLBACK: MarketplaceHubSortConfig = {
   default_code: DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE,
   selected_code: DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE,
@@ -121,6 +124,17 @@ function normalizeSellerListingFilters(filters: SellerHomeFilters): SellerHomeFi
           validInteractionStates.has(state)
         )
       )
+    ),
+  };
+}
+
+function normalizeBuyerListingFilters(filters: BuyerHomeFilters): BuyerHomeFilters {
+  return {
+    searchValue: filters.searchValue?.trim() ?? "",
+    startDate: filters.startDate?.trim() ?? "",
+    endDate: filters.endDate?.trim() ?? "",
+    selectedChipIds: Array.from(
+      new Set((filters.selectedChipIds ?? []).map((code) => code.trim()).filter(Boolean))
     ),
   };
 }
@@ -200,11 +214,7 @@ export default function MarketplaceHubSectionScreen() {
   }>();
   const role = useMemo(() => parseRole(parseStringParam(params.role)), [params.role]);
   const isSeller = role === "seller";
-  const topContentInset =
-    insets.top +
-    (isSeller
-      ? SELLER_TOP_BAR_VISIBLE_HEIGHT
-      : DETAIL_TOP_BAR_VISIBLE_HEIGHT);
+  const topContentInset = insets.top + TOP_BAR_VISIBLE_HEIGHT;
   const title = useMemo(
     () => parseStringParam(params.title) || "Oportunidades para ti",
     [params.title]
@@ -221,7 +231,7 @@ export default function MarketplaceHubSectionScreen() {
     () => parseStringParam(params.description),
     [params.description]
   );
-  const buyerSortCode = useMemo(
+  const routeBuyerSortCode = useMemo(
     () =>
       parseStringParam(params.sortCode) ||
       DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
@@ -240,6 +250,12 @@ export default function MarketplaceHubSectionScreen() {
   );
   const [sellerFilters, setSellerFilters] =
     useState<SellerHomeFilters>(initialSellerFilters);
+  const [buyerFilters, setBuyerFilters] = useState<BuyerHomeFilters>(() =>
+    normalizeBuyerListingFilters(routeFilters as BuyerHomeFilters)
+  );
+  const [buyerStatusOptions, setBuyerStatusOptions] = useState<PurchaseRequestStatusUiOption[]>([]);
+  const [buyerSortCode, setBuyerSortCode] = useState(routeBuyerSortCode);
+  const [buyerSortConfig, setBuyerSortConfig] = useState<MarketplaceHubSortConfig | null>(null);
   const [sellerSortCode, setSellerSortCode] = useState(
     DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE
   );
@@ -256,7 +272,7 @@ export default function MarketplaceHubSectionScreen() {
   const [sellerCategoryOptions, setSellerCategoryOptions] = useState<
     SellerHomeFilterCategoryOption[]
   >([]);
-  const effectiveFilters = isSeller ? sellerFilters : routeFilters;
+  const effectiveFilters = isSeller ? sellerFilters : buyerFilters;
   const effectiveSortCode = isSeller ? sellerSortCode : buyerSortCode;
   const criteriaKey = useMemo(
     () =>
@@ -289,6 +305,27 @@ export default function MarketplaceHubSectionScreen() {
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const { favoriteIds, toggle: toggleFavorite } =
     usePurchaseRequestFavorites(role);
+
+  useEffect(() => {
+    if (isSeller) return;
+    const nextFilters = normalizeBuyerListingFilters(routeFilters as BuyerHomeFilters);
+    setBuyerFilters((current) =>
+      JSON.stringify(current) === JSON.stringify(nextFilters) ? current : nextFilters
+    );
+  }, [isSeller, routeFilters]);
+
+  useEffect(() => {
+    if (!isSeller) setBuyerSortCode(routeBuyerSortCode);
+  }, [isSeller, routeBuyerSortCode]);
+
+  useEffect(() => {
+    if (isSeller) return;
+    let active = true;
+    void getPurchaseRequestStatusUiOptions().then((result) => {
+      if (active && result.ok) setBuyerStatusOptions(result.data);
+    });
+    return () => { active = false; };
+  }, [isSeller]);
 
   useEffect(() => {
     itemsRef.current = items;
@@ -396,6 +433,11 @@ export default function MarketplaceHubSectionScreen() {
           if (result.data.sort.selected_code !== sellerSortCode) {
             setSellerSortCode(result.data.sort.selected_code);
           }
+        } else if (!isSeller) {
+          setBuyerSortConfig(result.data.sort);
+          if (result.data.sort && result.data.sort.selected_code !== buyerSortCode) {
+            setBuyerSortCode(result.data.sort.selected_code);
+          }
         }
       } else if (replace) {
         if (hadItems) {
@@ -417,6 +459,7 @@ export default function MarketplaceHubSectionScreen() {
     },
     [
       criteriaKey,
+      buyerSortCode,
       effectiveFilters,
       effectiveSortCode,
       isSeller,
@@ -478,13 +521,19 @@ export default function MarketplaceHubSectionScreen() {
   ]);
 
   const clearSearch = useCallback(() => {
-    setSellerFilters((current) => ({ ...current, searchValue: "" }));
-  }, []);
+    if (isSeller) setSellerFilters((current) => ({ ...current, searchValue: "" }));
+    else setBuyerFilters((current) => ({ ...current, searchValue: "" }));
+  }, [isSeller]);
 
   const clearAll = useCallback(() => {
-    setSellerFilters({ ...EMPTY_SELLER_HOME_FILTERS });
-    setSellerSortCode(DEFAULT_SELLER_MARKETPLACE_HUB_SORT_CODE);
-  }, []);
+    if (isSeller) {
+      setSellerFilters({ ...EMPTY_SELLER_HOME_FILTERS });
+      setSellerSortCode(sellerSortPresentation.default_code);
+    } else {
+      setBuyerFilters({ ...EMPTY_BUYER_HOME_FILTERS });
+      setBuyerSortCode(buyerSortConfig?.default_code ?? DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE);
+    }
+  }, [buyerSortConfig?.default_code, isSeller, sellerSortPresentation.default_code]);
 
   const handleBackPress = useCallback(() => {
     if (router.canGoBack()) {
@@ -497,7 +546,47 @@ export default function MarketplaceHubSectionScreen() {
 
   useAndroidBackAction(handleBackPress);
 
-  const openSearchAndFilters = useCallback(() => {
+  const openSearchAndFilters = useCallback(async () => {
+    if (!isSeller) {
+      const result = buyerStatusOptions.length === 0
+        ? await getPurchaseRequestStatusUiOptions()
+        : null;
+      const statusOptions = result?.ok ? result.data : buyerStatusOptions;
+      if (result?.ok) setBuyerStatusOptions(statusOptions);
+
+      openPopup({
+        type: "filters",
+        title: "Filtros",
+        searchField: {
+          label: "Buscar solicitud",
+          placeholder: "Nombre, detalle, categoría o estado",
+          initialValue: buyerFilters.searchValue,
+        },
+        dateRangeField: {
+          label: "Rango de fechas",
+          startPlaceholder: "Desde",
+          endPlaceholder: "Hasta",
+          initialStartValue: buyerFilters.startDate,
+          initialEndValue: buyerFilters.endDate,
+        },
+        chipGroup: {
+          label: "Estado de la solicitud",
+          options: statusOptions.map((status) => ({
+            id: status.statusCode,
+            label: status.label,
+            styleCode: status.styleCode ?? undefined,
+          })),
+          initialSelectedIds: buyerFilters.selectedChipIds,
+        },
+        clearLabel: "Limpiar",
+        applyLabel: "Aplicar",
+        onDismiss: () => restoreAccessibilityFocus(filterButtonRef),
+        onClear: () => setBuyerFilters({ ...EMPTY_BUYER_HOME_FILTERS }),
+        onApply: (values) => setBuyerFilters(normalizeBuyerListingFilters(values)),
+      });
+      return;
+    }
+
     const chipGroups = [
       ...(sellerCategoryOptions.length > 1
         ? [
@@ -553,39 +642,76 @@ export default function MarketplaceHubSectionScreen() {
         );
       },
     });
-  }, [sellerCategoryOptions, sellerFilters]);
+  }, [buyerFilters, buyerStatusOptions, isSeller, sellerCategoryOptions, sellerFilters]);
 
   const openSort = useCallback(() => {
-    if (sellerSortPresentation.options.length === 0) return;
+    const sortConfig = isSeller ? sellerSortPresentation : buyerSortConfig;
+    if (!sortConfig || sortConfig.options.length === 0) return;
 
     openPopup({
       type: "sort",
-      title: "Ordenar oportunidades",
-      options: sellerSortPresentation.options.map((option) => ({
+      title: isSeller ? "Ordenar oportunidades" : "Ordenar solicitudes",
+      options: sortConfig.options.map((option) => ({
         id: option.code,
         label: option.label,
       })),
-      initialSelectedId: sellerSortCode,
+      initialSelectedId: effectiveSortCode,
       onDismiss: () => restoreAccessibilityFocus(sortButtonRef),
       onSelect: (optionId) => {
-        setSellerSortCode(optionId);
+        if (isSeller) setSellerSortCode(optionId);
+        else setBuyerSortCode(optionId);
       },
     });
-  }, [sellerSortCode, sellerSortPresentation]);
+  }, [buyerSortConfig, effectiveSortCode, isSeller, sellerSortPresentation]);
 
+  const sortPresentation = isSeller ? sellerSortPresentation : buyerSortConfig;
   const selectedSortLabel =
-    sellerSortPresentation.options.find(
-      (option) => option.code === sellerSortCode
-    )?.label ?? "Recomendadas";
-  const activeFilterCount = countSellerFilterGroups(sellerFilters);
+    sortPresentation?.options.find((option) => option.code === effectiveSortCode)?.label ?? "Orden";
+  const activeFilterCount = isSeller
+    ? countSellerFilterGroups(sellerFilters)
+    : countBuyerHomeFilterGroups(buyerFilters);
   const hasActiveSellerFilters = hasSellerListingFilters(sellerFilters);
-  const hasCustomSellerSort =
-    sellerSortCode !==
-    sellerSortPresentation.default_code;
+  const hasActiveBuyerFilters = hasBuyerHomeFilters(buyerFilters);
+  const hasActiveFilters = isSeller ? hasActiveSellerFilters : hasActiveBuyerFilters;
+  const hasCustomSort = Boolean(sortPresentation && effectiveSortCode !== sortPresentation.default_code);
 
   const criteriaChips = useMemo<CriteriaChip[]>(() => {
-    if (!isSeller) return [];
     const chips: CriteriaChip[] = [];
+
+    if (!isSeller) {
+      if (buyerFilters.searchValue) {
+        chips.push({ id: "search", label: `“${buyerFilters.searchValue}”`, onRemove: clearSearch });
+      }
+      if (buyerFilters.startDate || buyerFilters.endDate) {
+        chips.push({
+          id: "date",
+          label: buyerFilters.startDate && buyerFilters.endDate
+            ? `${buyerFilters.startDate} – ${buyerFilters.endDate}`
+            : buyerFilters.startDate
+              ? `Desde ${buyerFilters.startDate}`
+              : `Hasta ${buyerFilters.endDate}`,
+          onRemove: () => setBuyerFilters((current) => ({ ...current, startDate: "", endDate: "" })),
+        });
+      }
+      buyerFilters.selectedChipIds.forEach((statusCode) => {
+        chips.push({
+          id: `status-${statusCode}`,
+          label: buyerStatusOptions.find((status) => status.statusCode === statusCode)?.label ?? "Estado",
+          onRemove: () => setBuyerFilters((current) => ({
+            ...current,
+            selectedChipIds: current.selectedChipIds.filter((code) => code !== statusCode),
+          })),
+        });
+      });
+      if (hasCustomSort) {
+        chips.push({
+          id: "sort",
+          label: selectedSortLabel,
+          onRemove: () => setBuyerSortCode(buyerSortConfig?.default_code ?? DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE),
+        });
+      }
+      return chips;
+    }
 
     if (sellerFilters.searchValue) {
       chips.push({
@@ -648,7 +774,7 @@ export default function MarketplaceHubSectionScreen() {
       });
     });
 
-    if (hasCustomSellerSort) {
+    if (hasCustomSort) {
       chips.push({
         id: "sort",
         label: selectedSortLabel,
@@ -660,7 +786,10 @@ export default function MarketplaceHubSectionScreen() {
     return chips;
   }, [
     clearSearch,
-    hasCustomSellerSort,
+    buyerFilters,
+    buyerSortConfig?.default_code,
+    buyerStatusOptions,
+    hasCustomSort,
     isSeller,
     selectedSortLabel,
     sellerCategoryOptions,
@@ -683,7 +812,7 @@ export default function MarketplaceHubSectionScreen() {
         >
           {total} {total === 1 ? "solicitud" : "solicitudes"}
         </Text>
-        {isSeller && (hasActiveSellerFilters || hasCustomSellerSort) ? (
+        {hasActiveFilters || hasCustomSort ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Limpiar todos los filtros y el orden"
@@ -736,7 +865,7 @@ export default function MarketplaceHubSectionScreen() {
     <View style={s.emptyStateWrapper}>
       <StandaloneListEmptyState
         icon="alert-circle"
-        title="No pudimos cargar las oportunidades"
+        title={isSeller ? "No pudimos cargar las oportunidades" : "No pudimos cargar las solicitudes"}
         description={initialError}
         actionLabel="Reintentar"
         onAction={() => void loadPage(1, true)}
@@ -745,25 +874,27 @@ export default function MarketplaceHubSectionScreen() {
   ) : (
     <View style={s.emptyStateWrapper}>
       <StandaloneListEmptyState
-        icon={isSeller && hasActiveSellerFilters ? "search" : "folder-closed"}
+        icon={hasActiveFilters ? "search" : "folder-closed"}
         title={
-          isSeller && hasActiveSellerFilters
-            ? "No encontramos oportunidades"
-            : "No hay oportunidades disponibles"
+          hasActiveFilters
+            ? isSeller ? "No encontramos oportunidades" : "No encontramos solicitudes"
+            : isSeller ? "No hay oportunidades disponibles" : "No hay solicitudes disponibles"
         }
         description={
-          isSeller && hasActiveSellerFilters
+          hasActiveFilters
             ? "Prueba cambiando la búsqueda o limpiando los filtros."
-            : "Cuando aparezcan nuevas solicitudes para ti, las verás aquí."
+            : isSeller
+              ? "Cuando aparezcan nuevas solicitudes para ti, las verás aquí."
+              : "Tus solicitudes aparecerán aquí."
         }
         actionLabel={
-          isSeller && hasActiveSellerFilters ? "Limpiar filtros" : null
+          hasActiveFilters ? "Limpiar filtros" : null
         }
         actionIcon={
-          isSeller && hasActiveSellerFilters ? "x" : undefined
+          hasActiveFilters ? "x" : undefined
         }
         onAction={
-          isSeller && hasActiveSellerFilters ? clearAll : undefined
+          hasActiveFilters ? clearAll : undefined
         }
       />
     </View>
@@ -810,89 +941,91 @@ export default function MarketplaceHubSectionScreen() {
 
   return (
     <View style={s.screen}>
-      {isSeller ? (
-        <GlassSurface
-          variant="chrome"
-          blur="chrome"
-          style={s.topBar}
-          clipStyle={s.topBarClip}
-          contentStyle={s.topBarContent}
-        >
-          <View style={s.topBarTitleRow}>
+      <GlassSurface
+        variant="chrome"
+        blur="chrome"
+        style={s.topBar}
+        clipStyle={s.topBarClip}
+        contentStyle={s.topBarContent}
+      >
+        <View style={s.topBarTitleRow}>
+          <Pressable
+            onPress={handleBackPress}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+            hitSlop={12}
+            style={s.topBarSide}
+          >
+            <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+          </Pressable>
+
+          <Text
+            variant="subtitle"
+            align="center"
+            maxLines={1}
+            accessibilityRole="header"
+            style={s.topBarTitle}
+          >
+            {title}
+          </Text>
+
+          <View style={s.topBarSide} />
+        </View>
+
+        <View style={s.topBarAccessory}>
+          <View style={s.toolbar}>
             <Pressable
-              onPress={handleBackPress}
+              ref={filterButtonRef}
               accessibilityRole="button"
-              accessibilityLabel="Volver"
-              hitSlop={12}
-              style={s.topBarSide}
+              accessibilityLabel={
+                activeFilterCount > 0
+                  ? `Buscar y filtrar ${isSeller ? "oportunidades" : "solicitudes"}. ${activeFilterCount} ${
+                      activeFilterCount === 1
+                        ? "filtro activo"
+                        : "filtros activos"
+                    }`
+                  : `Buscar y filtrar ${isSeller ? "oportunidades" : "solicitudes"}`
+              }
+              accessibilityHint={isSeller
+                ? "Busca por solicitud, categoría o nombre del comprador"
+                : "Busca por solicitud, categoría o estado"}
+              onPress={() => void openSearchAndFilters()}
+              style={s.searchTrigger}
             >
-              <Icon name="arrow-left" size={28} color={t.colors.textDark} />
+              <Icon
+                name="sliders-horizontal"
+                size={20}
+                color={t.colors.stateAnulated}
+              />
+              <Text
+                variant="body"
+                color="stateAnulated"
+                style={s.searchTriggerText}
+              >
+                {activeFilterCount > 0
+                  ? `Filtros activos (${activeFilterCount})`
+                  : "Buscar y filtrar"}
+              </Text>
             </Pressable>
 
-            <Text
-              variant="subtitle"
-              align="center"
-              maxLines={1}
-              accessibilityRole="header"
-              style={s.topBarTitle}
+            <Pressable
+              ref={sortButtonRef}
+              accessibilityRole="button"
+              accessibilityLabel={`Ordenar ${isSeller ? "oportunidades" : "solicitudes"}. Orden actual: ${selectedSortLabel}`}
+              accessibilityState={{ disabled: !sortPresentation || sortPresentation.options.length < 2 }}
+              disabled={!sortPresentation || sortPresentation.options.length < 2}
+              onPress={openSort}
+              style={s.sortButton}
             >
-              {title}
-            </Text>
-
-            <View style={s.topBarSide} />
+              <Icon
+                name="arrow-up-down"
+                size={24}
+                color={t.colors.stateAnulated}
+              />
+            </Pressable>
           </View>
-
-          <View style={s.topBarAccessory}>
-            <View style={s.toolbar}>
-              <Pressable
-                ref={filterButtonRef}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  activeFilterCount > 0
-                    ? `Buscar y filtrar oportunidades. ${activeFilterCount} ${
-                        activeFilterCount === 1
-                          ? "filtro activo"
-                          : "filtros activos"
-                      }`
-                    : "Buscar y filtrar oportunidades"
-                }
-                accessibilityHint="Busca por solicitud, categoría o nombre del comprador"
-                onPress={openSearchAndFilters}
-                style={s.searchTrigger}
-              >
-                <Icon
-                  name="sliders-horizontal"
-                  size={20}
-                  color={t.colors.stateAnulated}
-                />
-                <Text
-                  variant="body"
-                  color="stateAnulated"
-                  style={s.searchTriggerText}
-                >
-                  {activeFilterCount > 0
-                    ? `Filtros activos (${activeFilterCount})`
-                    : "Buscar y filtrar"}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                ref={sortButtonRef}
-                accessibilityRole="button"
-                accessibilityLabel={`Ordenar oportunidades. Orden actual: ${selectedSortLabel}`}
-                onPress={openSort}
-                style={s.sortButton}
-              >
-                <Icon
-                  name="arrow-up-down"
-                  size={24}
-                  color={t.colors.stateAnulated}
-                />
-              </Pressable>
-            </View>
-          </View>
-        </GlassSurface>
-      ) : null}
+        </View>
+      </GlassSurface>
 
       <FlatList
         ref={listRef}
@@ -951,7 +1084,7 @@ function createStyles(t: Theme, topInset: number) {
       right: 0,
       zIndex: 10,
       elevation: Platform.OS === "android" ? 4 : 10,
-      height: topInset + SELLER_TOP_BAR_VISIBLE_HEIGHT,
+      height: topInset + TOP_BAR_VISIBLE_HEIGHT,
       borderTopLeftRadius: 0,
       borderTopRightRadius: 0,
       borderBottomLeftRadius: t.glass.radius.chrome,

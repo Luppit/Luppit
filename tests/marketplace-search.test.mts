@@ -113,6 +113,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
       getCurrentBuyerMarketplaceHub: request, getCurrentSellerMarketplaceHub: request,
       getCurrentBuyerMarketplaceHubItems: request, getCurrentSellerMarketplaceHubItems: request,
       getCurrentSellerHomeFilterCategoryOptions: async () => ({ ok: true, data: [{ id: "furniture", label: "Muebles" }, { id: "office", label: "Oficina" }] }),
+      getPurchaseRequestStatusUiOptions: async () => ({ ok: true, data: [{ statusCode: "active", label: "Activa", styleCode: null }] }),
     },
     "@/src/services/popup.service": { openPopup: (config: any) => { popup = config; } },
     "@/src/utils/useToast": { showError() {} },
@@ -133,6 +134,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   const component = listing ? exports.default : role === "buyer" ? exports.BuyerHomeContent : exports.SellerHomeContent;
   return {
     ...runtime, calls, routes, params, modules, exports, filterService, emptyFilters,
+    getPopup: () => popup,
     screen: () => runtime.render(component),
     setFilters(filters: any) { (role === "buyer" ? buyerFilters.setBuyerHomeFilters : sellerFilters.setSellerHomeFilters)(filters); },
     setSegment(value: string) { segment = value; segmentListener(value); },
@@ -320,11 +322,52 @@ test("buyer listing keeps filters and sorting across pages and resets when route
   assert.deepEqual(plain(f.calls[1].args), [filters, "todas", "all", "request_newest", 2, 20]);
   resolve(f.calls[1], { items: [item("b", "office")], total: 2, page: 2, has_more: false }); await flush();
   assert.deepEqual(plain(list().props.data.map((row: any) => row.id)), ["a", "b"]);
-  f.params.filters = JSON.stringify({ ...filters, searchValue: "" }); f.screen(); await flush();
+  f.params.filters = JSON.stringify({ ...filters, searchValue: "" }); f.screen(); await flush(); f.screen(); await flush();
   assert.equal(list().props.data.length, 0);
   assert.equal(f.calls[2].args[0].searchValue, "");
   assert.deepEqual(plain(f.calls[2].args[0].selectedChipIds), ["active"]);
   assert.equal(f.calls[2].args[4], 1);
+});
+
+test("buyer listing applies RPC filters and sort options across pages", async (t) => {
+  const f = fixture("buyer", true); t.after(f.cleanup);
+  const sort = {
+    default_code: "request_newest", selected_code: "request_newest",
+    options: [
+      { code: "request_newest", label: "Más recientes", sort_order: 10 },
+      { code: "request_oldest", label: "Más antiguas", sort_order: 20 },
+    ],
+  };
+  f.screen(); await flush();
+  resolve(f.calls[0], { items: [item("a")], total: 2, page: 1, has_more: true, sort });
+  await flush();
+  let tree = f.screen();
+  const filterButton = nodes(tree).find((node) => node.props.accessibilityHint === "Busca por solicitud, categoría o estado")!;
+  filterButton.props.onPress(); await flush();
+  assert.equal(f.getPopup().chipGroup.options[0].label, "Activa");
+  f.getPopup().onApply({ searchValue: "mesa", startDate: "", endDate: "", selectedChipIds: ["active"] });
+  f.screen(); await flush();
+  assert.deepEqual(plain(f.calls[1].args), [
+    { searchValue: "mesa", startDate: "", endDate: "", selectedChipIds: ["active"] },
+    "todas", "all", "request_newest", 1, 20,
+  ]);
+  resolve(f.calls[1], { items: [item("b")], total: 2, page: 1, has_more: true, sort });
+  await flush(); tree = f.screen();
+  const listHeader = nodes(tree).find((node) => node.type === "FlatList")!.props.ListHeaderComponent;
+  assert.ok(nodes(listHeader).some((node) => node.type === "LuppitChip" && node.props.label === "Activa"));
+  nodes(tree).find((node) => node.props.accessibilityLabel?.startsWith("Ordenar solicitudes."))!.props.onPress();
+  assert.deepEqual(f.getPopup().options.map((option: any) => option.label), ["Más recientes", "Más antiguas"]);
+  f.getPopup().onSelect("request_oldest");
+  f.screen(); await flush();
+  assert.equal(f.calls[2].args[3], "request_oldest");
+  resolve(f.calls[2], { items: [item("b")], total: 2, page: 1, has_more: true, sort: { ...sort, selected_code: "request_oldest" } });
+  await flush(); tree = f.screen();
+  nodes(tree).find((node) => node.type === "FlatList")!.props.onEndReached();
+  f.screen(); await flush();
+  assert.deepEqual(plain(f.calls[3].args), [
+    { searchValue: "mesa", startDate: "", endDate: "", selectedChipIds: ["active"] },
+    "todas", "all", "request_oldest", 2, 20,
+  ]);
 });
 
 test("a populated selected stage stays selected and RPC failure is retryable", async (t) => {
