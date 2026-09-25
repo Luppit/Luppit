@@ -37,6 +37,7 @@ export function buildConversationOfferSummary(
   const options = Array.isArray(context.fulfillment_options)
     ? context.fulfillment_options
     : [];
+  const deliveryOptions: string[] = [];
   for (const raw of options) {
     if (!raw || typeof raw !== "object") continue;
     const option = raw as Record<string, unknown>;
@@ -85,10 +86,13 @@ export function buildConversationOfferSummary(
         `Retiro: ${pickup.pickup_after_days} día(s) desde la confirmación del vendedor.`,
       );
     }
-    rows.push({
-      label: selected ? `${label} · Seleccionado` : label,
-      value: details.join("\n") || label,
-    });
+    const optionLabel = selected ? `${label} · Seleccionado` : label;
+    deliveryOptions.push(
+      [`• ${optionLabel}`, ...details.map((detail) => `  ${detail}`)].join("\n"),
+    );
+  }
+  if (deliveryOptions.length > 0) {
+    rows.push({ label: "Opciones de entrega", value: deliveryOptions.join("\n") });
   }
   if (options.length === 0) {
     const delivery = displayText(context.delivery_type);

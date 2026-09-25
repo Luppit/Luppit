@@ -115,13 +115,26 @@ test("both delivery methods and supplied costs/timing survive with explicit sele
       },
     ],
   });
-  assert.equal(summary.rows[3].label, "Envío");
+  assert.equal(summary.rows[3].label, "Opciones de entrega");
   assert.equal(
     summary.rows[3].value,
-    "Costo de envío no especificado\nCoordinar entrega",
+    "• Envío\n  Costo de envío no especificado\n  Coordinar entrega\n" +
+      "• Retiro en tienda · Seleccionado\n  Disponible en 2 días\n  Total: ₡160,000",
   );
-  assert.equal(summary.rows[4].label, "Retiro en tienda · Seleccionado");
-  assert.equal(summary.rows[4].value, "Disponible en 2 días\nTotal: ₡160,000");
+  assert.equal(summary.rows.length, 4);
+});
+
+test("delivery options without details appear once under a shared heading", () => {
+  const summary = buildConversationOfferSummary({
+    ...context,
+    fulfillment_options: [
+      { catalog_id: "shipping", label: "Envío" },
+      { catalog_id: "pickup", label: "Recoger en tienda" },
+    ],
+  });
+  assert.equal(summary.rows[3].label, "Opciones de entrega");
+  assert.equal(summary.rows[3].value, "• Envío\n• Recoger en tienda");
+  assert.equal(summary.rows.length, 4);
 });
 
 test("total pricing and missing optional fields do not invent quantities or delivery promises", () => {
@@ -161,12 +174,10 @@ test("full summary retains stored optional fulfillment details omitted by accept
   });
   assert.equal(
     summary.rows[3].value,
-    "Costo de envío: ₡0\nEntrega: hasta 3 día(s) desde el envío.",
+    "• Envío\n  Costo de envío: ₡0\n  Entrega: hasta 3 día(s) desde el envío.\n" +
+      "• Retiro en tienda\n  Retiro: 0 día(s) desde la confirmación del vendedor.",
   );
-  assert.equal(
-    summary.rows[4].value,
-    "Retiro: 0 día(s) desde la confirmación del vendedor.",
-  );
+  assert.equal(summary.rows.length, 4);
 });
 
 const serviceSource = readFileSync(
