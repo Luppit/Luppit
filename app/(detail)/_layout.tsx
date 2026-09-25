@@ -87,7 +87,10 @@ export default function DetailLayout() {
       <View
         style={{
           flex: 1,
-          paddingHorizontal: completedRequestsOwnsTopBar ? 0 : t.spacing.md,
+          paddingHorizontal:
+            marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar
+              ? 0
+              : t.spacing.md,
         }}
       >
         <Stack

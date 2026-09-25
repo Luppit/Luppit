@@ -947,8 +947,8 @@ function createStyles(t: Theme, topInset: number) {
     topBar: {
       position: "absolute",
       top: 0,
-      left: -t.spacing.md,
-      right: -t.spacing.md,
+      left: 0,
+      right: 0,
       zIndex: 10,
       elevation: Platform.OS === "android" ? 4 : 10,
       height: topInset + SELLER_TOP_BAR_VISIBLE_HEIGHT,
@@ -1018,6 +1018,7 @@ function createStyles(t: Theme, topInset: number) {
     listContent: {
       flexGrow: 1,
       gap: t.spacing.md,
+      paddingHorizontal: t.spacing.md,
       paddingBottom: t.spacing.xl,
     },
     listHeader: {
