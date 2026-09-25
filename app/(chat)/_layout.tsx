@@ -160,7 +160,6 @@ function ChatLayoutContent() {
             <InputChat
               key={draftResetKey}
               onDraftChange={setHasComposerDraft}
-              clearOnSendStart
               sendOnReturn={false}
               autoFocus={!isRestoring && canCompose && messages.length === 0}
               disabled={!canCompose}
@@ -170,9 +169,7 @@ function ChatLayoutContent() {
                 uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
               }
               maxImages={3}
-              onSend={({ text, images }) => {
-                void sendMessage({ text, images });
-              }}
+              onSend={({ text, images }) => sendMessage({ text, images })}
             />
           </View>
         ) : null}

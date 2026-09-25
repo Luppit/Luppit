@@ -236,7 +236,6 @@ test("composer reports unsaved content and keeps the leave guard active until se
   const changes: boolean[] = [];
   const pending = deferred<void>();
   const composer = createComposer({
-    clearOnSendStart: true,
     onDraftChange: (hasDraft) => changes.push(hasDraft),
     onSend: () => pending.promise,
   });
@@ -244,12 +243,52 @@ test("composer reports unsaved content and keeps the leave guard active until se
   void composer.nodes;
   assert.equal(changes.at(-1), true);
   const sent = composer.action.onPress();
-  assert.equal(composer.input.value, "");
+  assert.equal(composer.input.value, "Solicitud sin enviar");
   assert.equal(changes.at(-1), true);
   pending.resolve();
   await sent;
+  assert.equal(composer.input.value, "");
   void composer.nodes;
   assert.equal(changes.at(-1), false);
+});
+
+test("keyboard submit and app send share one in-flight send and clear after success", async () => {
+  const pending = deferred<void>();
+  const payloads: Parameters<InputChatProps["onSend"]>[0][] = [];
+  const composer = createComposer({ onSend: (payload) => { payloads.push(payload); return pending.promise; } });
+  composer.input.onChangeText("Llantas");
+  assert.equal(composer.input.submitBehavior, "submit");
+  assert.equal(composer.input.onKeyPress, undefined);
+  const keyboardSend = composer.input.onSubmitEditing();
+  composer.action.onPress();
+  composer.input.onSubmitEditing();
+  assert.equal(payloads.length, 1);
+  assert.equal(composer.input.value, "Llantas");
+  pending.resolve();
+  await keyboardSend;
+  assert.equal(composer.input.value, "");
+  assert.equal(composer.action.disabled, true);
+  assert.equal(payloads[0].text, "Llantas");
+});
+
+test("failed keyboard send retains text and images for retry", async () => {
+  const image = { uri: "file:///retry.jpg" };
+  const pending = deferred<void>();
+  const composer = createComposer({ onPickImages: () => [image], onSend: () => pending.promise });
+  await composer.nodes.find((node) => node.props.accessibilityLabel === "Adjuntar imágenes")!.props.onPress();
+  composer.input.onChangeText("Foto de las llantas");
+  const keyboardSend = composer.input.onSubmitEditing();
+  pending.reject(new Error("network failed"));
+  await keyboardSend;
+  assert.equal(composer.input.value, "Foto de las llantas");
+  assert.equal(composer.nodes.find((node) => node.type === "Image")!.props.source.uri, image.uri);
+  assert.equal(composer.action.disabled, false);
+});
+
+test("buyer composer keeps return as newline", () => {
+  const composer = createComposer({ sendOnReturn: false });
+  assert.equal(composer.input.submitBehavior, "newline");
+  assert.equal(composer.input.onSubmitEditing, undefined);
 });
 
 test("shared conversation callers can still preview and send an image without text", async () => {
@@ -296,7 +335,7 @@ test("composer releases its internal busy state when sending throws", async () =
   composer.input.onChangeText("Llantas");
   const sending = composer.action.onPress();
   response.reject(new Error("network failed"));
-  await assert.rejects(sending, /network failed/);
+  await sending;
   assert.equal(composer.action.accessibilityLabel, "Enviar mensaje");
   assert.equal(composer.action.disabled, false);
   assert.equal(composer.input.value, "Llantas");
@@ -353,7 +392,7 @@ test("service failure restores compose and preserves the failed request for retr
   const session = await createSession();
   const pending = session.state.sendMessage({ text: "Llantas", images: [] });
   session.calls[0].response.resolve({ ok: false, error: { code: "AI_TEMPORARILY_UNAVAILABLE", message: "Intenta de nuevo" } } as Result);
-  await pending;
+  await assert.rejects(pending, /Purchase request message failed/);
   assert.equal(session.state.canCompose, true);
   assert.equal(session.errors.length, 1);
   const failed = session.state.messages[0];
@@ -399,7 +438,7 @@ test("CONTINUE forwards the latest draft ID and retry preserves the dispatched p
     error: { type: "network", message: "Intenta de nuevo" },
     statusCode: 503, requestId: null, retryAfterSeconds: null, backendMessage: null,
   });
-  await pending;
+  await assert.rejects(pending, /Purchase request message failed/);
 
   const failed = session.state.messages.at(-1)!;
   assert.equal(failed.failedRequests?.[0].draft_id, "draft-latest");
@@ -573,7 +612,7 @@ test("Bug25 restored buyer draft keeps refusals and mixed edits on the message p
       assert.equal(call.input.prompt, text);
       assert.equal(call.input.draft_id, "draft-1");
       call.response.resolve({ ok: false, error: { code: "AI_TEMPORARILY_UNAVAILABLE", message: "Intenta de nuevo" } } as Result);
-      await sending;
+      await assert.rejects(sending, /Purchase request message failed/);
       const retry = session.state.retryMessage(session.state.messages.at(-1)!.id);
       const retried = session.calls.at(-1)!;
       assert.equal(retried.input.client_request_id, call.input.client_request_id);
@@ -616,7 +655,8 @@ test("buyer upload failure and stop retain the original image request for retry"
       ok: false, error: { type: "network", message: "No se pudo subir la imagen." },
       statusCode: 500, requestId: null, retryAfterSeconds: null, backendMessage: null,
     });
-    await pending;
+    if (stop) await pending;
+    else await assert.rejects(pending, /Purchase request message failed/);
     assert.equal(session.state.messages.length, 1);
     assert.deepEqual(session.state.messages[0].images, images);
     const retry = session.state.retryMessage(session.state.messages[0].id);

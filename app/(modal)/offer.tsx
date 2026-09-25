@@ -693,7 +693,7 @@ function OfferAssistantScreen({
     async ({ text, images }: { text: string; images: ChatImage[] }) => {
       if (!conversationId) {
         showError("No se pudo crear la oferta", "No encontramos la conversación asociada.");
-        return;
+        throw new Error("Seller offer conversation unavailable");
       }
 
       if (!initialized) return;
@@ -727,12 +727,13 @@ function OfferAssistantScreen({
       ]);
 
       if (shouldOpenSummary) {
-        await executeAssistantRequest({
+        const result = await executeAssistantRequest({
           prompt: userText,
           offerDraftId,
           uiAction: "SHOW_SUMMARY",
           identity: createSellerOfferAssistantRequestIdentity("seller-offer-summary"),
         });
+        if (!result?.ok) throw new Error("Seller offer message failed");
         return;
       }
 
@@ -745,7 +746,8 @@ function OfferAssistantScreen({
         identity: createSellerOfferAssistantRequestIdentity("seller-offer-message"),
       };
 
-      await executeAssistantRequest(input, images.length);
+      const result = await executeAssistantRequest(input, images.length);
+      if (!result?.ok) throw new Error("Seller offer message failed");
     },
     [
       clearReviewState,
@@ -1050,7 +1052,6 @@ function OfferAssistantScreen({
         <InputChat
           key={draftResetKey}
           onDraftChange={setHasComposerDraft}
-          clearOnSendStart
           autoFocus={!isEditMode && messages.length === 0}
           disabled={isBusy || !initialized || status === "sent" || status === "cancelled"}
           busy={isBusy}
@@ -1062,9 +1063,7 @@ function OfferAssistantScreen({
               ? "Escribe un cambio"
               : isEditMode ? "¿Qué quieres cambiar?" : "Describe tu oferta o adjunta fotos reales"
           }
-          onSend={(payload) => {
-            void handleSend(payload);
-          }}
+          onSend={handleSend}
         />
       </View>
     </View>
@@ -1093,7 +1092,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
   const scrollRef = useRef<ScrollView>(null);
 
   const run = useCallback(async (input: SellerOfferAssistantRequest) => {
-    if (activeRequestRef.current) return;
+    if (activeRequestRef.current) return false;
     const controller = new AbortController();
     activeRequestRef.current = controller;
     activeInputRef.current = input;
@@ -1106,11 +1105,11 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
     };
     try {
       const result = await callSellerOfferAssistant(request);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) return false;
       if (!result.ok) {
         setPendingRetry(input);
         showError("No se pudieron preparar las ofertas", result.error.message);
-        return;
+        return false;
       }
       setPendingRetry(null);
       setInitialized(true);
@@ -1134,11 +1133,13 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
       if (result.status === "sent") setPublications(result.publications);
       if (result.status === "cancelled") router.back();
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      return true;
     } catch {
       if (!controller.signal.aborted) {
         setPendingRetry(input);
         showError("No se pudieron preparar las ofertas", "Reintenta en un momento.");
       }
+      return false;
     } finally {
       if (activeRequestRef.current === controller) {
         activeRequestRef.current = null;
@@ -1154,15 +1155,16 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
     return () => { activeRequestRef.current?.abort(); };
   }, [conversationId, run]);
 
-  const handleSend = ({ text, images }: { text: string; images: ChatImage[] }) => {
+  const handleSend = async ({ text, images }: { text: string; images: ChatImage[] }) => {
     if (!initialized || status === "sent") return;
     const prompt = text.trim();
     if (!prompt && !images.length) return;
     setMessages((current) => [...current, {
       id: createLocalId("user"), sender: "user", text: prompt, images,
     }]);
-    void run({ prompt, images, offerDraftId: draftIdRef.current,
+    const sent = await run({ prompt, images, offerDraftId: draftIdRef.current,
       identity: createSellerOfferAssistantRequestIdentity("seller-offer-batch-message") });
+    if (!sent) throw new Error("Seller offer batch message failed");
   };
 
   const publish = () => {
@@ -1251,7 +1253,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
     {status !== "sent" ? <View style={{ paddingTop: t.spacing.sm,
       paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, t.spacing.md)
         : Platform.OS === "android" && !isAndroidKeyboardVisible ? Math.max(insets.bottom, t.spacing.sm) : t.spacing.sm,
-    }}><InputChat disabled={!initialized || busy} busy={busy} clearOnSendStart
+    }}><InputChat disabled={!initialized || busy} busy={busy}
       onStop={() => {
         if (activeInputRef.current) setPendingRetry(activeInputRef.current);
         activeRequestRef.current?.abort();

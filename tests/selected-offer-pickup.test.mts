@@ -104,6 +104,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
   let popupState: any = { config: null, visible: false };
   const reads: ReturnType<typeof deferred>[] = [];
   const executions: ReturnType<typeof deferred>[] = [];
+  const messageSends: ReturnType<typeof deferred>[] = [];
   let focus: Function | undefined;
   let blur: Function | undefined;
   let onAppState: Function | undefined;
@@ -175,7 +176,9 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     "@/src/components/loading/LoadingState": nativeComponent("LoadingState"),
     "@/src/lib/supabase": { getSession: async () => null },
     "@/src/lib/supabase/client": { supabase: { realtime: { setAuth: async () => {} }, channel: () => channel, removeChannel() {} } },
-    "@/src/services/conversation.message.service": { createConversationMessageGroupId() {}, createConversationMessages() { throw new Error("No messages allowed in fixture"); } },
+    "@/src/services/conversation.message.service": { createConversationMessageGroupId: () => "message-group", createConversationMessages() {
+      const send = deferred(); messageSends.push(send); return send.promise;
+    } },
     "@/src/services/conversation.service": { ...modules["@/src/services/conversation.service"], getCurrentProfileConversationById: async () => ({ ok: true, data: { request_title: "Synthetic request" } }) },
     "@/src/services/toast.service": { clearToastBottomInset() {}, setToastBottomInset() {} },
     "@/src/utils/conversationOfferPrice": { formatConversationOfferPrice: () => null },
@@ -188,7 +191,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     refreshConversation: async () => { calls.push("refreshConversation"); },
     onMessagesRefresh: () => calls.push("messagesRefresh"), onConversationPurged: async () => { calls.push("purged"); },
   };
-  return { ...h, calls, reads, executions, popups, props, shared,
+  return { ...h, calls, reads, executions, messageSends, popups, props, shared,
     focus: () => focus?.(), blur: () => blur?.(), appState: (state: string) => onAppState?.(state),
     draw: () => h.render(() => component(props)),
     drawConversation: () => h.render(() => conversation()),
@@ -652,6 +655,28 @@ test("conversation action bubble includes ordered TOP and AUX actions independen
     assert.equal(executions(f).length, 0, "The same configured confirmation must still run first");
     assert.equal(f.popups.at(-1).title, actions[3].confirmation.title);
   }
+});
+
+test("conversation send waits for the service and rejects a failed message", async () => {
+  const f = fixture();
+  f.drawConversation();
+  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true } }));
+  await flush();
+  const composer = () => nodes(f.drawConversation()).find((node) => node.type === "InputChat")!.props;
+  const failed = composer().onSend({ text: "Llantas", images: [] });
+  assert.equal(f.messageSends.length, 1);
+  assert.equal(f.drawConversation().props.value.optimisticMessages.length, 1);
+  f.messageSends[0].resolve({ ok: false, error: { message: "Sin conexión" } });
+  await assert.rejects(failed);
+  assert.equal(f.drawConversation().props.value.optimisticMessages.length, 0);
+  assert.ok(f.calls.some((call) => call[0] === "showError" && call[2] === "Sin conexión"));
+
+  const sent = composer().onSend({ text: "Ahora sí", images: [] });
+  assert.equal(f.messageSends.length, 2);
+  const saved = { id: "saved", text: "Ahora sí" };
+  f.messageSends[1].resolve({ ok: true, data: [saved] });
+  await sent;
+  assert.equal(f.drawConversation().props.value.optimisticMessages[0].id, "saved");
 });
 
 test("an open acceptance confirmation closes when the offer revision changes", () => {

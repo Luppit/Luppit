@@ -302,7 +302,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
 
   const executeMessageRequests = useCallback(
     async (messageId: string, requests: PurchaseRequestAssistantRequest[]) => {
-      if (activeRequestRef.current || !sessionReadyRef.current) return;
+      if (activeRequestRef.current || !sessionReadyRef.current) return true;
 
       const pendingRequests = requests.map((request) => ({ ...request }));
       const requestSequence = ++requestSequenceRef.current;
@@ -332,7 +332,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
                 )
               );
             }
-            return;
+            return true;
           }
 
           await syncAssistantState(result, {
@@ -342,7 +342,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
             requestController.signal.aborted ||
             activeRequestRef.current !== requestController
           ) {
-            return;
+            return true;
           }
           if (!result.ok) {
             if (
@@ -357,7 +357,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
                 )
               );
             }
-            return;
+            return false;
           }
           if (result.status === "published" || result.status === "cancelled") break;
           if (result.draftId) {
@@ -375,6 +375,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
             )
           );
         }
+        return true;
       } finally {
         if (activeRequestRef.current === requestController) {
           activeRequestRef.current = null;
@@ -430,7 +431,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
           ui_action: "SHOW_SUMMARY",
           ...createPurchaseRequestAssistantRequestIdentity("SHOW_SUMMARY"),
         });
-        await executeMessageRequests(messageId, requests);
+        if (!await executeMessageRequests(messageId, requests)) {
+          throw new Error("Purchase request message failed");
+        }
         return;
       }
 
@@ -449,7 +452,9 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
         images,
         ...createPurchaseRequestAssistantRequestIdentity("message"),
       });
-      await executeMessageRequests(messageId, requests);
+      if (!await executeMessageRequests(messageId, requests)) {
+        throw new Error("Purchase request message failed");
+      }
     },
     [
       draftId,

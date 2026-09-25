@@ -736,9 +736,8 @@ export default function ConversationLayout() {
               >
                 <InputChat
                   onDraftChange={setHasComposerDraft}
-                  clearOnSendStart
                   placeholder="Escribe un mensaje"
-                  onSend={({ text, images }) => {
+                  onSend={async ({ text, images }) => {
                     const messageGroupId = createConversationMessageGroupId();
                     const outgoingMessages = buildOptimisticMessages(
                       text,
@@ -756,41 +755,43 @@ export default function ConversationLayout() {
                     ]);
 
                     setPendingMessageCount((current) => current + 1);
-                    void (async () => {
+                    try {
+                      let created;
                       try {
-                        const created = await createConversationMessages({
+                        created = await createConversationMessages({
                           conversationId,
                           text,
                           images,
                           messageGroupId,
                         });
-
-                        if (!created.ok) {
-                          clearOptimisticMessages(outgoingMessageIds);
-                          showError(
-                            "No se pudo enviar el mensaje",
-                            created.error.message
-                          );
-                          return;
-                        }
-
-                        setOptimisticMessages((current) => [
-                          ...current.filter(
-                            (message) => !outgoingMessageIds.includes(message.id)
-                          ),
-                          ...created.data,
-                        ]);
-                        setMessageRefreshTick((prev) => prev + 1);
-                      } catch {
+                      } catch (error) {
                         clearOptimisticMessages(outgoingMessageIds);
                         showError(
                           "No se pudo enviar el mensaje",
                           "Ocurrió un error, intenta de nuevo."
                         );
-                      } finally {
-                        setPendingMessageCount((current) => Math.max(0, current - 1));
+                        throw error;
                       }
-                    })();
+
+                      if (!created.ok) {
+                        clearOptimisticMessages(outgoingMessageIds);
+                        showError(
+                          "No se pudo enviar el mensaje",
+                          created.error.message
+                        );
+                        throw created.error;
+                      }
+
+                      setOptimisticMessages((current) => [
+                        ...current.filter(
+                          (message) => !outgoingMessageIds.includes(message.id)
+                        ),
+                        ...created.data,
+                      ]);
+                      setMessageRefreshTick((prev) => prev + 1);
+                    } finally {
+                      setPendingMessageCount((current) => Math.max(0, current - 1));
+                    }
                   }}
                 />
               </View>

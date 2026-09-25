@@ -2,7 +2,6 @@ import { useTheme } from "@/src/themes";
 import * as ImagePicker from "expo-image-picker";
 import { ArrowUp, Paperclip, Square, X } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TextInputKeyPressEvent } from "react-native";
 import {
   Image,
   Pressable,
@@ -70,6 +69,7 @@ export default function InputChat({
   const [sending, setSending] = useState(false);
   const inputRef = useRef<TextInput>(null);
   const sendIdRef = useRef(0);
+  const sendingRef = useRef(false);
   const isBusy = busy || sending;
   const isBlocked = disabled || isBusy;
 
@@ -154,23 +154,26 @@ export default function InputChat({
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim();
-    if (isBlocked) return;
+    if (isBlocked || sendingRef.current) return;
     if (!trimmed && images.length === 0) return;
 
     const sendId = ++sendIdRef.current;
+    sendingRef.current = true;
     try {
       setSending(true);
       if (clearOnSend && clearOnSendStart) {
         clearInput();
       }
-
       await Promise.resolve(onSend({ text: trimmed, images }));
 
       if (sendIdRef.current === sendId && clearOnSend && !clearOnSendStart) {
         clearInput();
       }
+    } catch {
+      return;
     } finally {
       if (sendIdRef.current === sendId) {
+        sendingRef.current = false;
         setSending(false);
       }
     }
@@ -188,19 +191,10 @@ export default function InputChat({
     if (!isBusy || !onStop) return;
 
     sendIdRef.current += 1;
+    sendingRef.current = false;
     setSending(false);
     onStop();
   }, [isBusy, onStop]);
-
-  const handleKeyPress = useCallback(
-    (e: TextInputKeyPressEvent) => {
-      if (e.nativeEvent.key === "Enter") {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend],
-  );
 
   const handleTextChange = useCallback(
     (value: string) => {
@@ -266,9 +260,10 @@ export default function InputChat({
               autoFocus={autoFocus}
               multiline={true}
               returnKeyType={sendOnReturn ? "send" : "default"}
+              submitBehavior={sendOnReturn ? "submit" : "newline"}
               scrollEnabled
               textAlignVertical="top"
-              onKeyPress={sendOnReturn ? handleKeyPress : undefined}
+              onSubmitEditing={sendOnReturn ? handleSend : undefined}
             />
           </View>
 

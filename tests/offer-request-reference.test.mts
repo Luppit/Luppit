@@ -350,7 +350,7 @@ test("offer composer stops a pending image message, preserves its draft, and ign
   f.aiCalls[0].response.resolve(aiSuccess({ offerDraftId: "saved" })); await flush();
 
   const image = { uri: "file:///offer-photo.jpg" };
-  composer().onSend({ text: "Tengo 3 llantas", images: [image] });
+  const stoppedSend = composer().onSend({ text: "Tengo 3 llantas", images: [image] });
   assert.equal(composer().busy, true);
   assert.equal(composer().disabled, true);
   const progress = nodes(f.assistant()).find((n) => n.type === "Progress")!.props;
@@ -365,7 +365,9 @@ test("offer composer stops a pending image message, preserves its draft, and ign
 
   composer().onSend({ text: "Son 4 llantas", images: [] });
   assert.equal(f.aiCalls[2].input.offerDraftId, "saved");
-  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "stale", assistantMessage: "Late response" })); await flush();
+  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "stale", assistantMessage: "Late response" }));
+  await assert.rejects(stoppedSend, /Seller offer message failed/);
+  await flush();
   assert.equal(composer().busy, true);
   assert.equal(f.aiCalls[2].input.signal.aborted, false);
   const messages = nodes(f.assistant()).filter((n) => typeof n.type === "function" && n.type.name === "AssistantMessageBubble");
@@ -481,8 +483,9 @@ test("blocked summary stays in chat until an uploaded photo passes readiness", a
   assert.equal(assistantView(f).review, undefined);
   assert.match(assistantView(f).messages.at(-1).text, /Adjunta al menos una foto/);
   const photo = { uri: "file:///product.png" };
-  assistantView(f).composer.onSend({ text: "", images: [photo] });
+  const failedSend = assistantView(f).composer.onSend({ text: "", images: [photo] });
   f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await assert.rejects(failedSend, /Seller offer message failed/);
   await flush();
   assert.equal(assistantView(f).review, undefined);
   const retry = assistantView(f).tree.find((node) => node.type === "Pressable" && node.props.onPress)!;
@@ -685,12 +688,13 @@ for (const outcome of ["failed", "stopped", "unmounted"] as const) {
   test(`${outcome} offer summary preserves transcript and cannot apply a late review`, async () => {
     const f = screenFixture();
     await restoreReadyOffer(f);
-    assistantView(f).composer.onSend({ text: "Sí", images: [] });
+    const summarySend = assistantView(f).composer.onSend({ text: "Sí", images: [] });
     const call = f.aiCalls.at(-1)!;
     assert.equal(call.input.uiAction, "SHOW_SUMMARY");
     const before = assistantView(f).messages;
     if (outcome === "failed") {
       call.response.resolve(offerFailure);
+      await assert.rejects(summarySend, /Seller offer message failed/);
       await flush();
       const view = assistantView(f);
       assert.equal(view.review, undefined);
@@ -711,6 +715,7 @@ for (const outcome of ["failed", "stopped", "unmounted"] as const) {
         assistantView(f).composer.onSend({ text: "Ahora son 4", images: [] });
       }
       call.response.resolve(aiSuccess({ ...readyOffer, offerDraftId: "stale", assistantMessage: "Respuesta tardía" }));
+      await assert.rejects(summarySend, /Seller offer message failed/);
       await flush();
       const view = assistantView(f);
       assert.equal(view.review, undefined);
@@ -797,9 +802,10 @@ test("proposal review keeps effective photos through adjustment, failed upload, 
   await continuing;
   assert.equal(assistantView(f).review, undefined);
   const upload = { uri: "file:///new-product-photo.jpg" };
-  assistantView(f).composer.onSend({ text: "Agrega esta foto", images: [upload] });
+  const failedSend = assistantView(f).composer.onSend({ text: "Agrega esta foto", images: [upload] });
   const failedInput = f.aiCalls.at(-1)!.input;
   f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await assert.rejects(failedSend, /Seller offer message failed/);
   await flush();
   const context = () => assistantView(f).tree.find((n) => typeof n.type === "function" && n.type.name === "OfferEditContext")!.props;
   assert.equal(context().images, readyOffer.offerImages);
@@ -957,8 +963,9 @@ test("saved edit context survives continuing or failed turns without becoming a 
   await continueRequest;
   assert.equal(context().summary, readyOffer.summary);
   assert.equal(assistantView(f).review, undefined);
-  assistantView(f).composer.onSend({ text: "Cambia el precio", images: [] });
+  const failedSend = assistantView(f).composer.onSend({ text: "Cambia el precio", images: [] });
   f.aiCalls.at(-1)!.response.resolve(offerFailure);
+  await assert.rejects(failedSend, /Seller offer message failed/);
   await flush();
   assert.equal(context().summary, readyOffer.summary);
   assert.equal(assistantView(f).review, undefined);
@@ -1139,11 +1146,12 @@ test("offer discard removes failed upload retries and ignores stopped image repl
   for (const stopped of [false, true]) {
     const f = screenFixture();
     await restoreReadyOffer(f);
-    assistantView(f).composer.onSend({ text: "", images: [{ uri: "file:///old-photo.jpg" }] });
+    const oldSend = assistantView(f).composer.onSend({ text: "", images: [{ uri: "file:///old-photo.jpg" }] });
     const old = f.aiCalls.at(-1)!;
     if (stopped) assistantView(f).composer.onStop();
     else {
       old.response.resolve(offerFailure);
+      await assert.rejects(oldSend, /Seller offer message failed/);
       await flush();
     }
     const discard = confirmOfferDiscard(f)();
@@ -1154,6 +1162,7 @@ test("offer discard removes failed upload retries and ignores stopped image repl
     cleared.composer.onSend({ text: "Nueva oferta", images: [] });
     if (stopped) {
       old.response.resolve(aiSuccess({ ...readyOffer, uiState: "review", assistantMessage: "Respuesta vieja" }));
+      await assert.rejects(oldSend, /Seller offer message failed/);
       await flush();
     }
     assert.equal(assistantView(f).messages.length, 1);
