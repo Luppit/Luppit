@@ -812,7 +812,7 @@ export default function MarketplaceHubSectionScreen() {
         >
           {total} {total === 1 ? "solicitud" : "solicitudes"}
         </Text>
-        {hasActiveFilters || hasCustomSort ? (
+        {isSeller && (hasActiveFilters || hasCustomSort) ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Limpiar todos los filtros y el orden"

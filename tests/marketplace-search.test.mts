@@ -290,6 +290,7 @@ test("seller listing resets query pagination, ignores old pages, and preserves c
   f.screen(); await flush();
   resolve(f.calls[0], { items: [item("a"), item("b", "office")], total: 3, page: 1, has_more: true }); await flush();
   let tree = f.screen();
+  assert.match(text(list(tree).props.ListHeaderComponent), /Limpiar todo/);
   list(tree).props.onEndReached(); f.screen(); await flush();
   assert.deepEqual(plain(f.calls[1].args), [filters, "todas", "for_you", 2, 20, "recommended"]);
   f.applyListingFilters(tree, { ...filters, searchValue: "mesa", selectedCategoryIds: ["office"] });
@@ -355,6 +356,7 @@ test("buyer listing applies RPC filters and sort options across pages", async (t
   await flush(); tree = f.screen();
   const listHeader = nodes(tree).find((node) => node.type === "FlatList")!.props.ListHeaderComponent;
   assert.ok(nodes(listHeader).some((node) => node.type === "LuppitChip" && node.props.label === "Activa"));
+  assert.doesNotMatch(text(listHeader), /Limpiar todo/);
   nodes(tree).find((node) => node.props.accessibilityLabel?.startsWith("Ordenar solicitudes."))!.props.onPress();
   assert.deepEqual(f.getPopup().options.map((option: any) => option.label), ["Más recientes", "Más antiguas"]);
   f.getPopup().onSelect("request_oldest");
@@ -368,6 +370,14 @@ test("buyer listing applies RPC filters and sort options across pages", async (t
     { searchValue: "mesa", startDate: "", endDate: "", selectedChipIds: ["active"] },
     "todas", "all", "request_oldest", 2, 20,
   ]);
+  resolve(f.calls[3], { items: [item("c")], total: 2, page: 2, has_more: false, sort: { ...sort, selected_code: "request_oldest" } });
+  await flush(); tree = f.screen();
+  const searchChip = nodes(nodes(tree).find((node) => node.type === "FlatList")!.props.ListHeaderComponent)
+    .find((node) => node.type === "LuppitChip" && node.props.label === "“mesa”")!;
+  searchChip.props.onRemove(); f.screen(); await flush();
+  assert.equal(f.calls[4].args[0].searchValue, "");
+  assert.deepEqual(plain(f.calls[4].args[0].selectedChipIds), ["active"]);
+  assert.equal(f.calls[4].args[3], "request_oldest");
 });
 
 test("a populated selected stage stays selected and RPC failure is retryable", async (t) => {

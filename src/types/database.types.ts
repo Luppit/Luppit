@@ -4768,6 +4768,7 @@ export type Database = {
           p_profile_id: string
           p_search_text?: string
           p_segment_svg_name?: string
+          p_sort_code?: string
           p_stage_code?: string
           p_start_date?: string
           p_status_codes?: string[]
