@@ -2,13 +2,14 @@ import ConversationStatusSlotCard from "@/src/components/conversation/Conversati
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
 import {
   ConversationMessage,
   getConversationMessagesByConversationId,
 } from "@/src/services/conversation.message.service";
 import { getCurrentProfileConversationById } from "@/src/services/conversation.service";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useTheme } from "@/src/themes";
 import {
   buildConversationMessageRenderGroups,
@@ -54,6 +55,8 @@ async function getCounterpartDisplayNameByConversationId(conversationId: string)
 
 export default function ConversationChatScreen() {
   const t = useTheme();
+  const { activeProfile, refreshUnreadNotificationCount } = useActiveProfile();
+  const isFocused = useIsFocused();
   const {
     conversationId,
     profileId,
@@ -133,13 +136,22 @@ export default function ConversationChatScreen() {
     setMessages(result.data);
     clearOptimisticMessages(result.data.map((message) => message.id));
     setIsLoadingMessages(false);
+    if (activeProfile?.role === "seller") {
+      void refreshUnreadNotificationCount();
+    }
     if (result.data.length > 0) {
       scrollToBottom(false);
       setTimeout(() => {
         scrollToBottom(false);
       }, 120);
     }
-  }, [conversationId, scrollToBottom, clearOptimisticMessages]);
+  }, [
+    activeProfile?.role,
+    conversationId,
+    scrollToBottom,
+    clearOptimisticMessages,
+    refreshUnreadNotificationCount,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,8 +160,10 @@ export default function ConversationChatScreen() {
   );
 
   useEffect(() => {
-    void loadMessages();
-  }, [messageRefreshTick, loadMessages]);
+    if (activeProfile?.role !== "seller" || isFocused) {
+      void loadMessages();
+    }
+  }, [activeProfile?.role, isFocused, messageRefreshTick, loadMessages]);
 
   useEffect(() => {
     let active = true;
