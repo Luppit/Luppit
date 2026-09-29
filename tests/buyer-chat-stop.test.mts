@@ -858,7 +858,10 @@ test("an unsupported restored draft stays blocked but can be explicitly discarde
   assert.equal(session.state.canCompose, true);
 });
 
-function createLeaveLayout(platform: "ios" | "android", session?: Awaited<ReturnType<typeof createSession>>) {
+function createLeaveLayout(platform: "ios" | "android", session?: Awaited<ReturnType<typeof createSession>>, picker?: {
+  assets: { uri: string; mimeType: string; width: number; height: number; fileSize: number; fileName: string }[];
+  prepare: (image: { uri: string }) => Promise<unknown>;
+}) {
   const runtime = createHooks();
   const state: Record<string, any> = { title: "Crear solicitud", messages: [], uiState: "normal", status: "ready", draftId: "saved", showComposer: true, canCompose: true, isSendingMessage: false, isExecutingControl: false, isRestoring: false, discardDraft: async () => discardResult };
   let discardResult = false;
@@ -869,6 +872,8 @@ function createLeaveLayout(platform: "ios" | "android", session?: Awaited<Return
   const dispatched: unknown[] = [];
   const dismissals: unknown[] = [];
   const androidGuards: unknown[][] = [];
+  const pickerLimits: number[] = [];
+  const errors: unknown[][] = [];
   const navigation = { dispatch: (action: unknown) => dispatched.push(action) };
   const module = loadComponent<{ ChatLayoutContent: () => Element }>("../app/(chat)/_layout.tsx", {
     react: runtime.hooks,
@@ -881,8 +886,14 @@ function createLeaveLayout(platform: "ios" | "android", session?: Awaited<Return
     "./chat-session.context": { useChatSession: () => session?.state ?? state },
     "@/src/components/inputChat/inputChat": "InputChat",
     "@/src/components/inputChat/ChatKeyboardAvoidingView": "ChatKeyboardAvoidingView",
+    "@/src/services/purchase.request.image.service": { preparePurchaseRequestImage: picker?.prepare ?? (async (image: unknown) => image) },
     "@/src/services/role.service": { Roles: { BUYER: "BUYER" } },
     "@/src/services/toast.service": { clearToastBottomInset() {}, setToastBottomInset() {} },
+    "@/src/utils/useToast": { showError: (...args: unknown[]) => errors.push(args) },
+    "expo-image-picker": { requestMediaLibraryPermissionsAsync: async () => ({ granted: true }), launchImageLibraryAsync: async (options: { selectionLimit: number }) => {
+      pickerLimits.push(options.selectionLimit);
+      return picker ? { canceled: false, assets: picker.assets } : { canceled: true };
+    } },
     "@/src/services/user.role.service": { getCurrentUserRole() {} },
     "@/src/themes": { useTheme: () => ({ colors: {}, spacing: { sm: 8, md: 16 } }) },
     "expo-router": { Slot: "Slot", router: { dismissTo: (route: unknown) => dismissals.push(route) } },
@@ -890,13 +901,40 @@ function createLeaveLayout(platform: "ios" | "android", session?: Awaited<Return
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
   }, "ChatLayoutContent");
   const render = () => runtime.render(module.ChatLayoutContent);
-  return { state, dispatched, dismissals, androidGuards, render,
+  return { state, dispatched, dismissals, androidGuards, pickerLimits, errors, render,
     get popup() { return popup; }, get prevented() { return prevented; },
     attempt(action: unknown) { onPrevent({ data: { action } }); },
     setDiscardResult(value: boolean) { discardResult = value; },
     setHasPopup(value: boolean) { hasPopup = value; },
   };
 }
+
+test("buyer picker adds prepared photos beside existing previews within the three-image limit", async () => {
+  const asset = { uri: "file:///large.jpg", mimeType: "image/jpeg", width: 4000, height: 3000, fileSize: 5 * 1024 * 1024, fileName: "large.jpg" };
+  const layout = createLeaveLayout("ios", undefined, {
+    assets: [asset],
+    prepare: async (image) => ({ ...image, uri: "file:///prepared.jpg", size: 1024 * 1024 }),
+  });
+  const composer = elements(layout.render()).find((node) => node.type === "InputChat")!.props;
+  composer.onImagesChange([{ uri: "file:///existing.jpg" }]);
+  const images = await composer.onPickImages();
+  assert.deepEqual(layout.pickerLimits, [2]);
+  assert.equal(images.length, 2);
+  assert.equal(images[0].uri, "file:///existing.jpg");
+  assert.equal(images[1].uri, "file:///prepared.jpg");
+});
+
+test("buyer picker reports preparation failure without replacing existing attachments", async () => {
+  const asset = { uri: "file:///large.jpg", mimeType: "image/jpeg", width: 4000, height: 3000, fileSize: 5 * 1024 * 1024, fileName: "large.jpg" };
+  const layout = createLeaveLayout("ios", undefined, {
+    assets: [asset],
+    prepare: async () => { throw new Error("No se pudo reducir la imagen a 2 MB."); },
+  });
+  const composer = elements(layout.render()).find((node) => node.type === "InputChat")!.props;
+  composer.onImagesChange([{ uri: "file:///existing.jpg" }]);
+  assert.equal(await composer.onPickImages(), undefined);
+  assert.match(String(layout.errors[0][1]), /No se pudo reducir/);
+});
 
 for (const platform of ["ios", "android"] as const) {
   test(`${platform} saved-draft leave uses the shared popup and dispatches only after confirmed exit`, async () => {

@@ -8,8 +8,9 @@ import {
   ChatSessionProvider,
   useChatSession,
 } from "./chat-session.context";
-import InputChat from "@/src/components/inputChat/inputChat";
+import InputChat, { type ChatImage } from "@/src/components/inputChat/inputChat";
 import ChatKeyboardAvoidingView from "@/src/components/inputChat/ChatKeyboardAvoidingView";
+import { preparePurchaseRequestImage } from "@/src/services/purchase.request.image.service";
 import { Roles } from "@/src/services/role.service";
 import {
   clearToastBottomInset,
@@ -17,6 +18,8 @@ import {
 } from "@/src/services/toast.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useTheme } from "@/src/themes";
+import { showError } from "@/src/utils/useToast";
+import * as ImagePicker from "expo-image-picker";
 import { Redirect, Slot, router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -50,6 +53,9 @@ function ChatLayoutContent() {
   } = useChatSession();
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
+  const [isPreparingImages, setIsPreparingImages] = useState(false);
+  const selectedImagesRef = useRef<ChatImage[]>([]);
+  useEffect(() => { selectedImagesRef.current = []; }, [draftResetKey]);
   const navigation = useNavigation();
   const [exitAction, setExitAction] = useState<NavigationAction | null>(null);
   const handledExitRef = useRef<NavigationAction | null>(null);
@@ -99,6 +105,42 @@ function ChatLayoutContent() {
     },
     [t.spacing.sm]
   );
+
+  const pickImages = useCallback(async () => {
+    const remaining = 3 - selectedImagesRef.current.length;
+    if (remaining <= 0) return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return;
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.9,
+      });
+      if (result.canceled) return;
+
+      setIsPreparingImages(true);
+      const prepared: ChatImage[] = [];
+      for (const asset of result.assets) {
+        prepared.push(await preparePurchaseRequestImage({
+          uri: asset.uri,
+          mime: asset.mimeType ?? null,
+          width: asset.width ?? null,
+          height: asset.height ?? null,
+          size: asset.fileSize ?? null,
+          name: asset.fileName ?? null,
+        }));
+      }
+      return [...selectedImagesRef.current, ...prepared].slice(0, 3);
+    } catch (error) {
+      const message = error && typeof error === "object" && "message" in error && typeof error.message === "string"
+        ? error.message : "Vuelve a seleccionar la imagen.";
+      showError("No se pudo adjuntar la imagen", message);
+    } finally {
+      setIsPreparingImages(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!showComposer) {
@@ -162,7 +204,7 @@ function ChatLayoutContent() {
               onDraftChange={setHasComposerDraft}
               sendOnReturn={false}
               autoFocus={!isRestoring && canCompose && messages.length === 0}
-              disabled={!canCompose}
+              disabled={!canCompose || isPreparingImages}
               busy={isSendingMessage}
               onStop={stopAssistant}
               clearOnSendStart
@@ -170,6 +212,8 @@ function ChatLayoutContent() {
                 uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
               }
               maxImages={3}
+              onPickImages={pickImages}
+              onImagesChange={(images) => { selectedImagesRef.current = images; }}
               onSend={({ text, images }) => sendMessage({ text, images })}
             />
           </View>
