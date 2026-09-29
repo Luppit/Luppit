@@ -550,8 +550,10 @@ export default function ConversationLayout() {
   const headerActionsById = new Map(
     rawHeaderActions.map((action) => [action.id, action] as const)
   );
+  const headerActionCodes = new Set(rawHeaderActions.map((action) => action.code));
   const menuActions = conversationView.actions.filter(
-    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
+    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU" &&
+      !headerActionCodes.has(action.code.replace(/_MENU$/, ""))
   );
   const showHeaderControls = Boolean(conversationView.conversation.purchase_offer_id) ||
     headerActions.length > 0;
