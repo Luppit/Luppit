@@ -183,12 +183,12 @@ function screenFixture(params: Record<string, any> = {}) {
     },
   };
   for (const [path, name] of Object.entries({
-    "conversation/ConversationContextControls": "ContextControls", "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
+    "conversation/ConversationContextControls": "ContextControls", "button/Button": "Button", "assistant/OfferRequestReference": "OfferRequestReference", "assistant/AssistantProcessingProgress": "Progress", "assistant/AssistantReviewCard": "ReviewCard", "assistant/SummaryReviewContent": "SummaryReviewContent", "expandableInfoCard/ExpandableInfoCard": "ExpandableInfoCard", "filePicker/FilePicker": "FilePicker", "inputChat/inputChat": "InputChat", "message/MessageUtilities": "MessageUtilities", "optionsChecklistCard/OptionsChecklistCard": "OptionsChecklistCard", "loading/LoadingState": "LoadingState", "textArea/TextArea": "TextArea", "textFieldWithToggle/TextFieldWithToggle": "Toggle",
   })) modules[`@/src/components/${path}`] = name;
   const screen = load("../app/(modal)/offer.tsx", modules, "\nexport { OfferAssistantScreen, OfferScreenContent, OfferSummaryCard, OfferEditContext };\n");
   return { ...runtime, modules, referenceCalls, requestCalls, aiCalls, navigations, errors, get popup() { return popup; },
     get exitGuard() { return exitGuard; },
-    summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerPhotoCount: 1, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
+    summary: (summary: object, overrides: object = {}) => screen.OfferSummaryCard({ summary, purchaseRequestTitle: "Llantas", offerImages: readyOffer.offerImages, hasOfferPhoto: true, missingFields: [], disabled: false, loading: false, ...overrides }),
     context: (props: object) => runtime.render(() => screen.OfferEditContext({ reference, images: [], hasChanges: false, summary: null, ...props })),
     route: () => runtime.render(() => screen.default()),
     content: () => runtime.render(() => screen.OfferScreenContent({ params })),
@@ -424,16 +424,14 @@ const offerFailure = { ok: false, error: { type: "network", message: "Intenta de
 test("seller review groups the available delivery methods without inventing a shipping cost", () => {
   const f = screenFixture();
   for (const [entrega, retiro, expected] of [
-    ["Envío", "Recoger en tienda", "Envío · Recoger en tienda"],
-    ["Envío", null, "Envío"],
-    [null, "Recoger en tienda", "Recoger en tienda"],
-    [null, null, null],
+    ["Envío", "Recoger en tienda", ["Envío", "Recoger en tienda"]],
+    ["Envío", null, ["Envío"]],
+    [null, "Recoger en tienda", ["Recoger en tienda"]],
+    [null, null, []],
   ]) {
     const card = f.summary({ ...readyOffer.summary, entrega, retiro, precioEnvio: null });
-    const methods = card.props.rows.filter((row: any) => row.label === "Opciones de entrega");
-    assert.equal(methods.length, expected ? 1 : 0);
-    if (expected) assert.equal(methods[0].value, expected);
-    assert.ok(!card.props.rows.some((row: any) => row.label === "Costo de envío"));
+    assert.deepEqual(Array.from(card.props.deliveryRows, (row: any) => row.label), expected);
+    assert.ok(!card.props.deliveryRows.some((row: any) => row.amount));
     assert.equal(card.props.primaryDisabled, false);
     assert.match(card.props.completionDescription, /comprador deberá elegir y aceptar/);
   }
@@ -442,7 +440,7 @@ test("seller review groups the available delivery methods without inventing a sh
 test("an incomplete offer review never shows a success state and remains editable", () => {
   const f = screenFixture();
   const card = f.summary(readyOffer.summary, {
-    hasOfferPhoto: false, offerPhotoCount: 0,
+    hasOfferPhoto: false, offerImages: [],
     missingFields: ["foto real de la oferta"], disabled: true,
   });
   assert.equal(card.props.completionTitle, "Oferta incompleta");
@@ -566,7 +564,7 @@ test("offer review and repeated adjustment preserve the ordered transcript and s
   await openOfferSummary(f);
   let view = assistantView(f);
   assert.deepEqual(view.messages.map((m) => m.text), ["3 llantas, retiro en tienda", offerInvitation, "Sí"]);
-  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.equal(view.review!.offerImages.length, 1);
   assert.equal(view.review!.disabled, false);
   view.tree.find((n) => n.type === "ScrollView")!.props.onContentSizeChange();
   assert.deepEqual(scrolling, ["end"]);
@@ -585,7 +583,7 @@ test("offer review and repeated adjustment preserve the ordered transcript and s
     assert.equal(view.messages[0].images[0].uri, "https://example.test/photo");
     await openOfferSummary(f, "Ver resumen");
     view = assistantView(f);
-    assert.equal(view.review!.offerPhotoCount, 1);
+    assert.equal(view.review!.offerImages.length, 1);
   }
   assert.equal(view.messages.filter((m) => m.text === "Ver resumen").length, 2, "Repeated genuine user messages remain");
 });
@@ -630,7 +628,7 @@ test("restored control announcements are filtered without deleting real replies,
   assert.equal(view.review, undefined, "RESTORE does not invent a server review state");
   await openOfferSummary(f, "Ver resumen");
   view = assistantView(f);
-  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.equal(view.review!.offerImages.length, 1);
   assert.ok(view.messages.some((m) => m.text === usefulReply));
   view.composer.onSend({ text: "Ahora son 4", images: [] });
   f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, assistantMessage: offerInvitation }));
@@ -759,13 +757,13 @@ test("unchanged edit review cannot publish or infer photos from transcript attac
   const review = assistantView(f).review;
   assert.ok(review);
   assert.equal(review.disabled, true);
-  assert.equal(review.offerPhotoCount, 0);
+  assert.equal(review.offerImages.length, 0);
   assert.equal(review.offerImages.length, 0);
   await review.onPublish();
   assert.equal(f.aiCalls.length, 1);
 });
 
-test("proposal photos appear once inside the review surface, without changing creation summaries", async () => {
+test("proposal and creation photos appear once in the grouped review surface", async () => {
   const f = screenFixture({ mode: "edit" });
   f.assistant();
   f.aiCalls[0].response.resolve(aiSuccess({ ...readyOffer, uiState: "review" }));
@@ -775,21 +773,17 @@ test("proposal photos appear once inside the review surface, without changing cr
   assert.ok(!view.tree.some((n) => typeof n.type === "function" && n.type.name === "OfferPhotos"));
 
   const card = f.summary(readyOffer.summary, view.review!);
-  assert.ok(!card.props.rows.some((row: any) => row.label === "Fotos"));
-  const reviewCard = load("../src/components/assistant/AssistantReviewCard.tsx", f.modules).default;
+  assert.deepEqual(Array.from(card.props.images, (image: any) => image.uri), [readyOffer.offerImages[0].url]);
+  const reviewCard = load("../src/components/assistant/AssistantReviewCard.tsx", {
+    ...f.modules, "./SummaryReviewContent": "SummaryReviewContent",
+  }).default;
   const rendered = reviewCard(card.props);
-  const surface = rendered.props.children[0];
-  const photos = nodes(surface).filter((n) => typeof n.type === "function" && n.type.name === "OfferPhotos");
-  assert.equal(photos.length, 1);
-  assert.equal(photos[0].props.images, readyOffer.offerImages);
-  assert.equal(nodes(rendered).filter((n) => typeof n.type === "function" && n.type.name === "OfferPhotos").length, 1);
-  const thumbnails = nodes((photos[0].type as Function)(photos[0].props)).filter((n) => n.type === "Image");
-  assert.equal(thumbnails[0].props.source.uri, readyOffer.offerImages[0].url);
-  assert.equal(thumbnails[0].props.accessibilityLabel, "Foto 1 de la oferta");
+  const grouped = nodes(rendered).filter((n) => n.type === "SummaryReviewContent");
+  assert.equal(grouped.length, 1);
+  assert.deepEqual(Array.from(grouped[0].props.images, (image: any) => image.uri), [readyOffer.offerImages[0].url]);
 
   const creation = f.summary(readyOffer.summary, { offerImages: readyOffer.offerImages });
-  assert.ok(creation.props.rows.some((row: any) => row.label === "Fotos"));
-  assert.ok(!nodes(creation).some((n) => typeof n.type === "function" && n.type.name === "OfferPhotos"));
+  assert.deepEqual(Array.from(creation.props.images, (image: any) => image.uri), [readyOffer.offerImages[0].url]);
 });
 
 test("proposal review keeps effective photos through adjustment, failed upload, retry and fresh restore", async () => {
@@ -820,7 +814,7 @@ test("proposal review keeps effective photos through adjustment, failed upload, 
   f.aiCalls.at(-1)!.response.resolve(aiSuccess({ ...readyOffer, offerImages: effective }));
   await flush();
   assert.equal(assistantView(f).review!.offerImages, effective);
-  assert.equal(assistantView(f).review!.offerPhotoCount, 2);
+  assert.equal(assistantView(f).review!.offerImages.length, 2);
   assert.equal(context().images, effective);
   f.unmount();
 
@@ -834,7 +828,7 @@ test("proposal review keeps effective photos through adjustment, failed upload, 
   await flush();
   const view = assistantView(restored);
   assert.equal(view.review!.offerImages, refreshed);
-  assert.equal(view.review!.offerPhotoCount, 1);
+  assert.equal(view.review!.offerImages.length, 1);
   assert.equal(view.messages[0].images[0].uri, readyOffer.offerImages[0].url);
 });
 
@@ -894,9 +888,9 @@ test("edit summaries preserve UNIT versus TOTAL pricing without turning context 
   assert.equal(initial.primary.label, "Oferta");
   initial.primary.onPress();
   assert.equal(f.popup.title, "Resumen de la oferta");
-  assert.equal(f.popup.rows.find((r: any) => r.label === "Precio por unidad").value, "₡40,000");
-  assert.equal(f.popup.rows.find((r: any) => r.label === "Cantidad ofrecida").value, "4");
-  assert.equal(f.popup.rows.find((r: any) => r.label === "Total de productos").value, "₡160,000");
+  assert.equal(f.popup.offerVisual.price.value, "₡160,000");
+  assert.equal(f.popup.offerVisual.price.detail, "₡40,000 por unidad · 4 unidades");
+  assert.equal(f.popup.offerVisual.quantity, "4 unidades");
   assert.equal(f.popup.actions.length, 1);
   assert.equal(f.popup.actions[0].label, "Cerrar");
   assert.equal(f.aiCalls.length, 0);
@@ -904,8 +898,8 @@ test("edit summaries preserve UNIT versus TOTAL pricing without turning context 
   assert.equal(revised.price, "$150.25");
   revised.primary.onPress();
   assert.equal(f.popup.title, "Cambios propuestos");
-  assert.equal(f.popup.rows.find((r: any) => r.label === "Precio total").value, "$150.25");
-  assert.ok(!f.popup.rows.some((r: any) => r.label === "Total de productos"));
+  assert.equal(f.popup.offerVisual.price.label, "Precio total");
+  assert.equal(f.popup.offerVisual.price.value, "$150.25");
 });
 
 test("context popups preserve the full buyer request, conditions, fulfillment and authoritative photos", () => {
@@ -921,8 +915,10 @@ test("context popups preserve the full buyer request, conditions, fulfillment an
   assert.equal(f.popup.description, summary.descripcion);
   assert.equal(f.popup.descriptionPlacement, "afterRows");
   assert.equal(f.popup.metadata, undefined, "Do not repeat the request title below the popup title");
-  assert.equal(f.popup.rows.find((r: any) => r.label === "Opciones de entrega").value, "Envío · Retiro");
-  assert.ok(!f.popup.rows.some((r: any) => r.label === "Costo de envío" || r.label === "Fotos"));
+  assert.deepEqual(Array.from(f.popup.offerVisual.deliveryRows, (row: any) => row.label), ["Envío", "Retiro"]);
+  assert.equal(f.popup.offerVisual.deliveryRows[0].detail, "Máximo 3 día(s)");
+  assert.equal(f.popup.offerVisual.deliveryRows[1].detail, "Disponible en 1 día(s)");
+  assert.equal(f.popup.offerVisual.deliveryRows[0].amount, undefined);
   assert.deepEqual(Array.from(f.popup.images, (image: any) => image.uri), photos.map((photo) => photo.url));
   assert.ok(f.popup.images.every((image: any) => image.caption === undefined));
 });
@@ -1132,7 +1128,7 @@ test("failed offer discards preserve UI and retry identity, including lifecycle 
     assert.equal(after.composer.disabled, false);
     assert.equal(after.messages[0], before.messages[0]);
     assert.equal(after.review!.summary, before.review!.summary);
-    assert.equal(after.review!.offerPhotoCount, 1);
+    assert.equal(after.review!.offerImages.length, 1);
     assert.deepEqual(f.navigations, []);
   }
   const retry = confirm();

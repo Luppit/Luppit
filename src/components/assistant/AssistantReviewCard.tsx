@@ -5,6 +5,10 @@ import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React from "react";
 import { View } from "react-native";
+import SummaryReviewContent, {
+  type SummaryDeliveryRow,
+  type SummaryReviewImage,
+} from "./SummaryReviewContent";
 
 export type AssistantReviewRow = {
   label: string;
@@ -21,8 +25,15 @@ type AssistantReviewCardProps = {
   completionDescription: string;
   isComplete?: boolean;
   title: string;
+  subtitle?: string | null;
+  quantity?: string | null;
+  images?: SummaryReviewImage[];
+  imageNoun?: string;
   description?: string | null;
   rows: AssistantReviewRow[];
+  rowsTitle?: string;
+  price?: { label: string; value: string; detail?: string | null } | null;
+  deliveryRows?: SummaryDeliveryRow[];
   children?: React.ReactNode;
   notices?: AssistantReviewNotice[];
   primaryLabel: string;
@@ -39,8 +50,15 @@ export default function AssistantReviewCard({
   completionDescription,
   isComplete = true,
   title,
+  subtitle,
+  quantity,
+  images,
+  imageNoun,
   description,
   rows,
+  rowsTitle,
+  price,
+  deliveryRows,
   children,
   notices = [],
   primaryLabel,
@@ -71,6 +89,9 @@ export default function AssistantReviewCard({
             flexDirection: "row",
             alignItems: "center",
             gap: t.spacing.md,
+            padding: t.spacing.md,
+            borderRadius: t.borders.md,
+            backgroundColor: isComplete ? t.colors.primaryLight : t.colors.background,
           }}
         >
           <View
@@ -80,7 +101,7 @@ export default function AssistantReviewCard({
               borderRadius: 22,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: isComplete ? t.colors.primaryLight : t.colors.background,
+              backgroundColor: isComplete ? t.colors.backgroudWhite : t.colors.border,
             }}
           >
             <Icon
@@ -99,46 +120,18 @@ export default function AssistantReviewCard({
           </View>
         </View>
 
-        <View style={{ height: 1, backgroundColor: t.colors.border }} />
-
-        <View style={{ gap: t.spacing.sm }}>
-          <Text variant="title">{title}</Text>
-          {description ? <Text variant="body">{description}</Text> : null}
-        </View>
-
-        {rows.length > 0 ? (
-          <View style={{ borderTopWidth: 1, borderTopColor: t.colors.border }}>
-            {rows.map((row, index) => (
-              <View
-                key={`${row.label}-${index}`}
-                style={{
-                  minHeight: 48,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: t.spacing.md,
-                  paddingVertical: t.spacing.sm,
-                  borderBottomWidth: index < rows.length - 1 ? 1 : 0,
-                  borderBottomColor: t.colors.border,
-                }}
-              >
-                <Text
-                  variant="small"
-                  color="stateAnulated"
-                  style={{ flex: 0.42 }}
-                >
-                  {row.label}
-                </Text>
-                <Text
-                  variant="body"
-                  align="right"
-                  style={{ flex: 0.58 }}
-                >
-                  {row.value}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
+        <SummaryReviewContent
+          title={title}
+          subtitle={subtitle}
+          quantity={quantity}
+          images={images}
+          imageNoun={imageNoun}
+          description={description}
+          rows={rows}
+          rowsTitle={rowsTitle}
+          price={price}
+          deliveryRows={deliveryRows}
+        />
 
         {children}
 

@@ -91,6 +91,7 @@ function UserMessageBlock({ message }: { message: ChatMessage }) {
 function PublishRequestCard({
   summary,
   description,
+  images = [],
   isReadyToPublish,
   missingFields,
   disabled,
@@ -101,6 +102,7 @@ function PublishRequestCard({
 }: {
   summary: PurchaseRequestAssistantSummary | null;
   description: string | null;
+  images: { uri: string }[];
   isReadyToPublish: boolean;
   missingFields: string[];
   disabled: boolean;
@@ -110,6 +112,7 @@ function PublishRequestCard({
   onContinue: () => void;
 }) {
   const details = buildPurchaseRequestSummaryRows(summary);
+  const quantity = details.find((row) => row.label === "Cantidad")?.value;
 
   return (
     <AssistantReviewCard
@@ -119,8 +122,13 @@ function PublishRequestCard({
         : "Completa los datos pendientes para poder publicar."}
       isComplete={isReadyToPublish}
       title={summary?.titulo ?? "Solicitud"}
+      subtitle={summary?.categoria}
+      quantity={quantity ? `Cantidad: ${quantity}` : null}
+      images={images}
+      imageNoun={images.length === 1 ? "imagen compartida" : "imágenes compartidas"}
       description={description}
       rows={details}
+      rowsTitle="Detalles de la solicitud"
       notices={missingFields.length > 0 ? [{
         text: `Falta completar: ${missingFields.map(humanizeAttributeLabel).join(", ")}.`,
         tone: "error",
@@ -201,6 +209,17 @@ export default function ChatScreen() {
     status,
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl || isRestoring;
+  const reviewImages = React.useMemo(() => {
+    const seen = new Set<string>();
+    return messages.flatMap((message) => {
+      if (message.sender !== "user" || message.failedRequests) return [];
+      return (message.images ?? []).flatMap((image) => {
+        if (!image.uri || seen.has(image.uri)) return [];
+        seen.add(image.uri);
+        return [{ uri: image.uri }];
+      });
+    });
+  }, [messages]);
 
   if (isRestoring || sessionError) {
     return (
@@ -251,6 +270,7 @@ export default function ChatScreen() {
           <PublishRequestCard
             summary={summary}
             description={summaryText}
+            images={reviewImages}
             isReadyToPublish={isReadyToPublish}
             missingFields={missingFields}
             disabled={!canPublish || isAssistantBusy}

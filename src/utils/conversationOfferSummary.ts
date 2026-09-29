@@ -38,6 +38,11 @@ export function buildConversationOfferSummary(
     ? context.fulfillment_options
     : [];
   const deliveryOptions: string[] = [];
+  const deliveryRows: {
+    label: string;
+    detail?: string;
+    icon?: "truck" | "store";
+  }[] = [];
   for (const raw of options) {
     if (!raw || typeof raw !== "object") continue;
     const option = raw as Record<string, unknown>;
@@ -87,6 +92,12 @@ export function buildConversationOfferSummary(
       );
     }
     const optionLabel = selected ? `${label} · Seleccionado` : label;
+    deliveryRows.push({
+      label: optionLabel,
+      detail: details.join(" · ") || undefined,
+      icon: stored?.method_kind === "shipping" ? "truck"
+        : stored?.method_kind === "pickup" ? "store" : undefined,
+    });
     deliveryOptions.push(
       [`• ${optionLabel}`, ...details.map((detail) => `  ${detail}`)].join("\n"),
     );
@@ -96,12 +107,32 @@ export function buildConversationOfferSummary(
   }
   if (options.length === 0) {
     const delivery = displayText(context.delivery_type);
-    if (delivery) rows.push({ label: "Entrega", value: delivery });
+    if (delivery) {
+      rows.push({ label: "Entrega", value: delivery });
+      deliveryRows.push({ label: "Entrega", detail: delivery });
+    }
   }
 
   return {
     description: displayText(context.offer_description),
     descriptionPlacement: "afterRows" as const,
     rows,
+    offerVisual: {
+      title: displayText(context.offer_name) ?? displayText(context.request_title) ?? "Oferta",
+      quantity: typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0
+        ? `${quantity} unidades` : undefined,
+      price: total
+        ? {
+            label: context.offer_price_basis === "UNIT" ? "Total de productos" : "Precio total",
+            value: total,
+            detail: context.offer_price_basis === "UNIT" && unitPrice
+              ? `${unitPrice} por unidad${typeof quantity === "number" && quantity > 0 ? ` · ${quantity} unidades` : ""}`
+              : undefined,
+          }
+        : unitPrice && context.offer_price_basis === "UNIT"
+          ? { label: "Precio por unidad", value: unitPrice }
+          : undefined,
+      deliveryRows,
+    },
   };
 }

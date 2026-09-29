@@ -30,8 +30,9 @@ import {
   type SellerOfferBatchPublication,
   type SellerOfferAssistantImage,
 } from "@/src/services/purchase.offer.assistant.service";
-import { closePopup, openPopup, subscribePopup, type PopupSummaryConfig } from "@/src/services/popup.service";
+import { closePopup, openPopup, subscribePopup, type PopupOfferVisual, type PopupSummaryConfig } from "@/src/services/popup.service";
 import ConversationContextControls from "@/src/components/conversation/ConversationContextControls";
+import SummaryReviewContent from "@/src/components/assistant/SummaryReviewContent";
 import { Text } from "@/src/components/Text";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -158,52 +159,41 @@ function AssistantMessageBubble({ message }: { message: AssistantMessage }) {
   );
 }
 
-function hasSummaryValue(value: string | number | null | undefined) {
-  return value !== null && value !== undefined && value !== "";
-}
-
-function getOfferSummaryDetails(summary: SellerOfferAssistantSummary | null, offerPhotoCount: number) {
-  const formattedPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
-  const formattedShippingPrice = formatSummaryMoney(
-    summary?.precioEnvio,
+function getOfferVisual(
+  summary: SellerOfferAssistantSummary | null,
+  title: string | null | undefined
+): PopupOfferVisual {
+  const unitPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
+  const productTotal = formatSummaryMoney(
+    summary?.basePrecio === "UNIT" ? summary.precioTotal : summary?.precio,
     summary?.moneda
   );
-  const deliveryOptionsText = [summary?.entrega, summary?.retiro]
-    .filter((method) => typeof method === "string" && method.trim().length > 0)
-    .join(" · ");
-  const pickupTimingText = summary?.retiroDespuesDeDias != null
-    ? `${summary.retiroDespuesDeDias} día(s)`
-    : null;
-  const shippingTimingText = summary?.envioMaximoDias != null
-    ? `${summary.envioMaximoDias} día(s)`
-    : null;
-  return [
-    {
-      label: summary?.basePrecio === "UNIT" ? "Precio por unidad" : "Precio total",
-      value: formattedPrice,
-    },
-    {
-      label: "Cantidad ofrecida",
-      value: summary?.cantidadOfrecida != null ? String(summary.cantidadOfrecida) : null,
-    },
-    {
-      label: "Total de productos",
-      value: summary?.basePrecio === "UNIT"
-        ? formatSummaryMoney(summary?.precioTotal, summary?.moneda)
-        : null,
-    },
-    { label: "Opciones de entrega", value: deliveryOptionsText },
-    { label: "Tiempo máximo de entrega", value: shippingTimingText },
-    { label: "Costo de envío", value: formattedShippingPrice },
-    { label: "Retiro disponible en", value: pickupTimingText },
-    {
-      label: "Fotos",
-      value:
-        offerPhotoCount > 0
-          ? `${offerPhotoCount} ${offerPhotoCount === 1 ? "foto adjunta" : "fotos adjuntas"}`
-          : null,
-    },
-  ].filter((item) => hasSummaryValue(item.value));
+  const price = productTotal ? {
+    label: summary?.basePrecio === "UNIT" ? "Total de productos" : "Precio total",
+    value: productTotal,
+    detail: summary?.basePrecio === "UNIT" && unitPrice
+      ? `${unitPrice} por unidad${summary.cantidadOfrecida != null ? ` · ${summary.cantidadOfrecida} unidades` : ""}`
+      : undefined,
+  } : unitPrice ? { label: "Precio por unidad", value: unitPrice } : undefined;
+  const deliveryRows: NonNullable<PopupOfferVisual["deliveryRows"]> = [];
+  if (summary?.entrega) deliveryRows.push({
+    label: summary.entrega,
+    detail: summary.envioMaximoDias != null ? `Máximo ${summary.envioMaximoDias} día(s)` : undefined,
+    amount: formatSummaryMoney(summary.precioEnvio, summary.moneda) ?? undefined,
+    icon: "truck",
+  });
+  if (summary?.retiro) deliveryRows.push({
+    label: summary.retiro,
+    detail: summary.retiroDespuesDeDias != null
+      ? `Disponible en ${summary.retiroDespuesDeDias} día(s)` : undefined,
+    icon: "store",
+  });
+  return {
+    title: title?.trim() || "Oferta",
+    quantity: summary?.cantidadOfrecida != null ? `${summary.cantidadOfrecida} unidades` : undefined,
+    price,
+    deliveryRows,
+  };
 }
 
 function OfferEditContext({
@@ -243,13 +233,10 @@ function OfferEditContext({
       type: "summary",
       title: kind === "request" ? "Solicitud del comprador" : hasChanges ? "Cambios propuestos" : "Resumen de la oferta",
       ...(kind === "offer" ? {
-        rows: getOfferSummaryDetails(summary, 0).map((detail) => ({
-          label: detail.label,
-          value: detail.value ?? "",
-        })),
         description: summary?.descripcion || undefined,
         descriptionPlacement: "afterRows" as const,
         images: images.map((photo) => ({ uri: photo.url })),
+        offerVisual: getOfferVisual(summary, reference.title),
       } : {
         description: reference.text ?? "Esta solicitud no tiene título ni resumen disponibles.",
       }),
@@ -284,24 +271,9 @@ function OfferEditContext({
   );
 }
 
-function OfferPhotos({ images }: { images: SellerOfferAssistantImage[] }) {
-  const t = useTheme();
-  return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: t.spacing.sm }}>
-      {images.map((photo, index) => (
-        <View key={photo.storageRef} style={{ gap: t.spacing.xs }}>
-          <Image source={{ uri: photo.url }} accessibilityLabel={`Foto ${index + 1} de la oferta`}
-            resizeMode="contain" style={{ width: 96, height: 96, borderRadius: t.borders.md }} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 function OfferSummaryCard({
   summary,
   purchaseRequestTitle,
-  offerPhotoCount,
   missingFields,
   hasOfferPhoto,
   disabled,
@@ -314,7 +286,6 @@ function OfferSummaryCard({
 }: {
   summary: SellerOfferAssistantSummary | null;
   purchaseRequestTitle: string | null | undefined;
-  offerPhotoCount: number;
   missingFields: string[];
   hasOfferPhoto: boolean;
   disabled: boolean;
@@ -325,10 +296,9 @@ function OfferSummaryCard({
   changedFields?: string[];
   offerImages?: SellerOfferAssistantImage[];
 }) {
-  const t = useTheme();
-  const details = getOfferSummaryDetails(summary, isEditMode ? 0 : offerPhotoCount);
   const notices: AssistantReviewNotice[] = [];
   const isComplete = hasOfferPhoto && missingFields.length === 0;
+  const visual = getOfferVisual(summary, purchaseRequestTitle);
   if (isEditMode && changedFields.length) notices.push({ text: `Cambios: ${changedFields.join(", ")}.` });
 
   if (missingFields.length > 0) {
@@ -351,12 +321,14 @@ function OfferSummaryCard({
           : "Revisa tu oferta. El comprador deberá elegir y aceptar uno de los métodos de entrega que ofreces."
         : "Completa los datos pendientes antes de enviar tu oferta."}
       isComplete={isComplete}
-      title={purchaseRequestTitle?.trim() || "Oferta"}
+      title={visual.title}
+      quantity={visual.quantity}
+      images={offerImages.map((image) => ({ uri: image.url }))}
+      imageNoun={offerImages.length === 1 ? "foto" : "fotos"}
+      price={visual.price}
+      deliveryRows={visual.deliveryRows}
       description={summary?.descripcion ?? "Sin descripción todavía"}
-      rows={details.map((item) => ({
-        label: item.label,
-        value: String(item.value),
-      }))}
+      rows={[]}
       notices={notices}
       primaryLabel={isEditMode ? "Proponer cambios" : "Enviar oferta"}
       primaryDisabled={disabled || !isComplete}
@@ -365,14 +337,7 @@ function OfferSummaryCard({
       secondaryLabel="Seguir ajustando"
       secondaryDisabled={loading}
       onSecondaryPress={onContinue}
-    >
-      {isEditMode && offerImages.length > 0 ? (
-        <View style={{ gap: t.spacing.sm }}>
-          <Text variant="small" color="textMedium">Fotos que verá el comprador</Text>
-          <OfferPhotos images={offerImages} />
-        </View>
-      ) : null}
-    </AssistantReviewCard>
+    />
   );
 }
 
@@ -1023,7 +988,6 @@ function OfferAssistantScreen({
           <OfferSummaryCard
             summary={summary}
             purchaseRequestTitle={purchaseRequestTitle}
-            offerPhotoCount={successfulOfferPhotoCount}
             missingFields={missingFields}
             hasOfferPhoto={hasOfferPhoto}
             disabled={isBusy || !initialized || Boolean(conflict) || !isReadyToSend || (isEditMode && !hasChanges)}
@@ -1219,31 +1183,31 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
         </Text>
         {options.map((option, index) => {
           const selected = selectedIds.includes(option.id);
-          const rows = getOfferSummaryDetails(option.summary, option.offerImages.length)
-            .filter((row) => row.value != null && row.value !== "")
-            .map((row) => ({ label: row.label, value: String(row.value) }));
-          return <Pressable key={option.id} accessibilityRole="checkbox"
-            accessibilityState={{ checked: selected, disabled: !option.isReadyToSend }}
-            disabled={!option.isReadyToSend || busy}
-            onPress={() => setSelectedIds((current) => selected
-              ? current.filter((id) => id !== option.id) : [...current, option.id])}
+          const visual = getOfferVisual(option.summary, requestReference.title);
+          return <View key={option.id}
             style={[createRoundedSurfaceStyle(t), {
               padding: t.spacing.md, gap: t.spacing.sm,
               borderWidth: 1, borderColor: selected ? t.colors.primary : t.colors.border,
               opacity: option.isReadyToSend ? 1 : 0.75,
             }]}>
-            <Text variant="subtitle">{selected ? "☑" : "☐"} Opción {index + 1}</Text>
-            <Text>{option.summary?.descripcion ?? "Descripción pendiente"}</Text>
-            {rows.map((row) => <View key={row.label} style={{ flexDirection: "row", gap: t.spacing.sm }}>
-              <Text variant="small" color="textMedium" style={{ flex: 1 }}>{row.label}</Text>
-              <Text variant="small" style={{ flex: 1, textAlign: "right" }}>{row.value}</Text>
-            </View>)}
-            <OfferPhotos images={option.offerImages} />
+            <Pressable accessibilityRole="checkbox"
+              accessibilityLabel={`Seleccionar opción ${index + 1}`}
+              accessibilityState={{ checked: selected, disabled: !option.isReadyToSend || busy }}
+              disabled={!option.isReadyToSend || busy}
+              onPress={() => setSelectedIds((current) => selected
+                ? current.filter((id) => id !== option.id) : [...current, option.id])}>
+              <Text variant="subtitle">{selected ? "☑" : "☐"} Opción {index + 1}</Text>
+            </Pressable>
+            <SummaryReviewContent title={visual.title} quantity={visual.quantity}
+              images={option.offerImages.map((image) => ({ uri: image.url }))}
+              imageNoun={option.offerImages.length === 1 ? "foto" : "fotos"}
+              price={visual.price} deliveryRows={visual.deliveryRows}
+              description={option.summary?.descripcion ?? "Descripción pendiente"} />
             {option.missingFields.length ? <Text variant="small" color="error">
               Falta: {option.missingFields.join(", ")}
             </Text> : null}
             {option.reviewReason ? <Text variant="small" color="error">{option.reviewReason}</Text> : null}
-          </Pressable>;
+          </View>;
         })}
         <Button title={`Enviar ${selectedIds.length} oferta${selectedIds.length === 1 ? "" : "s"}`}
           disabled={busy || selectedIds.length === 0} loading={busy} onPress={publish} />

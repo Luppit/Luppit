@@ -83,6 +83,11 @@ test("summary preserves published terms and ignores pending proposals and privat
     notes: "Private seller note",
   });
   assert.equal(summary.description, context.offer_description);
+  assert.equal(summary.offerVisual.title, "4 llantas");
+  assert.equal(summary.offerVisual.quantity, "4 unidades");
+  assert.equal(summary.offerVisual.price.label, "Total de productos");
+  assert.equal(summary.offerVisual.price.value, "₡160,000");
+  assert.equal(summary.offerVisual.price.detail, "₡40,000 por unidad · 4 unidades");
   assert.equal(summary.metadata, undefined);
   assert.deepEqual(
     Array.from(summary.rows, (row: any) => ({ ...row })),
@@ -122,6 +127,10 @@ test("both delivery methods and supplied costs/timing survive with explicit sele
       "• Retiro en tienda · Seleccionado\n  Disponible en 2 días\n  Total: ₡160,000",
   );
   assert.equal(summary.rows.length, 4);
+  assert.deepEqual(Array.from(summary.offerVisual.deliveryRows, (row: any) => ({ ...row })), [
+    { label: "Envío", detail: "Costo de envío no especificado · Coordinar entrega", icon: undefined },
+    { label: "Retiro en tienda · Seleccionado", detail: "Disponible en 2 días · Total: ₡160,000", icon: undefined },
+  ]);
 });
 
 test("delivery options without details appear once under a shared heading", () => {
@@ -148,6 +157,20 @@ test("total pricing and missing optional fields do not invent quantities or deli
   assert.equal(summary.rows.length, 1);
   assert.equal(summary.rows[0].value, "$45");
   assert.equal(summary.description, undefined);
+  assert.equal(summary.offerVisual.price.value, "$45");
+  assert.equal(summary.offerVisual.quantity, undefined);
+  assert.equal(summary.offerVisual.deliveryRows.length, 0);
+});
+
+test("an unknown unit quantity never presents a made-up product total", () => {
+  const summary = buildConversationOfferSummary({
+    ...context,
+    offer_product_subtotal: null,
+    offer_quantity_offered: null,
+  });
+  assert.equal(summary.offerVisual.price.label, "Precio por unidad");
+  assert.equal(summary.offerVisual.price.value, "₡40,000");
+  assert.equal(summary.offerVisual.quantity, undefined);
 });
 
 test("full summary retains stored optional fulfillment details omitted by acceptance choices", () => {

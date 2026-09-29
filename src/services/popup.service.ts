@@ -44,6 +44,19 @@ export type PopupSummaryImage = {
   caption?: string;
 };
 
+export type PopupOfferVisual = {
+  title: string;
+  subtitle?: string;
+  quantity?: string;
+  price?: { label: string; value: string; detail?: string };
+  deliveryRows?: {
+    label: string;
+    detail?: string;
+    amount?: string;
+    icon?: "truck" | "store";
+  }[];
+};
+
 export type PopupSummaryFeedback = {
   tone: ToastVariant;
   title: string;
@@ -140,6 +153,7 @@ export type PopupSummaryConfig = {
   comparison?: PopupSummaryComparison;
   inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];
+  offerVisual?: PopupOfferVisual;
   blocker?: PopupSummaryBlocker | null;
   actions?: PopupSummaryAction[];
   dismissOnBackdropPress?: boolean;

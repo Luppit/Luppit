@@ -1,5 +1,6 @@
 import { resolveAndroidPopupBack } from "./androidBack";
 import { Icon } from "@/src/components/Icon";
+import SummaryReviewContent from "@/src/components/assistant/SummaryReviewContent";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { TextField } from "@/src/components/inputField/InputField";
@@ -232,6 +233,8 @@ export default function GlobalPopupHost() {
   const [dismissOnBackdropPress, setDismissOnBackdropPress] = useState(true);
   const [isMounted, setMounted] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const offerPreviewImages = summaryConfig?.offerVisual ? summaryConfig.images ?? [] : [];
+  const offerPreviewIndex = offerPreviewImages.findIndex((image) => image.uri === previewUri);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [filterSearchValue, setFilterSearchValue] = useState("");
   const [filterStartDate, setFilterStartDate] = useState("");
@@ -1614,11 +1617,13 @@ export default function GlobalPopupHost() {
                           accessible
                           accessibilityRole="header"
                           accessibilityLabel={showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
-                          style={s.summaryHeader}
+                          style={[s.summaryHeader,
+                            summaryConfig.offerVisual ? { justifyContent: "center" } : null]}
                         >
                           <Text
                             variant="subtitle"
-                            style={s.summaryTitle}
+                            style={[s.summaryTitle,
+                              summaryConfig.offerVisual ? { textAlign: "center" } : null]}
                           >
                             {showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
                           </Text>
@@ -1631,7 +1636,22 @@ export default function GlobalPopupHost() {
                         <View style={s.summaryHeaderSeparator} />
                       </View>
 
-                      {showComparisonDetails || summaryConfig.descriptionPlacement === "afterRows"
+                      {summaryConfig.offerVisual ? (
+                        <SummaryReviewContent
+                          variant="popup"
+                          title={summaryConfig.offerVisual.title}
+                          subtitle={summaryConfig.offerVisual.subtitle}
+                          quantity={summaryConfig.offerVisual.quantity}
+                          images={summaryConfig.images}
+                          imageNoun={summaryConfig.images?.length === 1 ? "foto" : "fotos"}
+                          onImagePress={(index) => setPreviewUri(summaryConfig.images?.[index]?.uri ?? null)}
+                          price={summaryConfig.offerVisual.price}
+                          description={summaryConfig.description}
+                          deliveryRows={summaryConfig.offerVisual.deliveryRows}
+                        />
+                      ) : null}
+
+                      {summaryConfig.offerVisual || showComparisonDetails || summaryConfig.descriptionPlacement === "afterRows"
                         ? null
                         : renderSummaryDescription()}
 
@@ -1646,7 +1666,7 @@ export default function GlobalPopupHost() {
                         />
                       ) : null}
 
-                      {(!summaryConfig.comparison || showComparisonDetails) &&
+                      {!summaryConfig.offerVisual && (!summaryConfig.comparison || showComparisonDetails) &&
                       summaryConfig.rows && summaryConfig.rows.length > 0 ? (
                         <View style={s.summaryRowsList}>
                           {summaryConfig.rows.map((row, index) => (
@@ -1671,7 +1691,7 @@ export default function GlobalPopupHost() {
                         </View>
                       ) : null}
 
-                      {!showComparisonDetails && summaryConfig.descriptionPlacement === "afterRows"
+                      {!summaryConfig.offerVisual && !showComparisonDetails && summaryConfig.descriptionPlacement === "afterRows"
                         ? renderSummaryDescription()
                         : null}
 
@@ -2054,7 +2074,7 @@ export default function GlobalPopupHost() {
                         </View>
                       ) : null}
 
-                      {(!summaryConfig.comparison || showComparisonDetails) &&
+                      {!summaryConfig.offerVisual && (!summaryConfig.comparison || showComparisonDetails) &&
                       summaryConfig.images && summaryConfig.images.length > 0 ? (
                         <View style={s.summaryImageBlock}>
                           <Text variant="body" style={s.summaryRowLabel}>
@@ -2397,6 +2417,11 @@ export default function GlobalPopupHost() {
         visible={previewUri != null}
         animationType="fade"
         onRequestClose={() => setPreviewUri(null)}
+        onDismiss={() => {
+          if (summaryConfig?.offerVisual) {
+            summaryScrollViewRef.current?.scrollTo({ y: 0, animated: false });
+          }
+        }}
       >
         <Pressable style={s.summaryImagePreviewBackdrop} onPress={() => setPreviewUri(null)}>
           {previewUri ? (
@@ -2406,6 +2431,32 @@ export default function GlobalPopupHost() {
             <Icon name="x" size={20} color={t.colors.backgroudWhite} />
           </View>
         </Pressable>
+        {offerPreviewIndex >= 0 && offerPreviewImages.length > 1 ? (
+          <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Imagen anterior"
+              onPress={() => setPreviewUri(offerPreviewImages[
+                (offerPreviewIndex - 1 + offerPreviewImages.length) % offerPreviewImages.length
+              ].uri)}
+              style={{ position: "absolute", left: t.spacing.md, top: "48%",
+                width: 44, height: 44, borderRadius: 22, alignItems: "center",
+                justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
+              <Icon name="arrow-left" size={24} color={t.colors.backgroudWhite} />
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Imagen siguiente"
+              onPress={() => setPreviewUri(offerPreviewImages[
+                (offerPreviewIndex + 1) % offerPreviewImages.length
+              ].uri)}
+              style={{ position: "absolute", right: t.spacing.md, top: "48%",
+                width: 44, height: 44, borderRadius: 22, alignItems: "center",
+                justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
+              <Icon name="arrow-right" size={24} color={t.colors.backgroudWhite} />
+            </Pressable>
+            <Text variant="small" style={{ color: t.colors.backgroudWhite,
+              position: "absolute", bottom: t.spacing.xl, alignSelf: "center" }}>
+              {offerPreviewIndex + 1} / {offerPreviewImages.length}
+            </Text>
+          </View>
+        ) : null}
       </Modal>
     </Modal>
   );
