@@ -44,9 +44,9 @@ async function screenHarness(
 ) {
   const values: unknown[] = [];
   let cursor = 0;
-  let mounted = false;
+  const effects: { deps?: unknown[]; cleanup?: () => void }[] = [];
+  let menu: { onPress: () => void; accessibilityLabel: string; disabled?: boolean; testID?: string } | null = null;
   let focus: () => void = () => {};
-  let cleanup: (() => void) | undefined;
   let rows = initial;
   let unreadCount = rows.filter((row) => row.readAt == null).length;
   let listFails = false;
@@ -75,7 +75,15 @@ async function screenHarness(
       if (!(index in values)) values[index] = { current: initialValue };
       return values[index];
     },
-    useEffect(callback: () => () => void) { if (!mounted) cleanup = callback(); },
+    useEffect(callback: () => (() => void) | void, deps?: unknown[]) {
+      const index = cursor++;
+      const previous = effects[index];
+      if (previous && deps && previous.deps?.length === deps.length &&
+        deps.every((value, position) => Object.is(value, previous.deps?.[position]))) return;
+      previous?.cleanup?.();
+      effects[index] = { deps, cleanup: callback() || undefined };
+    },
+    useContext: () => (next: typeof menu) => { menu = next; },
     useMemo: (callback: () => unknown) => callback(),
     useCallback: (callback: unknown) => callback,
   };
@@ -86,6 +94,7 @@ async function screenHarness(
     "@react-navigation/native": { useFocusEffect: (callback: () => void) => { focus = callback; } },
     "expo-router": { router: { push() {} } },
     "./detail-top-bar": { DETAIL_TOP_BAR_VISIBLE_HEIGHT: 72 },
+    "@/src/components/navbar/DetailTopBarMenuContext": { DetailTopBarMenuContext: {} },
     "@/src/components/chip/LuppitChip": { default: "LuppitChip", __esModule: true },
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/profile/ProfilePicture": { default: "ProfilePicture", __esModule: true },
@@ -114,6 +123,10 @@ async function screenHarness(
         return listFails ? failure : { ok: true, data: rows.map((row) => ({ ...row })) };
       },
       markAllCurrentProfileNotificationsRead: () => { bulkCalls++; return bulkResponse(); },
+      dismissAllCurrentProfileNotifications: async () => {
+        rows = [];
+        return { ok: true, data: { remainingUnreadCount: 0 } };
+      },
       markCurrentProfileNotificationRead: async (id: string) => {
         rows = rows.map((row) => row.notificationId === id ? { ...row, readAt: savedAt } : row);
         return { ok: true, data: { notificationId: id, readAt: savedAt } };
@@ -123,7 +136,6 @@ async function screenHarness(
   const render = (): Element[] => {
     cursor = 0;
     const tree = screen.default();
-    mounted = true;
     const elements: Element[] = [];
     const visit = (node: any) => {
       if (Array.isArray(node)) return node.forEach(visit);
@@ -139,6 +151,7 @@ async function screenHarness(
   await settle();
   return {
     render, errors, successes, popups,
+    get menu() { render(); return menu; },
     action: () => render().find((node) => node.props.testID === "mark-all-notifications-read"),
     items: () => render().filter((node) => node.props.notification).map((node) => node.props.notification as ProfileNotificationListItem),
     get unreadCount() { return unreadCount; },
@@ -151,7 +164,7 @@ async function screenHarness(
     throwList(value: boolean) { listThrows = value; },
     failCount(value: boolean) { countFails = value; },
     async refocus() { focus(); await settle(); },
-    unmount() { cleanup?.(); },
+    unmount() { effects.forEach((effect) => effect?.cleanup?.()); },
   };
 }
 
@@ -213,7 +226,7 @@ test("pending bulk read rejects rapid repeated taps and disables cleanup", async
   assert.equal(h.bulkCalls, 1);
   assert.equal(h.action()!.props.onPress, undefined);
   assert.equal(h.action()!.props.accessibilityState.busy, true);
-  assert.equal(h.render().find((node) => node.props.testID === "notification-options")!.props.onPress, undefined);
+  assert.equal(h.menu?.disabled, true);
   assert.equal(h.unreadCount, 2);
   finish(failure);
   await settle();
@@ -282,9 +295,69 @@ test("opening a detail still reads only its notification", async () => {
 test("empty and already-read lists do not offer an executable bulk read", async () => {
   const empty = await screenHarness([]);
   assert.equal(empty.action(), undefined);
+  assert.equal(empty.menu, null);
   assert.ok(empty.render().some((node) => node.props.title === "Sin notificaciones"));
   const read = await screenHarness([notification("read", savedAt)]);
   assert.equal(read.action()!.props.onPress, undefined);
+});
+
+test("notification cleanup menu is registered in the top bar and keeps its confirmation", async () => {
+  const h = await screenHarness();
+  assert.equal(h.render().some((node) => node.props.testID === "notification-options"), false);
+  assert.equal(h.menu?.testID, "notification-options");
+  assert.equal(h.menu?.accessibilityLabel, "Opciones de notificaciones");
+  h.menu?.onPress();
+  const options = h.popups[0] as { options: { id: string; onPress: () => void }[] };
+  assert.equal(options.options[0].id, "clear-notifications");
+  options.options[0].onPress();
+  const confirmation = h.popups[1] as { actions: { id: string; onPress?: () => Promise<boolean> }[] };
+  assert.equal(confirmation.actions[1].id, "dismiss-all-notifications");
+  assert.equal(await confirmation.actions[1].onPress?.(), true);
+  assert.equal(h.menu, null);
+  assert.equal(h.unreadCount, 0);
+});
+
+test("shared detail top bar renders the notification menu with its accessible disabled state", () => {
+  let presses = 0;
+  let purchasePopups = 0;
+  const react = {
+    createElement: (type: unknown, props: object, ...children: unknown[]) => ({ type, props: { ...props, children } }),
+    useState: (value: unknown) => [value, () => {}],
+    useCallback: (callback: unknown) => callback,
+    useEffect() {},
+  };
+  const topBar = loadModule("../app/(detail)/detail-top-bar.tsx", {
+    react,
+    "react-native": { Platform: { OS: "ios" }, Pressable: "Pressable", View: "View", Share: {} },
+    "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/Text": { Text: "Text" },
+    "@/src/components/glass/GlassSurface": { default: "GlassSurface", __esModule: true },
+    "@/src/services/popup.service": { openPopup() { purchasePopups++; } },
+    "@/src/services/purchase.request.service": {},
+    "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, xl: 32 }, glass: { radius: { chrome: 32 } } }) },
+    "@/src/utils/useToast": {},
+    "@/src/utils/purchaseRequestLink": {},
+    "expo-router": { router: {} },
+  }).default;
+  const menu = { onPress: () => { presses++; }, accessibilityLabel: "Opciones de notificaciones", testID: "notification-options" };
+  const findOptions = (disabled: boolean) => {
+    const tree = topBar({ title: "Notificaciones", topInset: 24, menu: { ...menu, disabled } });
+    const visit = (node: any): Element | undefined => {
+      if (Array.isArray(node)) return node.map(visit).find(Boolean);
+      if (!node?.props) return;
+      if (node.props.testID === "notification-options") return node;
+      return visit(node.props.children);
+    };
+    return visit(tree);
+  };
+  const options = findOptions(false);
+  assert.equal(options?.props.accessibilityRole, "button");
+  assert.equal(options?.props.accessibilityLabel, "Opciones de notificaciones");
+  options?.props.onPress();
+  assert.equal(presses, 1);
+  assert.equal(purchasePopups, 0);
+  assert.equal(findOptions(true)?.props.accessibilityState.disabled, true);
 });
 
 test("finishing a bulk read after unmount does not update the screen", async () => {

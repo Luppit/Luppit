@@ -1,4 +1,6 @@
 import DetailTopBar from "./detail-top-bar";
+import { DetailTopBarMenuContext } from "@/src/components/navbar/DetailTopBarMenuContext";
+import type { DetailTopBarMenu } from "@/src/components/navbar/DetailTopBarMenuContext";
 import { useTheme } from "@/src/themes";
 import { Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import React from "react";
@@ -64,6 +66,7 @@ export default function DetailLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const [notificationsMenu, setNotificationsMenu] = React.useState<DetailTopBarMenu | null>(null);
   const params = useGlobalSearchParams<{
     title?: string | string[];
     hideMenu?: string | string[];
@@ -78,48 +81,52 @@ export default function DetailLayout() {
     : params.fromConversation;
   const purchaseRequestId = getPurchaseRequestId(params.purchaseRequest);
   const purchaseRequestStatus = getPurchaseRequestStatus(params.purchaseRequest);
-  const hideMenu =
-    hideMenuParam === "true" || pathname !== "/purchase-request" || !purchaseRequestId;
+  const showNotificationsMenu = pathname === "/notifications" && notificationsMenu !== null;
+  const hideMenu = !showNotificationsMenu &&
+    (hideMenuParam === "true" || pathname !== "/purchase-request" || !purchaseRequestId);
   const marketplaceSectionOwnsTopBar = pathname === "/marketplace-hub-section";
   const completedRequestsOwnsTopBar = pathname === "/completed-requests";
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.colors.background }}>
-      <View
-        style={{
-          flex: 1,
-          paddingHorizontal:
-            Platform.OS === "android" ||
-            marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar
-              ? 0
-              : t.spacing.md,
-        }}
-      >
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: {
-              backgroundColor: t.colors.background,
-              paddingHorizontal:
-                Platform.OS === "android" &&
-                !marketplaceSectionOwnsTopBar && !completedRequestsOwnsTopBar
-                  ? t.spacing.md
-                  : 0,
-            },
+    <DetailTopBarMenuContext.Provider value={setNotificationsMenu}>
+      <View style={{ flex: 1, backgroundColor: t.colors.background }}>
+        <View
+          style={{
+            flex: 1,
+            paddingHorizontal:
+              Platform.OS === "android" ||
+              marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar
+                ? 0
+                : t.spacing.md,
           }}
-        />
+        >
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: {
+                backgroundColor: t.colors.background,
+                paddingHorizontal:
+                  Platform.OS === "android" &&
+                  !marketplaceSectionOwnsTopBar && !completedRequestsOwnsTopBar
+                    ? t.spacing.md
+                    : 0,
+              },
+            }}
+          />
+        </View>
+        {marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar ? null : (
+          <DetailTopBar
+            title={title}
+            returnToHome={fromConversation === "true"}
+            hideMenu={hideMenu}
+            menu={showNotificationsMenu ? notificationsMenu : null}
+            hideBack={pathname === "/business-verification"}
+            purchaseRequestId={purchaseRequestId}
+            purchaseRequestStatus={purchaseRequestStatus}
+            topInset={insets.top}
+          />
+        )}
       </View>
-      {marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar ? null : (
-        <DetailTopBar
-          title={title}
-          returnToHome={fromConversation === "true"}
-          hideMenu={hideMenu}
-          hideBack={pathname === "/business-verification"}
-          purchaseRequestId={purchaseRequestId}
-          purchaseRequestStatus={purchaseRequestStatus}
-          topInset={insets.top}
-        />
-      )}
-    </View>
+    </DetailTopBarMenuContext.Provider>
   );
 }
