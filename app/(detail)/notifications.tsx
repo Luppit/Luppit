@@ -23,6 +23,7 @@ import React from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
+import { DetailTopBarMenuContext } from "@/src/components/navbar/DetailTopBarMenuContext";
 
 function formatNotificationTime(value: string) {
   const date = new Date(value);
@@ -174,6 +175,7 @@ function getNotificationActions(
 
 export default function NotificationsScreen() {
   const t = useTheme();
+  const setTopBarMenu = React.useContext(DetailTopBarMenuContext);
   const insets = useSafeAreaInsets();
   const { activeProfile, unreadNotificationCount, applyUnreadNotificationCount, refreshUnreadNotificationCount } =
     useActiveProfile();
@@ -388,6 +390,26 @@ export default function NotificationsScreen() {
     });
   }, [applyUnreadNotificationCount]);
 
+  React.useEffect(() => {
+    if (!setTopBarMenu) return;
+    setTopBarMenu(!isLoading && !loadError && notifications.length > 0 ? {
+      onPress: () => openPopup({
+        options: [{
+          id: "clear-notifications",
+          label: "Limpiar notificaciones",
+          icon: "trash-2",
+          textColorKey: "error",
+          iconColorKey: "error",
+          onPress: openDismissAllConfirmation,
+        }],
+      }),
+      accessibilityLabel: "Opciones de notificaciones",
+      disabled: isMarkingAllRead,
+      testID: "notification-options",
+    } : null);
+    return () => setTopBarMenu(null);
+  }, [isLoading, loadError, notifications.length, isMarkingAllRead, openDismissAllConfirmation, setTopBarMenu]);
+
   useFocusEffect(
     React.useCallback(() => {
       void loadNotifications();
@@ -431,46 +453,21 @@ export default function NotificationsScreen() {
       contentContainerStyle={s.content}
     >
       <View style={s.controls}>
-        <View style={s.toolbar}>
-          <View style={s.filters}>
-            <LuppitChip
-              label="Todas"
-              selected={filter === "all"}
-              bordered
-              onPress={() => setFilter("all")}
-            />
-            <LuppitChip
-              label="Sin leer"
-              count={unreadNotificationCount}
-              selected={filter === "unread"}
-              bordered
-              accessibilityLabel={`Sin leer, ${unreadNotificationCount} notificaciones`}
-              onPress={() => setFilter("unread")}
-            />
-          </View>
-          <Pressable
-            testID="notification-options"
-            accessibilityRole="button"
-            accessibilityLabel="Opciones de notificaciones"
-            accessibilityState={{ disabled: isMarkingAllRead }}
-            disabled={isMarkingAllRead}
-            onPress={isMarkingAllRead ? undefined : () => openPopup({
-              options: [{
-                id: "clear-notifications",
-                label: "Limpiar notificaciones",
-                icon: "trash-2",
-                textColorKey: "error",
-                iconColorKey: "error",
-                onPress: openDismissAllConfirmation,
-              }],
-            })}
-            style={({ pressed }) => [
-              s.optionsButton,
-              pressed ? s.controlPressed : null,
-            ]}
-          >
-            <Icon name="ellipsis" size={22} color={t.colors.textMedium} />
-          </Pressable>
+        <View style={s.filters}>
+          <LuppitChip
+            label="Todas"
+            selected={filter === "all"}
+            bordered
+            onPress={() => setFilter("all")}
+          />
+          <LuppitChip
+            label="Sin leer"
+            count={unreadNotificationCount}
+            selected={filter === "unread"}
+            bordered
+            accessibilityLabel={`Sin leer, ${unreadNotificationCount} notificaciones`}
+            onPress={() => setFilter("unread")}
+          />
         </View>
         <Pressable
           testID="mark-all-notifications-read"
@@ -636,24 +633,10 @@ function createNotificationsStyles(t: Theme, topContentInset = 0) {
     controls: {
       gap: t.spacing.sm,
     },
-    toolbar: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: t.spacing.sm,
-    },
     filters: {
-      flex: 1,
       flexDirection: "row",
       flexWrap: "wrap",
       gap: t.spacing.sm,
-    },
-    optionsButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      ...createRoundedSurfaceStyle(t),
-      alignItems: "center",
-      justifyContent: "center",
     },
     markAllButton: {
       minHeight: 44,

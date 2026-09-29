@@ -16,10 +16,12 @@ import { buildPurchaseRequestUrl } from "@/src/utils/purchaseRequestLink";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, Share, View } from "react-native";
+import type { DetailTopBarMenu } from "@/src/components/navbar/DetailTopBarMenuContext";
 
 type DetailTopBarProps = {
   title?: string;
   hideMenu?: boolean;
+  menu?: DetailTopBarMenu | null;
   hideBack?: boolean;
   returnToHome?: boolean;
   purchaseRequestId?: string | null;
@@ -32,6 +34,7 @@ export const DETAIL_TOP_BAR_VISIBLE_HEIGHT = 72;
 export default function DetailTopBar({
   title,
   hideMenu = false,
+  menu,
   hideBack = false,
   returnToHome = false,
   purchaseRequestId,
@@ -303,7 +306,7 @@ export default function DetailTopBar({
           hideBack ? null : <View style={{ width: 40 }} />
         ) : (
           <Pressable
-            onPress={() =>
+            onPress={menu?.onPress ?? (() =>
               openPopup({
                 options: [
                   {
@@ -344,7 +347,12 @@ export default function DetailTopBar({
                     : []),
                 ],
               })
-            }
+            )}
+            disabled={menu?.disabled}
+            accessibilityRole="button"
+            accessibilityLabel={menu?.accessibilityLabel ?? "Opciones de solicitud"}
+            accessibilityState={{ disabled: menu?.disabled ?? false }}
+            testID={menu?.testID}
             hitSlop={12}
             style={{ width: 40, alignItems: "flex-end", justifyContent: "center" }}
           >
