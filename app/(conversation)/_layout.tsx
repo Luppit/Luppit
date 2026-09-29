@@ -737,6 +737,8 @@ export default function ConversationLayout() {
                 <InputChat
                   onDraftChange={setHasComposerDraft}
                   placeholder="Escribe un mensaje"
+                  clearOnSendStart
+                  restoreOnSendFailure
                   onSend={async ({ text, images }) => {
                     const messageGroupId = createConversationMessageGroupId();
                     const outgoingMessages = buildOptimisticMessages(

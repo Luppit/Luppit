@@ -31,6 +31,7 @@ export type InputChatProps = {
   autoFocus?: boolean;
   clearOnSend?: boolean;
   clearOnSendStart?: boolean;
+  restoreOnSendFailure?: boolean;
   showImagePreview?: boolean;
   sendOnReturn?: boolean;
   onSend: (payload: {
@@ -53,6 +54,7 @@ export default function InputChat({
   autoFocus = false,
   clearOnSend = true,
   clearOnSendStart = false,
+  restoreOnSendFailure = false,
   showImagePreview = true,
   sendOnReturn = true,
   onSend,
@@ -171,6 +173,15 @@ export default function InputChat({
         clearInput();
       }
     } catch {
+      if (
+        sendIdRef.current === sendId &&
+        clearOnSend &&
+        clearOnSendStart &&
+        restoreOnSendFailure
+      ) {
+        setText(text);
+        updateImages(() => images);
+      }
       return;
     } finally {
       if (sendIdRef.current === sendId) {
@@ -184,8 +195,10 @@ export default function InputChat({
     isBlocked,
     clearOnSend,
     clearOnSendStart,
+    restoreOnSendFailure,
     clearInput,
     onSend,
+    updateImages,
   ]);
 
   const handleStop = useCallback(() => {

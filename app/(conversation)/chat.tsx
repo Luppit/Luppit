@@ -421,6 +421,7 @@ export default function ConversationChatScreen() {
     const isSystemMessage = messageKind === "SYSTEM";
     const isImageMessage = messageKind === "IMAGE" || Boolean(imageUri);
     const isOwnMessage = message.sender_profile_id === profileId;
+    const isPending = message.id.startsWith("optimistic-");
     const senderName =
       message.sender_profile_id != null
         ? senderNameById[message.sender_profile_id] ?? fallbackSenderLabel
@@ -475,7 +476,7 @@ export default function ConversationChatScreen() {
             }}
           >
             <Text variant="small" color="textDark" align="right">
-              {formatTime(message.created_at)}
+              {isPending ? "Enviando..." : formatTime(message.created_at)}
             </Text>
           </View>
         ) : null}
@@ -544,10 +545,12 @@ export default function ConversationChatScreen() {
             </Pressable>
           ) : null}
         </View>
-        <MessageUtilities
-          text={message.text}
-          align={isOwnMessage ? "right" : "left"}
-        />
+        {!isPending ? (
+          <MessageUtilities
+            text={message.text}
+            align={isOwnMessage ? "right" : "left"}
+          />
+        ) : null}
       </View>
     );
   };

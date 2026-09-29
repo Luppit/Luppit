@@ -285,6 +285,31 @@ test("failed keyboard send retains text and images for retry", async () => {
   assert.equal(composer.action.disabled, false);
 });
 
+for (const text of ["Foto de las llantas", ""]) {
+  test(`conversation composer restores ${text ? "text and photo" : "image-only"} after a failed send`, async () => {
+    const image = { uri: "file:///retry.jpg" };
+    const pending = deferred<void>();
+    const composer = createComposer({
+      clearOnSendStart: true,
+      restoreOnSendFailure: true,
+      onPickImages: () => [image],
+      onSend: () => pending.promise,
+    });
+    await composer.nodes.find((node) => node.props.accessibilityLabel === "Adjuntar imágenes")!.props.onPress();
+    if (text) composer.input.onChangeText(text);
+
+    const sending = composer.action.onPress();
+    assert.equal(composer.input.value, "");
+    assert.equal(composer.nodes.filter((node) => node.type === "Image").length, 0);
+    pending.reject(new Error("network failed"));
+    await sending;
+
+    assert.equal(composer.input.value, text);
+    assert.equal(composer.nodes.find((node) => node.type === "Image")!.props.source.uri, image.uri);
+    assert.equal(composer.action.disabled, false);
+  });
+}
+
 test("buyer app-button send clears immediately, sends once, and leaves failed photos in the retryable message", async () => {
   const session = await createSession();
   const layout = createLeaveLayout("ios", session);

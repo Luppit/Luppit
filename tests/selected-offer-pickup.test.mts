@@ -663,6 +663,8 @@ test("conversation send waits for the service and rejects a failed message", asy
   f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true } }));
   await flush();
   const composer = () => nodes(f.drawConversation()).find((node) => node.type === "InputChat")!.props;
+  assert.equal(composer().clearOnSendStart, true);
+  assert.equal(composer().restoreOnSendFailure, true);
   const failed = composer().onSend({ text: "Llantas", images: [] });
   assert.equal(f.messageSends.length, 1);
   assert.equal(f.drawConversation().props.value.optimisticMessages.length, 1);
