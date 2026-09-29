@@ -16,6 +16,7 @@ export type ConversationActionButtonTone = "primary" | "secondary" | "danger";
 export type ConversationActionButtonConfig = {
   id: string;
   label: string;
+  helperText?: string | null;
   icon: LucideIconName;
   tone: ConversationActionButtonTone;
 };

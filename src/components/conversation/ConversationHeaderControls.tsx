@@ -282,11 +282,11 @@ export default function ConversationHeaderControls({
                     key={button.id}
                     ref={index === 0 ? firstMenuItem : undefined}
                     accessibilityRole="button"
-                    accessibilityLabel={button.label}
+                    accessibilityLabel={[button.label, button.helperText].filter(Boolean).join(". ")}
                     disabled={disabled}
                     onPress={() => closeMenu(button.id)}
                     style={({ pressed }) => ({
-                      minHeight: 56,
+                      minHeight: button.helperText ? 72 : 56,
                       flexDirection: "row",
                       alignItems: "center",
                       gap: t.spacing.sm,
@@ -305,18 +305,25 @@ export default function ConversationHeaderControls({
                           : t.colors.textDark
                       }
                     />
-                    <Text
-                      variant="body"
-                      style={{
-                        flex: 1,
-                        color:
-                          button.tone === "danger"
-                            ? t.colors.error
-                            : t.colors.textDark,
-                      }}
-                    >
-                      {button.label}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        variant="body"
+                        style={{
+                          fontFamily: t.typography.subtitle.fontFamily,
+                          color:
+                            button.tone === "danger"
+                              ? t.colors.error
+                              : t.colors.textDark,
+                        }}
+                      >
+                        {button.label}
+                      </Text>
+                      {button.helperText ? (
+                        <Text variant="small" color="textMedium">
+                          {button.helperText}
+                        </Text>
+                      ) : null}
+                    </View>
                   </Pressable>
                 ))}
               </ScrollView>

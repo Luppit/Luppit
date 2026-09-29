@@ -104,6 +104,7 @@ function toMenuOptionConfig(action: ConversationViewAction): PopupOption {
   return {
     id: action.id,
     label: action.label || action.code || "",
+    helperText: action.helper_text,
     icon: normalizeOptionalIcon(action.icon),
     textColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",
     iconColorKey: isDanger ? "error" : isPrimary ? "primary" : "textDark",

@@ -14,7 +14,7 @@ const defaults = {
 test("actions-only header keeps the entire menu inside the left edge", () => {
   const layout = getConversationActionsMenuLayout(defaults);
   assert.equal(layout.left, 16);
-  assert.equal(layout.width, 280);
+  assert.equal(layout.width, 320);
   assert.equal(layout.top, 186);
 });
 
@@ -48,9 +48,9 @@ test("narrow screens and wrapped controls keep a scrollable menu inside every sa
         const layout = getConversationActionsMenuLayout(options);
         assert.ok(layout.left >= 40);
         assert.ok(layout.left + layout.width <= width - 40);
-        assert.ok(layout.width > 0 && layout.width <= 280);
+        assert.ok(layout.width > 0 && layout.width <= 320);
         assert.ok(layout.top >= 63);
-        assert.ok(layout.maxHeight >= 56);
+        assert.ok(layout.maxHeight >= 72);
         assert.equal(layout.top + layout.maxHeight, 794);
       }
     }
@@ -63,7 +63,7 @@ test("short viewports reserve visible scrolling space instead of overflowing bel
     height: 320,
     anchor: { ...defaults.anchor, y: 240 },
   });
-  assert.equal(layout.top, 214);
-  assert.equal(layout.maxHeight, 56);
+  assert.equal(layout.top, 198);
+  assert.equal(layout.maxHeight, 72);
   assert.equal(layout.top + layout.maxHeight, 270);
 });

@@ -647,6 +647,7 @@ export type Database = {
           confirmation_template_id: string | null
           created_at: string
           executor_code: string | null
+          helper_text: string | null
           icon: string | null
           id: string
           label: string | null
@@ -658,6 +659,7 @@ export type Database = {
           confirmation_template_id?: string | null
           created_at?: string
           executor_code?: string | null
+          helper_text?: string | null
           icon?: string | null
           id?: string
           label?: string | null
@@ -669,6 +671,7 @@ export type Database = {
           confirmation_template_id?: string | null
           created_at?: string
           executor_code?: string | null
+          helper_text?: string | null
           icon?: string | null
           id?: string
           label?: string | null

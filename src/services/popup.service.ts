@@ -7,6 +7,7 @@ type ThemeColorKey = keyof Theme["colors"];
 export type PopupOption = {
   id: string;
   label: string;
+  helperText?: string | null;
   icon?: LucideIconName;
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;

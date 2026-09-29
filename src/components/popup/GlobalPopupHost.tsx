@@ -2267,8 +2267,10 @@ export default function GlobalPopupHost() {
                           {index > 0 ? <View style={s.separator} /> : null}
                           <Pressable
                             onPress={() => handleOptionPress(option)}
+                            accessibilityLabel={[option.label, option.helperText].filter(Boolean).join(". ")}
                             style={[
                               s.optionButton,
+                              option.helperText ? { paddingVertical: t.spacing.sm } : null,
                               option.backgroundColorKey != null
                                 ? { backgroundColor: t.colors[option.backgroundColorKey] }
                                 : null,
@@ -2277,9 +2279,24 @@ export default function GlobalPopupHost() {
                             {option.icon ? (
                               <Icon name={option.icon} size={22} color={iconColor} />
                             ) : null}
-                            <Text variant="body" style={[s.optionLabel, { color: textColor }]}>
-                              {option.label}
-                            </Text>
+                            <View style={s.optionLabel}>
+                              <Text
+                                variant="body"
+                                style={{
+                                  color: textColor,
+                                  fontFamily: option.helperText
+                                    ? t.typography.subtitle.fontFamily
+                                    : t.typography.body.fontFamily,
+                                }}
+                              >
+                                {option.label}
+                              </Text>
+                              {option.helperText ? (
+                                <Text variant="small" color="textMedium">
+                                  {option.helperText}
+                                </Text>
+                              ) : null}
+                            </View>
                           </Pressable>
                         </React.Fragment>
                       );

@@ -104,6 +104,7 @@ export type ConversationViewAction = {
   id: string;
   code: string;
   label: string;
+  helper_text: string | null;
   icon: string | null;
   style_code: string | null;
   ui_slot: string | null;
@@ -470,6 +471,7 @@ function parseConversationViewAction(raw: unknown): ConversationViewAction | nul
     id,
     code,
     label,
+    helper_text: typeof value.helper_text === "string" ? value.helper_text : null,
     icon:
       typeof value.icon === "string"
         ? value.icon

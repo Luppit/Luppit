@@ -26,7 +26,7 @@ export type GlobalPopupStyles = {
   indicator: ViewStyle;
   optionButton: ViewStyle;
   optionList: ViewStyle;
-  optionLabel: TextStyle;
+  optionLabel: ViewStyle;
   separator: ViewStyle;
   section: ViewStyle;
   filterSection: ViewStyle;

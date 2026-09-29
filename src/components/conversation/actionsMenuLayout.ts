@@ -17,12 +17,12 @@ export function getConversationActionsMenuLayout({
 }) {
   const minLeft = insets.left + margin;
   const maxRight = width - insets.right - margin;
-  const menuWidth = Math.max(0, Math.min(280, maxRight - minLeft));
+  const menuWidth = Math.max(0, Math.min(320, maxRight - minLeft));
   const minTop = insets.top + margin;
   const maxBottom = height - insets.bottom - margin;
   const top = Math.max(
     minTop,
-    Math.min(anchor.y + anchor.height + gap, maxBottom - 56),
+    Math.min(anchor.y + anchor.height + gap, maxBottom - 72),
   );
 
   return {

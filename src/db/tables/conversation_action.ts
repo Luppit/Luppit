@@ -8,6 +8,7 @@ export const COL_CONVERSATION_ACTION = {
   created_at: "created_at",
   code: "code",
   label: "label",
+  helper_text: "helper_text",
   icon: "icon",
   ui_slot: "ui_slot",
   style_code: "style_code",
