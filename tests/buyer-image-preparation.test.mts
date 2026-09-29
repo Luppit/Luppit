@@ -4,7 +4,7 @@ import test from "node:test";
 import { URL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
-import type { preparePurchaseRequestImage } from "../src/services/purchase.request.image.service";
+import type { prepareConversationImageForUpload, preparePurchaseRequestImage } from "../src/services/purchase.request.image.service";
 
 function createPreparation() {
   const sizes = new Map<string, number>();
@@ -28,7 +28,7 @@ function createPreparation() {
     },
   };
   const source = readFileSync(new URL("../src/services/purchase.request.image.service.ts", import.meta.url), "utf8");
-  const exports = {} as { preparePurchaseRequestImage: typeof preparePurchaseRequestImage };
+  const exports = {} as { preparePurchaseRequestImage: typeof preparePurchaseRequestImage; prepareConversationImageForUpload: typeof prepareConversationImageForUpload };
   runInNewContext(ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText, {
@@ -41,6 +41,7 @@ function createPreparation() {
   });
   return {
     prepare: exports.preparePurchaseRequestImage,
+    prepareConversation: exports.prepareConversationImageForUpload,
     sizes,
     attempts,
     set outputSizes(value: number[]) { outputSizes = value; },
@@ -87,4 +88,17 @@ test("failed or insufficient compression rejects instead of dropping or mislabel
   prep.outputSizes = [3 * 1024 * 1024];
   await assert.rejects(prep.prepare(image), /No se pudo reducir/);
   assert.equal(prep.attempts.length, 4);
+});
+
+test("conversation photos keep the 4 MB contract and resize oversized camera images", async () => {
+  const prep = createPreparation();
+  const image = { uri: "file:///photo.jpg", mime: "image/jpeg", width: 4000, height: 3000, size: 3_000_000 };
+  assert.equal((await prep.prepareConversation(image)).uri, image.uri);
+  assert.equal(prep.attempts.length, 0);
+
+  prep.outputSizes = [3_500_000];
+  const prepared = await prep.prepareConversation({ ...image, size: 6_000_000 });
+  assert.equal(prepared.uri, "file:///prepared-0.jpeg");
+  assert.equal(prepared.size, 3_500_000);
+  assert.equal(prepared.name, "conversation-image.jpg");
 });

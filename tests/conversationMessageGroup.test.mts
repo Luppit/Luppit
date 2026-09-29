@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildConversationMessageRenderGroups,
   getConversationMessageLogicalKey,
+  getConversationRenderImageUri,
   shouldGroupConversationImages,
 } from "../src/utils/conversationMessageGroup.ts";
 
@@ -46,6 +47,18 @@ test("renders text plus three shuffled images as one index-ordered group", () =>
     ),
     ["TEXT:0", "IMAGE:1", "IMAGE:2", "IMAGE:3"]
   );
+});
+
+test("a text and single-photo group renders the photo from its image row", () => {
+  const messages = [
+    { ...base, id: "text", message_group_id: "group-a", message_group_index: 0, message_kind: "TEXT", text: "Llantas", image_url: null },
+    { ...base, id: "photo", message_group_id: "group-a", message_group_index: 1, message_kind: "IMAGE", text: null, image_url: "file:///tire.jpg" },
+  ];
+  const groups = buildConversationMessageRenderGroups(messages);
+  assert.equal(groups[0].type, "messageGroup");
+  const representative = groups[0].messages.find((message) => message.text) ?? groups[0].messages[0];
+  const imageRows = groups[0].messages.filter((message) => message.image_url).map((message) => ({ uri: message.image_url! }));
+  assert.equal(getConversationRenderImageUri(representative, imageRows), "file:///tire.jpg");
 });
 
 test("uses group index as the realtime optimistic replacement key", () => {

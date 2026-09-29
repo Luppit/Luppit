@@ -679,6 +679,29 @@ test("conversation send waits for the service and rejects a failed message", asy
   assert.equal(f.drawConversation().props.value.optimisticMessages[0].id, "saved");
 });
 
+test("conversation text and photo stay together through optimistic and saved message state", async () => {
+  const f = fixture();
+  f.drawConversation();
+  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true } }));
+  await flush();
+  const composer = () => nodes(f.drawConversation()).find((node) => node.type === "InputChat")!.props;
+  const image = { uri: "file:///tire.jpg" };
+  const pending = composer().onSend({ text: "Llantas", images: [image] });
+  assert.equal(f.messageSends.length, 1);
+  assert.deepEqual(Array.from(f.drawConversation().props.value.optimisticMessages, (message: any) => message.message_kind), ["TEXT", "IMAGE"]);
+  assert.equal(f.drawConversation().props.value.optimisticMessages[1].image_url, image.uri);
+
+  f.messageSends[0].resolve({ ok: true, data: [
+    { id: "text", message_kind: "TEXT", message_group_index: 0, text: "Llantas" },
+    { id: "photo", message_kind: "IMAGE", message_group_index: 1, image_path: "published/photo.jpg" },
+  ] });
+  await pending;
+  const saved = f.drawConversation().props.value.optimisticMessages;
+  assert.equal(saved[0].id, "text");
+  assert.equal(saved[1].id, "photo");
+  assert.equal(saved[1].image_url, image.uri);
+});
+
 test("an open acceptance confirmation closes when the offer revision changes", () => {
   const f = fixture();
   const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });

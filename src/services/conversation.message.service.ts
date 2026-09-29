@@ -10,6 +10,7 @@ import {
   toAbsoluteStorageUrl,
 } from "../lib/supabase/storage";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { prepareConversationImageForUpload } from "./purchase.request.image.service";
 
 export type ConversationMessage = Row<"conversation_message"> & {
   image_path?: string | null;
@@ -356,7 +357,22 @@ export async function createConversationMessages(
   const preparedImages: PreparedConversationImage[] = [];
 
   for (const image of images) {
-    const prepared = await prepareConversationImage(image);
+    let uploadImage: ConversationMessageImage;
+    try {
+      uploadImage = await prepareConversationImageForUpload(image);
+    } catch (error) {
+      return {
+        ok: false,
+        error: {
+          type: "validation",
+          code: "invalid_conversation_image",
+          message: error instanceof Error
+            ? error.message
+            : "No se pudo preparar la imagen seleccionada.",
+        },
+      };
+    }
+    const prepared = await prepareConversationImage(uploadImage);
     if (!prepared.ok) return prepared;
     preparedImages.push(prepared.data);
   }
@@ -385,6 +401,5 @@ export async function createConversationMessages(
   );
   if (!created.ok) return created;
 
-  const createdWithUrls = await withSignedImageUrls(created.data);
-  return { ok: true, data: createdWithUrls };
+  return created;
 }

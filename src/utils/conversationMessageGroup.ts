@@ -15,6 +15,13 @@ export type ConversationMessageRenderGroup<T> = {
   messages: T[];
 };
 
+export function getConversationRenderImageUri(
+  message: GroupableConversationMessage,
+  groupImages?: { uri: string }[]
+) {
+  return groupImages?.[0]?.uri ?? message.image_url ?? null;
+}
+
 const legacyImageGroupWindowMs = 2 * 60 * 1000;
 
 export function shouldGroupConversationImages(

@@ -14,6 +14,7 @@ import { useTheme } from "@/src/themes";
 import {
   buildConversationMessageRenderGroups,
   getConversationMessageLogicalKey,
+  getConversationRenderImageUri,
 } from "@/src/utils/conversationMessageGroup";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -415,7 +416,8 @@ export default function ConversationChatScreen() {
     imageGroup?: ConversationImagePreview[]
   ) => {
     const messageKind = (message.message_kind ?? "").toUpperCase();
-    const imageUri = getMessageImageUri(message);
+    const imageUri = getConversationRenderImageUri(message, imageGroup) ??
+      getMessageImageUri(message);
     const isSystemMessage = messageKind === "SYSTEM";
     const isImageMessage = messageKind === "IMAGE" || Boolean(imageUri);
     const isOwnMessage = message.sender_profile_id === profileId;
@@ -538,12 +540,6 @@ export default function ConversationChatScreen() {
                   borderRadius: t.borders.sm,
                 }}
                 resizeMode="cover"
-                onError={(error) => {
-                  console.log("conversation image render error", {
-                    imageUri,
-                    error,
-                  });
-                }}
               />
             </Pressable>
           ) : null}

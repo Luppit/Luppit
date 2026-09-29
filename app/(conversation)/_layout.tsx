@@ -782,11 +782,20 @@ export default function ConversationLayout() {
                         throw created.error;
                       }
 
+                      const createdMessages = created.data.map((message, index) => {
+                        if ((message.message_kind ?? "").toUpperCase() !== "IMAGE") return message;
+                        const imageIndex = (message.message_group_index ?? index) -
+                          (text.trim() ? 1 : 0);
+                        return {
+                          ...message,
+                          image_url: images[imageIndex]?.uri ?? message.image_url,
+                        };
+                      });
                       setOptimisticMessages((current) => [
                         ...current.filter(
                           (message) => !outgoingMessageIds.includes(message.id)
                         ),
-                        ...created.data,
+                        ...createdMessages,
                       ]);
                       setMessageRefreshTick((prev) => prev + 1);
                     } finally {

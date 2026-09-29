@@ -3,6 +3,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import type { ChatImage } from "../components/inputChat/inputChat";
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_CONVERSATION_IMAGE_BYTES = 4_000_000;
 const MAX_DIMENSIONS = [1600, 1200, 900, 700];
 
 function imageMimeType(image: ChatImage) {
@@ -15,7 +16,12 @@ function imageMimeType(image: ChatImage) {
     extension === "gif" ? "image/gif" : null;
 }
 
-export async function preparePurchaseRequestImage(image: ChatImage): Promise<ChatImage> {
+async function prepareImage(
+  image: ChatImage,
+  maxBytes: number,
+  name: string,
+  limitLabel: string
+): Promise<ChatImage> {
   const mime = imageMimeType(image);
   if (!mime || !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mime)) {
     return image;
@@ -25,9 +31,11 @@ export async function preparePurchaseRequestImage(image: ChatImage): Promise<Cha
   if (!Number.isFinite(size) || size <= 0) {
     throw new Error("No se pudo leer la imagen seleccionada.");
   }
-  if (size <= MAX_IMAGE_BYTES) return { ...image, size };
+  if (size <= maxBytes) return { ...image, size };
   if (mime === "image/gif") {
-    throw new Error("El GIF supera 2 MB. Selecciona uno más pequeño para conservar su animación.");
+    throw new Error(
+      `El GIF supera ${limitLabel}. Selecciona uno más pequeño para conservar su animación.`
+    );
   }
   if (!image.width || !image.height) {
     throw new Error("No se pudo leer el tamaño de la imagen seleccionada.");
@@ -53,7 +61,7 @@ export async function preparePurchaseRequestImage(image: ChatImage): Promise<Cha
     } catch {
       throw new Error("No se pudo preparar la imagen. Vuelve a seleccionarla.");
     }
-    if (preparedSize > 0 && preparedSize <= MAX_IMAGE_BYTES) {
+    if (preparedSize > 0 && preparedSize <= maxBytes) {
       const extension = format === ImageManipulator.SaveFormat.JPEG ? "jpg" : format;
       return {
         uri: result.uri,
@@ -61,9 +69,19 @@ export async function preparePurchaseRequestImage(image: ChatImage): Promise<Cha
         width: result.width,
         height: result.height,
         size: preparedSize,
-        name: `request-image.${extension}`,
+        name: `${name}.${extension}`,
       };
     }
   }
-  throw new Error("No se pudo reducir la imagen a 2 MB. Selecciona una más pequeña.");
+  throw new Error(
+    `No se pudo reducir la imagen a ${limitLabel}. Selecciona una más pequeña.`
+  );
+}
+
+export function preparePurchaseRequestImage(image: ChatImage): Promise<ChatImage> {
+  return prepareImage(image, MAX_IMAGE_BYTES, "request-image", "2 MB");
+}
+
+export function prepareConversationImageForUpload(image: ChatImage): Promise<ChatImage> {
+  return prepareImage(image, MAX_CONVERSATION_IMAGE_BYTES, "conversation-image", "4 MB");
 }
