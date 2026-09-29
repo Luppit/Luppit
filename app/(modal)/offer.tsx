@@ -1056,6 +1056,7 @@ function OfferAssistantScreen({
           disabled={isBusy || !initialized || status === "sent" || status === "cancelled"}
           busy={isBusy}
           onStop={processingMode ? handleStop : undefined}
+          clearOnSendStart
           maxChars={4000}
           maxImages={6}
           placeholder={
@@ -1253,7 +1254,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
     {status !== "sent" ? <View style={{ paddingTop: t.spacing.sm,
       paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, t.spacing.md)
         : Platform.OS === "android" && !isAndroidKeyboardVisible ? Math.max(insets.bottom, t.spacing.sm) : t.spacing.sm,
-    }}><InputChat disabled={!initialized || busy} busy={busy}
+    }}><InputChat disabled={!initialized || busy} busy={busy} clearOnSendStart
       onStop={() => {
         if (activeInputRef.current) setPendingRetry(activeInputRef.current);
         activeRequestRef.current?.abort();
