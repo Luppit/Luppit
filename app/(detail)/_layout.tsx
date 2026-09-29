@@ -2,7 +2,7 @@ import DetailTopBar from "./detail-top-bar";
 import { useTheme } from "@/src/themes";
 import { Stack, useGlobalSearchParams, usePathname } from "expo-router";
 import React from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export const unstable_settings = {
@@ -89,6 +89,7 @@ export default function DetailLayout() {
         style={{
           flex: 1,
           paddingHorizontal:
+            Platform.OS === "android" ||
             marketplaceSectionOwnsTopBar || completedRequestsOwnsTopBar
               ? 0
               : t.spacing.md,
@@ -97,7 +98,14 @@ export default function DetailLayout() {
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: t.colors.background },
+            contentStyle: {
+              backgroundColor: t.colors.background,
+              paddingHorizontal:
+                Platform.OS === "android" &&
+                !marketplaceSectionOwnsTopBar && !completedRequestsOwnsTopBar
+                  ? t.spacing.md
+                  : 0,
+            },
           }}
         />
       </View>
