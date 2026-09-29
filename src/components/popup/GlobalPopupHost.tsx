@@ -1617,14 +1617,9 @@ export default function GlobalPopupHost() {
                           accessible
                           accessibilityRole="header"
                           accessibilityLabel={showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
-                          style={[s.summaryHeader,
-                            summaryConfig.offerVisual ? { justifyContent: "center" } : null]}
+                          style={s.summaryHeader}
                         >
-                          <Text
-                            variant="subtitle"
-                            style={[s.summaryTitle,
-                              summaryConfig.offerVisual ? { textAlign: "center" } : null]}
-                          >
+                          <Text variant="subtitle" style={s.summaryTitle}>
                             {showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
                           </Text>
                         </View>
