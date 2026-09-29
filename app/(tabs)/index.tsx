@@ -558,8 +558,8 @@ function MarketplaceHomeContent({
               {activeRequestCount}{" "}
               {role === "buyer"
                 ? activeRequestCount === 1
-                  ? "solicitud en movimiento"
-                  : "solicitudes en movimiento"
+                  ? "solicitud activa"
+                  : "solicitudes activas"
                 : activeRequestCount === 1
                   ? "oportunidad disponible"
                   : "oportunidades disponibles"}
