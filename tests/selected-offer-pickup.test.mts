@@ -657,6 +657,54 @@ test("conversation action bubble includes ordered TOP and AUX actions independen
   }
 });
 
+test("conversation menu omits paired header actions for buyers and sellers", async () => {
+  for (const [role, codes] of [
+    ["BUYER", ["BUYER_ACCEPT_OFFER", "BUYER_CANCEL_PURCHASE_OFFER_ACCEPTED"]],
+    ["SELLER", ["SELLER_DISCARD_REQUEST", "SELLER_CREATE_OFFER"]],
+  ] as const) {
+    const f = fixture();
+    f.drawConversation();
+    const first = pickupAction({ id: "first", code: codes[0], ui_slot: "TOP", label: "Primera acción" });
+    const second = pickupAction({ id: "second", code: codes[1], ui_slot: "AUX", label: "Segunda acción" });
+    const help = pickupAction({ id: "help", code: "CONVERSATION_HELP_CENTER", ui_slot: "MENU", label: "Centro de ayuda",
+      executor: { execution_type: "client_command", target: "detail.faq", requires_refresh: false }, confirmation: null });
+    const actions = [
+      first,
+      pickupAction({ id: "first-menu", code: `${codes[0]}_MENU`, ui_slot: "MENU", label: first.label }),
+      help,
+      second,
+      pickupAction({ id: "second-menu", code: `${codes[1]}_MENU`, ui_slot: "MENU", label: second.label }),
+      pickupAction({ id: "report", code: "REPORT_CONVERSATION", ui_slot: "MENU", label: "Reportar conversación" }),
+      pickupAction({ id: "block", code: "BLOCK_COUNTERPART", ui_slot: "MENU", label: "Bloquear contacto" }),
+      pickupAction({ id: "unpaired", code: "FUTURE_MENU_ONLY_MENU", ui_slot: "MENU", label: first.label }),
+    ];
+    f.reads[0].resolve(viewResult({ role_code: role, actions }));
+    await flush();
+
+    const tree = f.drawConversation();
+    assert.deepEqual(Array.from(buttons(tree)!.props.buttons, (action: any) => action.id), ["first", "second"]);
+    nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones")!.props.onPress();
+    assert.deepEqual(Array.from(f.popups.at(-1).options, (option: any) => option.id), ["help", "report", "block", "unpaired"]);
+    f.popups.at(-1).options[0].onPress();
+    assert.ok(f.calls.some((call) => call[0] === "push" && call[1].pathname === "/(detail)/faq"));
+    buttons(tree)!.props.onPress("first");
+    assert.equal(f.popups.at(-1).title, first.confirmation.title);
+  }
+});
+
+test("conversation overflow is hidden when all menu actions already appear in Acciones", async () => {
+  const f = fixture();
+  f.drawConversation();
+  f.reads[0].resolve(viewResult({ actions: [
+    pickupAction({ id: "header", code: "SELLER_CREATE_OFFER", ui_slot: "TOP" }),
+    pickupAction({ id: "menu", code: "SELLER_CREATE_OFFER_MENU", ui_slot: "MENU" }),
+  ] }));
+  await flush();
+  const tree = f.drawConversation();
+  assert.deepEqual(Array.from(buttons(tree)!.props.buttons, (action: any) => action.id), ["header"]);
+  assert.equal(nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones"), undefined);
+});
+
 test("conversation send waits for the service and rejects a failed message", async () => {
   const f = fixture();
   f.drawConversation();
