@@ -161,10 +161,11 @@ export default function InputChat({
     sendingRef.current = true;
     try {
       setSending(true);
+      const send = Promise.resolve(onSend({ text: trimmed, images }));
       if (clearOnSend && clearOnSendStart) {
         clearInput();
       }
-      await Promise.resolve(onSend({ text: trimmed, images }));
+      await send;
 
       if (sendIdRef.current === sendId && clearOnSend && !clearOnSendStart) {
         clearInput();

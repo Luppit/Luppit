@@ -285,6 +285,75 @@ test("failed keyboard send retains text and images for retry", async () => {
   assert.equal(composer.action.disabled, false);
 });
 
+test("buyer app-button send clears immediately, sends once, and leaves failed photos in the retryable message", async () => {
+  const session = await createSession();
+  const layout = createLeaveLayout("ios", session);
+  const inputProps = elements(layout.render()).find((node) => node.type === "InputChat")!.props;
+  assert.equal(inputProps.clearOnSendStart, true);
+  assert.equal(inputProps.sendOnReturn, false);
+  const image = { uri: "file:///tire.jpg", mime: "image/jpeg" };
+  const composer = createComposer({ ...inputProps, onPickImages: () => [image] });
+  await composer.nodes.find((node) => node.props.accessibilityLabel === "Adjuntar imágenes")!.props.onPress();
+  composer.input.onChangeText("Llantas");
+  const sending = composer.action.onPress();
+  assert.equal(composer.input.value, "");
+  assert.equal(composer.nodes.filter((node) => node.type === "Image").length, 0);
+  assert.equal(session.state.messages[0].text, "Llantas");
+  assert.deepEqual(session.state.messages[0].images, [image]);
+  composer.action.onPress();
+  assert.equal(session.calls.length, 1);
+  session.calls[0].response.resolve({
+    ok: false, error: { type: "network", message: "No se pudo enviar." },
+    statusCode: 500, requestId: null, retryAfterSeconds: null, backendMessage: null,
+  });
+  await sending;
+  assert.equal(session.state.messages[0].failedRequests?.length, 1);
+  assert.deepEqual(session.state.messages[0].failedRequests?.[0].images, [image]);
+  const retry = session.state.retryMessage(session.state.messages[0].id);
+  assert.equal(session.calls[1].input.client_request_id, session.calls[0].input.client_request_id);
+  session.calls[1].response.resolve(success());
+  await retry;
+  assert.equal(session.state.messages.filter((message) => message.sender === "user").length, 1);
+});
+
+test("buyer app-button cancellation keeps the cleared turn available for retry", async () => {
+  const session = await createSession();
+  const layout = createLeaveLayout("ios", session);
+  const inputProps = elements(layout.render()).find((node) => node.type === "InputChat")!.props;
+  const composer = createComposer(inputProps);
+  composer.input.onChangeText("Llantas");
+  const sending = composer.action.onPress();
+  assert.equal(composer.input.value, "");
+  composer.action.onPress();
+  assert.equal(session.calls[0].input.signal!.aborted, true);
+  session.calls[0].response.resolve(success());
+  await sending;
+  assert.equal(session.state.messages[0].text, "Llantas");
+  assert.equal(session.state.messages[0].failedRequests?.length, 1);
+});
+
+test("image-only failed messages show a retry action", () => {
+  const runtime = createHooks();
+  const module = loadComponent<{ default: (props: { text: string; onRetry: () => void }) => Element }>(
+    "../src/components/message/MessageUtilities.tsx",
+    {
+      react: runtime.hooks,
+      "react-native": { AccessibilityInfo: {}, Pressable: "Pressable", Share: {}, View: "View" },
+      "expo-clipboard": {},
+      "@/src/components/Icon": { Icon: "Icon" },
+      "@/src/themes": { useTheme: () => ({ spacing: { xs: 4 }, colors: {} }) },
+      "@/src/utils/useToast": { showError() {}, showSuccess() {} },
+    },
+  );
+  let retries = 0;
+  const view = elements(runtime.render(() => module.default({ text: "", onRetry: () => retries++ })));
+  const retry = view.find((node) => node.props.accessibilityLabel === "Reintentar mensaje");
+  assert.ok(retry);
+  retry.props.onPress();
+  assert.equal(retries, 1);
+  assert.equal(view.some((node) => node.props.accessibilityLabel === "Copiar mensaje"), false);
+});
+
 test("buyer composer keeps return as newline", () => {
   const composer = createComposer({ sendOnReturn: false });
   assert.equal(composer.input.submitBehavior, "newline");

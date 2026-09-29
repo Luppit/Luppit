@@ -165,6 +165,7 @@ function ChatLayoutContent() {
               disabled={!canCompose}
               busy={isSendingMessage}
               onStop={stopAssistant}
+              clearOnSendStart
               placeholder={
                 uiState === "review" ? "Escribe un cambio" : "Escribe un mensaje"
               }

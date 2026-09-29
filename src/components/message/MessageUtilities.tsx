@@ -64,7 +64,7 @@ export default function MessageUtilities({
     }
   }, [hasText, messageText]);
 
-  if (!hasText) return null;
+  if (!hasText && !onRetry) return null;
 
   const utilityButtonStyle = ({ pressed }: { pressed: boolean }) => ({
     width: 44,
@@ -83,36 +83,40 @@ export default function MessageUtilities({
         marginHorizontal: -t.spacing.xs,
       }}
     >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={isCopied ? "Mensaje copiado" : "Copiar mensaje"}
-        accessibilityHint="Copia el texto al portapapeles"
-        hitSlop={4}
-        onPress={() => void copyMessage()}
-        style={utilityButtonStyle}
-      >
-        <Icon
-          name={isCopied ? "check" : "copy"}
-          size={20}
-          color={isCopied ? t.colors.primary : t.colors.stateAnulated}
-          strokeWidth={1.8}
-        />
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Compartir mensaje"
-        accessibilityHint="Abre las opciones para compartir el texto"
-        hitSlop={4}
-        onPress={() => void shareMessage()}
-        style={utilityButtonStyle}
-      >
-        <Icon
-          name="share-2"
-          size={20}
-          color={t.colors.stateAnulated}
-          strokeWidth={1.8}
-        />
-      </Pressable>
+      {hasText ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isCopied ? "Mensaje copiado" : "Copiar mensaje"}
+          accessibilityHint="Copia el texto al portapapeles"
+          hitSlop={4}
+          onPress={() => void copyMessage()}
+          style={utilityButtonStyle}
+        >
+          <Icon
+            name={isCopied ? "check" : "copy"}
+            size={20}
+            color={isCopied ? t.colors.primary : t.colors.stateAnulated}
+            strokeWidth={1.8}
+          />
+        </Pressable>
+      ) : null}
+      {hasText ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Compartir mensaje"
+          accessibilityHint="Abre las opciones para compartir el texto"
+          hitSlop={4}
+          onPress={() => void shareMessage()}
+          style={utilityButtonStyle}
+        >
+          <Icon
+            name="share-2"
+            size={20}
+            color={t.colors.stateAnulated}
+            strokeWidth={1.8}
+          />
+        </Pressable>
+      ) : null}
       {onRetry ? (
         <Pressable
           accessibilityRole="button"
