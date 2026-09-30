@@ -112,12 +112,8 @@ export type GlobalPopupStyles = {
   summaryImagePreviewImage: ImageStyle;
   summaryImagePreviewBackdrop: ViewStyle;
   summaryImagePreviewClose: ViewStyle;
-  datePickerBackdrop: ViewStyle;
-  datePickerSheet: ViewStyle;
   datePickerCard: ViewStyle;
-  datePickerHeader: ViewStyle;
   datePicker: ViewStyle;
-  datePickerActionsRow: ViewStyle;
   summaryActionsRow: ViewStyle;
   summaryActionButton: ViewStyle;
   summaryActionButtonSingle: ViewStyle;
@@ -653,33 +649,18 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       alignItems: "center",
       justifyContent: "center",
     },
-    datePickerBackdrop: {
-      flex: 1,
-      backgroundColor: "rgba(0,0,0,0.34)",
-      justifyContent: "center",
-      paddingHorizontal: t.spacing.md,
-    },
-    datePickerSheet: {
-      width: "100%",
-      maxWidth: 420,
-      alignSelf: "center",
-      overflow: "hidden",
-      ...createRoundedSurfaceStyle(t),
-    },
     datePickerCard: {
+      borderWidth: 1,
+      borderColor: SOFT_BORDER_COLOR,
+      backgroundColor: t.colors.backgroudWhite,
+      borderRadius: t.borders.md,
       padding: t.spacing.md,
-      gap: t.spacing.md,
-    },
-    datePickerHeader: {
       gap: t.spacing.xs,
+      overflow: "hidden",
     },
     datePicker: {
       height: 216,
       alignSelf: "stretch",
-    },
-    datePickerActionsRow: {
-      flexDirection: "row",
-      gap: t.spacing.sm,
     },
     summaryActionsRow: {
       paddingHorizontal: t.spacing.md,

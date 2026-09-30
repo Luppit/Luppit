@@ -57,6 +57,11 @@ const SUMMARY_TOAST_DURATION = 2_800;
 
 function parseDateValue(rawValue: string): Date | null {
   if (!rawValue) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawValue)) {
+    const [year, month, day] = rawValue.split("-").map(Number);
+    const parsed = new Date(year, month - 1, day);
+    return formatDateValue(parsed) === rawValue ? parsed : null;
+  }
   const parsed = new Date(rawValue);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
@@ -329,6 +334,7 @@ export default function GlobalPopupHost() {
 
     return () => clearTimeout(timeout);
   }, [
+    activeDateField,
     activeSummaryChoiceInput,
     filterConfig,
     isMounted,
@@ -337,6 +343,10 @@ export default function GlobalPopupHost() {
   ]);
 
   const dismissCurrentLayer = () => {
+    if (activeDateField) {
+      setActiveDateField(null);
+      return;
+    }
     if (activeSummaryChoiceInputId) {
       setActiveSummaryChoiceInputId(null);
       return;
@@ -984,6 +994,10 @@ export default function GlobalPopupHost() {
       return;
     }
     if (successConfig || summaryActionPendingRef.current) return;
+    if (activeDateField) {
+      dismissCurrentLayer();
+      return;
+    }
     if (activeSummaryChoiceInputId) {
       dismissCurrentLayer();
       return;
@@ -1018,7 +1032,7 @@ export default function GlobalPopupHost() {
           ? handleAndroidBack
           : successConfig
             ? () => undefined
-            : activeSummaryChoiceInputId || showComparisonDetails
+            : activeDateField || activeSummaryChoiceInputId || showComparisonDetails
               ? dismissCurrentLayer
               : canDismissPopup
                 ? closePopup
@@ -1031,7 +1045,7 @@ export default function GlobalPopupHost() {
         onAccessibilityEscape={
           successConfig
             ? () => void handleSuccessActionPress()
-            : activeSummaryChoiceInputId || showComparisonDetails
+            : activeDateField || activeSummaryChoiceInputId || showComparisonDetails
               ? dismissCurrentLayer
               : canDismissPopup
                 ? closePopup
@@ -1042,7 +1056,7 @@ export default function GlobalPopupHost() {
           <Pressable
             style={[s.backdrop, { opacity: 0.34 }]}
             onPress={
-              activeSummaryChoiceInputId
+              activeDateField || activeSummaryChoiceInputId
                 ? dismissCurrentLayer
                 : canDismissPopup
                   ? dismissCurrentLayer
@@ -1125,7 +1139,75 @@ export default function GlobalPopupHost() {
                 >
                   <View style={s.indicator} />
                 </View>
-                {filterConfig ? (
+                {filterConfig && activeDateField ? (
+                  <>
+                    <View style={s.section}>
+                      <View style={s.summaryHeaderBlock}>
+                        <View
+                          ref={sheetHeadingRef}
+                          accessible
+                          accessibilityRole="header"
+                          accessibilityLabel={
+                            activeDateField === "start"
+                              ? "Selecciona la fecha inicial"
+                              : "Selecciona la fecha final"
+                          }
+                          style={s.summaryHeader}
+                        >
+                          <Text variant="subtitle" style={s.summaryTitle}>
+                            {activeDateField === "start"
+                              ? "Selecciona la fecha inicial"
+                              : "Selecciona la fecha final"}
+                          </Text>
+                        </View>
+                        <View style={s.summaryHeaderSeparator} />
+                      </View>
+
+                      <View style={s.datePickerCard}>
+                        <Text variant="body" color="textMedium">
+                          {formatDateValue(pickerValue)}
+                        </Text>
+                        <DateTimePicker
+                          value={pickerValue}
+                          mode="date"
+                          display={Platform.OS === "ios" ? "spinner" : "calendar"}
+                          style={s.datePicker}
+                          themeVariant="light"
+                          textColor={t.colors.textDark}
+                          onChange={(_event, selectedDate) => {
+                            if (selectedDate) setPickerValue(selectedDate);
+                          }}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={s.filterActionsRow}>
+                      <Pressable
+                        style={[s.filterActionButton, s.filterActionButtonSecondary]}
+                        onPress={() => setActiveDateField(null)}
+                      >
+                        <Text
+                          variant="body"
+                          style={[s.filterActionLabel, s.filterActionLabelSecondary]}
+                        >
+                          Cancelar
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        style={[s.filterActionButton, s.filterActionButtonPrimary]}
+                        onPress={applyDatePickerValue}
+                      >
+                        <Text
+                          variant="body"
+                          style={[s.filterActionLabel, s.filterActionLabelPrimary]}
+                        >
+                          Confirmar
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : filterConfig ? (
                   <>
                     <ScrollView
                       style={[
@@ -2360,68 +2442,6 @@ export default function GlobalPopupHost() {
               : null}
           </GlassSurface>
         </View>
-      </Modal>
-
-      <Modal
-        transparent
-        visible={activeDateField != null}
-        animationType="fade"
-        onRequestClose={() => setActiveDateField(null)}
-      >
-        <Pressable style={s.datePickerBackdrop} onPress={() => setActiveDateField(null)}>
-          <Pressable onPress={(event) => event.stopPropagation()}>
-            <View style={[s.datePickerSheet, s.datePickerCard]}>
-              <View style={s.datePickerHeader}>
-                <Text variant="subtitle">
-                  {activeDateField === "start" ? "Selecciona la fecha inicial" : "Selecciona la fecha final"}
-                </Text>
-                <Text variant="body" color="stateAnulated">
-                  {formatDateValue(pickerValue)}
-                </Text>
-              </View>
-
-              <DateTimePicker
-                value={pickerValue}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "calendar"}
-                style={s.datePicker}
-                themeVariant="light"
-                textColor={t.colors.textDark}
-                onChange={(_event, selectedDate) => {
-                  if (selectedDate) {
-                    setPickerValue(selectedDate);
-                  }
-                }}
-              />
-
-              <View style={s.datePickerActionsRow}>
-                <Pressable
-                  style={[s.filterActionButton, s.filterActionButtonSecondary]}
-                  onPress={() => setActiveDateField(null)}
-                >
-                  <Text
-                    variant="body"
-                    style={[s.filterActionLabel, s.filterActionLabelSecondary]}
-                  >
-                    Cancelar
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[s.filterActionButton, s.filterActionButtonPrimary]}
-                  onPress={applyDatePickerValue}
-                >
-                  <Text
-                    variant="body"
-                    style={[s.filterActionLabel, s.filterActionLabelPrimary]}
-                  >
-                    Confirmar
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          </Pressable>
-        </Pressable>
       </Modal>
 
       <Modal
