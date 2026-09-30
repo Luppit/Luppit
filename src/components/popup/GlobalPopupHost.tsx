@@ -2251,12 +2251,15 @@ export default function GlobalPopupHost() {
                     </View>
                   ) : summaryConfig.actions && summaryConfig.actions.length > 0 ? (
                     <View
-                      style={s.summaryActionsRow}
+                      style={[
+                        s.summaryActionsRow,
+                        summaryConfig.actions.length > 2 ? { flexDirection: "column" } : null,
+                      ]}
                       onLayout={(event) => {
                         summaryActionsHeightRef.current = event.nativeEvent.layout.height;
                       }}
                     >
-                      {summaryConfig.actions.slice(0, 2).map((action) => {
+                      {summaryConfig.actions.slice(0, 3).map((action) => {
                         const pendingAction = summaryConfig.actions?.find(
                           (candidate) =>
                             candidate.id === pendingSummaryActionId
@@ -2274,6 +2277,7 @@ export default function GlobalPopupHost() {
                             ? t.colors[action.backgroundColorKey]
                             : t.colors.backgroudWhite;
                         const isSingle = summaryConfig.actions?.length === 1;
+                        const isStacked = (summaryConfig.actions?.length ?? 0) > 2;
                         const isPending = pendingSummaryActionId === action.id;
                         const showPendingState =
                           isPending && action.showPendingState !== false;
@@ -2294,7 +2298,9 @@ export default function GlobalPopupHost() {
                             disabled={isDisabled}
                             style={[
                               s.summaryActionButton,
-                              isSingle ? s.summaryActionButtonSingle : null,
+                              isSingle || isStacked
+                                ? s.summaryActionButtonSingle
+                                : null,
                               { backgroundColor },
                               backgroundColor !== t.colors.backgroudWhite
                                 ? { borderColor: backgroundColor }

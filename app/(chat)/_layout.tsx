@@ -76,9 +76,10 @@ function ChatLayoutContent() {
       description: hasComposerDraft
         ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
         : "Puedes salir y continuar después, o descartar este borrador.",
-      dismissOnBackdropPress: false,
+      dismissOnBackdropPress: true,
       dismissOnAndroidBack: true,
       actions: [
+        { id: "continue-request", label: "Seguir editando" },
         { id: "exit-request", label: "Salir", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
         { id: "discard-request-draft", label: "Descartar", backgroundColorKey: "error", textColorKey: "backgroudWhite", iconColorKey: "backgroudWhite", disabled: isSendingMessage || isRestoring, showPendingState: true,
           onPress: async () => {

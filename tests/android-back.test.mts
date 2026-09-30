@@ -414,7 +414,9 @@ test("popup Back resolves explicit safe action, not its position or label", () =
   assert.equal(resolveAndroidPopupBack(config, false, true).type, "blocked");
   assert.equal(resolveAndroidPopupBack({ ...config, androidBackActionId: "missing" }, true, false).type, "blocked");
   assert.equal(resolveAndroidPopupBack({ ...config, actions: [copy, { ...close, disabled: true }] }, true, false).type, "blocked");
-  assert.equal(resolveAndroidPopupBack({ ...config, actions: [copy, copy, close] }, true, false).type, "blocked");
+  const third = resolveAndroidPopupBack({ ...config, actions: [copy, copy, close] }, true, false);
+  assert.equal(third.type, "action");
+  if (third.type === "action") assert.equal(third.action, close);
 });
 
 test("Android offer close dismisses only its confirmation; locked unconfigured summaries stay locked", () => {

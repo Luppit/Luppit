@@ -836,6 +836,10 @@ function OfferAssistantScreen({
         dismissOnBackdropPress: true,
         actions: [
           {
+            id: "continue-offer",
+            label: "Seguir editando",
+          },
+          {
             id: "exit-offer",
             label: "Salir",
             accessibilityLabel: "Salir y conservar borrador",

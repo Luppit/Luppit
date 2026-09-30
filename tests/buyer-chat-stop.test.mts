@@ -973,10 +973,14 @@ for (const platform of ["ios", "android"] as const) {
     const action = { type: "POP", source: "buyer-chat" };
     layout.attempt(action);
     assert.equal(layout.popup.dismissOnAndroidBack, true);
-    assert.equal(layout.popup.dismissOnBackdropPress, false);
+    assert.equal(layout.popup.dismissOnBackdropPress, true);
     assert.match(layout.popup.description, /no hayas enviado se perderán/);
-    assert.equal(layout.dispatched.length, 0, "Dismissing the popup keeps the draft open");
-    await layout.popup.actions[0].onPress();
+    assert.deepEqual(Array.from(layout.popup.actions, (item: { id: string }) => item.id), [
+      "continue-request", "exit-request", "discard-request-draft",
+    ]);
+    assert.equal(layout.popup.actions[0].onPress, undefined);
+    assert.equal(layout.dispatched.length, 0, "Keeping editing makes no navigation change");
+    await layout.popup.actions[1].onPress();
     layout.render();
     assert.equal(layout.prevented, false);
     assert.deepEqual(layout.dispatched, [action]);
@@ -999,16 +1003,16 @@ test("discard stays in chat, blocks control races, and preserves intentional clo
   layout.state.isSendingMessage = true;
   layout.render();
   layout.attempt(action);
-  assert.equal(layout.popup.actions[1].disabled, true);
+  assert.equal(layout.popup.actions[2].disabled, true);
   layout.state.isSendingMessage = false;
   layout.render();
   layout.attempt(action);
-  assert.equal(await layout.popup.actions[1].onPress(), false);
+  assert.equal(await layout.popup.actions[2].onPress(), false);
   layout.render();
   assert.equal(layout.prevented, true);
   assert.equal(layout.dispatched.length, 0);
   layout.setDiscardResult(true);
-  assert.equal(await layout.popup.actions[1].onPress(), true);
+  assert.equal(await layout.popup.actions[2].onPress(), true);
   layout.render();
   assert.deepEqual(layout.dispatched, []);
 });
@@ -1027,7 +1031,7 @@ for (const platform of ["ios", "android"] as const) {
     composer().onDraftChange(true);
     layout.render();
     layout.attempt({ type: "POP" });
-    const confirm = layout.popup.actions[1].onPress;
+    const confirm = layout.popup.actions[2].onPress;
     const pending = confirm();
     assert.equal(await confirm(), false, "Duplicate taps cannot send another discard");
     assert.equal(session.calls.length, 1);

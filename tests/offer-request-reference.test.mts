@@ -1007,7 +1007,9 @@ test("exit retains the offer draft; confirmed discard starts again in the same e
     assert.equal(exitGuard.enabled, true);
     exitGuard.callback({ data: { action: "go-back" } });
     assert.equal(popup.dismissOnBackdropPress, true);
-    assert.equal(popup.actions.length, 2);
+    assert.equal(popup.actions.length, 3);
+    assert.equal(popup.actions[0].id, "continue-offer");
+    assert.equal(popup.actions[0].onPress, undefined);
     assert.equal(popup.actions.find((a: any) => a.id === "discard-draft").label, "Descartar");
     assert.equal(f.aiCalls.length, 1, "Opening or dismissing the popup makes no draft mutation");
     assert.equal(navigations.length, 0);

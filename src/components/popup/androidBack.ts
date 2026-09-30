@@ -12,7 +12,7 @@ export function resolveAndroidPopupBack(
 ): PopupBackAction {
   if (pending) return { type: "blocked" };
   if (summary?.androidBackActionId !== undefined) {
-    const action = summary.actions?.slice(0, 2).find(
+    const action = summary.actions?.slice(0, 3).find(
       (candidate) => candidate.id === summary.androidBackActionId
     );
     return action && !action.disabled
