@@ -89,6 +89,27 @@ function toOptionalText(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function getActionAppearance(action: PopupSummaryAction, t: ReturnType<typeof useTheme>) {
+  const isDanger =
+    action.backgroundColorKey === "error" ||
+    action.textColorKey === "error" ||
+    action.iconColorKey === "error";
+  const isPrimary =
+    !isDanger &&
+    (action.backgroundColorKey === "primary" ||
+      action.backgroundColorKey === "success");
+
+  return {
+    backgroundColor: isPrimary ? t.colors.primary : t.colors.backgroudWhite,
+    contentColor: isDanger
+      ? t.colors.error
+      : isPrimary
+        ? t.colors.backgroudWhite
+        : t.colors.textDark,
+    icon: action.icon ?? (isDanger ? "x-circle" : isPrimary ? "check" : "arrow-left"),
+  } as const;
+}
+
 function getOtpHelperConfig(input: PopupSummaryInput): PopupHelperConfig | null {
   if (!isRecord(input.component_config)) return null;
 
@@ -849,18 +870,7 @@ export default function GlobalPopupHost() {
       <View style={s.summaryActionsRow}>
         {actions && actions.length > 0
           ? actions.slice(0, 2).map((action, index) => {
-              const textColor =
-                action.textColorKey != null
-                  ? t.colors[action.textColorKey]
-                  : t.colors.textDark;
-              const iconColor =
-                action.iconColorKey != null
-                  ? t.colors[action.iconColorKey]
-                  : textColor;
-              const backgroundColor =
-                action.backgroundColorKey != null
-                  ? t.colors[action.backgroundColorKey]
-                  : t.colors.backgroudWhite;
+              const { backgroundColor, contentColor, icon } = getActionAppearance(action, t);
               const isSingle = actions.length === 1;
               const isPending = pendingSummaryActionId === action.id;
               const isDisabled = pendingSummaryActionId != null;
@@ -890,13 +900,13 @@ export default function GlobalPopupHost() {
                   }}
                 >
                   {isPending ? (
-                    <ActivityIndicator size="small" color={iconColor} />
-                  ) : action.icon ? (
-                    <Icon name={action.icon} size={20} color={iconColor} />
-                  ) : null}
+                    <ActivityIndicator size="small" color={contentColor} />
+                  ) : (
+                    <Icon name={icon} size={20} color={contentColor} />
+                  )}
                   <Text
                     variant="body"
-                    style={[s.summaryActionLabel, { color: textColor }]}
+                    style={[s.summaryActionLabel, { color: contentColor }]}
                   >
                     {action.label}
                   </Text>
@@ -912,6 +922,7 @@ export default function GlobalPopupHost() {
               ]}
               onPress={onClose}
             >
+              <Icon name="check" size={20} color={t.colors.backgroudWhite} />
               <Text
                 variant="body"
                 style={[s.summaryActionLabel, { color: t.colors.backgroudWhite }]}
@@ -1185,6 +1196,7 @@ export default function GlobalPopupHost() {
                         style={[s.filterActionButton, s.filterActionButtonSecondary]}
                         onPress={() => setActiveDateField(null)}
                       >
+                        <Icon name="x" size={18} color={t.colors.textDark} />
                         <Text
                           variant="body"
                           style={[s.filterActionLabel, s.filterActionLabelSecondary]}
@@ -1197,6 +1209,7 @@ export default function GlobalPopupHost() {
                         style={[s.filterActionButton, s.filterActionButtonPrimary]}
                         onPress={applyDatePickerValue}
                       >
+                        <Icon name="check" size={18} color={t.colors.backgroudWhite} />
                         <Text
                           variant="body"
                           style={[s.filterActionLabel, s.filterActionLabelPrimary]}
@@ -2243,6 +2256,7 @@ export default function GlobalPopupHost() {
                           summaryScrollViewRef.current?.scrollTo({ y: 0, animated: false });
                         }}
                       >
+                        <Icon name="arrow-left" size={20} color={t.colors.textDark} />
                         <Text variant="body" style={s.summaryActionLabel}>
                           Volver a los cambios
                         </Text>
@@ -2263,18 +2277,7 @@ export default function GlobalPopupHost() {
                           (candidate) =>
                             candidate.id === pendingSummaryActionId
                         );
-                        const textColor =
-                          action.textColorKey != null
-                            ? t.colors[action.textColorKey]
-                            : t.colors.textDark;
-                        const iconColor =
-                          action.iconColorKey != null
-                            ? t.colors[action.iconColorKey]
-                            : textColor;
-                        const backgroundColor =
-                          action.backgroundColorKey != null
-                            ? t.colors[action.backgroundColorKey]
-                            : t.colors.backgroudWhite;
+                        const { backgroundColor, contentColor, icon } = getActionAppearance(action, t);
                         const isSingle = summaryConfig.actions?.length === 1;
                         const isStacked = (summaryConfig.actions?.length ?? 0) > 2;
                         const isPending = pendingSummaryActionId === action.id;
@@ -2313,11 +2316,11 @@ export default function GlobalPopupHost() {
                             onPress={() => handleSummaryActionPress(action)}
                           >
                             {showPendingState ? (
-                              <ActivityIndicator size="small" color={iconColor} />
-                            ) : action.icon ? (
-                              <Icon name={action.icon} size={20} color={iconColor} />
-                            ) : null}
-                            <Text variant="body" style={[s.summaryActionLabel, { color: textColor }]}>
+                              <ActivityIndicator size="small" color={contentColor} />
+                            ) : (
+                              <Icon name={icon} size={20} color={contentColor} />
+                            )}
+                            <Text variant="body" style={[s.summaryActionLabel, { color: contentColor }]}>
                               {action.label}
                             </Text>
                           </Pressable>

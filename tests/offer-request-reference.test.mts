@@ -1010,7 +1010,13 @@ test("exit retains the offer draft; confirmed discard starts again in the same e
     assert.equal(popup.actions.length, 3);
     assert.equal(popup.actions[0].id, "continue-offer");
     assert.equal(popup.actions[0].onPress, undefined);
-    assert.equal(popup.actions.find((a: any) => a.id === "discard-draft").label, "Descartar");
+    assert.deepEqual(Array.from(popup.actions, (item: any) => item.icon), [
+      "arrow-left", "log-out", "trash-2",
+    ]);
+    const discardAction = popup.actions.find((a: any) => a.id === "discard-draft");
+    assert.equal(discardAction.label, "Descartar");
+    assert.equal(discardAction.backgroundColorKey, "backgroudWhite");
+    assert.equal(discardAction.textColorKey, "error");
     assert.equal(f.aiCalls.length, 1, "Opening or dismissing the popup makes no draft mutation");
     assert.equal(navigations.length, 0);
     const result = popup.actions.find((a: any) => a.id === action).onPress();

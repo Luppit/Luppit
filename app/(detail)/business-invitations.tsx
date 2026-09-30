@@ -93,6 +93,9 @@ export default function BusinessTeamScreen() {
           id: "understood",
           label: "Entendido",
           icon: "check",
+          backgroundColorKey: "primary",
+          textColorKey: "backgroudWhite",
+          iconColorKey: "backgroudWhite",
         },
       ],
     });

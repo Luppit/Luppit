@@ -184,6 +184,7 @@ export default function ConversationHeaderControls({
           {
             id: "offer-summary-close",
             label: "Cerrar",
+            icon: "x",
             backgroundColorKey: "backgroudWhite",
             textColorKey: "textDark",
           },

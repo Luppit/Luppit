@@ -30,6 +30,7 @@ export function useAndroidLeaveGuard(hasChanges: boolean, busy = false) {
           {
             id: "leave-editor",
             label: "Salir",
+            icon: "log-out",
             textColorKey: "error",
             onPress: () => {
               if (navigation.isFocused()) navigation.dispatch(data.action);

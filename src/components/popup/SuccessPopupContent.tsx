@@ -48,6 +48,20 @@ export default function SuccessPopupContent({
   const s = useMemo(() => createSuccessPopupContentStyles(t), [t]);
   const progress = useRef(new Animated.Value(0)).current;
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  const actionIsDanger = config.actionBackgroundColorKey === "error";
+  const actionIsPrimary =
+    !actionIsDanger &&
+    (config.actionBackgroundColorKey == null ||
+      config.actionBackgroundColorKey === "primary" ||
+      config.actionBackgroundColorKey === "success");
+  const actionBackgroundColor = actionIsPrimary
+    ? t.colors.primary
+    : t.colors.backgroudWhite;
+  const actionContentColor = actionIsDanger
+    ? t.colors.error
+    : actionIsPrimary
+      ? t.colors.backgroudWhite
+      : t.colors.textDark;
   const particleColors = useMemo(
     () => ({
       primary: t.colors.primary,
@@ -189,21 +203,23 @@ export default function SuccessPopupContent({
         onPress={onAction}
         style={({ pressed }) => [
           s.action,
-          {
-            backgroundColor:
-              t.colors[config.actionBackgroundColorKey ?? "primary"],
-          },
+          { backgroundColor: actionBackgroundColor },
+          !actionIsPrimary ? s.secondaryAction : null,
           pressed && !pending ? s.actionPressed : null,
         ]}
       >
         {pending ? (
-          <ActivityIndicator size="small" color={t.colors.backgroudWhite} />
+          <ActivityIndicator size="small" color={actionContentColor} />
         ) : (
           <>
-            <Text variant="body" style={{ color: t.colors.backgroudWhite }}>
+            <Text variant="body" style={{ color: actionContentColor }}>
               {config.actionLabel}
             </Text>
-            <Icon name="arrow-right" size={20} color={t.colors.backgroudWhite} />
+            <Icon
+              name={actionIsDanger ? "x-circle" : "arrow-right"}
+              size={20}
+              color={actionContentColor}
+            />
           </>
         )}
       </Pressable>
@@ -214,10 +230,14 @@ export default function SuccessPopupContent({
           accessibilityState={{ busy: pending, disabled: pending }}
           disabled={pending}
           onPress={onSecondaryAction}
-          style={({ pressed }) => [s.action, s.secondaryAction,
-            pressed && !pending ? s.actionPressed : null]}
+          style={({ pressed }) => [
+            s.action,
+            s.secondaryAction,
+            pressed && !pending ? s.actionPressed : null,
+          ]}
         >
-          <Text variant="body">{config.secondaryActionLabel}</Text>
+          <Text variant="body" color="textDark">{config.secondaryActionLabel}</Text>
+          <Icon name="arrow-right" size={20} color={t.colors.textDark} />
         </Pressable>
       ) : null}
     </View>

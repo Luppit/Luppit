@@ -226,6 +226,9 @@ export function PushNotificationProvider({
               id: "enable-push-notifications",
               label: "Activar",
               icon: "bell",
+              backgroundColorKey: "primary",
+              textColorKey: "backgroudWhite",
+              iconColorKey: "backgroudWhite",
               onPress: async () => {
                 await enablePushNotifications();
                 return true;

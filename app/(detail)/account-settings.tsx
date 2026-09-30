@@ -515,6 +515,9 @@ function openLastProfileDeletionExplanation() {
         id: "close-last-profile-message",
         label: "Entendido",
         icon: "check",
+        backgroundColorKey: "primary",
+        textColorKey: "backgroudWhite",
+        iconColorKey: "backgroudWhite",
       },
     ],
   });

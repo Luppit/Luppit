@@ -282,6 +282,10 @@ test("allowed pickup appears from DB metadata without generating anything on mou
   assert.equal(f.popups[0].description, "Enviar al correo verificado. Vence en 10 minutos.");
   assert.equal(f.popups[0].rows[0].value, "Correo verificado");
   assert.equal(confirm(f).label, "Enviar");
+  assert.equal(f.popups[0].actions[0].icon, "arrow-left");
+  assert.equal(confirm(f).icon, "send");
+  assert.equal(confirm(f).backgroundColorKey, "primary");
+  assert.equal(confirm(f).textColorKey, "backgroudWhite");
 });
 
 test("does not invent eligibility for shipping, pending, canceled, completed or restricted views", async () => {
@@ -802,6 +806,50 @@ test("proposal review preserves comparison, photos, shared horizontal actions an
   assert.equal(executions(f)[0][1].payload.fulfillment_catalog_id, undefined);
   f.executions[0].resolve({ ok: true, data: { success_message: "Cambios aceptados" } });
   assert.equal(await pending, true);
+});
+
+test("DB destructive confirmation keeps its label and uses a white button with red content", () => {
+  const f = fixture();
+  const action = proposalAction();
+  Object.assign(action.confirmation, {
+    confirm_label: "Rechazar",
+    confirm_icon: null,
+    confirm_style_code: "primary danger",
+  });
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  const confirmAction = f.popups[0].actions[1];
+  assert.equal(confirmAction.label, "Rechazar");
+  assert.equal(confirmAction.icon, "x-circle");
+  assert.equal(confirmAction.backgroundColorKey, "backgroudWhite");
+  assert.equal(confirmAction.textColorKey, "error");
+  assert.equal(confirmAction.iconColorKey, "error");
+});
+
+test("paired DB rejection keeps its destructive style in the review footer", () => {
+  const f = fixture();
+  const action = proposalAction();
+  const reject = pickupAction({
+    id: "reject-action",
+    code: "BUYER_REJECT_OFFER_CHANGE",
+    icon: null,
+    style_code: "danger",
+    confirmation: {
+      ...pickupAction().confirmation,
+      confirm_label: "Rechazar",
+      confirm_icon: null,
+      confirm_style_code: "danger",
+    },
+  });
+  Object.assign(action.confirmation, {
+    secondary_action_code: reject.code,
+    cancel_icon: null,
+  });
+  f.hook({ conversationView: viewResult({ actions: [action, reject] }).data }).handleActionPress(action);
+  const secondary = f.popups[0].actions[0];
+  assert.equal(secondary.label, "Rechazar");
+  assert.equal(secondary.icon, "x-circle");
+  assert.equal(secondary.backgroundColorKey, "backgroudWhite");
+  assert.equal(secondary.textColorKey, "error");
 });
 
 for (const change of ["replaced", "stage_changed", "closed"]) {

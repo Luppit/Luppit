@@ -978,6 +978,11 @@ for (const platform of ["ios", "android"] as const) {
     assert.deepEqual(Array.from(layout.popup.actions, (item: { id: string }) => item.id), [
       "continue-request", "exit-request", "discard-request-draft",
     ]);
+    assert.deepEqual(Array.from(layout.popup.actions, (item: { icon: string }) => item.icon), [
+      "arrow-left", "log-out", "trash-2",
+    ]);
+    assert.equal(layout.popup.actions[2].backgroundColorKey, "backgroudWhite");
+    assert.equal(layout.popup.actions[2].textColorKey, "error");
     assert.equal(layout.popup.actions[0].onPress, undefined);
     assert.equal(layout.dispatched.length, 0, "Keeping editing makes no navigation change");
     await layout.popup.actions[1].onPress();

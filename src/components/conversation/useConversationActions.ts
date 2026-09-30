@@ -485,6 +485,11 @@ export function useConversationActions({
         ? conversationView?.actions.find((candidate) =>
             candidate.code === confirmation.secondary_action_code && candidate.id !== action.id)
         : undefined;
+      const secondaryStyle = secondaryAction
+        ? normalizeStyleFlags(
+            secondaryAction.confirmation?.confirm_style_code ?? secondaryAction.style_code
+          )
+        : null;
       const hasUnavailableRequiredChoice = confirmation.inputs.some(
         (input) =>
           input.kind === "choice" &&
@@ -529,10 +534,23 @@ export function useConversationActions({
           {
             id: `${action.id}-cancel`,
             label: secondaryAction?.confirmation?.confirm_label || secondaryAction?.label || confirmation.cancel_label || "Volver",
-            icon: normalizeOptionalIcon(confirmation.cancel_icon),
-            backgroundColorKey: "backgroudWhite",
-            textColorKey: "textDark",
-            iconColorKey: "textDark",
+            icon: normalizeOptionalIcon(secondaryAction?.confirmation?.confirm_icon) ??
+              normalizeOptionalIcon(secondaryAction?.icon) ??
+              normalizeOptionalIcon(confirmation.cancel_icon) ??
+              (secondaryStyle?.isDanger ? "x-circle" : "arrow-left"),
+            backgroundColorKey: secondaryStyle?.isPrimary && !secondaryStyle.isDanger
+              ? "primary"
+              : "backgroudWhite",
+            textColorKey: secondaryStyle?.isDanger
+              ? "error"
+              : secondaryStyle?.isPrimary
+                ? "backgroudWhite"
+                : "textDark",
+            iconColorKey: secondaryStyle?.isDanger
+              ? "error"
+              : secondaryStyle?.isPrimary
+                ? "backgroudWhite"
+                : "textDark",
             onPress: secondaryAction ? () => {
               handleActionPress(secondaryAction);
               return false;
@@ -541,17 +559,20 @@ export function useConversationActions({
           {
             id: `${action.id}-confirm`,
             label: confirmation.confirm_label || action.label || "Confirmar",
-            icon: normalizeOptionalIcon(confirmation.confirm_icon),
-            backgroundColorKey: confirmStyle.isPrimary ? "primary" : "backgroudWhite",
-            textColorKey: confirmStyle.isPrimary
-              ? "backgroudWhite"
-              : confirmStyle.isDanger
-                ? "error"
+            icon: normalizeOptionalIcon(confirmation.confirm_icon) ??
+              (confirmStyle.isDanger ? "x-circle" : "check"),
+            backgroundColorKey: confirmStyle.isPrimary && !confirmStyle.isDanger
+              ? "primary"
+              : "backgroudWhite",
+            textColorKey: confirmStyle.isDanger
+              ? "error"
+              : confirmStyle.isPrimary
+                ? "backgroudWhite"
                 : "textDark",
-            iconColorKey: confirmStyle.isPrimary
-              ? "backgroudWhite"
-              : confirmStyle.isDanger
-                ? "error"
+            iconColorKey: confirmStyle.isDanger
+              ? "error"
+              : confirmStyle.isPrimary
+                ? "backgroudWhite"
                 : "textDark",
             disabled:
               confirmation.blocker != null || hasUnavailableRequiredChoice,

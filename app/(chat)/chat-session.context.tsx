@@ -239,7 +239,7 @@ export function ChatSessionProvider({ children }: { children: React.ReactNode })
           description:
             "Ya está visible para que los negocios puedan enviarte ofertas.",
           actionLabel: "Ver mi solicitud",
-          actionBackgroundColorKey: "textDark",
+          actionBackgroundColorKey: "primary",
           onAction: () => {
             router.replace({
               pathname: "/request/[purchaseRequestId]",

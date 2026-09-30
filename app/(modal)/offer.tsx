@@ -244,6 +244,7 @@ function OfferEditContext({
       actions: [{
         id: "offer-context-close",
         label: "Cerrar",
+        icon: "x",
         backgroundColorKey: "backgroudWhite",
         textColorKey: "textDark",
       }],
@@ -548,7 +549,7 @@ function OfferAssistantScreen({
               ? "El comprador podrá aceptar o rechazar tus cambios. La oferta actual sigue vigente mientras decide."
               : "El comprador ya puede revisar tu oferta. Si quieres, puedes agregar otra a esta solicitud.",
             actionLabel: isEditMode ? "Ver conversación" : "Agregar otra oferta",
-            actionBackgroundColorKey: "textDark",
+            actionBackgroundColorKey: "primary",
             onAction: async () => {
               if (!isEditMode) {
                 const seed = await getOrCreateCurrentSellerOfferSeedConversation(requestReference.id);
@@ -838,11 +839,13 @@ function OfferAssistantScreen({
           {
             id: "continue-offer",
             label: "Seguir editando",
+            icon: "arrow-left",
           },
           {
             id: "exit-offer",
             label: "Salir",
             accessibilityLabel: "Salir y conservar borrador",
+            icon: "log-out",
             backgroundColorKey: "backgroudWhite",
             textColorKey: "textDark",
             iconColorKey: "textDark",
@@ -852,9 +855,10 @@ function OfferAssistantScreen({
             id: "discard-draft",
             label: "Descartar",
             accessibilityLabel: "Descartar borrador",
-            backgroundColorKey: "error",
-            textColorKey: "backgroudWhite",
-            iconColorKey: "backgroudWhite",
+            icon: "trash-2",
+            backgroundColorKey: "backgroudWhite",
+            textColorKey: "error",
+            iconColorKey: "error",
             disabled: isBusy,
             showPendingState: true,
             onPress: discardDraft,

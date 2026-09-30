@@ -79,9 +79,9 @@ function ChatLayoutContent() {
       dismissOnBackdropPress: true,
       dismissOnAndroidBack: true,
       actions: [
-        { id: "continue-request", label: "Seguir editando" },
-        { id: "exit-request", label: "Salir", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
-        { id: "discard-request-draft", label: "Descartar", backgroundColorKey: "error", textColorKey: "backgroudWhite", iconColorKey: "backgroudWhite", disabled: isSendingMessage || isRestoring, showPendingState: true,
+        { id: "continue-request", label: "Seguir editando", icon: "arrow-left" },
+        { id: "exit-request", label: "Salir", icon: "log-out", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
+        { id: "discard-request-draft", label: "Descartar", icon: "trash-2", backgroundColorKey: "backgroudWhite", textColorKey: "error", iconColorKey: "error", disabled: isSendingMessage || isRestoring, showPendingState: true,
           onPress: async () => {
             if (!await discardDraft()) return false;
             setHasComposerDraft(false);
