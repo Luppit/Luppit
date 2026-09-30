@@ -1008,8 +1008,12 @@ test("exit retains the offer draft; confirmed discard starts again in the same e
     exitGuard.callback({ data: { action: "go-back" } });
     assert.equal(popup.dismissOnBackdropPress, true);
     assert.equal(popup.actions.length, 3);
+    assert.equal(popup.description, "Salir conserva el borrador de cambios para continuar después. Descartar los cambios deja intacta la oferta publicada.");
     assert.equal(popup.actions[0].id, "continue-offer");
     assert.equal(popup.actions[0].onPress, undefined);
+    assert.deepEqual(Array.from(popup.actions, (item: any) => item.accessibilityLabel), [
+      "Seguir modificando la oferta", "Salir y conservar el borrador de cambios", "Descartar el borrador de modificación",
+    ]);
     assert.deepEqual(Array.from(popup.actions, (item: any) => item.icon), [
       "arrow-left", "log-out", "trash-2",
     ]);
@@ -1055,7 +1059,7 @@ test("exit popup warns about unsent composer content on iOS as well as Android",
     assistantView(f).composer.onDraftChange(true);
     f.assistant();
     exitGuard!({ data: { action: "go-back" } });
-    assert.match(popup.description, /todavía no hayas enviado se perderán/);
+    assert.equal(popup.description, "Salir conserva el borrador de cambios para continuar después. Descartar los cambios deja intacta la oferta publicada. El texto y las fotos sin enviar se perderán al salir.");
   }
 });
 

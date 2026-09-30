@@ -974,9 +974,12 @@ for (const platform of ["ios", "android"] as const) {
     layout.attempt(action);
     assert.equal(layout.popup.dismissOnAndroidBack, true);
     assert.equal(layout.popup.dismissOnBackdropPress, true);
-    assert.match(layout.popup.description, /no hayas enviado se perderán/);
+    assert.equal(layout.popup.description, "Salir conserva el borrador para continuar después. Descartar lo elimina. El texto y las fotos sin enviar se perderán al salir.");
     assert.deepEqual(Array.from(layout.popup.actions, (item: { id: string }) => item.id), [
       "continue-request", "exit-request", "discard-request-draft",
+    ]);
+    assert.deepEqual(Array.from(layout.popup.actions, (item: { accessibilityLabel: string }) => item.accessibilityLabel), [
+      "Seguir editando la solicitud", "Salir y conservar el borrador de la solicitud", "Descartar el borrador de la solicitud",
     ]);
     assert.deepEqual(Array.from(layout.popup.actions, (item: { icon: string }) => item.icon), [
       "arrow-left", "log-out", "trash-2",

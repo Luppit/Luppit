@@ -73,15 +73,13 @@ function ChatLayoutContent() {
     Keyboard.dismiss();
     openPopup({
       type: "summary", title: "¿Salir de la solicitud?",
-      description: hasComposerDraft
-        ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
-        : "Puedes salir y continuar después, o descartar este borrador.",
+      description: `Salir conserva el borrador para continuar después. Descartar lo elimina.${hasComposerDraft ? " El texto y las fotos sin enviar se perderán al salir." : ""}`,
       dismissOnBackdropPress: true,
       dismissOnAndroidBack: true,
       actions: [
-        { id: "continue-request", label: "Seguir editando", icon: "arrow-left" },
-        { id: "exit-request", label: "Salir", icon: "log-out", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
-        { id: "discard-request-draft", label: "Descartar", icon: "trash-2", backgroundColorKey: "backgroudWhite", textColorKey: "error", iconColorKey: "error", disabled: isSendingMessage || isRestoring, showPendingState: true,
+        { id: "continue-request", label: "Seguir editando", accessibilityLabel: "Seguir editando la solicitud", icon: "arrow-left" },
+        { id: "exit-request", label: "Salir", accessibilityLabel: "Salir y conservar el borrador de la solicitud", icon: "log-out", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
+        { id: "discard-request-draft", label: "Descartar", accessibilityLabel: "Descartar el borrador de la solicitud", icon: "trash-2", backgroundColorKey: "backgroudWhite", textColorKey: "error", iconColorKey: "error", disabled: isSendingMessage || isRestoring, showPendingState: true,
           onPress: async () => {
             if (!await discardDraft()) return false;
             setHasComposerDraft(false);

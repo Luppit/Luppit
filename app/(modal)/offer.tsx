@@ -831,20 +831,21 @@ function OfferAssistantScreen({
       openPopup({
         type: "summary",
         title: isEditMode ? "¿Salir de la modificación?" : "¿Salir de la oferta?",
-        description: hasComposerDraft
-          ? "Puedes continuar después con el borrador guardado. El texto o las fotos que todavía no hayas enviado se perderán."
-          : "Tu borrador quedará guardado para continuar después.",
+        description: `${isEditMode
+          ? "Salir conserva el borrador de cambios para continuar después. Descartar los cambios deja intacta la oferta publicada."
+          : "Salir conserva el borrador para continuar después. Descartar lo elimina."}${hasComposerDraft ? " El texto y las fotos sin enviar se perderán al salir." : ""}`,
         dismissOnBackdropPress: true,
         actions: [
           {
             id: "continue-offer",
             label: "Seguir editando",
+            accessibilityLabel: isEditMode ? "Seguir modificando la oferta" : "Seguir editando la oferta",
             icon: "arrow-left",
           },
           {
             id: "exit-offer",
             label: "Salir",
-            accessibilityLabel: "Salir y conservar borrador",
+            accessibilityLabel: isEditMode ? "Salir y conservar el borrador de cambios" : "Salir y conservar el borrador de la oferta",
             icon: "log-out",
             backgroundColorKey: "backgroudWhite",
             textColorKey: "textDark",
@@ -854,7 +855,7 @@ function OfferAssistantScreen({
           {
             id: "discard-draft",
             label: "Descartar",
-            accessibilityLabel: "Descartar borrador",
+            accessibilityLabel: isEditMode ? "Descartar el borrador de modificación" : "Descartar el borrador de la oferta",
             icon: "trash-2",
             backgroundColorKey: "backgroudWhite",
             textColorKey: "error",
