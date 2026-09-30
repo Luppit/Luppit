@@ -967,7 +967,6 @@ export default function GlobalPopupHost() {
     setFilterEndDate("");
     setSelectedFilterChipIds([]);
     setSelectedFilterChipGroupIds({});
-    filterConfig?.onClear?.();
   };
 
   const openDatePicker = (field: "start" | "end") => {
