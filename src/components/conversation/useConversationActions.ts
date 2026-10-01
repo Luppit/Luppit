@@ -309,6 +309,15 @@ export function useConversationActions({
                 conversationId,
               },
             });
+          } else if (action.executor.target === "detail.buyer_profile") {
+            router.push({
+              pathname: "/(detail)/buyer-profile",
+              params: {
+                title: "Perfil del comprador",
+                hideMenu: "true",
+                conversationId,
+              },
+            });
           } else if (action.executor.target === "favorite.toggle") {
             if (!purchaseRequestId) {
               showError(
