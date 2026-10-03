@@ -4,8 +4,14 @@ import { getSession } from "../lib/supabase";
 import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getCurrentProfileResult } from "./active.profile.service";
+import { parseConversationViewAction, type ConversationViewAction } from "./conversation.service";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: AppError };
+
+export type SellerRequestDiscardResult = {
+  discardedCount: number;
+  skippedCount: number;
+};
 
 export type SellerRequestOfferConversation = {
   conversationId: string;
@@ -23,6 +29,38 @@ async function currentSellerProfileId(): Promise<Result<string>> {
   if (profile?.ok === false) return profile;
   if (!profile) return { ok: false, error: fromAppError("not_found") };
   return { ok: true, data: profile.data.id };
+}
+
+export async function getCurrentSellerRequestOffersMenu(
+  purchaseRequestId: string
+): Promise<Result<ConversationViewAction[]>> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+  const profile = await currentSellerProfileId();
+  if (!profile.ok) return profile;
+  const result = await supabase.rpc(RPC_FUNCTIONS.GET_SELLER_REQUEST_OFFERS_MENU,
+    { p_purchase_request_id: purchaseRequestId, p_profile_id: profile.data });
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  const value = result.data as { actions?: unknown } | null;
+  const actions = Array.isArray(value?.actions) ? value.actions : [];
+  return { ok: true, data: actions.map(parseConversationViewAction)
+    .filter((action): action is ConversationViewAction => action !== null) };
+}
+
+export async function discardCurrentSellerRequestOffers(
+  purchaseRequestId: string
+): Promise<Result<SellerRequestDiscardResult>> {
+  if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
+  const profile = await currentSellerProfileId();
+  if (!profile.ok) return profile;
+  const result = await supabase.rpc(RPC_FUNCTIONS.SELLER_DISCARD_REQUEST_OFFERS,
+    { p_purchase_request_id: purchaseRequestId, p_profile_id: profile.data });
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  const value = result.data as Record<string, unknown> | null;
+  if (!value || value.ok !== true || typeof value.discarded_count !== "number" ||
+      typeof value.skipped_count !== "number") {
+    return { ok: false, error: fromAppError("validation") };
+  }
+  return { ok: true, data: { discardedCount: value.discarded_count, skippedCount: value.skipped_count } };
 }
 
 export async function getCurrentSellerRequestOfferConversations(

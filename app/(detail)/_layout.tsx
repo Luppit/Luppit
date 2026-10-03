@@ -66,7 +66,7 @@ export default function DetailLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const [notificationsMenu, setNotificationsMenu] = React.useState<DetailTopBarMenu | null>(null);
+  const [screenMenu, setScreenMenu] = React.useState<DetailTopBarMenu | null>(null);
   const params = useGlobalSearchParams<{
     title?: string | string[];
     hideMenu?: string | string[];
@@ -81,14 +81,14 @@ export default function DetailLayout() {
     : params.fromConversation;
   const purchaseRequestId = getPurchaseRequestId(params.purchaseRequest);
   const purchaseRequestStatus = getPurchaseRequestStatus(params.purchaseRequest);
-  const showNotificationsMenu = pathname === "/notifications" && notificationsMenu !== null;
-  const hideMenu = !showNotificationsMenu &&
+  const showScreenMenu = (pathname === "/notifications" || pathname === "/seller-request-offers") && screenMenu !== null;
+  const hideMenu = !showScreenMenu &&
     (hideMenuParam === "true" || pathname !== "/purchase-request" || !purchaseRequestId);
   const marketplaceSectionOwnsTopBar = pathname === "/marketplace-hub-section";
   const completedRequestsOwnsTopBar = pathname === "/completed-requests";
 
   return (
-    <DetailTopBarMenuContext.Provider value={setNotificationsMenu}>
+    <DetailTopBarMenuContext.Provider value={setScreenMenu}>
       <View style={{ flex: 1, backgroundColor: t.colors.background }}>
         <View
           style={{
@@ -119,7 +119,7 @@ export default function DetailLayout() {
             title={title}
             returnToHome={fromConversation === "true"}
             hideMenu={hideMenu}
-            menu={showNotificationsMenu ? notificationsMenu : null}
+            menu={showScreenMenu ? screenMenu : null}
             hideBack={pathname === "/business-verification"}
             purchaseRequestId={purchaseRequestId}
             purchaseRequestStatus={purchaseRequestStatus}

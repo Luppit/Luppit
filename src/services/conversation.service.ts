@@ -488,7 +488,7 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
   };
 }
 
-function parseConversationViewAction(raw: unknown): ConversationViewAction | null {
+export function parseConversationViewAction(raw: unknown): ConversationViewAction | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
   const id = typeof value.id === "string" ? value.id : "";

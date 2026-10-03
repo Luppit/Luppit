@@ -2,20 +2,27 @@ import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
+import { DetailTopBarMenuContext } from "@/src/components/navbar/DetailTopBarMenuContext";
+import { normalizeOptionalIcon, normalizeStyleFlags } from "@/src/components/conversation/useConversationActions";
 import MarketplaceCardFrame from "@/src/components/marketplaceHub/MarketplaceCardFrame";
 import StatusChip from "@/src/components/statusChip/StatusChip";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { getCurrentSellerPurchaseOffers, type SellerPurchaseOfferCardData } from "@/src/services/purchase.offer.service";
-import { getPurchaseRequestById, type PurchaseRequest } from "@/src/services/purchase.request.service";
-import { getOrCreateCurrentSellerOfferSeedConversation } from "@/src/services/seller.request.offers.service";
+import { addCurrentSellerPurchaseRequestFavorite, getPurchaseRequestById,
+  removeCurrentSellerPurchaseRequestFavorite, type PurchaseRequest } from "@/src/services/purchase.request.service";
+import { discardCurrentSellerRequestOffers, getCurrentSellerRequestOffersMenu,
+  getOrCreateCurrentSellerOfferSeedConversation } from "@/src/services/seller.request.offers.service";
+import type { ConversationViewAction } from "@/src/services/conversation.service";
+import { openPopup } from "@/src/services/popup.service";
 import { useTheme } from "@/src/themes";
 import { formatConversationOfferPrice, formatConversationOfferTotal, formatOfferAmount } from "@/src/utils/conversationOfferPrice";
-import { showError } from "@/src/utils/useToast";
+import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
+import { buildPurchaseRequestUrl } from "@/src/utils/purchaseRequestLink";
 import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, ScrollView, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
@@ -57,29 +64,44 @@ export default function SellerRequestOffersScreen() {
   const [request, setRequest] = React.useState<PurchaseRequest | null>(null);
   const [offers, setOffers] = React.useState<SellerPurchaseOfferCardData[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [menuActions, setMenuActions] = React.useState<ConversationViewAction[]>([]);
+  const [isExecuting, setIsExecuting] = React.useState(false);
+  const setTopBarMenu = React.useContext(DetailTopBarMenuContext);
+  const focusedRef = React.useRef(false);
+  const loadVersionRef = React.useRef(0);
+  const executingRef = React.useRef(false);
 
-  useFocusEffect(React.useCallback(() => {
-    let active = true;
-    if (!purchaseRequestId) {
-      setLoading(false);
-      return () => { active = false; };
-    }
-    setLoading(true);
-    void Promise.all([
+  const loadOffers = React.useCallback(async () => {
+    if (!purchaseRequestId) return;
+    const loadVersion = ++loadVersionRef.current;
+    const [requestResult, offersResult, menuResult] = await Promise.all([
       getPurchaseRequestById(purchaseRequestId),
       getCurrentSellerPurchaseOffers(undefined, "newly_listed", "all"),
-    ]).then(([requestResult, offersResult]) => {
-      if (!active) return;
-      if (requestResult?.ok) setRequest(requestResult.data);
-      if (offersResult.ok) {
-        setOffers(offersResult.data.filter((offer) => offer.purchase_request_id === purchaseRequestId));
-      } else {
-        showError("No se pudieron cargar las ofertas", offersResult.error.message);
-      }
+      getCurrentSellerRequestOffersMenu(purchaseRequestId),
+    ]);
+    if (!focusedRef.current || loadVersion !== loadVersionRef.current) return;
+    if (requestResult?.ok) setRequest(requestResult.data);
+    if (offersResult.ok) {
+      setOffers(offersResult.data.filter((offer) => offer.purchase_request_id === purchaseRequestId));
+    } else {
+      showError("No se pudieron cargar las ofertas", offersResult.error.message);
+    }
+    setMenuActions(menuResult.ok ? menuResult.data : []);
+    if (!menuResult.ok) showError("No se pudieron cargar las opciones", menuResult.error.message);
+    setLoading(false);
+  }, [purchaseRequestId]);
+
+  useFocusEffect(React.useCallback(() => {
+    focusedRef.current = true;
+    setIsExecuting(executingRef.current);
+    if (purchaseRequestId) {
+      setLoading(true);
+      void loadOffers();
+    } else {
       setLoading(false);
-    });
-    return () => { active = false; };
-  }, [purchaseRequestId]));
+    }
+    return () => { focusedRef.current = false; loadVersionRef.current += 1; };
+  }, [loadOffers, purchaseRequestId]));
 
   const addOffer = React.useCallback(async () => {
     if (!purchaseRequestId) return;
@@ -100,6 +122,89 @@ export default function SellerRequestOffersScreen() {
       title: "Información de categoría", hideMenu: "true", purchaseRequestId,
     } });
   }, [purchaseRequestId]);
+
+  const executeMenuAction = React.useCallback(async (action: ConversationViewAction) => {
+    if (!purchaseRequestId || executingRef.current) return false;
+    executingRef.current = true;
+    setIsExecuting(true);
+    try {
+      if (action.executor?.target === "public.seller_discard_request_offers") {
+        const result = await discardCurrentSellerRequestOffers(purchaseRequestId);
+        if (!result.ok) {
+          showError("No se pudieron descartar las ofertas", result.error.message);
+          return false;
+        }
+        const message = `Descartadas: ${result.data.discardedCount}. Omitidas: ${result.data.skippedCount}.`;
+        if (result.data.discardedCount > 0) showSuccess("Ofertas descartadas", message);
+        else showInfo("No se descartaron ofertas", message);
+        await loadOffers();
+        return true;
+      }
+      const result = action.executor?.target === "request.favorite.add"
+        ? await addCurrentSellerPurchaseRequestFavorite(purchaseRequestId)
+        : await removeCurrentSellerPurchaseRequestFavorite(purchaseRequestId);
+      if (!result.ok) {
+        showError("No se pudo actualizar el favorito", result.error.message);
+        return false;
+      }
+      await loadOffers();
+      return true;
+    } finally {
+      executingRef.current = false;
+      if (focusedRef.current) setIsExecuting(false);
+    }
+  }, [loadOffers, purchaseRequestId]);
+
+  const openMenuAction = React.useCallback((action: ConversationViewAction) => {
+    if (executingRef.current || !purchaseRequestId) return;
+    const target = action.executor?.target;
+    if (target === "request.category") {
+      openCategoryInfo();
+      return;
+    }
+    if (target === "request.share") {
+      const url = buildPurchaseRequestUrl(purchaseRequestId);
+      const title = request?.title?.trim() || "Solicitud en Luppit";
+      void Share.share({ message: `${title}\n${url}`, url, title })
+        .catch(() => showError("No se pudo compartir", "Intenta nuevamente."));
+      return;
+    }
+    if (target === "request.favorite.add" || target === "request.favorite.remove") {
+      void executeMenuAction(action);
+      return;
+    }
+    if (target !== "public.seller_discard_request_offers" || !action.confirmation) return;
+    const confirmation = action.confirmation;
+    const colorKey = normalizeStyleFlags(confirmation.confirm_style_code).isDanger ? "error" : "textDark";
+    openPopup({
+      type: "summary", title: confirmation.title, icon: normalizeOptionalIcon(action.icon),
+      description: confirmation.description_template,
+      rows: confirmation.fields.map((field) => ({ label: field.label, value: field.value })),
+      actions: [
+        { id: "keep-offers", label: confirmation.cancel_label,
+          icon: normalizeOptionalIcon(confirmation.cancel_icon), backgroundColorKey: "backgroudWhite",
+          textColorKey: "textDark", iconColorKey: "textDark" },
+        { id: "discard-offers", label: confirmation.confirm_label,
+          icon: normalizeOptionalIcon(confirmation.confirm_icon), backgroundColorKey: "backgroudWhite",
+          textColorKey: colorKey, iconColorKey: colorKey, onPress: () => executeMenuAction(action) },
+      ],
+    });
+  }, [executeMenuAction, openCategoryInfo, purchaseRequestId, request?.title]);
+
+  useFocusEffect(React.useCallback(() => {
+    if (!setTopBarMenu) return;
+    setTopBarMenu(!loading && menuActions.length > 0 ? {
+      onPress: () => openPopup({ options: menuActions.map((action) => ({
+        id: action.id, label: action.label, helperText: action.helper_text,
+        icon: normalizeOptionalIcon(action.icon),
+        textColorKey: normalizeStyleFlags(action.style_code).isDanger ? "error" : "textDark",
+        iconColorKey: normalizeStyleFlags(action.style_code).isDanger ? "error" : "textDark",
+        onPress: () => openMenuAction(action),
+      })) }),
+      accessibilityLabel: "Opciones de solicitud", disabled: isExecuting, testID: "seller-request-options",
+    } : null);
+    return () => setTopBarMenu(null);
+  }, [isExecuting, loading, menuActions, openMenuAction, setTopBarMenu]));
 
   const canAddOffer = request?.status === "active" && offers.length > 0;
 
