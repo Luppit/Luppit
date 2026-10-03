@@ -93,6 +93,7 @@ export type ConversationActionConfirmation = {
   fields: ConversationActionConfirmationField[];
   comparison?: ConversationActionComparison;
   secondary_action_code?: string;
+  read_only?: boolean;
   inputs: ConversationActionConfirmationInput[];
   payload_defaults: Record<string, unknown>;
   review_images?: { storage_ref: string; caption: string | null }[];
@@ -132,6 +133,33 @@ export type ConversationViewSlot = {
   trigger_transition_to: string | null;
 };
 
+export type ConversationPresentation = {
+  terms_label: string | null;
+  terms_version: string | null;
+  show_terms: boolean;
+  show_terms_price?: boolean;
+  request_brief: { label: string; description: string } | null;
+  card: {
+    label: string;
+    title: string;
+    message: string;
+    icon: string | null;
+    tone: "normal" | "danger" | "success";
+    comparison?: {
+      current_label: string;
+      current_value: string;
+      proposed_label: string;
+      proposed_value: string;
+    };
+    supporting?: { title: string; message: string };
+  };
+  history_label: string;
+  history_expand_label: string;
+  history_collapse_label: string;
+  locked: boolean;
+  rating_message?: string | null;
+};
+
 export type ConversationView = {
   conversation: {
     id: string;
@@ -147,6 +175,7 @@ export type ConversationView = {
   context: Record<string, unknown>;
   actions: ConversationViewAction[];
   slots: ConversationViewSlot[];
+  presentation?: ConversationPresentation | null;
 };
 
 export type ExecuteConversationActionInput = {
@@ -443,6 +472,7 @@ function parseConversationActionConfirmation(raw: unknown): ConversationActionCo
     fields,
     comparison: parseConversationComparison(value.comparison),
     secondary_action_code: toOptionalText(value.secondary_action_code) ?? undefined,
+    read_only: value.read_only === true,
     inputs,
     payload_defaults:
       value.payload_defaults &&
@@ -528,6 +558,59 @@ function parseConversationViewSlot(raw: unknown): ConversationViewSlot | null {
   };
 }
 
+function parseConversationPresentation(raw: unknown): ConversationPresentation | null {
+  if (!raw || typeof raw !== "object") return null;
+  const value = raw as Record<string, unknown>;
+  const card = value.card && typeof value.card === "object"
+    ? value.card as Record<string, unknown>
+    : null;
+  if (!card || typeof card.title !== "string") return null;
+
+  const brief = value.request_brief && typeof value.request_brief === "object"
+    ? value.request_brief as Record<string, unknown>
+    : null;
+  const comparison = card.comparison && typeof card.comparison === "object"
+    ? card.comparison as Record<string, unknown>
+    : null;
+  const supporting = card.supporting && typeof card.supporting === "object"
+    ? card.supporting as Record<string, unknown>
+    : null;
+
+  return {
+    terms_label: toOptionalText(value.terms_label),
+    terms_version: toOptionalText(value.terms_version),
+    show_terms: value.show_terms === true,
+    show_terms_price: value.show_terms_price === true,
+    request_brief: brief && typeof brief.description === "string"
+      ? { label: toOptionalText(brief.label) ?? "Solicitud del comprador", description: brief.description }
+      : null,
+    card: {
+      label: toOptionalText(card.label) ?? "Estado actual",
+      title: card.title,
+      message: toOptionalText(card.message) ?? "",
+      icon: toOptionalText(card.icon),
+      tone: card.tone === "danger" || card.tone === "success" ? card.tone : "normal",
+      ...(comparison && typeof comparison.current_value === "string" &&
+        typeof comparison.proposed_value === "string" ? {
+          comparison: {
+            current_label: toOptionalText(comparison.current_label) ?? "Actual",
+            current_value: comparison.current_value,
+            proposed_label: toOptionalText(comparison.proposed_label) ?? "Propuesta",
+            proposed_value: comparison.proposed_value,
+          },
+        } : {}),
+      ...(supporting && typeof supporting.title === "string" ? {
+        supporting: { title: supporting.title, message: toOptionalText(supporting.message) ?? "" },
+      } : {}),
+    },
+    history_label: toOptionalText(value.history_label) ?? "Conversación",
+    history_expand_label: toOptionalText(value.history_expand_label) ?? "Ver historial",
+    history_collapse_label: toOptionalText(value.history_collapse_label) ?? "Ocultar historial",
+    locked: value.locked === true,
+    rating_message: toOptionalText(value.rating_message),
+  };
+}
+
 function parseConversationView(raw: unknown): ConversationView | null {
   if (!raw || typeof raw !== "object") return null;
   const value = raw as Record<string, unknown>;
@@ -557,6 +640,9 @@ function parseConversationView(raw: unknown): ConversationView | null {
     .map((slot) => parseConversationViewSlot(slot))
     .filter((slot): slot is ConversationViewSlot => Boolean(slot))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const context = value.context && typeof value.context === "object"
+    ? value.context as Record<string, unknown>
+    : {};
 
   return {
     conversation: {
@@ -597,12 +683,10 @@ function parseConversationView(raw: unknown): ConversationView | null {
           ? permissionsValue.can_send_attachments
           : false,
     },
-    context:
-      value.context && typeof value.context === "object"
-        ? (value.context as Record<string, unknown>)
-        : {},
+    context,
     actions,
     slots,
+    presentation: parseConversationPresentation(context.conversation_presentation),
   };
 }
 
@@ -838,7 +922,7 @@ export async function getConversationView(
     if (confirmation.images.length !== confirmation.review_images.length) {
       confirmation.blocker = {
         code: "proposal_images_unavailable",
-        message: "No se pudieron cargar todas las fotos. Actualiza la conversación antes de aceptar.",
+        message: "No se pudieron cargar todas las fotos. Actualiza la conversación para revisarlas.",
         action_label: null,
         action_target: null,
       };
@@ -988,7 +1072,7 @@ export async function executeConversationActionByExecutor(
     p_conversation_id: input.conversationId,
     p_profile_id: input.profileId,
     p_action_code: input.actionCode,
-    p_payload: input.payload ?? null,
+    p_payload: { ...input.payload, pricing_version: 2 },
   } as never);
 
   if (rpcResult.error) {

@@ -178,20 +178,22 @@ export function useConversationActions({
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const isExecutingActionRef = useRef(false);
-  const acceptancePopupRef = useRef<{ actionId: string; revision: string; config: PopupSummaryConfig } | null>(null);
+  const confirmationPopupRef = useRef<{ actionId: string; revision: string; source: string; config: PopupSummaryConfig } | null>(null);
   useEffect(() => subscribePopup(({ config }) => {
-    if (config !== acceptancePopupRef.current?.config) acceptancePopupRef.current = null;
+    if (config !== confirmationPopupRef.current?.config) confirmationPopupRef.current = null;
   }), []);
   useEffect(() => {
-    const pending = acceptancePopupRef.current;
+    const pending = confirmationPopupRef.current;
     if (!pending || !conversationView || isExecutingActionRef.current) return;
-    const acceptance = conversationView.actions.find((action) => action.id === pending.actionId);
-    if (JSON.stringify(acceptance?.confirmation?.payload_defaults) !== pending.revision) {
-      acceptancePopupRef.current = null;
+    const currentAction = conversationView.actions.find((action) => action.id === pending.actionId);
+    const unavailable = !currentAction || pending.source !== `${conversationId}:${profileId}`;
+    if (unavailable || JSON.stringify(currentAction?.confirmation?.payload_defaults) !== pending.revision) {
+      confirmationPopupRef.current = null;
       closePopup();
-      showWarning("La oferta cambió", "Revisa los términos actuales antes de continuar.");
+      showWarning(unavailable ? "Acción no disponible" : "La oferta cambió",
+        "Revisa la conversación antes de continuar.");
     }
-  }, [conversationView, isExecutingAction]);
+  }, [conversationId, profileId, conversationView, isExecutingAction]);
   const purchaseRequestId = conversationView?.conversation.purchase_request_id ?? null;
 
   const runAction = useCallback(
@@ -490,7 +492,7 @@ export function useConversationActions({
       const ratingInputTitle =
         confirmation.inputs.find((input) => input.kind === "rating")?.label ?? null;
       const confirmStyle = normalizeStyleFlags(confirmation.confirm_style_code);
-      const secondaryAction = confirmation.secondary_action_code
+      const secondaryAction = !confirmation.read_only && confirmation.secondary_action_code
         ? conversationView?.actions.find((candidate) =>
             candidate.code === confirmation.secondary_action_code && candidate.id !== action.id)
         : undefined;
@@ -736,7 +738,7 @@ export function useConversationActions({
                 if (succeeded) return true;
 
                 const error = failure as ConversationActionFailure | null;
-                if (["offer_changed", "offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable"].includes(error?.code ?? "")) {
+                if (["offer_changed", "offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable", "offer_change_pending"].includes(error?.code ?? "")) {
                   closePopup();
                   await refreshConversation();
                   showWarning(
@@ -783,12 +785,16 @@ export function useConversationActions({
           },
         ],
       };
-      acceptancePopupRef.current = typeof confirmation.payload_defaults.offer_revision === "string" ||
-        typeof confirmation.payload_defaults.review_revision === "string"
-        ? { actionId: action.id, revision: JSON.stringify(confirmation.payload_defaults), config: popupConfig } : null;
+      if (confirmation.read_only) {
+        popupConfig.inputs = [];
+        popupConfig.actions = popupConfig.actions?.slice(0, 1);
+      }
+      confirmationPopupRef.current = { actionId: action.id,
+        revision: JSON.stringify(confirmation.payload_defaults),
+        source: `${conversationId}:${profileId}`, config: popupConfig };
       openPopup(popupConfig);
     },
-    [conversationView?.context, conversationView?.actions, refreshConversation, runAction]
+    [conversationId, profileId, conversationView?.context, conversationView?.actions, refreshConversation, runAction]
   );
 
   return { isExecutingAction, executingActionId, handleActionPress };

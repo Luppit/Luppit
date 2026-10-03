@@ -1,3 +1,4 @@
+import { buildOfferPricingRows } from "@/src/utils/conversationOfferPrice";
 import { getCurrentProfile, subscribeActiveProfile } from "@/src/services/active.profile.service";
 import { getOrCreateCurrentSellerOfferSeedConversation } from "@/src/services/seller.request.offers.service";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
@@ -164,17 +165,20 @@ function getOfferVisual(
   title: string | null | undefined
 ): PopupOfferVisual {
   const unitPrice = formatSummaryMoney(summary?.precio, summary?.moneda);
+  const quantity = summary?.cantidadOfrecida != null
+    ? `${summary.cantidadOfrecida}${summary.unidadCobro ? " × " : " "}${summary.unidadCobro ?? "unidades"}`
+    : undefined;
   const productTotal = formatSummaryMoney(
-    summary?.basePrecio === "UNIT" ? summary.precioTotal : summary?.precio,
+    summary?.pricingVersion === 2 || summary?.basePrecio === "UNIT" ? summary?.precioTotal : summary?.precio,
     summary?.moneda
   );
   const price = productTotal ? {
-    label: summary?.basePrecio === "UNIT" ? "Total de productos" : "Precio total",
+    label: summary?.pricingVersion === 2 ? "Subtotal de la oferta" : summary?.basePrecio === "UNIT" ? "Total de productos" : "Precio total",
     value: productTotal,
     detail: summary?.basePrecio === "UNIT" && unitPrice
-      ? `${unitPrice} por unidad${summary.cantidadOfrecida != null ? ` · ${summary.cantidadOfrecida} unidades` : ""}`
+      ? `${unitPrice} por ${summary.unidadCobro ?? "unidad"}${quantity ? ` · ${quantity}` : ""}`
       : undefined,
-  } : unitPrice ? { label: "Precio por unidad", value: unitPrice } : undefined;
+  } : unitPrice ? { label: summary?.pricingVersion === 2 ? "Precio principal" : "Precio por unidad", value: unitPrice } : undefined;
   const deliveryRows: NonNullable<PopupOfferVisual["deliveryRows"]> = [];
   if (summary?.entrega) deliveryRows.push({
     label: summary.entrega,
@@ -190,8 +194,11 @@ function getOfferVisual(
   });
   return {
     title: title?.trim() || "Oferta",
-    quantity: summary?.cantidadOfrecida != null ? `${summary.cantidadOfrecida} unidades` : undefined,
+    quantity,
     price,
+    rows: buildOfferPricingRows({ offer_components: summary?.componentes, offer_price_amount: summary?.precio,
+      offer_price_basis: summary?.basePrecio, offer_quantity_offered: summary?.cantidadOfrecida, offer_unit_label: summary?.unidadCobro,
+      offer_product_subtotal: summary?.subtotalPrincipal, offer_currency_code: summary?.moneda }),
     deliveryRows,
   };
 }
@@ -211,7 +218,7 @@ function OfferEditContext({
 }) {
   const popup = useRef<PopupSummaryConfig | null>(null);
   const total = formatSummaryMoney(
-    summary?.basePrecio === "UNIT" ? summary.precioTotal : summary?.precio,
+    summary?.pricingVersion === 2 || summary?.basePrecio === "UNIT" ? summary?.precioTotal : summary?.precio,
     summary?.moneda
   );
   useEffect(() => subscribePopup(({ config }) => {
@@ -329,7 +336,8 @@ function OfferSummaryCard({
       price={visual.price}
       deliveryRows={visual.deliveryRows}
       description={summary?.descripcion ?? "Sin descripción todavía"}
-      rows={[]}
+      rows={visual.rows ?? []}
+      rowsTitle="Desglose de la oferta"
       notices={notices}
       primaryLabel={isEditMode ? "Proponer cambios" : "Enviar oferta"}
       primaryDisabled={disabled || !isComplete}
@@ -942,9 +950,6 @@ function OfferAssistantScreen({
             <View style={{ gap: t.spacing.md }}>
               <Text variant="title">¿Qué quieres cambiar?</Text>
               <Text color="textMedium">Cuéntame el cambio. Mantendré el resto de la oferta.</Text>
-              <Text variant="small" color="textMedium">
-                Solo tú ves este borrador. El comprador verá los cambios cuando los propongas y se aplicarán solo si los acepta.
-              </Text>
             </View>
           ) : null
         ) : <OfferRequestReference reference={requestReference} />}
@@ -1210,7 +1215,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
             <SummaryReviewContent title={visual.title} quantity={visual.quantity}
               images={option.offerImages.map((image) => ({ uri: image.url }))}
               imageNoun={option.offerImages.length === 1 ? "foto" : "fotos"}
-              price={visual.price} deliveryRows={visual.deliveryRows}
+              rows={visual.rows} rowsTitle="Desglose de la oferta" price={visual.price} deliveryRows={visual.deliveryRows}
               description={option.summary?.descripcion ?? "Descripción pendiente"} />
             {option.missingFields.length ? <Text variant="small" color="error">
               Falta: {option.missingFields.join(", ")}

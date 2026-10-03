@@ -1,3 +1,4 @@
+import { normalizeOfferComponents, type OfferPricingComponent } from "../utils/conversationOfferPrice";
 import type { ChatImage } from "../components/inputChat/inputChat";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
@@ -41,6 +42,10 @@ export type SellerOfferAssistantControlAction =
   | string;
 
 export type SellerOfferAssistantSummary = {
+  pricingVersion?: number;
+  unidadCobro?: string | null;
+  subtotalPrincipal?: number | null;
+  componentes?: OfferPricingComponent[];
   descripcion: string | null;
   precio: number | null;
   basePrecio: "UNIT" | "TOTAL" | null;
@@ -177,6 +182,10 @@ function normalizeSummary(value: unknown): SellerOfferAssistantSummary | null {
     : null;
 
   return {
+    pricingVersion: record.pricing_version === 2 ? 2 : 1,
+    unidadCobro: normalizeString(record.unidad_cobro),
+    subtotalPrincipal: normalizeNumber(record.subtotal_principal),
+    componentes: normalizeOfferComponents(record.componentes),
     descripcion: normalizeString(record.descripcion),
     precio: normalizeNumber(record.precio),
     basePrecio: record.base_precio === "UNIT" || record.base_precio === "TOTAL"
@@ -533,6 +542,7 @@ export async function callSellerOfferAssistant(
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         apikey: anonKey,
+        "X-Luppit-Pricing-Version": "2",
         ...(hasImages ? {} : { "Content-Type": "application/json" }),
         "Idempotency-Key": identity.idempotencyKey,
         "x-request-id": identity.clientRequestId,

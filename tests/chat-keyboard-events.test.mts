@@ -17,6 +17,7 @@ function keyboardHarness({
   initialHeight = 0,
   nativeState = KeyboardState.UNKNOWN,
   nativeHeight = 0,
+  visibilityHook = "",
 } = {}) {
   let visible = initialHeight > 0;
   let metrics = { height: initialHeight, screenY: 924 - initialHeight };
@@ -30,6 +31,8 @@ function keyboardHarness({
     previous: number | null;
   }[] = [];
   const keyboard = { state: { value: nativeState }, height: { value: nativeHeight } };
+  const states: unknown[] = [];
+  let stateIndex = 0;
   const react = {
     createElement(type: string | ((props: object) => Element), props: object, ...children: unknown[]) {
       const nextProps = { ...props, children };
@@ -38,6 +41,13 @@ function keyboardHarness({
     useCallback: (fn: unknown) => fn,
     useEffect: (effect: typeof effects[number]) => effects.push(effect),
     useRef: (value: unknown) => ({ current: value }),
+    useState(value: unknown) {
+      const index = stateIndex++;
+      if (!(index in states)) states[index] = typeof value === "function" ? value() : value;
+      return [states[index], (next: unknown) => {
+        states[index] = typeof next === "function" ? next(states[index]) : next;
+      }];
+    },
   };
   const modules: Record<string, unknown> = {
     react,
@@ -82,7 +92,11 @@ function keyboardHarness({
       jsx: ts.JsxEmit.React, esModuleInterop: true,
     },
   });
-  const exports = {} as { default: (props: object) => Element };
+  const exports = {} as {
+    default: (props: object) => Element;
+    useChatKeyboardVisible: () => boolean;
+    useAndroidChatKeyboardVisible: () => boolean;
+  };
   runInNewContext(outputText, {
     exports,
     require(name: string) {
@@ -90,7 +104,15 @@ function keyboardHarness({
       return modules[name];
     },
   });
-  const element = exports.default({ style: { flex: 1 }, androidEnabled });
+  const renderVisibility = () => {
+    stateIndex = 0;
+    return visibilityHook === "android"
+      ? exports.useAndroidChatKeyboardVisible() : exports.useChatKeyboardVisible();
+  };
+  const element = visibilityHook
+    ? { type: "VisibilityHook", props: {} }
+    : exports.default({ style: { flex: 1 }, androidEnabled });
+  if (visibilityHook) renderVisibility();
   const cleanups = effects.map((effect) => effect());
   const flushReactions = () => {
     for (const reaction of reactions) {
@@ -105,6 +127,10 @@ function keyboardHarness({
     nativeSubscriptions,
     padding: () => animatedStyle?.().paddingBottom,
     listenerCount: () => [...listeners.values()].reduce((count, callbacks) => count + callbacks.size, 0),
+    visible: renderVisibility,
+    emit(event: string) {
+      listeners.get(event)?.forEach((callback) => callback({ endCoordinates: metrics }));
+    },
     frame(state: number, height: number) {
       keyboard.state.value = state;
       keyboard.height.value = height;
@@ -206,4 +232,31 @@ test("iOS and Android opt-out preserve their existing KAV behavior without Andro
     assert.equal(h.nativeSubscriptions, 0);
     assert.equal(h.listenerCount(), 0);
   }
+});
+
+test("iOS composer visibility follows will-show and will-hide before keyboard animation", () => {
+  const h = keyboardHarness({ os: "ios", visibilityHook: "all" });
+  assert.equal(h.visible(), false);
+  h.emit("keyboardWillShow");
+  assert.equal(h.visible(), true);
+  h.emit("keyboardWillHide");
+  assert.equal(h.visible(), false);
+  h.unmount();
+  assert.equal(h.listenerCount(), 0);
+});
+
+test("visibility detects an already-open keyboard and Android keeps did-event behavior", () => {
+  const h = keyboardHarness({ initialHeight: 336, visibilityHook: "all" });
+  assert.equal(h.visible(), true);
+  h.hide();
+  assert.equal(h.visible(), false);
+  h.show(336);
+  assert.equal(h.visible(), true);
+});
+
+test("existing Android-only callers remain false on iOS", () => {
+  const h = keyboardHarness({ os: "ios", initialHeight: 336, visibilityHook: "android" });
+  assert.equal(h.visible(), false);
+  h.emit("keyboardWillShow");
+  assert.equal(h.visible(), false);
 });

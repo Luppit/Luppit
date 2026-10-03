@@ -21,14 +21,8 @@ export type ConversationActionButtonConfig = {
   tone: ConversationActionButtonTone;
 };
 
-export type ConversationActionSummary = {
-  label?: string | null;
-  value?: string | null;
-};
-
 type ConversationActionButtonsProps = {
   buttons: ConversationActionButtonConfig[];
-  summary?: ConversationActionSummary;
   disabled?: boolean;
   loadingButtonId?: string | null;
   onPress?: (id: string) => void;
@@ -36,7 +30,6 @@ type ConversationActionButtonsProps = {
 
 export default function ConversationActionButtons({
   buttons,
-  summary,
   disabled = false,
   loadingButtonId,
   onPress,
@@ -46,44 +39,11 @@ export default function ConversationActionButtons({
   const { fontScale, width } = useWindowDimensions();
   const shouldStackActions =
     buttons.length > 2 || fontScale >= 1.35 || width < 350;
-  const hasSummary = Boolean(summary?.label || summary?.value);
 
   if (buttons.length === 0) return null;
 
   return (
     <View style={s.container}>
-      {hasSummary ? (
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={[summary?.label, summary?.value]
-            .filter(Boolean)
-            .join(": ")}
-          style={s.summaryContainer}
-        >
-          {summary?.label ? (
-            <Text
-              variant="small"
-              color="textMedium"
-              maxFontSizeMultiplier={2}
-              style={s.summaryLabel}
-            >
-              {summary.label}
-            </Text>
-          ) : null}
-          {summary?.value ? (
-            <Text
-              selectable
-              variant="subtitle"
-              maxFontSizeMultiplier={2}
-              style={s.summaryValue}
-            >
-              {summary.value}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
       <View style={[s.actions, shouldStackActions && s.actionsStacked]}>
         {buttons.map((button) => {
           const isLoading = loadingButtonId === button.id;

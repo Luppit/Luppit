@@ -34,6 +34,62 @@ const context = {
   offer_currency_code: "CRC",
 };
 
+const complementaryContext = {
+  ...context,
+  pricing_version: 2,
+  offer_unit_label: "llanta",
+  offer_subtotal: 165_000,
+  offer_components: [
+    { id: "alignment", description: "Alineado", charge_mode: "EXTRA", amount: 5_000,
+      basis: "TOTAL", quantity: 1, unit_label: "trabajo" },
+    { id: "balance", description: "Balanceo", charge_mode: "INCLUDED", amount: null,
+      basis: null, quantity: null, unit_label: null },
+  ],
+};
+
+test("complementary summaries show complete server subtotal and preserve independent scopes", () => {
+  const summary = buildConversationOfferSummary(complementaryContext);
+  assert.equal(summary.offerVisual.price.value, "₡165,000");
+  assert.equal(summary.offerVisual.price.label, "Subtotal de la oferta");
+  assert.equal(summary.offerVisual.quantity, "4 × llanta");
+  assert.equal(summary.offerVisual.price.detail, "₡40,000 por llanta · 4 × llanta");
+  assert.equal(summary.offerVisual.rows[1].label, "Alineado");
+  assert.equal(summary.offerVisual.rows[1].value, "₡5,000 · por el conjunto");
+  assert.equal(summary.offerVisual.rows[2].value, "Incluido");
+  assert.equal(pricing.formatConversationOfferTotal({ ...complementaryContext,
+    offer_quantity_offered: 2, offer_product_subtotal: 80_000, offer_subtotal: 85_000 }), "₡85,000");
+  assert.equal(pricing.formatConversationOfferTotal({ ...complementaryContext,
+    offer_price_basis: "TOTAL", offer_price_amount: 160_000 }), "₡165,000");
+});
+
+test("unknown composite subtotal never falls back to the principal amount", () => {
+  const pending = { ...complementaryContext, offer_subtotal: null,
+    offer_price_basis: "TOTAL", offer_price_amount: 160_000 };
+  assert.equal(pricing.formatConversationOfferTotal(pending), null);
+  assert.match(pricing.formatConversationOfferPrice(pending)!, /Subtotal pendiente/);
+  assert.equal(buildConversationOfferSummary(pending).offerVisual.price, undefined);
+});
+
+test("pricing normalization preserves stable identities, included null amounts, and charging units", () => {
+  const normalized = pricing.normalizePurchaseOfferPricing(complementaryContext);
+  assert.equal(normalized.offer_subtotal, 165_000);
+  assert.equal(normalized.offer_unit_label, "llanta");
+  assert.equal(normalized.offer_components[0].id, "alignment");
+  assert.equal(normalized.offer_components[0].quantity, 1);
+  assert.equal(normalized.offer_components[1].amount, null);
+  assert.equal(normalized.offer_components[1].charge_mode, "INCLUDED");
+});
+
+test("a pending scope is displayed without presenting its amount as a fixed charge", () => {
+  const pending = { ...complementaryContext, offer_subtotal: null,
+    offer_components: [{ ...complementaryContext.offer_components[0], description: null, basis: null }] };
+  const rows = pricing.buildOfferPricingRows(pending);
+  assert.equal(rows[1].label, "Concepto pendiente");
+  assert.equal(rows[1].value, "₡5,000 · Alcance pendiente");
+  assert.match(pricing.formatConversationOfferPrice(pending)!, /Subtotal pendiente/);
+  assert.equal(pricing.formatConversationOfferTotal(pending), null);
+});
+
 test("the compact price is the product total, not the unit price", () => {
   assert.equal(pricing.formatConversationOfferTotal(context), "₡160,000");
   assert.equal(
@@ -207,6 +263,27 @@ const serviceSource = readFileSync(
   new URL("../src/services/conversation.service.ts", import.meta.url),
   "utf8",
 );
+const parsePresentation = compile(serviceSource.slice(
+  serviceSource.indexOf("function parseConversationPresentation("),
+  serviceSource.indexOf("function parseConversationView("),
+) + "\nexports.parsePresentation = parseConversationPresentation;", {
+  toOptionalText: (value: unknown) => typeof value === "string" && value.trim() ? value.trim() : null,
+}).parsePresentation;
+
+test("conversation stage metadata preserves DB labels, labeled amounts, pause and lock without deriving a state", () => {
+  const parsed = parsePresentation({ show_terms: false, show_terms_price: false, locked: true,
+    terms_version: "Condiciones acordadas", card: { title: "Cambios pendientes", message: "Esperando al comprador",
+      comparison: { current_label: "Acordada", current_value: "₡160.000", proposed_label: "Propuesta", proposed_value: "₡140.000" },
+      supporting: { title: "Envío en pausa", message: "No envíes la compra" } } });
+  assert.equal(parsed.locked, true);
+  assert.equal(parsed.show_terms, false);
+  assert.equal(parsed.show_terms_price, false);
+  assert.equal(parsed.card.comparison.current_label, "Acordada");
+  assert.equal(parsed.card.comparison.proposed_value, "₡140.000");
+  assert.equal(parsed.card.supporting.title, "Envío en pausa");
+  assert.equal(parsePresentation(null), null);
+  assert.equal(parsePresentation({ card: {} }), null);
+});
 const summaryServiceSource = serviceSource.slice(
   serviceSource.indexOf(
     "export async function getCurrentConversationOfferSummary(",

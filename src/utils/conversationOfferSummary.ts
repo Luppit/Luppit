@@ -1,6 +1,7 @@
 import {
   formatConversationOfferTotal,
   formatOfferAmount,
+  buildOfferPricingRows,
 } from "./conversationOfferPrice";
 
 function displayText(value: unknown) {
@@ -16,7 +17,12 @@ export function buildConversationOfferSummary(
     ? context.offer_fulfillment_details
     : [];
   const rows: { label: string; value: string }[] = [];
+  const pricingRows = buildOfferPricingRows(context);
+  const hasComponents = pricingRows.length > 0 || context.pricing_version === 2;
+  const unit = displayText(context.offer_unit_label);
   const quantity = context.offer_quantity_offered;
+  const quantityLabel = typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0
+    ? `${quantity}${unit ? " × " : " "}${unit ?? "unidades"}` : undefined;
   if (
     typeof quantity === "number" &&
     Number.isFinite(quantity) &&
@@ -29,10 +35,10 @@ export function buildConversationOfferSummary(
     context.offer_currency_code,
   );
   if (context.offer_price_basis === "UNIT" && unitPrice) {
-    rows.push({ label: "Precio por unidad", value: unitPrice });
+    rows.push({ label: `Precio por ${displayText(context.offer_unit_label) ?? "unidad"}`, value: unitPrice });
   }
   const total = formatConversationOfferTotal(context);
-  if (total) rows.push({ label: "Total de productos", value: total });
+  if (total) rows.push({ label: hasComponents ? "Subtotal de la oferta" : "Total de productos", value: total });
 
   const options = Array.isArray(context.fulfillment_options)
     ? context.fulfillment_options
@@ -119,19 +125,19 @@ export function buildConversationOfferSummary(
     rows,
     offerVisual: {
       title: displayText(context.offer_name) ?? displayText(context.request_title) ?? "Oferta",
-      quantity: typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0
-        ? `${quantity} unidades` : undefined,
+      quantity: quantityLabel,
       price: total
         ? {
-            label: context.offer_price_basis === "UNIT" ? "Total de productos" : "Precio total",
+            label: hasComponents ? "Subtotal de la oferta" : context.offer_price_basis === "UNIT" ? "Total de productos" : "Precio total",
             value: total,
             detail: context.offer_price_basis === "UNIT" && unitPrice
-              ? `${unitPrice} por unidad${typeof quantity === "number" && quantity > 0 ? ` · ${quantity} unidades` : ""}`
+              ? `${unitPrice} por ${unit ?? "unidad"}${quantityLabel ? ` · ${quantityLabel}` : ""}`
               : undefined,
           }
         : unitPrice && context.offer_price_basis === "UNIT"
           ? { label: "Precio por unidad", value: unitPrice }
           : undefined,
+      rows: pricingRows,
       deliveryRows,
     },
   };

@@ -3274,6 +3274,79 @@ export type Database = {
           },
         ]
       }
+      purchase_offer_component: {
+        Row: {
+          amount: number | null
+          basis: string | null
+          charge_mode: string
+          description: string
+          id: string
+          purchase_offer_id: string
+          quantity: number | null
+          sort_order: number
+          unit_label: string | null
+        }
+        Insert: {
+          amount?: number | null
+          basis?: string | null
+          charge_mode: string
+          description: string
+          id: string
+          purchase_offer_id: string
+          quantity?: number | null
+          sort_order: number
+          unit_label?: string | null
+        }
+        Update: {
+          amount?: number | null
+          basis?: string | null
+          charge_mode?: string
+          description?: string
+          id?: string
+          purchase_offer_id?: string
+          quantity?: number | null
+          sort_order?: number
+          unit_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_component_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_category_pricing_policy: {
+        Row: {
+          allow_fractional_quantities: boolean
+          allowed_units: string[] | null
+          category_id: string
+          max_components: number
+        }
+        Insert: {
+          allow_fractional_quantities?: boolean
+          allowed_units?: string[] | null
+          category_id: string
+          max_components?: number
+        }
+        Update: {
+          allow_fractional_quantities?: boolean
+          allowed_units?: string[] | null
+          category_id?: string
+          max_components?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_category_pricing_policy_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "category"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_offer: {
         Row: {
           business_id: string | null
@@ -3286,6 +3359,7 @@ export type Database = {
           privacy_purge_after: string | null
           purchase_request_id: string | null
           quantity_offered: number | null
+          unit_label: string | null
         }
         Insert: {
           business_id?: string | null
@@ -3298,6 +3372,7 @@ export type Database = {
           privacy_purge_after?: string | null
           purchase_request_id?: string | null
           quantity_offered?: number | null
+          unit_label?: string | null
         }
         Update: {
           business_id?: string | null
@@ -3310,6 +3385,7 @@ export type Database = {
           privacy_purge_after?: string | null
           purchase_request_id?: string | null
           quantity_offered?: number | null
+          unit_label?: string | null
         }
         Relationships: [
           {
@@ -4659,6 +4735,7 @@ export type Database = {
       }
       create_seller_offer_priced_fulfillment_from_conversation: {
         Args: {
+          p_components?: Json
           p_conversation_id: string
           p_conversation_image_paths?: string[]
           p_currency_id: string
@@ -4669,10 +4746,12 @@ export type Database = {
           p_pickup_catalog_id?: string
           p_price: number
           p_price_basis?: string
+          p_pricing_version?: number
           p_profile_id: string
           p_quantity_offered?: number
           p_shipping_max_days?: number
           p_shipping_price?: number
+          p_unit_label?: string
         }
         Returns: Json
       }
@@ -4811,11 +4890,15 @@ export type Database = {
           currency_id: string
           description: string
           id: string
+          offer_components: Json
           offer_currency_code: string
           offer_price_summary: string
           offer_product_subtotal: number
+          offer_subtotal: number
+          offer_unit_label: string
           price: number
           price_basis: string
+          pricing_version: number
           purchase_request_id: string
           quantity_offered: number
         }[]
@@ -5002,6 +5085,37 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_seller_offer_pricing: {
+        Args: {
+          p_conversation_id: string
+          p_draft?: Json
+          p_profile_id: string
+        }
+        Returns: Json
+      }
+      create_seller_offer_priced_before_components: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_price_basis?: string
+          p_profile_id: string
+          p_quantity_offered?: number
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
+      get_conversation_view_before_components: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -5120,11 +5234,15 @@ export type Database = {
           currency_id: string
           description: string
           id: string
+          offer_components: Json
           offer_currency_code: string
           offer_price_summary: string
           offer_product_subtotal: number
+          offer_subtotal: number
+          offer_unit_label: string
           price: number
           price_basis: string
+          pricing_version: number
           purchase_request_id: string
           quantity_offered: number
           request_category_id: string

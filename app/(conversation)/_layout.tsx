@@ -1,25 +1,23 @@
 import {
   normalizeOptionalIcon,
   normalizeStyleFlags,
-  toTopButtonConfig,
   useConversationActions,
 } from "@/src/components/conversation/useConversationActions";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { useFocusEffect } from "@react-navigation/native";
-import ConversationHeaderControls from "@/src/components/conversation/ConversationHeaderControls";
 import Button from "@/src/components/button/Button";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import InputChat from "@/src/components/inputChat/inputChat";
 import ChatKeyboardAvoidingView, {
-  useAndroidChatKeyboardVisible,
+  useChatKeyboardVisible,
 } from "@/src/components/inputChat/ChatKeyboardAvoidingView";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { Text } from "@/src/components/Text";
 import { getSession } from "@/src/lib/supabase";
 import { supabase } from "@/src/lib/supabase/client";
-import type { AppError } from "@/src/lib/supabase/errors";
+import { fromAppError, type AppError } from "@/src/lib/supabase/errors";
 import {
   openPopup,
   PopupOption,
@@ -54,7 +52,6 @@ import React, {
   useState,
 } from "react";
 import {
-  Keyboard,
   LayoutChangeEvent,
   Platform,
   Pressable,
@@ -72,13 +69,12 @@ type ConversationLayoutContextValue = {
   conversationId: string;
   profileId: string;
   conversationView: ConversationView;
-  showComposer: boolean;
-  refreshConversation: () => Promise<void>;
+  handleActionPress: (action: ConversationViewAction) => void;
+  isExecutingAction: boolean;
+  executingActionId: string | null;
   messageRefreshTick: number;
   optimisticMessages: ConversationMessage[];
   clearOptimisticMessages: (messageIds: string[]) => void;
-  contentTopInset: number;
-  contentBottomInset: number;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -141,7 +137,7 @@ function getRealtimeRefreshTargets(
 export default function ConversationLayout() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const isAndroidKeyboardVisible = useAndroidChatKeyboardVisible();
+  const isKeyboardVisible = useChatKeyboardVisible();
   const params = useGlobalSearchParams<{
     conversationId?: string | string[];
     title?: string | string[];
@@ -154,8 +150,6 @@ export default function ConversationLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<AppError | null>(null);
   const [messageRefreshTick, setMessageRefreshTick] = useState(0);
-  const [composerOverlayHeight, setComposerOverlayHeight] = useState(0);
-  const [headerControlsHeight, setHeaderControlsHeight] = useState(0);
   const [purchaseRequestTitle, setPurchaseRequestTitle] = useState<string | null>(null);
   const [optimisticMessages, setOptimisticMessages] = useState<ConversationMessage[]>(
     []
@@ -179,7 +173,8 @@ export default function ConversationLayout() {
     [params.offerPublishedAt]
   );
   const lastOfferPublishedAtRef = useRef(offerPublishedAt);
-  const showComposer = conversationView?.permissions.can_send_messages ?? false;
+  const showComposer = Boolean(conversationView?.permissions.can_send_messages) &&
+    !conversationView?.presentation?.locked;
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
   const [pendingMessageCount, setPendingMessageCount] = useState(0);
   useEffect(() => {
@@ -291,20 +286,27 @@ export default function ConversationLayout() {
     if (!conversationId) return;
     const generation = ++viewRefreshGenerationRef.current;
 
-    const result = await getCurrentUserConversationView(conversationId);
-    if (generation !== viewRefreshGenerationRef.current) return;
-    if (!result.ok) {
-      setLoadError(result.error);
-      setConversationView(null);
-      setProfileId(null);
-      setIsLoading(false);
-      return;
+    try {
+      const result = await getCurrentUserConversationView(conversationId);
+      if (generation !== viewRefreshGenerationRef.current) return;
+      if (!result.ok) {
+        setLoadError(result.error);
+        setConversationView(null);
+        setProfileId(null);
+        return;
+      }
+      setLoadError(null);
+      setConversationView(result.data);
+      setProfileId(result.profileId);
+    } catch {
+      if (generation === viewRefreshGenerationRef.current) {
+        setLoadError(fromAppError("network"));
+        setConversationView(null);
+        setProfileId(null);
+      }
+    } finally {
+      if (generation === viewRefreshGenerationRef.current) setIsLoading(false);
     }
-
-    setLoadError(null);
-    setConversationView(result.data);
-    setProfileId(result.profileId);
-    setIsLoading(false);
   }, [conversationId]);
 
   useFocusEffect(
@@ -398,7 +400,7 @@ export default function ConversationLayout() {
     };
   }, [conversationId, refreshConversation]);
 
-  const { isExecutingAction, handleActionPress } =
+  const { isExecutingAction, executingActionId, handleActionPress } =
     useConversationActions({
       conversationId,
       profileId,
@@ -488,20 +490,9 @@ export default function ConversationLayout() {
     [handleActionPress]
   );
 
-  const handleComposerOverlayLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-    setComposerOverlayHeight((currentHeight) =>
-      currentHeight === nextHeight ? currentHeight : nextHeight
-    );
-    setToastBottomInset(TOAST_INSET_SOURCE, nextHeight + t.spacing.sm);
+  const handleComposerLayout = useCallback((event: LayoutChangeEvent) => {
+    setToastBottomInset(TOAST_INSET_SOURCE, Math.ceil(event.nativeEvent.layout.height) + t.spacing.sm);
   }, [t.spacing.sm]);
-
-  const handleHeaderControlsLayout = useCallback((event: LayoutChangeEvent) => {
-    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-    setHeaderControlsHeight((currentHeight) =>
-      currentHeight === nextHeight ? currentHeight : nextHeight
-    );
-  }, []);
 
   if (!conversationId) return <Redirect href="/(tabs)" />;
 
@@ -544,43 +535,22 @@ export default function ConversationLayout() {
     );
   }
 
-  const rawHeaderActions = conversationView.actions.filter(
-    (action) => ["TOP", "AUX"].includes((action.ui_slot ?? "").toUpperCase())
+  const menuActions = conversationView.presentation?.locked ? [] : conversationView.actions.filter(
+    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU"
   );
-  const headerActions = rawHeaderActions.map(toTopButtonConfig);
-  const headerActionsById = new Map(
-    rawHeaderActions.map((action) => [action.id, action] as const)
-  );
-  const headerActionCodes = new Set(rawHeaderActions.map((action) => action.code));
-  const menuActions = conversationView.actions.filter(
-    (action) => (action.ui_slot ?? "").toUpperCase() === "MENU" &&
-      !headerActionCodes.has(action.code.replace(/_MENU$/, ""))
-  );
-  const showHeaderControls = Boolean(conversationView.conversation.purchase_offer_id) ||
-    headerActions.length > 0;
   const headerBarHeight = 56;
-  const headerControlsFallbackHeight = t.spacing.sm * 2 + 48;
-  const composerOverlayFallbackHeight =
-    showComposer ? Math.max(insets.bottom, t.spacing.sm) + 88 : 0;
-  const contentTopInset = showHeaderControls
-    ? headerControlsHeight || headerControlsFallbackHeight
-    : 0;
-  const contentBottomInset = showComposer && Platform.OS !== "android"
-    ? composerOverlayHeight || composerOverlayFallbackHeight
-    : 0;
   const title = purchaseRequestTitle ?? routeTitle ?? "Conversación";
 
   const providerValue: ConversationLayoutContextValue = {
     conversationId,
     profileId,
     conversationView,
-    showComposer,
-    refreshConversation,
+    handleActionPress,
+    isExecutingAction,
+    executingActionId,
     messageRefreshTick,
     optimisticMessages,
     clearOptimisticMessages,
-    contentTopInset,
-    contentBottomInset,
   };
 
   return (
@@ -636,16 +606,17 @@ export default function ConversationLayout() {
                 <Icon name="arrow-left" size={28} />
               </Pressable>
 
-              <Text
-                variant="subtitle"
-                align="center"
-                maxLines={2}
-                maxFontSizeMultiplier={2}
-                accessibilityRole="header"
-                style={{ flex: 1, paddingHorizontal: t.spacing.sm }}
-              >
-                {title}
-              </Text>
+              <View style={{ flex: 1, paddingHorizontal: t.spacing.sm, gap: t.spacing.xs }}>
+                <Text variant="subtitle" align="center" maxLines={2}
+                  maxFontSizeMultiplier={2} accessibilityRole="header">
+                  {title}
+                </Text>
+                {conversationView.presentation?.terms_version ? (
+                  <Text variant="small" color="textMedium" align="center" maxFontSizeMultiplier={2}>
+                    {conversationView.presentation.terms_version}
+                  </Text>
+                ) : null}
+              </View>
 
               {menuActions.length > 0 ? (
                 <Pressable
@@ -673,57 +644,16 @@ export default function ConversationLayout() {
             </View>
           </GlassSurface>
 
-          <View
-            style={{
-              flex: 1,
-            }}
-          >
-            <View
-              style={{ flex: 1, paddingHorizontal: t.spacing.md }}
-              onTouchStart={() => Keyboard.dismiss()}
-            >
-              <Slot />
-            </View>
-
-            {showHeaderControls ? (
-              <View
-                pointerEvents="box-none"
-                onLayout={handleHeaderControlsLayout}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 9,
-                  backgroundColor: "transparent",
-                }}
-              >
-                <ConversationHeaderControls
-                  view={conversationView}
-                  profileId={profileId}
-                  buttons={headerActions}
-                  disabled={isExecutingAction}
-                  onPress={(id) => {
-                    const action = headerActionsById.get(id);
-                    if (!action) return;
-                    handleActionPress(action);
-                  }}
-                />
-              </View>
-            ) : null}
+          <View style={{ flex: 1 }}>
+            <Slot />
           </View>
 
           {showComposer ? (
             <View
               pointerEvents="box-none"
-              onLayout={handleComposerOverlayLayout}
+              onLayout={handleComposerLayout}
               style={{
-                position: Platform.OS === "android" ? "relative" : "absolute",
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 9,
-                elevation: 9,
+                flexShrink: 0,
                 backgroundColor: t.colors.background,
               }}
             >
@@ -731,7 +661,7 @@ export default function ConversationLayout() {
                 style={{
                   paddingHorizontal: t.spacing.md,
                   paddingTop: t.spacing.sm,
-                  paddingBottom: isAndroidKeyboardVisible
+                  paddingBottom: isKeyboardVisible
                     ? t.spacing.sm
                     : Math.max(insets.bottom, t.spacing.sm),
                   backgroundColor: t.colors.background,
@@ -740,9 +670,14 @@ export default function ConversationLayout() {
                 <InputChat
                   onDraftChange={setHasComposerDraft}
                   placeholder="Escribe un mensaje"
+                  showAttachmentButton={conversationView.permissions.can_send_attachments === true}
                   clearOnSendStart
                   restoreOnSendFailure
                   onSend={async ({ text, images }) => {
+                    if (images.length > 0 && !conversationView.permissions.can_send_attachments) {
+                      showError("No se pudieron enviar las fotos", "Esta conversación no permite adjuntar fotos.");
+                      throw new Error("conversation_attachments_unavailable");
+                    }
                     const messageGroupId = createConversationMessageGroupId();
                     const outgoingMessages = buildOptimisticMessages(
                       text,

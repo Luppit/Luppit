@@ -1,4 +1,6 @@
-import ConversationStatusSlotCard from "@/src/components/conversation/ConversationStatusSlotCard";
+import ConversationStageCard from "@/src/components/conversation/ConversationStageCard";
+import ConversationOfferDetails from "@/src/components/conversation/ConversationOfferDetails";
+import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
@@ -9,7 +11,7 @@ import {
   getConversationMessagesByConversationId,
 } from "@/src/services/conversation.message.service";
 import { getCurrentProfileConversationById } from "@/src/services/conversation.service";
-import { useFocusEffect, useIsFocused } from "@react-navigation/native";
+import { useIsFocused } from "@react-navigation/native";
 import { useTheme } from "@/src/themes";
 import {
   buildConversationMessageRenderGroups,
@@ -18,8 +20,9 @@ import {
 } from "@/src/utils/conversationMessageGroup";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Image, Modal, Pressable, ScrollView, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, useWindowDimensions, View } from "react-native";
 import type { StyleProp, ViewStyle } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useConversationLayout } from "./_layout";
 
 type ConversationImagePreview = {
@@ -34,11 +37,6 @@ type ConversationRenderItem =
       message: ConversationMessage;
       images: ConversationImagePreview[];
     };
-
-const getMessageImageUri = (message: ConversationMessage) =>
-  (message.image_url as string | null | undefined) ??
-  ((message as any).imageUrl as string | null | undefined) ??
-  null;
 
 function normalizeDisplayName(value: string | null | undefined) {
   const name = value?.trim() ?? "";
@@ -56,6 +54,8 @@ async function getCounterpartDisplayNameByConversationId(conversationId: string)
 
 export default function ConversationChatScreen() {
   const t = useTheme();
+  const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { activeProfile, refreshUnreadNotificationCount } = useActiveProfile();
   const isFocused = useIsFocused();
   const {
@@ -65,11 +65,15 @@ export default function ConversationChatScreen() {
     messageRefreshTick,
     optimisticMessages,
     clearOptimisticMessages,
-    contentTopInset,
-    contentBottomInset,
+    handleActionPress,
+    isExecutingAction,
+    executingActionId,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
+  const [messageError, setMessageError] = useState<string | null>(null);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [newMessageCount, setNewMessageCount] = useState(0);
   const [senderNameById, setSenderNameById] = useState<Record<string, string>>({});
   const [counterpartDisplayName, setCounterpartDisplayName] = useState<string | null>(
     null
@@ -78,14 +82,12 @@ export default function ConversationChatScreen() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const scrollViewRef = React.useRef<ScrollView | null>(null);
   const prefetchedPreviewUrisRef = React.useRef<Set<string>>(new Set());
-  const imageMessageWidth = 230;
-  const statusSlots = useMemo(
-    () =>
-      conversationView.slots.filter(
-        (slot) => (slot.ui_slot ?? "").toUpperCase() === "STATUS"
-      ),
-    [conversationView.slots]
-  );
+  const imageMessageWidth = Math.max(1, Math.min(230,
+    (width - t.spacing.md * 2) * 0.88 - t.spacing.md * 2));
+  const loadGenerationRef = React.useRef(0);
+  const atBottomRef = React.useRef(false);
+  const historyLoadedRef = React.useRef(false);
+  const previousMessageKeysRef = React.useRef<Set<string>>(new Set());
   const visibleMessages = useMemo(() => {
     const seenKeys = new Set<string>();
 
@@ -110,7 +112,7 @@ export default function ConversationChatScreen() {
         type: "messageGroup",
         message,
         images: group.messages.flatMap((candidate) => {
-          const uri = getMessageImageUri(candidate);
+          const uri = getConversationRenderImageUri(candidate);
           return uri ? [{ id: candidate.id, uri }] : [];
         }),
       };
@@ -118,53 +120,69 @@ export default function ConversationChatScreen() {
   }, [visibleMessages]);
   const activePreviewImage = previewImages[previewIndex] ?? null;
   const scrollToBottom = useCallback((animated = false) => {
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated });
-      }, 0);
-    });
+    atBottomRef.current = true;
+    setHistoryExpanded(true);
+    setNewMessageCount(0);
+    requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated }));
   }, []);
 
   const loadMessages = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setIsLoadingMessages(true);
-    const result =
-      await getConversationMessagesByConversationId(conversationId);
-    if (!result.ok) {
-      setIsLoadingMessages(false);
-      return;
+    try {
+      const result = await getConversationMessagesByConversationId(conversationId);
+      if (generation !== loadGenerationRef.current) return;
+      if (!result.ok) {
+        setMessageError(result.error.message);
+        return;
+      }
+      setMessageError(null);
+      setMessages(result.data);
+      clearOptimisticMessages(result.data.map((message) => message.id));
+      if (activeProfile?.role === "seller") void refreshUnreadNotificationCount();
+    } catch {
+      if (generation === loadGenerationRef.current) {
+        setMessageError("No se pudieron cargar los mensajes. Intenta de nuevo.");
+      }
+    } finally {
+      if (generation === loadGenerationRef.current) setIsLoadingMessages(false);
     }
-
-    setMessages(result.data);
-    clearOptimisticMessages(result.data.map((message) => message.id));
-    setIsLoadingMessages(false);
-    if (activeProfile?.role === "seller") {
-      void refreshUnreadNotificationCount();
-    }
-    if (result.data.length > 0) {
-      scrollToBottom(false);
-      setTimeout(() => {
-        scrollToBottom(false);
-      }, 120);
-    }
-  }, [
-    activeProfile?.role,
-    conversationId,
-    scrollToBottom,
-    clearOptimisticMessages,
-    refreshUnreadNotificationCount,
-  ]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void loadMessages();
-    }, [loadMessages]),
-  );
+  }, [activeProfile?.role, conversationId, clearOptimisticMessages, refreshUnreadNotificationCount]);
 
   useEffect(() => {
-    if (activeProfile?.role !== "seller" || isFocused) {
-      void loadMessages();
+    setMessages([]);
+    setMessageError(null);
+    setPreviewImages([]);
+    setCounterpartDisplayName(null);
+    setHistoryExpanded(true);
+    setNewMessageCount(0);
+    atBottomRef.current = false;
+    historyLoadedRef.current = false;
+    previousMessageKeysRef.current.clear();
+  }, [conversationId, profileId]);
+
+  useEffect(() => {
+    if (isFocused) void loadMessages();
+    return () => { loadGenerationRef.current += 1; };
+  }, [isFocused, profileId, messageRefreshTick, loadMessages]);
+
+  useEffect(() => {
+    const previous = previousMessageKeysRef.current;
+    const incoming = visibleMessages.filter((message) => !previous.has(getConversationMessageLogicalKey(message)));
+    previousMessageKeysRef.current = new Set(visibleMessages.map(getConversationMessageLogicalKey));
+    const initialLoad = !historyLoadedRef.current;
+    if (!isLoadingMessages) historyLoadedRef.current = true;
+    if (incoming.length === 0) return;
+    if (incoming.some((message) => message.id.startsWith("optimistic-") && message.sender_profile_id === profileId)) {
+      scrollToBottom();
+    } else if (initialLoad) {
+      return;
+    } else if (atBottomRef.current && historyExpanded) {
+      scrollToBottom();
+    } else {
+      setNewMessageCount((count) => count + incoming.length);
     }
-  }, [activeProfile?.role, isFocused, messageRefreshTick, loadMessages]);
+  }, [visibleMessages, profileId, historyExpanded, isLoadingMessages, scrollToBottom]);
 
   useEffect(() => {
     let active = true;
@@ -180,7 +198,7 @@ export default function ConversationChatScreen() {
     return () => {
       active = false;
     };
-  }, [conversationId]);
+  }, [conversationId, profileId]);
 
   useEffect(() => {
     const senderIds = Array.from(
@@ -327,6 +345,8 @@ export default function ConversationChatScreen() {
     <Pressable
       key={image.id}
       onPress={() => openImagePreview(images, index)}
+      accessibilityRole="button"
+      accessibilityLabel={`Ver imagen ${index + 1} de ${images.length}`}
       style={[
         {
           overflow: "hidden",
@@ -416,8 +436,7 @@ export default function ConversationChatScreen() {
     imageGroup?: ConversationImagePreview[]
   ) => {
     const messageKind = (message.message_kind ?? "").toUpperCase();
-    const imageUri = getConversationRenderImageUri(message, imageGroup) ??
-      getMessageImageUri(message);
+    const imageUri = getConversationRenderImageUri(message, imageGroup);
     const isSystemMessage = messageKind === "SYSTEM";
     const isImageMessage = messageKind === "IMAGE" || Boolean(imageUri);
     const isOwnMessage = message.sender_profile_id === profileId;
@@ -429,32 +448,9 @@ export default function ConversationChatScreen() {
 
     if (isSystemMessage) {
       return (
-        <View
-          key={message.id}
-          style={{
-            alignSelf: "stretch",
-            alignItems: "center",
-            marginVertical: t.spacing.sm,
-            gap: t.spacing.md,
-          }}
-        >
-          <View
-            style={{
-              borderRadius: 999,
-              paddingHorizontal: t.spacing.sm + 2,
-              paddingVertical: 2,
-              backgroundColor: t.colors.border,
-            }}
-          >
-            <Text variant="body" color="textDark" align="center">
-              {formatSystemDate(message.created_at)}
-            </Text>
-          </View>
-          {message.text ? (
-            <Text variant="body" color="stateAnulated" align="center">
-              {message.text}
-            </Text>
-          ) : null}
+        <View key={message.id} style={{ alignSelf: "stretch", gap: t.spacing.xs, paddingVertical: t.spacing.sm }}>
+          {message.text ? <Text variant="body" color="textMedium" align="center" selectable>{message.text}</Text> : null}
+          <Text variant="small" color="textMedium" align="center">{formatTime(message.created_at)}</Text>
         </View>
       );
     }
@@ -495,12 +491,13 @@ export default function ConversationChatScreen() {
               accessibilityRole="link"
               accessibilityLabel={`Ver perfil de ${senderName}`}
               hitSlop={8}
+              style={{ flexShrink: 1 }}
             >
               <Text variant="small" color="textMedium">
                 {senderName}
               </Text>
             </Pressable>
-            <Text variant="small" color="stateAnulated">
+            <Text variant="small" color="stateAnulated" style={{ flexShrink: 0 }}>
               {formatTime(message.created_at)}
             </Text>
           </View>
@@ -532,6 +529,8 @@ export default function ConversationChatScreen() {
               onPress={() =>
                 openImagePreview([{ id: message.id, uri: imageUri }], 0)
               }
+              accessibilityRole="button"
+              accessibilityLabel="Ver imagen"
             >
               <Image
                 source={{ uri: imageUri }}
@@ -561,35 +560,78 @@ export default function ConversationChatScreen() {
         ref={scrollViewRef}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          paddingTop: contentTopInset + t.spacing.sm,
-          gap: t.spacing.md,
-          paddingBottom: contentBottomInset + t.spacing.xl,
-        }}
+        contentContainerStyle={{ padding: t.spacing.md, paddingBottom: t.spacing.xl, gap: t.spacing.md }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={({ nativeEvent }) => {
+          const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
+          atBottomRef.current = contentSize.height - contentOffset.y - layoutMeasurement.height < 64;
+          if (atBottomRef.current && historyExpanded) setNewMessageCount(0);
+        }}
         onContentSizeChange={() => {
-          if (visibleMessages.length === 0) return;
-          scrollToBottom(false);
+          if (atBottomRef.current && historyExpanded) scrollViewRef.current?.scrollToEnd({ animated: false });
         }}
       >
-        {isLoadingMessages && visibleMessages.length === 0 ? (
-          <LoadingState
-            label="Cargando mensajes..."
-            variant="inline"
-            style={{ minHeight: 160 }}
-          />
+        <ConversationOfferDetails view={conversationView} profileId={profileId} disabled={isExecutingAction} />
+        <ConversationStageCard view={conversationView} disabled={isExecutingAction}
+          loadingActionId={executingActionId} onPress={handleActionPress} />
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+          <Text variant="body" style={{ flex: 1, fontFamily: t.typography.subtitle.fontFamily }}>
+            {conversationView.presentation?.history_label ?? "Conversación"}
+          </Text>
+          {renderItems.length > 0 ? (
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: historyExpanded }}
+              onPress={() => { setHistoryExpanded((current) => !current); atBottomRef.current = false; }}
+              style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
+              <Text variant="small" color="textMedium">
+                {historyExpanded
+                  ? conversationView.presentation?.history_collapse_label ?? "Ocultar historial"
+                  : conversationView.presentation?.history_expand_label ?? "Ver historial"}
+              </Text>
+              <Icon name={historyExpanded ? "chevron-up" : "chevron-down"} size={18} />
+            </Pressable>
+          ) : null}
+        </View>
+        {messageError ? (
+          <View style={{ gap: t.spacing.sm }}>
+            <Text variant="body" accessibilityRole="alert" selectable>{messageError}</Text>
+            <Button title="Reintentar" onPress={() => void loadMessages()} />
+          </View>
         ) : null}
-
-        {renderItems.map((item) =>
-          item.type === "messageGroup"
-            ? renderConversationMessage(item.message, item.images)
-            : renderConversationMessage(item.message)
-        )}
-
-        {statusSlots.map((slot) => (
-          <ConversationStatusSlotCard key={slot.code} slot={slot} />
-        ))}
+        {isLoadingMessages && visibleMessages.length === 0 ? (
+          <LoadingState label="Cargando mensajes..." variant="inline" style={{ minHeight: 120 }} />
+        ) : null}
+        {!isLoadingMessages && !messageError && renderItems.length === 0 ? (
+          <View style={{ paddingVertical: t.spacing.lg, alignItems: "center", gap: t.spacing.sm }}>
+            <Icon name="message-square" size={28} color={t.colors.textMedium} />
+            <Text variant="body">Aún no hay mensajes</Text>
+            <Text variant="small" color="textMedium" align="center">Aquí aparecerá el historial de esta conversación.</Text>
+          </View>
+        ) : null}
+        {historyExpanded ? renderItems.map((item, index) => {
+          const date = formatSystemDate(item.message.created_at);
+          const previousDate = index > 0 ? formatSystemDate(renderItems[index - 1].message.created_at) : null;
+          return (
+            <React.Fragment key={item.message.id}>
+              {date !== previousDate ? (
+                <Text variant="small" color="textMedium" align="center" style={{ paddingVertical: t.spacing.sm }}>{date}</Text>
+              ) : null}
+              {item.type === "messageGroup"
+                ? renderConversationMessage(item.message, item.images)
+                : renderConversationMessage(item.message)}
+            </React.Fragment>
+          );
+        }) : null}
       </ScrollView>
+      {newMessageCount > 0 ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`${newMessageCount} mensajes nuevos. Ver mensajes`}
+          onPress={() => scrollToBottom(true)}
+          style={{ padding: t.spacing.sm, minHeight: 44, flexDirection: "row", justifyContent: "center", gap: t.spacing.sm }}>
+          <Icon name="chevron-down" size={18} />
+          <Text variant="body">Nuevos mensajes ({newMessageCount})</Text>
+        </Pressable>
+      ) : null}
 
       <Modal
         visible={Boolean(activePreviewImage)}
@@ -608,10 +650,12 @@ export default function ConversationChatScreen() {
         >
           <Pressable
             onPress={closeImagePreview}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar imagen"
             hitSlop={12}
             style={{
               position: "absolute",
-              top: t.spacing.xl,
+              top: insets.top + t.spacing.sm,
               right: t.spacing.lg,
               zIndex: 2,
               width: 40,
@@ -652,6 +696,8 @@ export default function ConversationChatScreen() {
             <>
               <Pressable
                 onPress={showPreviousPreviewImage}
+                accessibilityRole="button"
+                accessibilityLabel="Imagen anterior"
                 hitSlop={12}
                 style={{
                   position: "absolute",
@@ -673,6 +719,8 @@ export default function ConversationChatScreen() {
               </Pressable>
               <Pressable
                 onPress={showNextPreviewImage}
+                accessibilityRole="button"
+                accessibilityLabel="Imagen siguiente"
                 hitSlop={12}
                 style={{
                   position: "absolute",
@@ -698,7 +746,7 @@ export default function ConversationChatScreen() {
                 style={{
                   color: t.colors.backgroudWhite,
                   position: "absolute",
-                  bottom: t.spacing.xl,
+                  bottom: Math.max(insets.bottom, t.spacing.xl),
                   alignSelf: "center",
                 }}
               >

@@ -197,14 +197,14 @@ export default function OfferCard({
                   <View style={s.priceRow}>
                     <Text variant="small" color="textMedium" style={s.priceLabel}>
                       {offer.quantity_offered != null
-                        ? `${offer.quantity_offered} ${offer.quantity_offered === 1 ? "unidad" : "unidades"}`
+                        ? `${offer.quantity_offered} ${offer.offer_unit_label ?? (offer.quantity_offered === 1 ? "unidad" : "unidades")}`
                         : "Precio por unidad"}
                     </Text>
-                    <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice} c/u</Text>
+                    <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice}{offer.offer_unit_label ? ` / ${offer.offer_unit_label}` : " c/u"}</Text>
                   </View>
                 ) : null}
                 <View style={s.priceRow}>
-                  <Text variant="small" color="textMedium" style={s.priceLabel}>Total de productos</Text>
+                  <Text variant="small" color="textMedium" style={s.priceLabel}>{offer.pricing_version === 2 ? "Subtotal de la oferta" : "Total de productos"}</Text>
                   <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
                 </View>
               </>

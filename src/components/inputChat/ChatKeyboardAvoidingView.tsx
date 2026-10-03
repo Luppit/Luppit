@@ -102,15 +102,14 @@ function AndroidChatKeyboardView({ children, style, onLayout, ...props }: ViewPr
   );
 }
 
-export function useAndroidChatKeyboardVisible() {
-  const [visible, setVisible] = useState(
-    () => Platform.OS === "android" && Keyboard.isVisible(),
-  );
+export function useChatKeyboardVisible() {
+  const [visible, setVisible] = useState(() => Keyboard.isVisible());
 
   useEffect(() => {
-    if (Platform.OS !== "android") return;
-    const show = Keyboard.addListener("keyboardDidShow", () => setVisible(true));
-    const hide = Keyboard.addListener("keyboardDidHide", () => setVisible(false));
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvent, () => setVisible(true));
+    const hide = Keyboard.addListener(hideEvent, () => setVisible(false));
     return () => {
       show.remove();
       hide.remove();
@@ -118,6 +117,11 @@ export function useAndroidChatKeyboardVisible() {
   }, []);
 
   return visible;
+}
+
+export function useAndroidChatKeyboardVisible() {
+  const visible = useChatKeyboardVisible();
+  return Platform.OS === "android" && visible;
 }
 
 export default function ChatKeyboardAvoidingView({

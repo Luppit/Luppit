@@ -3,9 +3,6 @@ import { TextStyle, ViewStyle } from "react-native";
 
 export type ConversationActionButtonsStyles = {
   container: ViewStyle;
-  summaryContainer: ViewStyle;
-  summaryLabel: TextStyle;
-  summaryValue: TextStyle;
   actions: ViewStyle;
   actionsStacked: ViewStyle;
   button: ViewStyle;
@@ -28,19 +25,6 @@ export function createConversationActionButtonsStyles(
     container: {
       alignSelf: "stretch",
       gap: t.spacing.sm + t.spacing.xs,
-    },
-    summaryContainer: {
-      alignItems: "stretch",
-      gap: t.spacing.xs,
-      minHeight: 32,
-      paddingHorizontal: t.spacing.xs,
-    },
-    summaryLabel: {
-      fontFamily: t.typography.subtitle.fontFamily,
-    },
-    summaryValue: {
-      color: t.colors.textDark,
-      fontVariant: ["tabular-nums"],
     },
     actions: {
       alignSelf: "stretch",

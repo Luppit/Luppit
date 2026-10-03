@@ -204,3 +204,6 @@ export { COL_UI_SLOT_CATALOG, TB_UI_SLOT_CATALOG } from "./ui_slot_catalog";
 
 export { TB_OFFER_CHANGE_PROPOSAL, COL_OFFER_CHANGE_PROPOSAL } from "./offer_change_proposal";
 export { TB_OFFER_AGREEMENT_REVISION, COL_OFFER_AGREEMENT_REVISION } from "./offer_agreement_revision";
+
+export { TB_PURCHASE_OFFER_COMPONENT, COL_PURCHASE_OFFER_COMPONENT } from "./purchase_offer_component";
+export { TB_OFFER_CATEGORY_PRICING_POLICY, COL_OFFER_CATEGORY_PRICING_POLICY } from "./offer_category_pricing_policy";

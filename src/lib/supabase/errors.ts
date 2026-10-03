@@ -159,9 +159,33 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "validation",
     message: "Ya hay una propuesta pendiente. Retírala antes de preparar otra.",
   },
+  offer_change_pending: {
+    type: "validation",
+    message: "Hay cambios pendientes. El comprador debe aceptarlos o rechazarlos antes de continuar.",
+  },
   offer_changed: {
     type: "validation",
     message: "La oferta cambió. Revísala nuevamente antes de concretar la compra.",
+  },
+  pricing_update_required: {
+    type: "validation",
+    message: "Actualiza Luppit para revisar y aceptar todos los conceptos de esta oferta.",
+  },
+  invalid_offer_components: {
+    type: "validation",
+    message: "Revisa los importes, cantidades y unidades de los conceptos de la oferta.",
+  },
+  invalid_offer_price: {
+    type: "validation",
+    message: "Revisa el precio, la cantidad y el costo de envío de la oferta.",
+  },
+  offer_components_incomplete: {
+    type: "validation",
+    message: "Completa los conceptos pendientes antes de enviar la oferta.",
+  },
+  invalid_offer_unit: {
+    type: "validation",
+    message: "Revisa la unidad y la cantidad permitidas para esta categoría.",
   },
   delivery_method_not_configured: {
     type: "validation",

@@ -4,7 +4,7 @@ import StatusChip from "@/src/components/statusChip/StatusChip";
 import { Text } from "@/src/components/Text";
 import { SellerPurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
-import { formatConversationOfferPrice } from "@/src/utils/conversationOfferPrice";
+import { formatConversationOfferPrice, formatConversationOfferTotal } from "@/src/utils/conversationOfferPrice";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -52,12 +52,15 @@ export default function SellerOfferCard({
   const accessibleOfferDate = formatAccessibleOfferDate(offer.created_at);
   const statusLabel = offer.conversation_status_label?.trim();
   const buyerLabel = profileName ? `Comprador · ${profileName}` : "Comprador";
-  const formattedPrice = formatConversationOfferPrice({
+  const pricingContext = {
     ...offer,
     offer_price_amount: offer.price,
     offer_price_basis: offer.price_basis,
     offer_quantity_offered: offer.quantity_offered,
-  }) ?? "Precio no disponible";
+  };
+  const formattedPrice = offer.pricing_version === 2
+    ? `Subtotal de la oferta: ${formatConversationOfferTotal(pricingContext) ?? "Pendiente"}`
+    : formatConversationOfferPrice(pricingContext) ?? "Precio no disponible";
   const accessibilityLabel = [
     categoryName,
     requestTitle || "Solicitud",

@@ -20,6 +20,14 @@ export function formatConversationOfferPrice(context: Record<string, unknown>) {
     displayText(context.offer_price);
   if (summary) return summary;
 
+  if (context.pricing_version === 2) {
+    const rows = buildOfferPricingRows(context);
+    const subtotal = formatOfferAmount(context.offer_subtotal, context.offer_currency_code);
+    return [...rows.map((row) => `${row.label}: ${row.value}`),
+      subtotal ? `Subtotal de la oferta: ${subtotal}` : "Subtotal pendiente",
+    ].join("\n");
+  }
+
   const amount = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
   if (!amount) return null;
   if (context.offer_price_basis === "TOTAL") return `Total de productos: ${amount}`;
@@ -37,6 +45,9 @@ export function formatConversationOfferPrice(context: Record<string, unknown>) {
 }
 
 export function formatConversationOfferTotal(context: Record<string, unknown>) {
+  const fullSubtotal = formatOfferAmount(context.offer_subtotal, context.offer_currency_code);
+  if (fullSubtotal) return fullSubtotal;
+  if (context.pricing_version === 2 || (Array.isArray(context.offer_components) && context.offer_components.length > 0)) return null;
   const subtotal = formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code);
   if (subtotal) return subtotal;
 
@@ -52,6 +63,10 @@ export function formatConversationOfferTotal(context: Record<string, unknown>) {
 
 export function normalizePurchaseOfferPricing(value: Record<string, unknown>) {
   return {
+    offer_subtotal: typeof value.offer_subtotal === "number" && Number.isFinite(value.offer_subtotal) ? value.offer_subtotal : null,
+    offer_components: normalizeOfferComponents(value.offer_components),
+    offer_unit_label: displayText(value.offer_unit_label),
+    pricing_version: value.pricing_version === 2 ? 2 : 1,
     price_basis: value.price_basis === "UNIT" || value.price_basis === "TOTAL"
       ? value.price_basis
       : null,
@@ -67,4 +82,48 @@ export function normalizePurchaseOfferPricing(value: Record<string, unknown>) {
         : null,
     offer_price_summary: displayText(value.offer_price_summary),
   };
+}
+
+export type OfferPricingComponent = {
+  id: string;
+  description: string;
+  charge_mode: "EXTRA" | "INCLUDED" | "UNRESOLVED";
+  amount: number | null;
+  basis: "UNIT" | "TOTAL" | null;
+  quantity: number | null;
+  unit_label: string | null;
+  subtotal: number | null;
+};
+
+export function normalizeOfferComponents(value: unknown): OfferPricingComponent[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object" || typeof raw.id !== "string") return [];
+    const numeric = (n: unknown) => typeof n === "number" && Number.isFinite(n) ? n : null;
+    return [{ id: raw.id, description: displayText(raw.description) ?? "Concepto pendiente",
+      charge_mode: raw.charge_mode === "EXTRA" || raw.charge_mode === "INCLUDED" ? raw.charge_mode : "UNRESOLVED",
+      amount: numeric(raw.amount), basis: raw.basis === "UNIT" || raw.basis === "TOTAL" ? raw.basis : null,
+      quantity: numeric(raw.quantity), unit_label: displayText(raw.unit_label), subtotal: numeric(raw.subtotal) } as OfferPricingComponent];
+  });
+}
+
+export function buildOfferPricingRows(context: Record<string, unknown>) {
+  const components = normalizeOfferComponents(context.offer_components);
+  if (!components.length) return [];
+  const principal = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
+  const quantity = context.offer_quantity_offered;
+  const unit = displayText(context.offer_unit_label) ?? "unidad";
+  const rows = [{ label: "Concepto principal", value: [principal,
+    context.offer_price_basis === "UNIT" ? `por ${unit} × ${quantity ?? "cantidad pendiente"}`
+      : context.offer_price_basis === "TOTAL" ? "por el conjunto" : "Alcance pendiente",
+    formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code),
+  ].filter(Boolean).join(" · ") }];
+  for (const c of components) {
+    const amount = formatOfferAmount(c.amount, context.offer_currency_code);
+    rows.push({ label: c.description, value: c.charge_mode === "INCLUDED" ? "Incluido"
+      : c.charge_mode === "UNRESOLVED" || !amount ? "Pendiente"
+      : [amount, c.basis === "UNIT" ? `por ${c.unit_label ?? "unidad pendiente"} × ${c.quantity ?? "cantidad pendiente"}`
+        : c.basis === "TOTAL" ? "por el conjunto" : "Alcance pendiente"].join(" · ") });
+  }
+  return rows;
 }

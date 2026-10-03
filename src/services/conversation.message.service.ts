@@ -221,33 +221,6 @@ export async function getConversationMessagesByConversationId(
   return { ok: true, data: messagesWithUrls };
 }
 
-export async function createConversationTextMessage(
-  conversationId: string,
-  text: string
-): Promise<{ ok: true; data: ConversationMessage } | { ok: false; error: AppError }> {
-  if (!conversationId || !text.trim()) {
-    return { ok: false, error: fromAppError("validation") };
-  }
-
-  const session = await getSession();
-  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
-
-  const profile = await getCurrentProfileResult();
-  if (profile?.ok === false) return { ok: false, error: profile.error };
-  if (!profile) return { ok: false, error: fromAppError("not_found") };
-
-  const result = await sendModeratedConversationMessage(conversationId, profile.data.id, {
-    messageGroupId: createConversationMessageGroupId(),
-    text: text.trim(),
-    pendingImagePaths: [],
-  });
-  if (!result.ok) return result;
-  const message = result.data[0];
-  return message
-    ? { ok: true, data: message }
-    : { ok: false, error: fromAppError("unknown") };
-}
-
 function toRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)

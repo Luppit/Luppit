@@ -4,6 +4,7 @@ import test from "node:test";
 import { URL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as messageGroups from "../src/utils/conversationMessageGroup.ts";
 
 // Real component and shared action callbacks with synthetic I/O; native rendering
 // and the live backend lifecycle are outside this harness.
@@ -17,6 +18,7 @@ function load(path: string, modules: Record<string, unknown>, expose = "") {
   } });
   const exports: Record<string, any> = {};
   runInNewContext(outputText, { exports, AbortController, console, setTimeout,
+    requestAnimationFrame: (callback: Function) => callback(),
     require(name: string) {
       assert.ok(name in modules, `Unmocked import: ${name}`);
       return modules[name];
@@ -92,7 +94,7 @@ const viewResult = (overrides: Record<string, any> = {}) => ({
   data: {
     role_code: "BUYER",
     conversation: { id: "conversation-A", purchase_request_id: "request-A", purchase_offer_id: "offer-A", status_code: "SELLER_ACCEPTED" },
-    context: { expiration_copy: "Vence en 10 minutos." }, permissions: { can_send_messages: false }, actions: [pickupAction()], ...overrides,
+    context: { expiration_copy: "Vence en 10 minutos." }, permissions: { can_send_messages: false, can_send_attachments: true }, slots: [], actions: [pickupAction()], ...overrides,
   },
 });
 
@@ -103,6 +105,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
   const popupListeners = new Set<Function>();
   let popupState: any = { config: null, visible: false };
   const reads: ReturnType<typeof deferred>[] = [];
+  const summaries: ReturnType<typeof deferred>[] = [];
   const executions: ReturnType<typeof deferred>[] = [];
   const messageSends: ReturnType<typeof deferred>[] = [];
   let focus: Function | undefined;
@@ -118,6 +121,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     },
     "@/src/services/conversation.service": {
       getCurrentUserConversationView: (id: string) => { calls.push(["view", id]); const d = deferred(); reads.push(d); return d.promise; },
+      getCurrentConversationOfferSummary: () => { const d = deferred(); summaries.push(d); return d.promise; },
       executeConversationActionByExecutor: (input: any) => { calls.push(["execute", input]); const d = deferred(); executions.push(d); return d.promise; },
     },
     "@/src/services/purchase.request.service": {
@@ -165,14 +169,14 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
   const channel = { on: () => channel, subscribe: () => channel };
   const conversation = load("../app/(conversation)/_layout.tsx", {
     ...modules,
+    "@/src/lib/supabase/errors": { fromAppError: (type: string) => ({ type, message: "Error de red" }) },
     "@/src/components/conversation/useConversationActions": shared,
-    "@/src/components/conversation/ConversationHeaderControls": nativeComponent("ActionButtons"),
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: Function) => navigate() },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
     "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/inputChat/inputChat": nativeComponent("InputChat"),
-    "@/src/components/inputChat/ChatKeyboardAvoidingView": { ...nativeComponent("ChatKeyboardAvoidingView"), useAndroidChatKeyboardVisible: () => false },
+    "@/src/components/inputChat/ChatKeyboardAvoidingView": { ...nativeComponent("ChatKeyboardAvoidingView"), useChatKeyboardVisible: () => false },
     "@/src/components/loading/LoadingState": nativeComponent("LoadingState"),
     "@/src/lib/supabase": { getSession: async () => null },
     "@/src/lib/supabase/client": { supabase: { realtime: { setAuth: async () => {} }, channel: () => channel, removeChannel() {} } },
@@ -186,15 +190,38 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     "react-native": { ...modules["react-native"], Platform: { OS: "ios" }, Keyboard: {}, Pressable: "Pressable", StyleSheet: { create: (styles: any) => styles } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
   }).default;
+  const stageCard = load("../src/components/conversation/ConversationStageCard.tsx", {
+    ...modules,
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({ borderRadius: 28 }) },
+    "./ConversationActionButtons": nativeComponent("ActionButtons"),
+    "./useConversationActions": shared,
+    "react-native": { ...modules["react-native"], StyleSheet: { hairlineWidth: 1 },
+      useWindowDimensions: () => ({ width: 390, fontScale: 1 }) },
+  }).default;
+  const offerDetails = load("../src/components/conversation/ConversationOfferDetails.tsx", {
+    ...modules,
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({ activeProfile: { profile: { id: "buyer-profile" } } }) },
+    "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
+    "@/src/utils/conversationOfferPrice": { formatConversationOfferTotal: () => "₡160.000" },
+    "@/src/utils/conversationOfferSummary": { buildConversationOfferSummary: () => ({ rows: [] }) },
+    "react-native": { ...modules["react-native"], Keyboard: { dismiss() {} }, Pressable: "Pressable", StyleSheet: { hairlineWidth: 1 } },
+  }).default;
   const props = { conversationId: "conversation-A", purchaseRequestId: "request-A", purchaseOfferId: "offer-A", onRefresh: () => calls.push("timelineRefresh") };
   let hookOptions = { conversationId: props.conversationId, profileId: "buyer-profile", conversationView: viewResult().data,
     refreshConversation: async () => { calls.push("refreshConversation"); },
     onMessagesRefresh: () => calls.push("messagesRefresh"), onConversationPurged: async () => { calls.push("purged"); },
   };
-  return { ...h, calls, reads, executions, messageSends, popups, props, shared,
+  return { ...h, calls, reads, summaries, executions, messageSends, popups, props, shared,
+    openUnrelatedPopup: () => modules["@/src/services/popup.service"].openPopup({ type: "summary", title: "Otra pantalla" }),
     focus: () => focus?.(), blur: () => blur?.(), appState: (state: string) => onAppState?.(state),
     draw: () => h.render(() => component(props)),
     drawConversation: () => h.render(() => conversation()),
+    drawDetails: (view: any) => h.render(() => offerDetails({ view, profileId: "buyer-profile", disabled: false })),
+    drawCard: (tree: any) => stageCard({ view: tree.props.value.conversationView,
+      disabled: tree.props.value.isExecutingAction, loadingActionId: tree.props.value.executingActionId,
+      onPress: tree.props.value.handleActionPress }),
     hook: (overrides = {}) => { hookOptions = { ...hookOptions, ...overrides }; return h.render(() => shared.useConversationActions(hookOptions)); },
   };
 }
@@ -544,7 +571,7 @@ test("actual conversation layout routes TOP, AUX and MENU actions through the ex
     f.reads[0].resolve(viewResult({ actions: [action] })); await flush();
     const tree = f.drawConversation();
     assert.equal(executions(f).length, 0);
-    if (slot !== "MENU") buttons(tree)!.props.onPress(action.id);
+    if (slot !== "MENU") buttons(f.drawCard(tree))!.props.onPress(action.id);
     else {
       nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones")!.props.onPress();
       f.popups.at(-1).options[0].onPress();
@@ -556,7 +583,7 @@ test("actual conversation layout routes TOP, AUX and MENU actions through the ex
     f.reads.at(-1)!.resolve(viewResult({ actions: [] })); await flush();
     assert.equal(await pending, true);
     const refreshed = f.drawConversation();
-    assert.equal(buttons(refreshed)?.props.buttons.length, 0);
+    assert.equal(buttons(f.drawCard(refreshed))?.props.buttons.length ?? 0, 0);
     assert.equal(refreshed.props.value.messageRefreshTick, 1);
   }
 });
@@ -637,7 +664,7 @@ test("detail reached from conversation returns home on its next back action", ()
   assert.deepEqual(calls, [["dismissTo", "/(tabs)"], ["dismissTo", "/(tabs)"]]);
 });
 
-test("conversation action bubble includes ordered TOP and AUX actions independently of the composer", async () => {
+test("conversation card includes ordered TOP and AUX actions independently of the composer", async () => {
   for (const canSend of [false, true]) {
     const f = fixture();
     f.drawConversation();
@@ -650,18 +677,18 @@ test("conversation action bubble includes ordered TOP and AUX actions independen
     f.reads[0].resolve(viewResult({ actions, permissions: { can_send_messages: canSend } }));
     await flush();
     const tree = f.drawConversation();
-    const controls = buttons(tree)!.props.buttons;
+    const controls = buttons(f.drawCard(tree))!.props.buttons;
     assert.deepEqual(Array.from(controls, (item: any) => item.id), ["review", "edit", "cancel"]);
     assert.equal(controls[2].tone, "danger");
     assert.equal(nodes(tree).filter((n) => n.type === "InputChat").length, canSend ? 1 : 0);
     assert.ok(!nodes(tree).some((n) => n.props.children?.flat().some((child: any) => child === "Revisar cambios" || child === "Cancelar compra")), "Do not repeat actions as standalone footer controls");
-    buttons(tree)!.props.onPress("cancel");
+    buttons(f.drawCard(tree))!.props.onPress("cancel");
     assert.equal(executions(f).length, 0, "The same configured confirmation must still run first");
     assert.equal(f.popups.at(-1).title, actions[3].confirmation.title);
   }
 });
 
-test("conversation menu omits paired header actions for buyers and sellers", async () => {
+test("conversation menu preserves the server projection and does not deduplicate by label", async () => {
   for (const [role, codes] of [
     ["BUYER", ["BUYER_ACCEPT_OFFER", "BUYER_CANCEL_PURCHASE_OFFER_ACCEPTED"]],
     ["SELLER", ["SELLER_DISCARD_REQUEST", "SELLER_CREATE_OFFER"]],
@@ -674,10 +701,8 @@ test("conversation menu omits paired header actions for buyers and sellers", asy
       executor: { execution_type: "client_command", target: "detail.faq", requires_refresh: false }, confirmation: null });
     const actions = [
       first,
-      pickupAction({ id: "first-menu", code: `${codes[0]}_MENU`, ui_slot: "MENU", label: first.label }),
       help,
       second,
-      pickupAction({ id: "second-menu", code: `${codes[1]}_MENU`, ui_slot: "MENU", label: second.label }),
       pickupAction({ id: "report", code: "REPORT_CONVERSATION", ui_slot: "MENU", label: "Reportar conversación" }),
       pickupAction({ id: "block", code: "BLOCK_COUNTERPART", ui_slot: "MENU", label: "Bloquear contacto" }),
       pickupAction({ id: "unpaired", code: "FUTURE_MENU_ONLY_MENU", ui_slot: "MENU", label: first.label }),
@@ -686,33 +711,32 @@ test("conversation menu omits paired header actions for buyers and sellers", asy
     await flush();
 
     const tree = f.drawConversation();
-    assert.deepEqual(Array.from(buttons(tree)!.props.buttons, (action: any) => action.id), ["first", "second"]);
+    assert.deepEqual(Array.from(buttons(f.drawCard(tree))!.props.buttons, (action: any) => action.id), ["first", "second"]);
     nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones")!.props.onPress();
     assert.deepEqual(Array.from(f.popups.at(-1).options, (option: any) => option.id), ["help", "report", "block", "unpaired"]);
     f.popups.at(-1).options[0].onPress();
     assert.ok(f.calls.some((call) => call[0] === "push" && call[1].pathname === "/(detail)/faq"));
-    buttons(tree)!.props.onPress("first");
+    buttons(f.drawCard(tree))!.props.onPress("first");
     assert.equal(f.popups.at(-1).title, first.confirmation.title);
   }
 });
 
-test("conversation overflow is hidden when all menu actions already appear in Acciones", async () => {
+test("conversation overflow is hidden when the server returns card actions only", async () => {
   const f = fixture();
   f.drawConversation();
   f.reads[0].resolve(viewResult({ actions: [
     pickupAction({ id: "header", code: "SELLER_CREATE_OFFER", ui_slot: "TOP" }),
-    pickupAction({ id: "menu", code: "SELLER_CREATE_OFFER_MENU", ui_slot: "MENU" }),
   ] }));
   await flush();
   const tree = f.drawConversation();
-  assert.deepEqual(Array.from(buttons(tree)!.props.buttons, (action: any) => action.id), ["header"]);
+  assert.deepEqual(Array.from(buttons(f.drawCard(tree))!.props.buttons, (action: any) => action.id), ["header"]);
   assert.equal(nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones"), undefined);
 });
 
 test("conversation send waits for the service and rejects a failed message", async () => {
   const f = fixture();
   f.drawConversation();
-  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true } }));
+  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true, can_send_attachments: true } }));
   await flush();
   const composer = () => nodes(f.drawConversation()).find((node) => node.type === "InputChat")!.props;
   assert.equal(composer().clearOnSendStart, true);
@@ -736,7 +760,7 @@ test("conversation send waits for the service and rejects a failed message", asy
 test("conversation text and photo stay together through optimistic and saved message state", async () => {
   const f = fixture();
   f.drawConversation();
-  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true } }));
+  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true, can_send_attachments: true } }));
   await flush();
   const composer = () => nodes(f.drawConversation()).find((node) => node.type === "InputChat")!.props;
   const image = { uri: "file:///tire.jpg" };
@@ -774,7 +798,7 @@ test("an offer refresh leaves an unrelated popup open after acceptance was dismi
   const action = pickupAction({ code: "BUYER_ACCEPT_OFFER" });
   Object.assign(action.confirmation, { code: "BUYER_ACCEPT_OFFER_CONFIRMATION", payload_defaults: { offer_revision: "revision-one" } });
   f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
-  f.hook().handleActionPress(pickupAction());
+  f.openUnrelatedPopup();
   f.hook({ conversationView: viewResult({ actions: [] }).data });
   assert.ok(!f.calls.includes("closePopup"));
 });
@@ -865,7 +889,7 @@ for (const change of ["replaced", "stage_changed", "closed"]) {
   });
 }
 
-for (const code of ["offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable"]) {
+for (const code of ["offer_proposal_changed", "offer_proposal_closed", "offer_edit_unavailable", "offer_change_pending"]) {
   test(`proposal ${code} refreshes authoritative terms and closes stale review`, async () => {
     const f = fixture(); const action = proposalAction();
     f.hook().handleActionPress(action);
@@ -888,4 +912,209 @@ test("a proposal invalidated during an in-flight request closes after a generic 
   await pending;
   f.hook({ conversationView: closedView });
   assert.ok(f.calls.includes("closePopup"));
+});
+
+
+test("read-only seller comparison uses the shared sheet with one close action and no executor", () => {
+  const f = fixture();
+  const action = proposalAction();
+  action.code = "SELLER_VIEW_OFFER_CHANGE";
+  Object.assign(action.confirmation, { read_only: true, cancel_label: "Cerrar", inputs: [],
+    blocker: { code: "proposal_images_unavailable", message: "No se pudieron cargar todas las fotos" },
+    comparison: { current_label: "Actual", proposed_label: "Propuesta", changed_label: "Con cambios",
+      fields: [{ id: "price", label: "Total", current_value: "₡160.000", proposed_value: "₡140.000", changed: true, layout: "inline" }] } });
+  f.hook({ conversationView: viewResult({ role_code: "SELLER", actions: [action] }).data }).handleActionPress(action);
+  const popup = f.popups.at(-1);
+  assert.equal(popup.actions.length, 1);
+  assert.equal(popup.actions[0].label, "Cerrar");
+  assert.equal(popup.blocker.message, "No se pudieron cargar todas las fotos");
+  assert.equal(popup.comparison.fields[0].proposedValue, "₡140.000");
+  popup.actions[0].onPress?.();
+  assert.equal(executions(f).length, 0);
+});
+
+test("conversation view exceptions release loading and expose a working retry", async () => {
+  const f = fixture(); f.drawConversation(); f.reads[0].reject(new Error("offline")); await flush();
+  const tree = f.drawConversation();
+  assert.equal(nodes(tree).some((node) => node.type === "LoadingState"), false);
+  nodes(tree).find((node) => node.type === "Button" && node.props.title === "Reintentar")!.props.onPress();
+  f.reads[1].resolve(viewResult()); await flush();
+  assert.ok(nodes(f.drawConversation()).some((node) => node.type === "Slot"));
+});
+
+test("server waiting lock hides seller card actions, overflow and composer together", async () => {
+  const f = fixture(); f.drawConversation();
+  f.reads[0].resolve(viewResult({ role_code: "SELLER", permissions: { can_send_messages: true },
+    actions: [pickupAction(), pickupAction({ id: "menu", ui_slot: "MENU" })],
+    presentation: { locked: true, show_terms: false, card: { label: "Estado actual", title: "Cambios pendientes", message: "Esperando la decisión del comprador", tone: "normal" } } }));
+  await flush();
+  const tree = f.drawConversation();
+  assert.equal(buttons(f.drawCard(tree))?.props.buttons.length, 0);
+  assert.equal(nodes(tree).find((node) => node.props.accessibilityLabel === "Más acciones"), undefined);
+  assert.equal(nodes(tree).find((node) => node.type === "InputChat"), undefined);
+});
+
+test("an already-open secondary confirmation closes when the server locks the seller", () => {
+  const f = fixture();
+  const action = pickupAction({ code: "REPORT_CONVERSATION", ui_slot: "MENU" });
+  const view = viewResult({ role_code: "SELLER", actions: [action] }).data;
+  f.hook({ conversationView: view }).handleActionPress(action);
+  assert.equal(f.popups.length, 1);
+  f.hook({ conversationView: { ...view, actions: [], presentation: { locked: true } } });
+  assert.ok(f.calls.includes("closePopup"));
+  assert.equal(f.executions.length, 0);
+});
+
+test("request brief and labeled proposal values are rendered in the current card", async () => {
+  const f = fixture(); f.drawConversation();
+  f.reads[0].resolve(viewResult({ presentation: { locked: false,
+    request_brief: { label: "Solicitud del comprador", description: "4 llantas 185/65 R15" },
+    card: { label: "Estado actual", title: "Cambios pendientes", message: "Revisa las condiciones", tone: "normal",
+      comparison: { current_label: "Acordada", current_value: "₡160.000", proposed_label: "Propuesta", proposed_value: "₡140.000" },
+      supporting: { title: "Envío en pausa", message: "Revisa los cambios para continuar" } } } }));
+  await flush();
+  const tree = f.drawCard(f.drawConversation());
+  const text = nodes(tree).flatMap((node) => node.props.children).filter((value) => typeof value === "string");
+  assert.ok(text.includes("4 llantas 185/65 R15"));
+  assert.ok(text.includes("Envío en pausa"));
+  assert.ok(nodes(tree).some((node) => node.props.accessibilityLabel === "Acordada: ₡160.000"));
+  assert.ok(nodes(tree).some((node) => node.props.accessibilityLabel === "Propuesta: ₡140.000"));
+});
+
+
+test("offer detail label and amount visibility come from DB presentation", () => {
+  for (const showPrice of [false, true]) {
+    const f = fixture();
+    const view = viewResult({ presentation: { show_terms: true, show_terms_price: showPrice,
+      terms_label: showPrice ? "Resumen" : "Ver oferta publicada" } }).data;
+    const tree = f.drawDetails(view);
+    const control = nodes(tree).find((node) => node.props.accessibilityRole === "button")!;
+    assert.equal(control.props.accessibilityLabel, showPrice ? "Resumen. ₡160.000" : "Ver oferta publicada");
+  }
+});
+
+test("a fresh server response cannot open terms that became hidden while loading", async () => {
+  const f = fixture(); const view = viewResult({ presentation: { show_terms: true } }).data;
+  const tree = f.drawDetails(view);
+  const pending = nodes(tree).find((node) => node.props.accessibilityRole === "button")!.props.onPress();
+  f.summaries[0].resolve({ ...viewResult({ presentation: { show_terms: false, locked: true } }), images: [] });
+  await pending;
+  assert.equal(f.popups.length, 0);
+});
+
+test("an owned canonical summary closes when server presentation locks the conversation", async () => {
+  const f = fixture(); const view = viewResult({ presentation: { show_terms: true } }).data;
+  const pending = nodes(f.drawDetails(view)).find((node) => node.props.accessibilityRole === "button")!.props.onPress();
+  f.summaries[0].resolve({ ...viewResult(), images: [] }); await pending;
+  assert.equal(f.popups.length, 1);
+  assert.equal(f.drawDetails({ ...view, presentation: { show_terms: false, locked: true } }), null);
+  assert.ok(f.calls.some((call) => call === "closePopup"));
+});
+
+function historyFixture() {
+  const h = hooks();
+  const reads: ReturnType<typeof deferred>[] = [];
+  const scrolls: any[] = [];
+  let context: any = {
+    conversationId: "conversation-A", profileId: "buyer-profile", conversationView: viewResult().data,
+    messageRefreshTick: 0, optimisticMessages: [], clearOptimisticMessages() {},
+    handleActionPress() {}, isExecutingAction: false, executingActionId: null,
+  };
+  const profile = { activeProfile: { role: "buyer" }, refreshUnreadNotificationCount() {} };
+  const component = load("../app/(conversation)/chat.tsx", {
+    react: h.react,
+    "react-native": { View: "View", Pressable: "Pressable", ScrollView: "ScrollView", Modal: "Modal",
+      Image: { prefetch: async () => {} }, useWindowDimensions: () => ({ width: 320 }) },
+    "@/src/components/conversation/ConversationStageCard": { default: "StageCard", __esModule: true },
+    "@/src/components/conversation/ConversationOfferDetails": { default: "OfferDetails", __esModule: true },
+    "@/src/components/button/Button": { default: "Button", __esModule: true },
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/loading/LoadingState": { default: "LoadingState", __esModule: true },
+    "@/src/components/message/MessageUtilities": { default: "MessageUtilities", __esModule: true },
+    "@/src/components/Text": { Text: "Text" },
+    "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => profile },
+    "@/src/services/conversation.message.service": { getConversationMessagesByConversationId: () => {
+      const read = deferred(); reads.push(read); return read.promise;
+    } },
+    "@/src/services/conversation.service": { getCurrentProfileConversationById: async () => ({ ok: true, data: { display_name: "A very long business name" } }) },
+    "@react-navigation/native": { useIsFocused: () => true },
+    "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 59, bottom: 34 }) },
+    "@/src/themes": { useTheme: () => theme },
+    "@/src/utils/conversationMessageGroup": messageGroups,
+    "expo-router": { router: { push() {} } },
+    "./_layout": { useConversationLayout: () => context },
+  }).default;
+  return { reads, scrolls, update: (next: any) => { context = { ...context, ...next }; }, draw() {
+    const tree = h.render(component);
+    nodes(tree).find((node) => node.type === "ScrollView")!.props.ref.current = { scrollToEnd: (args: any) => scrolls.push(args) };
+    return tree;
+  } };
+}
+const historyMessage = (id: string, overrides: any = {}) => ({ id, sender_profile_id: "seller-profile",
+  message_kind: "TEXT", text: id, created_at: "2026-10-02T12:00:00Z", ...overrides });
+const historyText = (tree: any) => nodes(tree).flatMap((node) => node.props.children).filter((child) => typeof child === "string");
+
+test("current terms and stage precede dated history without an initial jump to the bottom", async () => {
+  const f = historyFixture(); f.draw();
+  f.reads[0].resolve({ ok: true, data: [historyMessage("message-A")] }); await flush();
+  const tree = f.draw();
+  const types = nodes(tree).map((node) => node.type);
+  assert.ok(types.indexOf("OfferDetails") < types.indexOf("StageCard"));
+  assert.ok(types.indexOf("StageCard") < nodes(tree).findIndex((node) => node.props.children?.includes("message-A")));
+  assert.ok(historyText(tree).includes("2 Oct, 2026"));
+  nodes(tree).find((node) => node.type === "ScrollView")!.props.onContentSizeChange();
+  assert.equal(f.scrolls.length, 0);
+});
+
+test("new messages preserve older reading position and the cue opens collapsed history", async () => {
+  const f = historyFixture(); f.draw();
+  f.reads[0].resolve({ ok: true, data: [historyMessage("message-A")] }); await flush(); f.draw();
+  const tree = f.draw();
+  nodes(tree).find((node) => node.props.accessibilityState?.expanded === true)!.props.onPress(); f.draw();
+  f.update({ messageRefreshTick: 1 }); f.draw();
+  f.reads[1].resolve({ ok: true, data: [historyMessage("message-A"), historyMessage("message-B")] }); await flush(); f.draw();
+  const pending = f.draw();
+  assert.equal(f.scrolls.length, 0);
+  assert.ok(!historyText(pending).includes("message-B"));
+  nodes(pending).find((node) => node.type === "ScrollView")!.props.onScroll({ nativeEvent: {
+    contentOffset: { y: 100 }, contentSize: { height: 400 }, layoutMeasurement: { height: 300 },
+  } });
+  assert.ok(nodes(f.draw()).some((node) => node.props.accessibilityLabel === "1 mensajes nuevos. Ver mensajes"));
+  nodes(pending).find((node) => node.props.accessibilityLabel === "1 mensajes nuevos. Ver mensajes")!.props.onPress();
+  assert.ok(historyText(f.draw()).includes("message-B"));
+  assert.equal(f.scrolls.length, 1);
+});
+
+test("first optimistic send opens the history and saved grouped replacement does not create a new cue", async () => {
+  const f = historyFixture(); f.draw(); f.reads[0].resolve({ ok: true, data: [] }); await flush(); f.draw();
+  const optimistic = historyMessage("optimistic-1", { sender_profile_id: "buyer-profile", message_group_id: "g", message_group_index: 0 });
+  f.update({ optimisticMessages: [optimistic] }); f.draw(); f.draw();
+  assert.equal(f.scrolls.length, 1);
+  f.update({ messageRefreshTick: 1 }); f.draw();
+  f.reads[1].resolve({ ok: true, data: [{ ...optimistic, id: "saved-1" }] }); await flush();
+  f.draw(); const tree = f.draw();
+  assert.equal(historyText(tree).filter((text) => text === "optimistic-1").length, 1);
+  assert.ok(!nodes(tree).some((node) => node.props.accessibilityLabel?.includes("mensajes nuevos")));
+});
+
+test("history errors preserve the stage card, allow retry and ignore stale responses after a profile change", async () => {
+  const f = historyFixture(); f.draw(); f.reads[0].reject(new Error("offline")); await flush();
+  let tree = f.draw();
+  assert.ok(nodes(tree).some((node) => node.type === "StageCard"));
+  assert.ok(!nodes(tree).some((node) => node.type === "LoadingState"));
+  nodes(tree).find((node) => node.type === "Button" && node.props.title === "Reintentar")!.props.onPress();
+  f.update({ profileId: "other-profile" }); f.draw(); f.draw();
+  f.reads[1].resolve({ ok: true, data: [historyMessage("stale")] });
+  f.reads[2].resolve({ ok: true, data: [historyMessage("fresh")] }); await flush(); f.draw(); tree = f.draw();
+  assert.ok(!historyText(tree).includes("stale"));
+  assert.ok(historyText(tree).includes("fresh"));
+});
+
+test("the shared composer hides attachments and refuses an attached draft when DB permission is revoked", async () => {
+  const f = fixture(); f.drawConversation();
+  f.reads[0].resolve(viewResult({ permissions: { can_send_messages: true, can_send_attachments: false } })); await flush();
+  const composer = nodes(f.drawConversation()).find((node) => node.type === "InputChat")!;
+  assert.equal(composer.props.showAttachmentButton, false);
+  await assert.rejects(composer.props.onSend({ text: "", images: [{ uri: "local-photo" }] }), /conversation_attachments_unavailable/);
+  assert.equal(f.messageSends.length, 0);
 });

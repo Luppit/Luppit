@@ -5,11 +5,11 @@ Applies to conversation screens and conversation UI behavior.
 
 ## Conversation Contract
 - Visible chat actions come from `public.get_conversation_view(...).actions[]`; passive deadline/status cards come from `slots[]`.
-- DB `ui_slot` determines grouping: `TOP` and `AUX` actions share the header `Acciones` bubble; `MENU` stays in the overflow menu and passive `STATUS` stays in the transcript. Preserve returned ordering and do not deduplicate actions by label/behavior.
+- DB `ui_slot` determines grouping: `TOP` and `AUX` actions render in the current-state card; `MENU` stays in the overflow menu. Other placements remain available to configured confirmations. Preserve returned ordering; paired-menu projection belongs to the DB, never deduplicate by label/behavior in the client.
 - Confirmation title, description, fields, buttons, icons, conditional inputs, and rating/OTP metadata come from the DB payload.
 - Action visibility, including double-rating prevention, is DB-resolved. Refresh and trust returned `actions[]` after execution.
-- `permissions.can_send_messages=true` shows the composer independently of available actions. Do not repeat AUX actions below the messages or above the composer.
-- `STATUS` slots render inside the scrollable message thread after messages, like passive system items; they are not executable actions.
+- `permissions.can_send_messages=true` shows the composer independently of available actions. DB presentation `locked=true` disables the entire interaction surface while a proposal awaits a buyer decision. Do not repeat card actions in the footer or menu.
+- Current-state copy, terms visibility, request brief and proposal comparison come from `context.conversation_presentation`. Passive `slots[]` supply deadlines in that same card above dated history; never append current snapshots after messages or give them historical timestamps.
 
 ## Implementation Rules
 - Do not hardcode product behavior by action code when an executor/confirmation exists.
@@ -19,8 +19,9 @@ Applies to conversation screens and conversation UI behavior.
 - Use DB-provided slot/card copy and preformatted due dates when available; apply only safe presentational fallbacks.
 - Do not mark messages opened in client code; loading messages must go through `public.get_conversation_messages(...)`.
 - Header title should be the purchase request title, not counterpart display name.
-- Conversation chrome keeps two separate controls below the title: published product total with `Resumen`, and `Acciones` for DB `TOP`/`AUX` actions. Preserve DB ordering and the existing action executor; `MENU` placement remains separate. Keep the title header in layout flow. Render the context controls in a transparent overlay above the transcript and reserve their measured height as the transcript's initial top inset.
-- `Resumen` exists only with a linked offer and uses the shared `GlobalPopupHost` summary config and existing trailing image strip. Load canonical published terms and current offer photos, never private drafts or proposal terms. Invalidate open summaries on offer revision, selection, profile, conversation, or lifecycle changes. Do not change the shared popup shell or its horizontal footer for this screen.
+- The header, terms control, current-state card and dated history follow the approved purchase-stage mockups. Keep them in layout flow with one keyboard owner and an in-flow composer. There is no `Acciones` bubble or overlaid context-control layer. Stage 2 uses the amount-free published-offer control; later stages may show the canonical amount when DB presentation permits it.
+- Preserve the reader's scroll position when messages arrive; show a new-message cue while reading older history. Initial opening keeps the current-state card visible. History expansion is presentational only and does not modify read-state semantics.
+- Offer details exist only with a linked offer and permitted DB presentation. Use the shared `GlobalPopupHost` summary config and existing image strip. Load canonical published terms and current offer photos, never private drafts or proposal terms. Invalidate open summaries on offer revision, selection, profile, conversation, lifecycle or visibility changes. Read-only proposal comparisons reuse the same confirmation renderer with `read_only=true` and one close action. Do not change the shared popup shell or its horizontal footer.
 - Message bubble labels should use real buyer profile name or seller business name, with generic role labels only as last-resort fallback.
 - Shared composer sizing lives in `src/components/inputChat/AGENTS.md`; do not rebuild autosize behavior here.
 - Offer create/edit mode uses the normalized shipping/pickup method payloads; timing fields are integer days.

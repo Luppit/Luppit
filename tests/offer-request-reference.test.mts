@@ -4,6 +4,7 @@ import test from "node:test";
 import { URL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as offerPricing from "../src/utils/conversationOfferPrice.ts";
 import * as assistantSummaryReply from "../src/utils/assistantSummaryReply.ts";
 
 // Execute the real service and screen callbacks with deferred I/O. Native layout
@@ -19,6 +20,7 @@ function load(path: string, modules: Record<string, unknown>, expose = "") {
   const exports: Record<string, any> = {};
   runInNewContext(outputText, { exports, AbortController, console, setTimeout,
     require(name: string) {
+      if (name === "../utils/conversationOfferPrice" || name === "@/src/utils/conversationOfferPrice") return offerPricing;
       assert.ok(name in modules, `Unmocked import: ${name}`);
       return modules[name];
     },
@@ -921,6 +923,24 @@ test("context popups preserve the full buyer request, conditions, fulfillment an
   assert.equal(f.popup.offerVisual.deliveryRows[0].amount, undefined);
   assert.deepEqual(Array.from(f.popup.images, (image: any) => image.uri), photos.map((photo) => photo.url));
   assert.ok(f.popup.images.every((image: any) => image.caption === undefined));
+});
+
+test("seller review popup preserves complementary pricing for a package principal", () => {
+  const f = screenFixture();
+  const summary = { ...readyOffer.summary, pricingVersion: 2, basePrecio: "TOTAL", precio: 160000,
+    precioTotal: 165000, subtotalPrincipal: 160000, cantidadOfrecida: 4, unidadCobro: "llanta",
+    componentes: [{ id: "alignment", description: "Alineado", charge_mode: "EXTRA", amount: 5000,
+      basis: "TOTAL", quantity: 1, unit_label: "trabajo", subtotal: 5000 }] };
+  const controls = f.context({ summary }).props;
+  assert.equal(controls.price, "₡165,000");
+  controls.primary.onPress();
+  assert.equal(f.popup.offerVisual.price.value, "₡165,000");
+  assert.equal(f.popup.offerVisual.rows[1].label, "Alineado");
+  assert.equal(f.popup.offerVisual.rows[1].value, "₡5,000 · por el conjunto");
+  const review = f.summary(summary).props;
+  assert.equal(review.price.value, "₡165,000");
+  assert.equal(review.rows[1].label, "Alineado");
+  assert.equal(review.rows[1].value, "₡5,000 · por el conjunto");
 });
 
 test("context popups close when source changes or editor leaves, without closing another popup", () => {

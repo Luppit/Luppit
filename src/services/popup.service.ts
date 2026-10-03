@@ -46,6 +46,7 @@ export type PopupSummaryImage = {
 };
 
 export type PopupOfferVisual = {
+  rows?: { label: string; value: string }[];
   title: string;
   subtitle?: string;
   quantity?: string;

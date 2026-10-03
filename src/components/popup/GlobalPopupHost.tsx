@@ -1734,6 +1734,8 @@ export default function GlobalPopupHost() {
                           images={summaryConfig.images}
                           imageNoun={summaryConfig.images?.length === 1 ? "foto" : "fotos"}
                           onImagePress={(index) => setPreviewUri(summaryConfig.images?.[index]?.uri ?? null)}
+                          rows={summaryConfig.offerVisual.rows}
+                          rowsTitle="Desglose de la oferta"
                           price={summaryConfig.offerVisual.price}
                           description={summaryConfig.description}
                           deliveryRows={summaryConfig.offerVisual.deliveryRows}

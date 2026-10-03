@@ -23,7 +23,7 @@ import {
 } from "../lib/supabase/storage";
 import { getBusinessIdByProfileId } from "./profile.business.service";
 import { getCurrentProfileResult } from "./active.profile.service";
-import { normalizePurchaseOfferPricing } from "../utils/conversationOfferPrice";
+import { normalizePurchaseOfferPricing, type OfferPricingComponent } from "../utils/conversationOfferPrice";
 
 export type PurchaseOffer = Row<"purchase_offer">;
 export type PurchaseOfferCardData = PurchaseOffer & {
@@ -34,6 +34,10 @@ export type PurchaseOfferCardData = PurchaseOffer & {
   offer_currency_code: string | null;
   offer_price_summary?: string | null;
   offer_product_subtotal?: number | null;
+  offer_subtotal?: number | null;
+  offer_components?: OfferPricingComponent[];
+  offer_unit_label?: string | null;
+  pricing_version?: number;
   conversation_id?: string | null;
 };
 export type SellerPurchaseOfferCardData = PurchaseOffer & {
@@ -44,6 +48,10 @@ export type SellerPurchaseOfferCardData = PurchaseOffer & {
   offer_currency_code: string | null;
   offer_price_summary?: string | null;
   offer_product_subtotal?: number | null;
+  offer_subtotal?: number | null;
+  offer_components?: OfferPricingComponent[];
+  offer_unit_label?: string | null;
+  pricing_version?: number;
   conversation_id: string | null;
   conversation_status_code: string | null;
   conversation_status_label: string | null;
