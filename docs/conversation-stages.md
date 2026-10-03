@@ -2,6 +2,14 @@
 
 Implements the approved [buyer/seller mockups](https://luppit-purchase-flow-mockups.jdcanales1905.chatgpt.site) for stages 1–8 and alternate closing states.
 
+## iOS release — 2026-10-02
+
+- App source: `d465f8b8a5caee58e974394288160ffd26afc735`; database: `a3de3cc`; Edge Functions: `522a9c6`. All three repositories are on main and synchronized with their remotes.
+- iOS `1.0.0 (26)` built successfully and was submitted to TestFlight. Apple processing is `VALID`; build 26 belongs to the existing internal `Team (Expo)` group with four testers. No Android build was requested or started.
+- [EAS build](https://expo.dev/accounts/luppit/projects/Luppit/builds/2b82ad9c-542c-4171-a78f-9c9f37301f33); [submission](https://expo.dev/accounts/luppit/projects/Luppit/submissions/333f39a2-79dc-4ec9-8ff0-aa0fbdb68827).
+- Conversation migrations and reusable pricing are deployed. `ai-vendedor-completar` is active at version 85 with JWT verification enabled. Live readback confirmed restricted component/policy access and the preserved seller waiting guard.
+- This release does not expand the partial Simulator or real-model QA coverage described below.
+
 ## UI ownership
 
 - `app/(conversation)/_layout.tsx` owns the glass header, three-dot menu, realtime refresh, shared composer, and existing action hook.
