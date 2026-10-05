@@ -33,12 +33,15 @@ export type ConversationActionComparison = {
   current_label: string;
   proposed_label: string;
   changed_label: string;
+  difference_label?: string;
   fields: {
     id: string;
     label: string;
     current_value: string;
     proposed_value: string;
     changed: boolean;
+    change_label?: string;
+    compact_visible?: boolean;
     layout: "inline" | "stacked";
   }[];
 };
@@ -427,12 +430,15 @@ function parseConversationComparison(raw: unknown): ConversationActionComparison
       id: field.id, label: field.label,
       current_value: field.current_value, proposed_value: field.proposed_value,
       changed: field.changed, layout: field.layout,
+      change_label: typeof field.change_label === "string" && field.change_label.trim() ? field.change_label : undefined,
+      compact_visible: typeof field.compact_visible === "boolean" ? field.compact_visible : undefined,
     });
   }
   return {
     current_label: value.current_label as string,
     proposed_label: value.proposed_label as string,
     changed_label: value.changed_label as string,
+    difference_label: typeof value.difference_label === "string" && value.difference_label.trim() ? value.difference_label : undefined,
     fields,
   };
 }

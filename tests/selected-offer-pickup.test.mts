@@ -237,9 +237,9 @@ test("structured proposal review replaces legacy term blocks but retains policy,
       { label: "Plazos", value_source: "deadline_policy", value: "Keep deadlines" },
     ],
     comparison: {
-      current_label: "Actual", proposed_label: "Propuesta", changed_label: "Con cambios",
+      current_label: "Actual", proposed_label: "Propuesta", changed_label: "Con cambios", difference_label: "Aumenta ₡5,000",
       fields: [{ id: "description", label: "Descripción", current_value: "Full original",
-        proposed_value: "Full proposed", changed: true, layout: "stacked" }],
+        proposed_value: "Full proposed", changed: true, layout: "stacked", change_label: "Descripción actualizada", compact_visible: true }],
     },
     inputs: [{ id: "delivery", kind: "choice", label: "Elige entrega", payload_key: "fulfillment_catalog_id",
       is_required: true, options: [{ value: "shipping", label: "Envío" }] }],
@@ -248,6 +248,11 @@ test("structured proposal review replaces legacy term blocks but retains policy,
   const popup = f.popups.at(-1);
   assert.deepEqual(Array.from(popup.rows, (row: any) => row.value), ["Keep deadlines"]);
   assert.equal(popup.comparison.fields[0].proposedValue, "Full proposed");
+  assert.equal(popup.comparison.differenceLabel, "Aumenta ₡5,000");
+  assert.equal(popup.comparison.fields[0].changeLabel, "Descripción actualizada");
+  assert.equal(popup.comparison.fields[0].compactVisible, true);
+  assert.deepEqual(Array.from(confirm(f).requiredChoiceInputIds), ["delivery"]);
+  assert.equal(popup.actions[0].requiredChoiceInputIds, undefined);
   assert.equal(popup.images[0].uri, "https://example.test/signed-proposal.jpg");
   assert.equal(popup.inputs[0].payload_key, "fulfillment_catalog_id");
   assert.ok(!confirm(f).onPress().shouldClose);
@@ -1117,4 +1122,28 @@ test("the shared composer hides attachments and refuses an attached draft when D
   assert.equal(composer.props.showAttachmentButton, false);
   await assert.rejects(composer.props.onSend({ text: "", images: [{ uri: "local-photo" }] }), /conversation_attachments_unavailable/);
   assert.equal(f.messageSends.length, 0);
+});
+
+
+test("proposal delivery submits only an available explicit choice with the review revision", async () => {
+  const f = fixture();
+  const action = proposalAction();
+  Object.assign(action.confirmation, {
+    comparison: { current_label: "Actual", proposed_label: "Propuesta", changed_label: "Con cambios",
+      fields: [{ id: "total", label: "Subtotal de la oferta", current_value: "₡120,000", proposed_value: "₡132,500", changed: true, layout: "inline" }] },
+    inputs: [{ id: "delivery", kind: "choice", label: "Elige entrega", payload_key: "fulfillment_catalog_id", is_required: true,
+      options: [{ value: "shipping", label: "Envío", disabled: false }, { value: "pickup", label: "Retiro", disabled: true }] }],
+  });
+  f.hook({ conversationView: viewResult({ actions: [action] }).data }).handleActionPress(action);
+  const popup = f.popups.at(-1);
+  assert.equal(confirm(f).onPress().shouldClose, false);
+  popup.inputs[0].onValueChange("pickup");
+  assert.equal(confirm(f).onPress().shouldClose, false);
+  assert.equal(executions(f).length, 0);
+  popup.inputs[0].onValueChange("shipping");
+  const pending = confirm(f).onPress();
+  assert.equal(executions(f)[0][1].payload.fulfillment_catalog_id, "shipping");
+  assert.equal(executions(f)[0][1].payload.review_revision, "review-one");
+  f.executions[0].resolve({ ok: true, data: { success_message: "Cambios aceptados" } });
+  assert.equal(await pending, true);
 });

@@ -1,3 +1,4 @@
+import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
 import type { PopupSummaryComparison } from "@/src/services/popup.service";
 import { type Theme, useTheme } from "@/src/themes";
@@ -5,36 +6,6 @@ import React, { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 type ComparisonField = PopupSummaryComparison["fields"][number];
-
-export function getDescriptionChange(current: string, proposed: string) {
-  let start = 0;
-  while (start < current.length && start < proposed.length && current[start] === proposed[start]) {
-    start += 1;
-  }
-
-  let end = 0;
-  while (end < current.length - start && end < proposed.length - start &&
-    current[current.length - end - 1] === proposed[proposed.length - end - 1]) {
-    end += 1;
-  }
-
-  const rawRemoved = current.slice(start, current.length - end);
-  const rawAdded = proposed.slice(start, proposed.length - end);
-  const removed = rawRemoved.trim();
-  const added = rawAdded.trim();
-  const word = /[A-Za-zÀ-ÿ0-9]/;
-  const startsInsideWord = start > 0 && word.test(current[start - 1]) &&
-    (word.test(rawRemoved[0] ?? "") || word.test(rawAdded[0] ?? ""));
-  const endsInsideWord = end > 0 && word.test(current[current.length - end]) &&
-    (word.test(rawRemoved.at(-1) ?? "") || word.test(rawAdded.at(-1) ?? ""));
-
-  if (startsInsideWord || endsInsideWord || (!removed && !added)) {
-    return { label: "Texto actualizado", current, proposed };
-  }
-  if (!removed) return { label: "Se añadió", proposed: added };
-  if (!added) return { label: "Se quitó", current: removed };
-  return { label: "Se reemplazó", current: removed, proposed: added };
-}
 
 export default function SummaryComparison({
   comparison,
@@ -47,114 +18,115 @@ export default function SummaryComparison({
 }) {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const total = comparison.fields.find((field) => field.id === "total");
+  const fields = showFull ? comparison.fields : comparison.fields.filter(
+    (field) => field.id !== "total" && field.changed && field.compactVisible !== false
+  );
 
-  if (showFull) {
-    return (
-      <View style={styles.full}>
-        {([
-          [comparison.currentLabel, "currentValue"],
-          [comparison.proposedLabel, "proposedValue"],
-        ] as const).map(([title, valueKey]) => (
-          <View key={valueKey} style={styles.offer}>
-            <Text variant="subtitle">{`Oferta ${title.toLowerCase()}`}</Text>
-            {comparison.fields.map((field) => (
-              <View key={field.id} style={styles.fullField} accessible
-                accessibilityLabel={`${field.label}: ${field[valueKey]}`}>
-                <Text variant="small" color="textMedium">{field.label}</Text>
-                <Text variant="body">{field[valueKey]}</Text>
-              </View>
-            ))}
+  const renderValues = (field: ComparisonField) => (
+    <View style={field.layout === "inline" ? styles.columns : styles.values}>
+      {([
+        [comparison.currentLabel, field.currentValue],
+        [comparison.proposedLabel, field.proposedValue],
+      ] as const).map(([label, value], index) => (
+        showFull || value ? (
+          <View key={label} style={[styles.value, field.layout === "inline" ? styles.columnValue : undefined]}>
+            <Text variant="small" color="textMedium">{label}</Text>
+            <Text variant="body" style={index === 1 ? styles.proposed : undefined}>
+              {value || "—"}
+            </Text>
           </View>
-        ))}
-      </View>
-    );
-  }
-
-  const changedFields = comparison.fields.filter((field) => field.changed).filter((field) => {
-    if (field.id !== "price") return true;
-    const total = comparison.fields.find((candidate) => candidate.id === "total");
-    return !total?.changed || !field.currentValue.endsWith(" en total") ||
-      !field.proposedValue.endsWith(" en total");
-  });
+        ) : null
+      ))}
+    </View>
+  );
 
   return (
-    <View>
-      {changedFields.length === 0 ? (
-        <Text variant="body">No hay cambios en los detalles mostrados.</Text>
-      ) : changedFields.map((field) => (
-        <View key={field.id} style={styles.change} accessible
-          accessibilityLabel={getChangedFieldAccessibilityLabel(field)}>
-          <Text variant="body" style={styles.heading}>{field.label}</Text>
-          {field.id === "description" ? (
-            <DescriptionChange field={field} styles={styles} />
-          ) : field.id === "photos" && field.currentValue === field.proposedValue ? (
-            <Text variant="body">Las fotos cambiaron.</Text>
-          ) : (
-            <View style={styles.values}>
-              <Text variant="small" color="textMedium">{`${comparison.currentLabel}: ${field.currentValue}`}</Text>
-              <Text variant="body">{`${comparison.proposedLabel}: ${field.proposedValue}`}</Text>
+    <View style={styles.comparison}>
+      {!showFull && total ? (
+        <View style={styles.total}>
+          <Text variant="small" color="textMedium">{total.label}</Text>
+          <View style={styles.columns}>
+            <View style={[styles.value, styles.columnValue]}>
+              <Text variant="small" color="textMedium">{comparison.currentLabel}</Text>
+              <Text variant="subtitle">{total.currentValue}</Text>
             </View>
-          )}
+            <View style={[styles.value, styles.columnValue]}>
+              <Text variant="small" color="textMedium">{comparison.proposedLabel}</Text>
+              <Text variant="subtitle" color="primary">{total.proposedValue}</Text>
+            </View>
+          </View>
+          {comparison.differenceLabel ? (
+            <Text variant="body" style={styles.heading}>{comparison.differenceLabel}</Text>
+          ) : null}
         </View>
-      ))}
-      {onShowFull ? (
+      ) : null}
+      {fields.map((field) => {
+        const disclosure = !showFull && (field.id === "description" || field.id === "photos");
+        return (
+          <View key={field.id} style={styles.field}>
+            <View style={styles.fieldHeading}>
+              <Text variant="body" style={styles.heading}>
+                {showFull ? field.label : field.changeLabel || field.label}
+              </Text>
+              {showFull && field.changed ? (
+                <Text variant="small" color="textMedium">{comparison.changedLabel}</Text>
+              ) : null}
+            </View>
+            {disclosure ? (
+              <Pressable accessibilityRole="button" onPress={onShowFull}
+                accessibilityLabel={field.id === "description" ? "Ver descripción completa" : "Ver fotos"}
+                style={styles.disclosure}>
+                <Text variant="body" style={styles.disclosureText}>
+                  {field.id === "description" ? "Ver descripción completa" : "Ver fotos"}
+                </Text>
+                <Icon name="chevron-right" size={18} color={theme.colors.textMedium} />
+              </Pressable>
+            ) : renderValues(field)}
+          </View>
+        );
+      })}
+      {!showFull && !comparison.fields.some((field) => field.changed) ? (
+        <Text variant="body">No hay cambios en los detalles mostrados.</Text>
+      ) : null}
+      {!showFull && onShowFull ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Ver ofertas completas"
-          onPress={onShowFull} style={styles.detailsLink} hitSlop={8}>
-          <Text variant="body" style={styles.linkText}>Ver ofertas completas</Text>
+          onPress={onShowFull} style={styles.details}>
+          <Text variant="body" style={[styles.heading, styles.disclosureText]}>Ver ofertas completas</Text>
+          <Icon name="chevron-right" size={20} color={theme.colors.textMedium} />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-function DescriptionChange({ field, styles }: {
-  field: ComparisonField;
-  styles: ReturnType<typeof createStyles>;
-}) {
-  const change = getDescriptionChange(field.currentValue, field.proposedValue);
-  return (
-    <View style={styles.values}>
-      <Text variant="small" color="textMedium">{change.label}</Text>
-      {change.current !== undefined ? (
-        <Text variant="body">{change.label === "Texto actualizado" ? `Actual: ${change.current}` : change.current}</Text>
-      ) : null}
-      {change.proposed !== undefined ? (
-        <Text variant="body">{change.label === "Texto actualizado" ? `Propuesta: ${change.proposed}` : change.proposed}</Text>
-      ) : null}
-    </View>
-  );
-}
-
-function getChangedFieldAccessibilityLabel(field: ComparisonField) {
-  if (field.id !== "description") {
-    if (field.id === "photos" && field.currentValue === field.proposedValue) {
-      return `${field.label}. Las fotos cambiaron. Actual: ${field.currentValue}. Propuesta: ${field.proposedValue}`;
-    }
-    return `${field.label}. Actual: ${field.currentValue}. Propuesta: ${field.proposedValue}`;
-  }
-  const change = getDescriptionChange(field.currentValue, field.proposedValue);
-  return [field.label, change.label, change.current, change.proposed].filter(Boolean).join(". ");
-}
-
 function createStyles(t: Theme) {
   return StyleSheet.create({
-    change: {
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border,
-      paddingVertical: t.spacing.md,
-      gap: t.spacing.sm,
-    },
-    heading: { fontFamily: t.typography.subtitle.fontFamily },
-    values: { gap: t.spacing.xs },
-    detailsLink: { alignSelf: "flex-start", paddingVertical: t.spacing.md },
-    linkText: { textDecorationLine: "underline" },
-    full: { gap: t.spacing.lg },
-    offer: { gap: t.spacing.sm },
-    fullField: {
+    comparison: { gap: t.spacing.sm },
+    total: { gap: t.spacing.sm, paddingVertical: t.spacing.sm },
+    columns: { flexDirection: "row", gap: t.spacing.md },
+    value: { minWidth: 0, gap: t.spacing.xs },
+    columnValue: { flex: 1 },
+    values: { gap: t.spacing.md },
+    field: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: t.colors.border,
       paddingVertical: t.spacing.sm,
-      gap: t.spacing.xs,
+      gap: t.spacing.sm,
+    },
+    fieldHeading: { gap: t.spacing.xs },
+    heading: { fontFamily: t.typography.subtitle.fontFamily },
+    proposed: { fontFamily: t.typography.subtitle.fontFamily },
+    disclosureText: { flexShrink: 1 },
+    disclosure: {
+      minHeight: 44, flexDirection: "row", alignItems: "center",
+      justifyContent: "space-between", gap: t.spacing.sm,
+    },
+    details: {
+      minHeight: 48, flexDirection: "row", alignItems: "center",
+      justifyContent: "space-between", gap: t.spacing.sm,
+      borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border,
+      paddingVertical: t.spacing.sm,
     },
   });
 }
