@@ -49,7 +49,7 @@ The reusable-pricing migration preserves an already deployed stage presentation 
 
 ## Bug batch integration — 2026-10-04
 
-All five completed application branches and four database branches were merged into main, retaining their original commits. This batch is source integration only; its four migrations have not been applied to the hosted database and no new app release was made.
+All five completed application branches and four database branches were merged into main, retaining their original commits. At integration, its four migrations had not been applied to the hosted database and no new app release was made. Their subsequent database deployment is recorded below.
 
 | Item | Result | App commit | Database commit |
 | --- | --- | --- | --- |
@@ -65,3 +65,11 @@ Migrations replay in version order: `20261003195303_b02_seller_request_discard_a
 Combined verification passed: 398 app tests, TypeScript, full-project ESLint, a fresh migration/seed reset, all 63 database suites / 1,912 assertions, public/private SQL lint at error level, four bulk-discard races and 17 proposal/fulfillment races. SQL and race tests ran only in an isolated local stack and disposable clones. All task commits and both previous main baselines remain ancestors of main; task worktrees were clean when audited.
 
 Native coverage remains the individual task coverage: I01 navigation/keyboard and B04 layout fixtures passed native checks; B02 menu, B03 comparison and B05 deadline integration still need native QA. B03/B05 browser checks and SQL tests do not constitute a native or deployed pass. B01's six simulated tests do not establish real-model behavior.
+
+## Automatic chat summaries follow-up — 2026-10-04
+
+The hosted database still used the old request/offer message producers because the merged migrations were pending. The user chose to retain existing chats. New request conversations now capture private seller context without creating a buyer message. Offer publication creates no summary or brief SYSTEM event; the response retains `publication_message_id` as null. Explicit conversation photos, canonical pricing, offer-created notifications and purchase history remain available.
+
+Migration `20261005045451_conversation_without_summary_messages` and the four pending batch migrations were applied through the linked CLI. All 103 hosted migration versions exactly match the repository. The five request/publication/list function definitions match the tested local definitions, and private request context has RLS with no anonymous/authenticated table-read grants. All 293 pre-deployment messages retain the same content digest.
+
+Verification passed a fresh migration/seed replay, all 63 database suites / 1,916 assertions, and public/private SQL lint at error level. No native QA or new app build was performed for this database-only follow-up. Security advisors reported no errors; existing extension, public-RPC and Auth warnings remain outside this change.
