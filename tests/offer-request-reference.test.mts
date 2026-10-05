@@ -114,6 +114,47 @@ test("ownership failure or mismatched conversation stops all subsequent reads", 
   }
 });
 
+test("message-free conversations load the authorized request snapshot without reading private request rows", async () => {
+  for (const status of ["REQUEST_OPENED", "OFFER_MADE", "OFFER_ACCEPTED", "SELLER_ACCEPTED"]) {
+    const fixture = serviceFixture({
+      view: { ok: true, data: {
+        conversation: { id: "conversation-A", purchase_request_id: "request-A", status_code: status },
+        context: { offer_request_reference: {
+          id: "request-A", title: "Computadora portátil", description: "16 GB de memoria y entrega en tienda.",
+        } },
+      } },
+      messages: { ok: true, data: [] }, request: null,
+    });
+    const result = await fixture.read("conversation-A");
+    assert.equal(result.ok, true);
+    assert.equal(result.data.title, "Computadora portátil");
+    assert.equal(result.data.text, "16 GB de memoria y entrega en tienda.");
+    assert.equal(result.data.source, "conversation");
+    assert.deepEqual(fixture.calls, [["view", "conversation-A"]]);
+  }
+});
+
+test("the deployed stage brief supports creation before the all-stage reference is available", async () => {
+  const fixture = serviceFixture({ view: { ok: true, data: {
+    conversation: { id: "conversation-A", purchase_request_id: "request-A" },
+    context: { offer_name: "Solicitud" },
+    presentation: { request_brief: { description: snapshot } },
+  } }, request: null });
+  const result = await fixture.read("conversation-A");
+  assert.equal(result.data.text, snapshot);
+  assert.equal(result.data.title, "Solicitud");
+  assert.deepEqual(fixture.calls, [["view", "conversation-A"]]);
+});
+
+test("rejects an RPC reference belonging to another request", async () => {
+  const fixture = serviceFixture({ view: { ok: true, data: {
+    conversation: { id: "conversation-A", purchase_request_id: "request-A" },
+    context: { offer_request_reference: { id: "request-B", title: "Wrong", description: "Wrong" } },
+  } } });
+  assert.equal((await fixture.read("conversation-A")).ok, false);
+  assert.deepEqual(fixture.calls, [["view", "conversation-A"]]);
+});
+
 test("message-read errors are retryable and never quietly replaced with newer request values", async () => {
   const fixture = serviceFixture({ messages: { ok: false, error: { type: "network" } } });
   assert.equal((await fixture.read("conversation-A")).ok, false);

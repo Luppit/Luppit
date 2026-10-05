@@ -22,11 +22,31 @@ export async function getOfferRequestReference(
     return { ok: false, error: fromAppError("not_found") };
   }
 
+  const rawReference = view.data.context?.offer_request_reference;
+  const reference = rawReference && typeof rawReference === "object"
+    ? rawReference as Record<string, unknown>
+    : null;
+  if (reference && reference.id !== requestId) {
+    return { ok: false, error: fromAppError("not_found") };
+  }
+  const description = reference?.description ?? view.data.presentation?.request_brief?.description;
+  if (typeof description === "string" && description.trim()) {
+    return {
+      ok: true,
+      data: {
+        id: requestId,
+        title: typeof reference?.title === "string" ? reference.title
+          : typeof view.data.context?.offer_name === "string" ? view.data.context.offer_name : null,
+        text: description,
+        source: "conversation",
+      },
+    };
+  }
+
   const messages = await getConversationMessagesByConversationId(conversationId);
   if (!messages.ok) return messages;
 
-  // Conversation creation stores the request snapshot as its first buyer text.
-  // Keep the entire message, including any details in older snapshots.
+  // Older conversations stored the request snapshot as their first buyer text.
   const firstMessage = messages.data
     .filter((message) => message.conversation_id === conversationId && message.message_kind !== "SYSTEM")
     .sort((first, second) => Date.parse(first.created_at) - Date.parse(second.created_at))[0];

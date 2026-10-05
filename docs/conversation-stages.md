@@ -22,6 +22,10 @@ The replaced header/status/menu helper components, their unused SVG, and the obs
 
 ## Database contract
 
+Offer-assistant loading was corrected on 2026-10-05 after message-free conversation creation exposed a dependency on the first buyer message. The assistant now prefers the request reference returned by the participant-authorized conversation view, with the deployed preparation card and legacy messages as compatibility fallbacks. `20261005160506_conversation_offer_request_reference.sql` makes the existing immutable snapshot available to the seller during creation and later editing; request-table policies, private-table grants, purchase actions, and stored messages remain unchanged.
+
+Validation: 401 app tests, TypeScript, service ESLint, 63 database suites / 1,924 assertions, and public/private SQL lint passed. Live readback matched the tested function, confirmed all 104 migration versions, and verified that a seller loads another buyer's request through the RPC while direct request-table access remains denied. The existing empty-chat offer was reopened in the iPhone Simulator and its request details loaded without publishing an offer. The latest iOS production build remains `1.0.0 (26)`; these later app changes require a new TestFlight build.
+
 `20261002202253_conversation_stage_presentation.sql` lives in the sibling `luppit-supabase` repository. It adds `context.conversation_presentation` to the existing authorized conversation view and adjusts action presentation without creating a second executor or client-side lifecycle. Its SQL is identical to the locally tested `20261002181553` file; the filename matches the live deployment's recorded version.
 
 Pending changes use the same comparison card before and during a purchase. After acceptance, the seller waits for the buyer's decision: no action, summary, menu, composer, withdrawal, dispatch, or pickup validation remains available. Existing RPCs enforce this under the same request/conversation locks, including stale popups and moderated message commits. The buyer's eligible cancellation/code actions remain secondary while review is primary.
