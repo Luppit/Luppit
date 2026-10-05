@@ -29,6 +29,7 @@ const DEFAULT_DETAIL_TITLES: Record<string, string> = {
   "/legal-document": "Documento legal",
   "/marketplace-hub-section": "Marketplace",
   "/notifications": "Notificaciones",
+  "/pending-ratings": "Calificaciones pendientes",
   "/purchase-request": "Detalle de solicitud",
   "/seller-business": "Negocio",
   "/seller-home-group": "Para ti",

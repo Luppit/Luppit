@@ -341,6 +341,7 @@ export default function GlobalPopupHost() {
 
   useEffect(() => {
     if (
+      Platform.OS === "web" ||
       !isMounted ||
       (!filterConfig &&
         !sortConfig &&
@@ -599,7 +600,7 @@ export default function GlobalPopupHost() {
 
   const scrollSummaryInputIntoView = useCallback(
     (target?: unknown | null) => {
-      if (target == null) return;
+      if (target == null || Platform.OS === "web") return;
 
       const scrollToTarget = () => {
         summaryScrollViewRef.current?.scrollResponderScrollNativeHandleToKeyboard(

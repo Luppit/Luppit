@@ -153,7 +153,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
       back: () => calls.push(["back"]),
       canGoBack: () => true,
     } },
-    "@react-navigation/native": { useFocusEffect: (cb: Function) => h.react.useEffect(() => {
+    "@react-navigation/native": { useIsFocused: () => true, useFocusEffect: (cb: Function) => h.react.useEffect(() => {
       focus = () => { blur = cb(); };
       focus(); return () => blur?.();
     }, [cb]) },
@@ -175,6 +175,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     ...modules,
     "@/src/lib/supabase/errors": { fromAppError: (type: string) => ({ type, message: "Error de red" }) },
     "@/src/components/conversation/useConversationActions": shared,
+    "@/src/components/conversation/useRatingReminder": { useRatingReminder() {} },
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: Function) => navigate() },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
     "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),

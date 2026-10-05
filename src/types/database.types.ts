@@ -5176,6 +5176,10 @@ export type Database = {
         Returns: Json
       }
       get_current_legal_acceptance_state: { Args: never; Returns: Json }
+      get_current_profile_pending_ratings: {
+        Args: { p_profile_id: string; p_page?: number; p_page_size?: number }
+        Returns: Json
+      }
       get_current_profile_conversations: {
         Args: {
           p_category_ids?: string[]

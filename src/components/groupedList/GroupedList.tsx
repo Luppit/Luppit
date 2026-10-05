@@ -56,6 +56,26 @@ export function GroupedListSection({
   );
 }
 
+export function GroupedListCountPill({ count }: { count: number }) {
+  const t = useTheme();
+  const s = useMemo(() => createGroupedListStyles(t), [t]);
+  const displayCount = Math.max(0, count);
+
+  if (displayCount <= 0) return null;
+
+  return (
+    <View
+      style={s.countPill}
+      accessibilityElementsHidden
+      importantForAccessibility="no"
+    >
+      <Text variant="small" color="backgroudWhite" style={s.countText}>
+        {displayCount > 99 ? "99+" : String(displayCount)}
+      </Text>
+    </View>
+  );
+}
+
 export function GroupedListRow({
   icon,
   label,
@@ -164,6 +184,18 @@ function createGroupedListStyles(t: Theme) {
     group: {
       overflow: "hidden",
       ...createRoundedSurfaceStyle(t),
+    },
+    countPill: {
+      minWidth: 28,
+      height: 22,
+      borderRadius: 11,
+      paddingHorizontal: t.spacing.sm,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: t.colors.primary,
+    },
+    countText: {
+      textAlign: "center",
     },
     row: {
       minHeight: 54,

@@ -1,6 +1,8 @@
 import { Icon } from "@/src/components/Icon";
+import PendingRatingsEntry from "@/src/components/conversation/PendingRatingsEntry";
 import {
   GroupedList,
+  GroupedListCountPill,
   GroupedListRow,
 } from "@/src/components/groupedList/GroupedList";
 import LoadingState from "@/src/components/loading/LoadingState";
@@ -157,6 +159,7 @@ function BuyerProfileContent() {
           </View>
 
           <GroupedList>
+            <PendingRatingsEntry />
             <GroupedListRow
               icon="check"
               label="Solicitudes finalizadas"
@@ -171,7 +174,7 @@ function BuyerProfileContent() {
               icon="bell"
               label="Notificaciones"
               accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationCount)}
-              rightAccessory={<NotificationCountPill count={unreadNotificationCount} />}
+              rightAccessory={<GroupedListCountPill count={unreadNotificationCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -315,6 +318,7 @@ function SellerProfileContent() {
           <BusinessSummaryCard business={business} />
 
           <GroupedList>
+            <PendingRatingsEntry />
             <GroupedListRow
               icon="check"
               label="Solicitudes finalizadas"
@@ -329,7 +333,7 @@ function SellerProfileContent() {
               icon="bell"
               label="Notificaciones"
               accessibilityLabel={getNotificationRowAccessibilityLabel(unreadNotificationCount)}
-              rightAccessory={<NotificationCountPill count={unreadNotificationCount} />}
+              rightAccessory={<GroupedListCountPill count={unreadNotificationCount} />}
               onPress={() =>
                 router.push({
                   pathname: "/(detail)/notifications",
@@ -470,27 +474,6 @@ function getNotificationRowAccessibilityLabel(unreadCount: number) {
   return `Notificaciones, ${unreadCount > 99 ? "99 o más" : unreadCount} sin leer`;
 }
 
-function NotificationCountPill({ count }: { count: number }) {
-  const t = useTheme();
-  const s = useMemo(() => createProfileStyles(t), [t]);
-  const displayCount = Math.max(0, count);
-  const displayCountLabel = displayCount > 99 ? "99+" : String(displayCount);
-
-  if (displayCount <= 0) return null;
-
-  return (
-    <View
-      style={s.actionCountPill}
-      accessibilityElementsHidden
-      importantForAccessibility="no"
-    >
-      <Text variant="small" color="backgroudWhite" style={s.actionCountText}>
-        {displayCountLabel}
-      </Text>
-    </View>
-  );
-}
-
 function createProfileStyles(t: Theme) {
   const cardSurface = createRoundedSurfaceStyle(t);
 
@@ -586,18 +569,6 @@ function createProfileStyles(t: Theme) {
     },
     statWideDetail: {
       flexShrink: 1,
-    },
-    actionCountPill: {
-      minWidth: 28,
-      height: 22,
-      borderRadius: 11,
-      paddingHorizontal: t.spacing.sm,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: t.colors.primary,
-    },
-    actionCountText: {
-      textAlign: "center",
     },
   });
 }

@@ -11,7 +11,8 @@ function load(path: string, modules: Record<string, any>) {
   const { outputText } = ts.transpileModule(readFileSync(new URL(path, import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   });
-  runInNewContext(outputText, { exports, require: (name: string) => modules[name] ?? {} });
+  runInNewContext(outputText, { exports, require: (name: string) => modules[name] ??
+    (name === "@react-navigation/native" ? { useIsFocused: () => true } : {}) });
   return exports;
 }
 const summary = load("../src/utils/conversationOfferSummary.ts", { "./conversationOfferPrice": pricing });

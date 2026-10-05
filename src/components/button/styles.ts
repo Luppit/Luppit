@@ -1,7 +1,7 @@
 import type { Theme } from "@/src/themes/ThemeProvider";
 import type { TextStyle, ViewStyle } from "react-native";
 
-export type ButtonVariant = "dark" | "white" | "disabled";
+export type ButtonVariant = "dark" | "white" | "primary" | "disabled";
 
 export type ButtonStyles = {
   base: {
@@ -43,6 +43,7 @@ export function createButtonStyles(t: Theme): ButtonStyles {
     variants: {
       container: {
         dark: { backgroundColor: t.colors.textDark },
+        primary: { backgroundColor: t.colors.primary },
         white: {
           backgroundColor: t.colors.background,
           borderWidth: 1,
@@ -52,6 +53,7 @@ export function createButtonStyles(t: Theme): ButtonStyles {
       },
       label: {
         dark: { color: t.colors.background },
+        primary: { color: t.colors.backgroudWhite },
         white: { color: t.colors.textDark },
         disabled: { color: t.colors.textDark },
       },

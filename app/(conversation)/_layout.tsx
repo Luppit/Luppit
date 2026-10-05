@@ -4,6 +4,7 @@ import {
   useConversationActions,
 } from "@/src/components/conversation/useConversationActions";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
+import { useRatingReminder } from "@/src/components/conversation/useRatingReminder";
 import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { useFocusEffect } from "@react-navigation/native";
 import Button from "@/src/components/button/Button";
@@ -414,6 +415,7 @@ export default function ConversationLayout() {
   const allowNavigation = useAndroidLeaveGuard(
     showComposer && hasComposerDraft, isExecutingAction || pendingMessageCount > 0
   );
+  useRatingReminder(conversationView, profileId, isExecutingAction, handleActionPress);
   const closeConversation = useCallback(async () => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;

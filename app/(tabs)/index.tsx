@@ -1,8 +1,10 @@
 import { Icon } from "@/src/components/Icon";
 import Button from "@/src/components/button/Button";
+import PendingRatingsEntry from "@/src/components/conversation/PendingRatingsEntry";
 import { BundledSvg } from "@/src/components/BundledSvg";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import LoadingState from "@/src/components/loading/LoadingState";
+import HomeShortcut from "@/src/components/marketplaceHub/HomeShortcut";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import { openSellerRequest } from "@/src/components/marketplaceHub/openSellerRequest";
@@ -514,7 +516,7 @@ function MarketplaceHomeContent({
         topContentInset={topContentInset}
         message="No pudimos cargar las solicitudes. Intenta de nuevo."
         onRetry={onRetry}
-      />
+      ><PendingRatingsEntry home /></HomeEmptyState>
     );
   }
 
@@ -529,7 +531,7 @@ function MarketplaceHomeContent({
               ? "Crea tu primera solicitud y empieza a recibir ofertas."
               : "Aún no hay oportunidades para tus categorías."
         }
-      />
+      ><PendingRatingsEntry home /></HomeEmptyState>
     );
   }
 
@@ -570,12 +572,14 @@ function MarketplaceHomeContent({
                   ? "Una necesita atención."
                   : `${attentionCount} necesitan atención.`
                 : role === "buyer"
-                  ? "No tienes acciones pendientes."
+                  ? "No tienes solicitudes que necesiten atención."
                   : "No tienes negociaciones pendientes."}
             </Text>
           </>
         )}
       </View>
+
+      <PendingRatingsEntry home />
 
       {!hasActiveFilters && attentionCount > 0 ? (
         <HomeShortcut
@@ -764,44 +768,6 @@ function HomeRailEmptyState({ message }: { message: string }) {
   );
 }
 
-function HomeShortcut({
-  icon,
-  title,
-  description,
-  onPress,
-}: {
-  icon: "alert-circle" | "message-circle";
-  title: string;
-  description: string;
-  onPress: () => void;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [s.shortcut, pressed ? s.shortcutPressed : null]}
-    >
-      <View style={s.shortcutContent}>
-        <View style={s.shortcutIcon}>
-          <Icon name={icon} size={20} color={t.colors.primary} />
-        </View>
-        <View style={s.shortcutText}>
-          <Text variant="body" style={s.shortcutTitle}>
-            {title}
-          </Text>
-          <Text variant="body" color="stateAnulated">
-            {description}
-          </Text>
-        </View>
-        <Icon name="chevron-right" size={20} color={t.colors.stateAnulated} />
-      </View>
-    </Pressable>
-  );
-}
-
 function AccountSetupRequiredState({
   requirement,
   topContentInset,
@@ -883,10 +849,12 @@ function HomeEmptyState({
   topContentInset,
   message,
   onRetry,
+  children,
 }: {
   topContentInset: number;
   message: string;
   onRetry?: () => void;
+  children?: React.ReactNode;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -895,6 +863,7 @@ function HomeEmptyState({
     <View
       style={[s.stateContent, { paddingTop: topContentInset }]}
     >
+      {children}
       <BundledSvg
         asset={require("../../assets/images/empty_box.svg")}
         width={240}
@@ -1006,36 +975,6 @@ function createMarketplaceHomeStyles(t: Theme) {
     inlineEmptyFallbackImage: {
       width: 84,
       height: 84,
-    },
-    shortcut: {
-      marginHorizontal: t.spacing.md,
-      ...createRoundedSurfaceStyle(t),
-    },
-    shortcutPressed: {
-      opacity: 0.78,
-    },
-    shortcutContent: {
-      minHeight: 80,
-      padding: t.spacing.md,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: t.spacing.md,
-    },
-    shortcutIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: t.colors.primaryLight,
-    },
-    shortcutText: {
-      flex: 1,
-      minWidth: 0,
-      gap: 4,
-    },
-    shortcutTitle: {
-      color: t.colors.textDark,
     },
     stateContent: {
       flex: 1,

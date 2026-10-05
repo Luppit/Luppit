@@ -1,4 +1,5 @@
 import { RPC_FUNCTIONS } from "../db/functions";
+import { parsePendingRatings, type PendingRatings } from "./conversation.rating.helpers";
 import { COL_CONVERSATION, TB_CONVERSATION } from "../db/tables";
 import { FunctionName, Row } from "../db/types";
 import { getSession } from "../lib/supabase";
@@ -1043,6 +1044,24 @@ export async function getCurrentUserConversationView(
   if (!view.ok) return view;
 
   return { ok: true, data: view.data, profileId: profile.data.id };
+}
+
+export async function getCurrentProfilePendingRatings(page = 1): Promise<
+  | { ok: true; data: PendingRatings; profileId: string }
+  | { ok: false; error: AppError }
+> {
+  const session = await getSession();
+  if (!session?.user.id) return { ok: false, error: fromAppError("auth") };
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return { ok: false, error: profile.error };
+  if (!profile) return { ok: false, error: fromAppError("not_found") };
+  const { data, error } = await supabase.rpc(RPC_FUNCTIONS.GET_CURRENT_PROFILE_PENDING_RATINGS, {
+    p_profile_id: profile.data.id, p_page: page, p_page_size: 20,
+  });
+  if (error) return { ok: false, error: fromSupabaseError(error) };
+  const parsed = parsePendingRatings(data);
+  return parsed ? { ok: true, data: parsed, profileId: profile.data.id }
+    : { ok: false, error: fromAppError("unknown") };
 }
 
 export async function getCurrentConversationOfferSummary(conversationId: string) {

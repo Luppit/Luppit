@@ -76,6 +76,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters) };
   const request = (...args: any[]) => { const response = deferred(); calls.push({ args, response }); return response.promise; };
   const modules: Record<string, any> = {
+    "@/src/components/conversation/PendingRatingsEntry": { default: "PendingRatingsEntry" },
     react: runtime.react,
     "react-native": {
       ...Object.fromEntries(["Image", "Pressable", "ScrollView", "View", "FlatList", "ActivityIndicator"].map((name) => [name, name])),
@@ -121,6 +122,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   };
   for (const [path, name] of Object.entries({
     "button/Button": "Button", "chip/LuppitChip": "LuppitChip", "loading/LoadingState": "LoadingState",
+    "marketplaceHub/HomeShortcut": "HomeShortcut",
     "marketplaceHub/MarketplaceRequestCard": "MarketplaceRequestCard", "role/RoleGate": "RoleGate",
     "glass/GlassSurface": "GlassSurface", "standaloneList/StandaloneListEmptyState": "StandaloneListEmptyState",
   })) modules[`@/src/components/${path}`] = name;

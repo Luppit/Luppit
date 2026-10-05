@@ -23,6 +23,7 @@ import {
 import { buildOfferAcceptancePresentation } from "@/src/utils/conversationOfferSummary";
 import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type ConversationActionFailure = {
@@ -176,6 +177,7 @@ export function useConversationActions({
   onMessagesRefresh,
   onConversationPurged,
 }: ConversationActionsOptions) {
+  const isFocused = useIsFocused();
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [executingActionId, setExecutingActionId] = useState<string | null>(null);
   const isExecutingActionRef = useRef(false);
@@ -183,6 +185,12 @@ export function useConversationActions({
   useEffect(() => subscribePopup(({ config }) => {
     if (config !== confirmationPopupRef.current?.config) confirmationPopupRef.current = null;
   }), []);
+  useEffect(() => () => {
+    if (confirmationPopupRef.current) closePopup();
+  }, []);
+  useEffect(() => {
+    if (!isFocused && confirmationPopupRef.current) closePopup();
+  }, [isFocused]);
   useEffect(() => {
     const pending = confirmationPopupRef.current;
     if (!pending || !conversationView || isExecutingActionRef.current) return;
@@ -372,6 +380,11 @@ export function useConversationActions({
         }
 
         if (!result.ok) {
+          if (result.error.code === "rating_already_submitted") {
+            await refreshConversation();
+            showInfo("Tu calificación ya fue enviada.");
+            return true;
+          }
           if (onFailure) {
             onFailure(result.error);
           } else {
@@ -394,7 +407,8 @@ export function useConversationActions({
         }
 
         if (action.executor?.execution_type !== "client_command") {
-          showSuccess(getActionSuccessMessage(result.data));
+          showSuccess(action.confirmation?.inputs.some((input) => input.kind === "rating")
+            ? "Tu calificación fue enviada." : getActionSuccessMessage(result.data));
         }
 
         return true;

@@ -47,6 +47,7 @@ export const RPC_FUNCTIONS = {
   GET_CURRENT_BUYER_FINALIZED_PURCHASE_REQUESTS:
     "get_current_buyer_finalized_purchase_requests",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
+  GET_CURRENT_PROFILE_PENDING_RATINGS: "get_current_profile_pending_ratings",
   GET_CURRENT_LEGAL_ACCEPTANCE_STATE:
     "get_current_legal_acceptance_state",
   GET_CURRENT_SAFETY_BLOCKS: "get_current_safety_blocks",
