@@ -521,9 +521,11 @@ export function useConversationActions({
           currentLabel: confirmation.comparison.current_label,
           proposedLabel: confirmation.comparison.proposed_label,
           changedLabel: confirmation.comparison.changed_label,
+          differenceLabel: confirmation.comparison.difference_label,
           fields: confirmation.comparison.fields.map((field) => ({
             id: field.id, label: field.label, currentValue: field.current_value,
             proposedValue: field.proposed_value, changed: field.changed, layout: field.layout,
+            changeLabel: field.change_label, compactVisible: field.compact_visible,
           })),
         } : undefined,
         inputs,
@@ -585,6 +587,9 @@ export function useConversationActions({
               : confirmStyle.isPrimary
                 ? "backgroudWhite"
                 : "textDark",
+            requiredChoiceInputIds: confirmation.comparison
+              ? confirmation.inputs.filter((input) => input.kind === "choice" && input.is_required).map((input) => input.id)
+              : undefined,
             disabled:
               confirmation.blocker != null || hasUnavailableRequiredChoice,
             onPress: () => {

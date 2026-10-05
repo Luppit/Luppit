@@ -16,6 +16,7 @@ import TextArea from "@/src/components/textArea/TextArea";
 import { getToastVariantPresentation } from "@/src/components/toast/presentation";
 import {
   closePopup,
+  hasMissingRequiredChoices,
   PopupFilterConfig,
   PopupHelperConfig,
   PopupOption,
@@ -661,7 +662,8 @@ export default function GlobalPopupHost() {
   };
 
   const handleSummaryActionPress = async (action: PopupSummaryAction) => {
-    if (action.disabled || summaryActionPendingRef.current) return;
+    if (action.disabled || summaryActionPendingRef.current ||
+        hasMissingRequiredChoices(action, summaryConfig?.inputs, summaryChoiceValues)) return;
     summaryActionPendingRef.current = true;
 
     setPendingSummaryActionId(action.id);
@@ -1699,7 +1701,7 @@ export default function GlobalPopupHost() {
                       { maxHeight: sheetContentMaxHeight },
                     ]}
                     contentContainerStyle={s.sheetContentScrollContent}
-                    showsVerticalScrollIndicator={isKeyboardVisible}
+                    showsVerticalScrollIndicator={isKeyboardVisible || showComparisonDetails}
                     nestedScrollEnabled
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -2175,12 +2177,12 @@ export default function GlobalPopupHost() {
                             <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={s.summaryImageScrollContent}
+                              contentContainerStyle={[s.summaryImageScrollContent, summaryConfig.comparison ? { gap: t.spacing.md } : null]}
                             >
                               {summaryConfig.images.map((image, index) => (
-                                <View key={`${image.uri}-${index}`}>
+                                <View key={`${image.uri}-${index}`} style={summaryConfig.comparison ? { width: 128, gap: t.spacing.xs } : undefined}>
                                   <Pressable
-                                    style={s.summaryImageItem}
+                                    style={[s.summaryImageItem, summaryConfig.comparison ? { width: 128, height: 96 } : null]}
                                     onPress={() => setPreviewUri(image.uri)}
                                     accessibilityRole="button"
                                     accessibilityLabel={image.caption || `Imagen ${index + 1}`}
@@ -2252,7 +2254,7 @@ export default function GlobalPopupHost() {
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="Volver a los cambios"
-                        style={[s.summaryActionButton, s.summaryActionButtonSingle]}
+                        style={[s.summaryActionButton, s.summaryActionButtonSingle, { flexBasis: "auto" }]}
                         onPress={() => {
                           setShowComparisonDetails(false);
                           summaryScrollViewRef.current?.scrollTo({ y: 0, animated: false });
@@ -2288,7 +2290,8 @@ export default function GlobalPopupHost() {
                         const showSharedPendingState =
                           pendingAction?.showPendingState !== false;
                         const isDisabled =
-                          action.disabled === true || pendingSummaryActionId != null;
+                          action.disabled === true || pendingSummaryActionId != null ||
+                          hasMissingRequiredChoices(action, summaryConfig.inputs, summaryChoiceValues);
 
                         return (
                           <Pressable

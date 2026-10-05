@@ -30,12 +30,15 @@ export type PopupSummaryComparison = {
   currentLabel: string;
   proposedLabel: string;
   changedLabel: string;
+  differenceLabel?: string;
   fields: {
     id: string;
     label: string;
     currentValue: string;
     proposedValue: string;
     changed: boolean;
+    changeLabel?: string;
+    compactVisible?: boolean;
     layout: "inline" | "stacked";
   }[];
 };
@@ -87,6 +90,7 @@ export type PopupSummaryAction = {
   textColorKey?: ThemeColorKey;
   iconColorKey?: ThemeColorKey;
   disabled?: boolean;
+  requiredChoiceInputIds?: string[];
   showPendingState?: boolean;
   onPress?: () => PopupSummaryActionResult | Promise<PopupSummaryActionResult>;
 };
@@ -117,6 +121,17 @@ export type PopupSummaryInput = {
   options?: PopupSummaryChoiceOption[];
   onValueChange?: (value: unknown) => void;
 };
+
+export function hasMissingRequiredChoices(
+  action: PopupSummaryAction,
+  inputs: PopupSummaryInput[] | undefined,
+  values: Record<string, string>,
+) {
+  return action.requiredChoiceInputIds?.some((id) => {
+    const input = inputs?.find((candidate) => candidate.id === id);
+    return !input?.options?.some((option) => option.value === values[id] && !option.disabled);
+  }) ?? false;
+}
 
 export type PopupSummaryBlocker = {
   message: string;
