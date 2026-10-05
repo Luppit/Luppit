@@ -4,6 +4,7 @@ import test from "node:test";
 import { URL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as pricing from "../src/utils/conversationOfferPrice.ts";
 import * as messageGroups from "../src/utils/conversationMessageGroup.ts";
 
 // Real component and shared action callbacks with synthetic I/O; native rendering
@@ -26,6 +27,8 @@ function load(path: string, modules: Record<string, unknown>, expose = "") {
   });
   return exports;
 }
+const offerSummary = load("../src/utils/conversationOfferSummary.ts", { "./conversationOfferPrice": pricing });
+
 function deferred() {
   let resolve!: (value: any) => void;
   let reject!: (value: any) => void;
@@ -141,6 +144,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
         ok: true, data: { id: "conversation-new" },
       }),
     },
+    "@/src/utils/conversationOfferSummary": offerSummary,
     "@/src/utils/useToast": Object.fromEntries(["showError", "showInfo", "showSuccess", "showWarning"].map((key) => [key, (...args: any[]) => calls.push([key, ...args])])),
     "expo-router": { router: {
       push: (route: any) => calls.push(["push", route]),
@@ -547,9 +551,11 @@ for (const methods of [["shipping"], ["pickup"], ["shipping", "pickup"]]) {
     f.hook().handleActionPress(action);
     const popup = f.popups[0];
     assert.equal(popup.metadata, "Llantas — 4 unidades");
-    assert.equal(popup.rows.length, 1);
-    assert.equal(popup.rows[0].label, "Precio");
-    assert.equal(popup.rows[0].value, "₡100000");
+    assert.equal(popup.rows.length, 0);
+    assert.equal(popup.offerAcceptance.rows[0].label, "Precio");
+    assert.equal(popup.offerAcceptance.rows[0].detail, "₡100000");
+    assert.equal(popup.offerAcceptance.descriptionLabel, "Descripción del producto");
+    assert.equal(popup.offerAcceptance.fulfillmentInputId, "delivery-choice");
     assert.equal(popup.description, "Cuatro llantas nuevas.");
     assert.equal(popup.descriptionPlacement, "afterRows");
     assert.equal(popup.inputs[0].options.length, methods.length);

@@ -156,6 +156,13 @@ export type PopupHelperConfig = {
   dismissOnBackdropPress?: boolean;
 };
 
+export type PopupOfferAcceptance = {
+  rows: { label: string; detail?: string; value?: string }[];
+  subtotal?: { label: string; value: string };
+  descriptionLabel: string;
+  fulfillmentInputId?: string;
+};
+
 export type PopupSummaryConfig = {
   type: "summary";
   title: string;
@@ -171,6 +178,7 @@ export type PopupSummaryConfig = {
   inputs?: PopupSummaryInput[];
   images?: PopupSummaryImage[];
   offerVisual?: PopupOfferVisual;
+  offerAcceptance?: PopupOfferAcceptance;
   blocker?: PopupSummaryBlocker | null;
   actions?: PopupSummaryAction[];
   dismissOnBackdropPress?: boolean;

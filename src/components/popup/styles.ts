@@ -59,6 +59,11 @@ export type GlobalPopupStyles = {
   summaryDescriptionScroll: ViewStyle;
   summaryDescriptionScrollContent: ViewStyle;
   summaryRowsList: ViewStyle;
+  offerAcceptancePanel: ViewStyle;
+  offerAcceptanceRow: ViewStyle;
+  offerAcceptanceCopy: ViewStyle;
+  offerAcceptanceValue: TextStyle;
+  offerAcceptanceTotal: TextStyle;
   summaryInputsList: ViewStyle;
   summaryInputLabel: TextStyle;
   summaryTextArea: ViewStyle;
@@ -384,6 +389,31 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     summaryRowsList: {
       overflow: "hidden",
       ...createRoundedSurfaceStyle(t),
+    },
+    offerAcceptancePanel: {
+      ...createRoundedSurfaceStyle(t),
+      padding: t.spacing.md,
+      gap: t.spacing.sm,
+      borderWidth: 1,
+      borderColor: SOFT_BORDER_COLOR,
+    },
+    offerAcceptanceRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+    },
+    offerAcceptanceCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: t.spacing.xs,
+    },
+    offerAcceptanceValue: {
+      flexShrink: 1,
+      maxWidth: "45%",
+    },
+    offerAcceptanceTotal: {
+      flexShrink: 1,
+      maxWidth: "55%",
     },
     summaryInputsList: {
       gap: t.spacing.md,

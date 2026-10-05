@@ -29,6 +29,7 @@ import {
   PopupSummaryInput,
   subscribePopup,
 } from "@/src/services/popup.service";
+import { getOfferAcceptanceTotal } from "@/src/utils/conversationOfferSummary";
 import { useTheme } from "@/src/themes";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -242,7 +243,7 @@ function SummaryTextAreaInput({
 export default function GlobalPopupHost() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth, fontScale } = useWindowDimensions();
   const s = useMemo(() => createGlobalPopupStyles(t), [t]);
   const [options, setOptions] = useState<PopupOption[]>([]);
   const summaryActionPendingRef = useRef(false);
@@ -763,7 +764,50 @@ export default function GlobalPopupHost() {
     );
   };
 
+  const renderOfferAcceptancePrice = () => {
+    const presentation = summaryConfig?.offerAcceptance;
+    if (!presentation) return null;
+    const total = getOfferAcceptanceTotal(presentation, summaryConfig.inputs, summaryChoiceValues);
+    const stack = windowWidth < 360 || fontScale > 1.3;
+    return (
+      <View style={s.offerAcceptancePanel}>
+        {presentation.rows.map((row, index) => (
+          <React.Fragment key={`${row.label}-${index}`}>
+            <View accessible accessibilityLabel={[row.label, row.detail, row.value].filter(Boolean).join(". ")}
+              style={[s.offerAcceptanceRow, stack ? { flexDirection: "column", alignItems: "stretch" } : null]}>
+              <View style={s.offerAcceptanceCopy}>
+                <Text variant="body">{row.label}</Text>
+                {row.detail ? <Text variant="small" color="textMedium">{row.detail}</Text> : null}
+              </View>
+              {row.value && (index > 0 || row.value !== total?.value) ? <Text variant="body" align={stack ? "left" : "right"}
+                style={stack ? undefined : s.offerAcceptanceValue}>{row.value}</Text> : null}
+            </View>
+            {index < presentation.rows.length - 1 || total ? <View style={s.summaryRowSeparator} /> : null}
+          </React.Fragment>
+        ))}
+        {total ? (
+          <View accessible accessibilityLabel={`${total.label}: ${total.value}`}
+            style={[s.offerAcceptanceRow, stack ? { flexDirection: "column", alignItems: "stretch" } : null]}>
+            <Text variant="body" style={s.offerAcceptanceCopy}>{total.label}</Text>
+            <Text variant="title" align={stack ? "left" : "right"}
+              style={stack ? undefined : s.offerAcceptanceTotal}>{total.value}</Text>
+          </View>
+        ) : null}
+      </View>
+    );
+  };
+
   const renderSummaryDescription = () => {
+    if (summaryConfig?.offerAcceptance) {
+      if (!summaryConfig.metadata && !summaryConfig.description) return null;
+      return (
+        <View style={s.offerAcceptancePanel}>
+          <Text variant="subtitle" accessibilityRole="header">{summaryConfig.offerAcceptance.descriptionLabel}</Text>
+          {summaryConfig.metadata ? <Text variant="body">{summaryConfig.metadata}</Text> : null}
+          {summaryConfig.description ? <Text variant="body" color="textMedium">{summaryConfig.description}</Text> : null}
+        </View>
+      );
+    }
     if (!summaryConfig?.description) return null;
 
     const description = (
@@ -1719,13 +1763,15 @@ export default function GlobalPopupHost() {
                             {showComparisonDetails ? "Ofertas completas" : summaryConfig.title}
                           </Text>
                         </View>
-                        {summaryConfig.metadata ? (
+                        {summaryConfig.metadata && !summaryConfig.offerAcceptance ? (
                           <Text variant="small" style={s.summaryMetadata}>
                             {summaryConfig.metadata}
                           </Text>
                         ) : null}
                         <View style={s.summaryHeaderSeparator} />
                       </View>
+
+                      {renderOfferAcceptancePrice()}
 
                       {summaryConfig.offerVisual ? (
                         <SummaryReviewContent
@@ -1855,6 +1901,7 @@ export default function GlobalPopupHost() {
 
                             if (input.kind === "choice") {
                               const choiceOptions = input.options ?? [];
+                              const isAcceptanceDelivery = summaryConfig.offerAcceptance?.fulfillmentInputId === input.id;
                               const selectedValue = summaryChoiceValues[input.id];
                               const presentation =
                                 getSummaryChoicePresentation(input);
@@ -2049,7 +2096,7 @@ export default function GlobalPopupHost() {
                                                 >
                                                   {option.label}
                                                 </Text>
-                                                {option.availabilityLabel ? (
+                                                {option.availabilityLabel && (!isAcceptanceDelivery || option.disabled) ? (
                                                   <Text
                                                     variant="small"
                                                     style={s.choiceOptionMeta}
@@ -2058,7 +2105,7 @@ export default function GlobalPopupHost() {
                                                   </Text>
                                                 ) : null}
                                               </View>
-                                              {[option.feeLabel, option.totalLabel, option.timingLabel]
+                                              {[option.feeLabel, isAcceptanceDelivery ? null : option.totalLabel, option.timingLabel]
                                                 .filter(Boolean)
                                                 .map((detail) => (
                                                   <Text

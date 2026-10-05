@@ -20,6 +20,7 @@ import {
   getActiveSellerOfferDraftMode,
   getOrCreateCurrentSellerOfferSeedConversation,
 } from "@/src/services/seller.request.offers.service";
+import { buildOfferAcceptancePresentation } from "@/src/utils/conversationOfferSummary";
 import { showError, showInfo, showSuccess, showWarning } from "@/src/utils/useToast";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -451,8 +452,20 @@ export function useConversationActions({
         confirmation.description_template,
         conversationView?.context ?? {}
       );
+      const offerPrice = isOfferAcceptance
+        ? confirmation.fields.find((field) => field.value_source === "offer_price")
+        : undefined;
+      const offerAcceptance = offerPrice ? {
+        ...buildOfferAcceptancePresentation(conversationView?.context ?? {}, {
+          label: offerPrice.label,
+          value: toStringValue(offerPrice.value),
+        }),
+        descriptionLabel: offerDescription?.label || "Descripción",
+        fulfillmentInputId: confirmation.inputs.find((input) => input.kind === "choice" && input.payload_key === "fulfillment_catalog_id")?.id,
+      } : undefined;
       const rows = confirmation.fields
         .filter((field) => field !== offerName && field !== offerDescription)
+        .filter((field) => !offerAcceptance || (field !== offerPrice && field.value_source !== "fulfillment_total"))
         .filter((field) => !confirmation.comparison ||
           !["current_terms", "proposed_terms"].includes(field.value_source))
         .map((field) => ({
@@ -517,6 +530,7 @@ export function useConversationActions({
           : description,
         descriptionPlacement: offerDescription || confirmation.comparison ? "afterRows" : undefined,
         rows,
+        offerAcceptance,
         comparison: confirmation.comparison ? {
           currentLabel: confirmation.comparison.current_label,
           proposedLabel: confirmation.comparison.proposed_label,

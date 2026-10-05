@@ -2,7 +2,10 @@ import {
   formatConversationOfferTotal,
   formatOfferAmount,
   buildOfferPricingRows,
+  normalizeOfferComponents,
 } from "./conversationOfferPrice";
+
+import type { PopupOfferAcceptance, PopupSummaryInput } from "../services/popup.service";
 
 function displayText(value: unknown) {
   return typeof value === "string" && value.trim() && value.trim() !== "-"
@@ -140,5 +143,59 @@ export function buildConversationOfferSummary(
       rows: pricingRows,
       deliveryRows,
     },
+  };
+}
+
+
+export function buildOfferAcceptancePresentation(
+  context: Record<string, unknown>,
+  priceField: { label: string; value: string },
+): PopupOfferAcceptance {
+  const amount = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
+  const subtotal = formatConversationOfferTotal(context);
+  const principalSubtotal = formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code);
+  const unit = displayText(context.offer_unit_label) ?? "unidad";
+  const quantity = context.offer_quantity_offered;
+  const components = normalizeOfferComponents(context.offer_components);
+  if (!amount || !subtotal || !["UNIT", "TOTAL"].includes(String(context.offer_price_basis))) {
+    return { rows: [{ label: priceField.label, detail: priceField.value }], descriptionLabel: "Descripción" };
+  }
+
+  const rows: PopupOfferAcceptance["rows"] = [{
+    label: "Concepto principal",
+    detail: context.offer_price_basis === "UNIT"
+      ? `${typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0 ? `${quantity} × ` : ""}${amount} por ${unit}`
+      : "Por el conjunto",
+    value: context.offer_price_basis === "UNIT" ? principalSubtotal ?? undefined : amount,
+  }];
+  for (const component of components) {
+    const componentAmount = formatOfferAmount(component.amount, context.offer_currency_code);
+    rows.push({
+      label: component.description,
+      detail: component.charge_mode === "INCLUDED" ? undefined
+        : component.basis === "UNIT"
+          ? `${componentAmount ?? "Importe pendiente"} por ${component.unit_label ?? "unidad pendiente"} × ${component.quantity ?? "cantidad pendiente"}`
+          : component.basis === "TOTAL" ? "Por el conjunto" : "Alcance pendiente",
+      value: component.charge_mode === "INCLUDED" ? "Incluido"
+        : component.charge_mode === "UNRESOLVED" ? "Pendiente"
+        : component.basis === "UNIT" ? undefined : componentAmount ?? "Pendiente",
+    });
+  }
+  return { rows, subtotal: { label: "Subtotal de la oferta", value: subtotal }, descriptionLabel: "Descripción" };
+}
+
+export function getOfferAcceptanceTotal(
+  presentation: PopupOfferAcceptance,
+  inputs: PopupSummaryInput[] | undefined,
+  values: Record<string, string>,
+) {
+  const input = inputs?.find((candidate) => candidate.id === presentation.fulfillmentInputId);
+  const option = input?.options?.find((candidate) => candidate.value === values[input.id] && !candidate.disabled);
+  if (!option) return presentation.subtotal;
+  if (!option.totalLabel) return { label: "Total a pagar", value: "Por confirmar" };
+  const money = /^Total:\s*([A-Z]{3})\s+([0-9]+(?:\.[0-9]+)?)$/.exec(option.totalLabel.trim());
+  return {
+    label: "Total a pagar",
+    value: money ? formatOfferAmount(Number(money[2]), money[1])! : option.totalLabel,
   };
 }
