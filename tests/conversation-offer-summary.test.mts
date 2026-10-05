@@ -263,6 +263,26 @@ const serviceSource = readFileSync(
   new URL("../src/services/conversation.service.ts", import.meta.url),
   "utf8",
 );
+test("deadline slots preserve separate server availability, readable date and explanation without deriving a lifecycle", () => {
+  const parseSlot = compile(serviceSource.slice(
+    serviceSource.indexOf("function parseNullableNumber("),
+    serviceSource.indexOf("function parseConversationPresentation("),
+  ) + "\nexports.parseSlot = parseConversationViewSlot;", {}).parseSlot;
+  const raw = { code: "deadline", due_at: "2026-10-06T18:54:03.035703Z",
+    formatted_due_at: "6 oct 2026 · 12:54 p. m.", section_label: "Fecha límite del retiro",
+    availability: { label: "Disponible desde", formatted_at: "3 oct 2026 · 12:54 p. m." },
+    deadline_message: "La compra seguirá abierta.", is_overdue: false };
+  const parsed = parseSlot(raw);
+  assert.equal(parsed.due_at, raw.due_at);
+  assert.equal(parsed.formatted_due_at, raw.formatted_due_at);
+  assert.equal(parsed.availability.label, raw.availability.label);
+  assert.equal(parsed.availability.formatted_at, raw.availability.formatted_at);
+  assert.equal(parsed.deadline_message, raw.deadline_message);
+  assert.equal(parsed.is_overdue, false);
+  assert.equal(parseSlot({ code: "legacy" }).availability, null);
+  assert.equal(parseSlot({ code: "bad", availability: { label: "Incomplete" }, deadline_message: 4 }).availability, null);
+  assert.equal(parseSlot({ code: "bad", deadline_message: 4 }).deadline_message, null);
+});
 const parsePresentation = compile(serviceSource.slice(
   serviceSource.indexOf("function parseConversationPresentation("),
   serviceSource.indexOf("function parseConversationView("),

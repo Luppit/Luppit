@@ -965,6 +965,29 @@ test("an already-open secondary confirmation closes when the server locks the se
   assert.equal(f.executions.length, 0);
 });
 
+test("stage card displays DB dates and deadline copy before actions, including overdue slots without a timestamp", async () => {
+  for (const overdue of [false, true]) {
+    const f = fixture(); f.drawConversation();
+    const slot = { code: "deadline", section_label: "Fecha límite del retiro", is_overdue: overdue,
+      due_at: overdue ? null : "2026-10-06T18:54:03.035703Z",
+      formatted_due_at: overdue ? null : "6 oct 2026 · 12:54 p. m.",
+      availability: overdue ? null : { label: "Disponible desde", formatted_at: "3 oct 2026 · 12:54 p. m." },
+      deadline_message: overdue ? "El plazo venció. La compra sigue abierta." : "Si no se completa, quedará con atraso. La compra seguirá abierta." };
+    f.reads[0].resolve(viewResult({ slots: [slot], presentation: { locked: false,
+      card: { title: "Estado desde DB", message: "Instrucciones desde DB", tone: "normal" } } }));
+    await flush();
+    const tree = f.drawCard(f.drawConversation());
+    const all = nodes(tree);
+    const text = all.flatMap((node) => node.props.children).filter((value) => typeof value === "string");
+    assert.ok(text.includes(slot.deadline_message));
+    assert.equal(text.includes("6 oct 2026 · 12:54 p. m."), !overdue);
+    assert.equal(text.includes("Disponible desde"), !overdue);
+    assert.ok(all.findIndex((node) => node.props.children?.includes(slot.deadline_message)) < all.findIndex((node) => node.type === "ActionButtons"));
+    assert.equal(buttons(tree)!.props.buttons[0].label, "Generar código de retiro");
+    assert.equal(executions(f).length, 0);
+  }
+});
+
 test("request brief and labeled proposal values are rendered in the current card", async () => {
   const f = fixture(); f.drawConversation();
   f.reads[0].resolve(viewResult({ presentation: { locked: false,
