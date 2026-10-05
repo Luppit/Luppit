@@ -1045,10 +1045,15 @@ function historyFixture() {
     handleActionPress() {}, isExecutingAction: false, executingActionId: null,
   };
   const profile = { activeProfile: { role: "buyer" }, refreshUnreadNotificationCount() {} };
+  const scrollHook = load("../src/components/conversation/useConversationScroll.ts", {
+    react: h.react, "react-native": { AccessibilityInfo: { announceForAccessibility() {} } },
+  });
   const component = load("../app/(conversation)/chat.tsx", {
     react: h.react,
     "react-native": { View: "View", Pressable: "Pressable", ScrollView: "ScrollView", Modal: "Modal",
       Image: { prefetch: async () => {} }, useWindowDimensions: () => ({ width: 320 }) },
+    "@/src/components/conversation/useConversationScroll": scrollHook,
+    "@/src/components/glass/GlassSurface": { default: "GlassSurface", __esModule: true },
     "@/src/components/conversation/ConversationStageCard": { default: "StageCard", __esModule: true },
     "@/src/components/conversation/ConversationOfferDetails": { default: "OfferDetails", __esModule: true },
     "@/src/components/button/Button": { default: "Button", __esModule: true },
@@ -1070,7 +1075,7 @@ function historyFixture() {
   }).default;
   return { reads, scrolls, update: (next: any) => { context = { ...context, ...next }; }, draw() {
     const tree = h.render(component);
-    nodes(tree).find((node) => node.type === "ScrollView")!.props.ref.current = { scrollToEnd: (args: any) => scrolls.push(args) };
+    nodes(tree).find((node) => node.type === "ScrollView")!.props.ref.current = { scrollToEnd: (args: any) => scrolls.push(args), scrollTo: (args: any) => scrolls.push(args) };
     return tree;
   } };
 }
@@ -1086,7 +1091,7 @@ test("current terms and stage precede dated history without an initial jump to t
   assert.ok(types.indexOf("OfferDetails") < types.indexOf("StageCard"));
   assert.ok(types.indexOf("StageCard") < nodes(tree).findIndex((node) => node.props.children?.includes("message-A")));
   assert.ok(historyText(tree).includes("2 Oct, 2026"));
-  nodes(tree).find((node) => node.type === "ScrollView")!.props.onContentSizeChange();
+  nodes(tree).find((node) => node.type === "ScrollView")!.props.onContentSizeChange(320, 1800);
   assert.equal(f.scrolls.length, 0);
 });
 
@@ -1103,9 +1108,12 @@ test("new messages preserve older reading position and the cue opens collapsed h
   nodes(pending).find((node) => node.type === "ScrollView")!.props.onScroll({ nativeEvent: {
     contentOffset: { y: 100 }, contentSize: { height: 400 }, layoutMeasurement: { height: 300 },
   } });
-  assert.ok(nodes(f.draw()).some((node) => node.props.accessibilityLabel === "1 mensajes nuevos. Ver mensajes"));
-  nodes(pending).find((node) => node.props.accessibilityLabel === "1 mensajes nuevos. Ver mensajes")!.props.onPress();
-  assert.ok(historyText(f.draw()).includes("message-B"));
+  assert.ok(nodes(f.draw()).some((node) => node.props.accessibilityLabel === "1 mensaje nuevo. Ir a los últimos mensajes"));
+  nodes(pending).find((node) => node.props.accessibilityLabel === "1 mensaje nuevo. Ir a los últimos mensajes")!.props.onPress();
+  const expanded = f.draw();
+  assert.ok(historyText(expanded).includes("message-B"));
+  assert.equal(f.scrolls.length, 0);
+  nodes(expanded).find((node) => node.type === "ScrollView")!.props.onContentSizeChange(320, 1800);
   assert.equal(f.scrolls.length, 1);
 });
 

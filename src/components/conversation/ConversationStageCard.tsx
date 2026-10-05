@@ -9,6 +9,7 @@ import type {
 import { useTheme } from "@/src/themes";
 import React from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
+import type { LayoutChangeEvent } from "react-native";
 import ConversationActionButtons from "./ConversationActionButtons";
 import { normalizeOptionalIcon, toTopButtonConfig } from "./useConversationActions";
 
@@ -17,6 +18,7 @@ type Props = {
   disabled: boolean;
   loadingActionId?: string | null;
   onPress: (action: ConversationViewAction) => void;
+  onCardLayout?: (event: LayoutChangeEvent) => void;
 };
 
 function formatDeadline(slot: ConversationViewSlot) {
@@ -31,6 +33,7 @@ export default function ConversationStageCard({
   disabled,
   loadingActionId,
   onPress,
+  onCardLayout,
 }: Props) {
   const t = useTheme();
   const { width, fontScale } = useWindowDimensions();
@@ -83,7 +86,7 @@ export default function ConversationStageCard({
         </View>
       ) : null}
 
-      <View style={surface}>
+      <View style={surface} onLayout={onCardLayout}>
         {card.label ? <Text variant="small" color="textMedium">{card.label}</Text> : null}
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.spacing.sm }}>
           {cardIcon ? <Icon name={cardIcon} size={26} color={accentColor} /> : null}

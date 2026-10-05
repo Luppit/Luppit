@@ -158,6 +158,11 @@ export type ConversationPresentation = {
   history_label: string;
   history_expand_label: string;
   history_collapse_label: string;
+  navigation_state_label?: string;
+  navigation_latest_label?: string;
+  navigation_expand_label?: string;
+  navigation_new_label?: string;
+  navigation_new_singular_label?: string;
   locked: boolean;
   rating_message?: string | null;
 };
@@ -615,8 +620,13 @@ function parseConversationPresentation(raw: unknown): ConversationPresentation |
       } : {}),
     },
     history_label: toOptionalText(value.history_label) ?? "Conversación",
-    history_expand_label: toOptionalText(value.history_expand_label) ?? "Ver historial",
-    history_collapse_label: toOptionalText(value.history_collapse_label) ?? "Ocultar historial",
+    history_expand_label: toOptionalText(value.history_expand_label) ?? "Mostrar mensajes",
+    history_collapse_label: toOptionalText(value.history_collapse_label) ?? "Ocultar mensajes",
+    navigation_state_label: toOptionalText(value.navigation_state_label) ?? "Estado actual",
+    navigation_latest_label: toOptionalText(value.navigation_latest_label) ?? "Últimos mensajes",
+    navigation_expand_label: toOptionalText(value.navigation_expand_label) ?? "Ver mensajes",
+    navigation_new_label: toOptionalText(value.navigation_new_label) ?? "nuevos",
+    navigation_new_singular_label: toOptionalText(value.navigation_new_singular_label) ?? "nuevo",
     locked: value.locked === true,
     rating_message: toOptionalText(value.rating_message),
   };
