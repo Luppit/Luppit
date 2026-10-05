@@ -206,7 +206,8 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
     "@/src/utils/conversationOfferPrice": { formatConversationOfferTotal: () => "₡160.000" },
     "@/src/utils/conversationOfferSummary": { buildConversationOfferSummary: () => ({ rows: [] }) },
-    "react-native": { ...modules["react-native"], Keyboard: { dismiss() {} }, Pressable: "Pressable", StyleSheet: { hairlineWidth: 1 } },
+    "react-native": { ...modules["react-native"], Keyboard: { dismiss() {} }, Pressable: "Pressable", StyleSheet: { hairlineWidth: 1 },
+      useWindowDimensions: () => ({ width: 390, fontScale: 1 }) },
   }).default;
   const props = { conversationId: "conversation-A", purchaseRequestId: "request-A", purchaseOfferId: "offer-A", onRefresh: () => calls.push("timelineRefresh") };
   let hookOptions = { conversationId: props.conversationId, profileId: "buyer-profile", conversationView: viewResult().data,

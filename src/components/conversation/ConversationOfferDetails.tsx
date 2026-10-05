@@ -18,7 +18,7 @@ import { buildConversationOfferSummary } from "@/src/utils/conversationOfferSumm
 import { showError, showInfo } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Keyboard, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 
 type Props = {
   view: ConversationView;
@@ -28,6 +28,7 @@ type Props = {
 
 export default function ConversationOfferDetails({ view, profileId, disabled }: Props) {
   const t = useTheme();
+  const { width, fontScale } = useWindowDimensions();
   const { activeProfile } = useActiveProfile();
   const requestId = useRef(0);
   const summaryPopup = useRef<PopupSummaryConfig | null>(null);
@@ -121,10 +122,11 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
 
   if (!showTerms) return null;
 
+  const stack = price != null && (fontScale > 1.3 || width < 360 || price.length > 12);
   const pillStyle = { borderRadius: t.glass.radius.chip };
   return (
     <View style={{ alignItems: "flex-start" }}>
-      <GlassSurface variant="control" style={[pillStyle, { maxWidth: "100%" }]} clipStyle={pillStyle}>
+      <GlassSurface variant="control" style={[pillStyle, { maxWidth: "100%", width: stack ? "100%" : undefined }]} clipStyle={pillStyle}>
         <Pressable
           onPress={openSummary}
           disabled={disabled || loadingSummary}
@@ -133,29 +135,29 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
           accessibilityState={{ disabled: disabled || loadingSummary, busy: loadingSummary }}
           style={({ pressed }) => ({
             minHeight: 48,
-            flexDirection: "row",
-            flexWrap: "wrap",
-            alignItems: "center",
+            flexDirection: stack ? "column" : "row",
+            alignItems: stack ? "stretch" : "center",
             gap: t.spacing.sm,
             paddingHorizontal: t.spacing.md,
             paddingVertical: t.spacing.sm,
             opacity: pressed || disabled ? 0.6 : 1,
           })}
         >
-          <Icon name="file-text" size={20} color={t.colors.textDark} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm, flexShrink: stack ? 0 : 1 }}>
+            <Icon name="file-text" size={20} color={t.colors.textDark} />
+            {price ? <Text variant="body" maxFontSizeMultiplier={2} style={{ flexShrink: 1 }}>{price}</Text> : null}
+          </View>
           {price ? (
-            <>
-              <Text variant="body" maxFontSizeMultiplier={2}>{price}</Text>
-              <View style={{ width: StyleSheet.hairlineWidth, height: 24, backgroundColor: t.colors.border }} />
-            </>
+            <View style={{ width: stack ? "100%" : StyleSheet.hairlineWidth,
+              height: stack ? StyleSheet.hairlineWidth : 24, backgroundColor: t.colors.border }} />
           ) : null}
-          <View style={{ flexShrink: 1 }}>
+          <View style={{ flexShrink: stack ? 0 : 1 }}>
             <Text variant="body" maxFontSizeMultiplier={2} style={{ opacity: loadingSummary ? 0 : 1 }}>
               {label}
             </Text>
             {loadingSummary ? (
               <ActivityIndicator size="small" color={t.colors.textDark}
-                style={{ position: "absolute", alignSelf: "center" }} />
+                style={StyleSheet.absoluteFillObject} />
             ) : null}
           </View>
         </Pressable>
