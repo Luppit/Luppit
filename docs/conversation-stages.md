@@ -15,7 +15,7 @@ Implements the approved [buyer/seller mockups](https://luppit-purchase-flow-mock
 - `app/(conversation)/_layout.tsx` owns the glass header, three-dot menu, realtime refresh, shared composer, and existing action hook.
 - `ConversationStageCard` renders the DB-provided current stage, request brief, comparisons, deadlines, and primary/auxiliary actions.
 - `ConversationOfferDetails` opens the existing summary popup with canonical terms and current offer photos. Unaccepted offers show a labeled shortcut without a floating amount; buyer proposals hide that shortcut until reviewed.
-- `chat.tsx` owns the dated, expandable message history and image preview. Opening shows the stage first; incoming messages preserve an older reading position and expose a new-message control.
+- `chat.tsx` owns the dated, expandable message history and image preview. `useConversationScroll` measures the current-state card and latest messages, exposes navigation above the composer, and preserves the reader's position. Opening shows the stage first; incoming messages expose an integrated new-message cue.
 - Offer creation/editing, confirmations, ratings, reports, fulfillment choices, pickup codes, and grouped message sending retain their existing shared components and executors.
 
 The replaced header/status/menu helper components, their unused SVG, and the obsolete helper test were removed. `ConversationContextControls` remains used by the offer editor; the conversation timeline service remains used by request details.
@@ -45,4 +45,23 @@ The reusable-pricing migration preserves an already deployed stage presentation 
 - Continued Simulator QA verified the seller's pending-change card, read-only review, withdrawal confirmation, full comparison-body scrolling, availability confirmation, overdue shipping/pickup cards, pickup-code validation form, completed pickup, eligible rating button/form, already-rated notice, and report form. All opened forms were cancelled without submitting a decision, rating, report, message, or fulfillment action.
 - The confirmation-copy follow-up passed all 179 stage assertions in a disposable database transaction that rolled back. It was deployed as version `20261002231602`; live authorized views returned the distinct shipping/pickup titles, descriptions, and confirm labels. Private-helper permissions remained restricted. The disposable database was stopped, retaining its backup; the existing local stack remained healthy.
 - Native QA remains partial: the Mac locked during the corrected-popup recheck. The rendered copy after the follow-up and remaining buyer screens are pending. Stages without current account fixtures (initial request, private draft, scheduled pickup, active emailed code, an active-purchase proposal lock, in-transit/late-delivery decisions, and negative final outcomes) remain covered by database tests rather than direct Simulator proof. The stale LAN connection was replaced with the existing localhost development server before testing.
-- The seller request brief uses the exact seeded buyer request text. Request-assistant photos currently have no seller-sharing contract; later conversation photos are not relabeled as request references.
+- The seller request brief uses the exact request snapshot captured when a new conversation is created; existing conversations retain their stored-message fallback. Request-assistant photos currently have no seller-sharing contract; later conversation photos are not relabeled as request references.
+
+## Bug batch integration — 2026-10-04
+
+All five completed application branches and four database branches were merged into main, retaining their original commits. This batch is source integration only; its four migrations have not been applied to the hosted database and no new app release was made.
+
+| Item | Result | App commit | Database commit |
+| --- | --- | --- | --- |
+| B01 | Analysis only: retained photo observations and the second readiness review can reopen an answered discrepancy. The prompt already prioritizes explicit seller corrections, but the flow lacks structured resolution of the pending question. No Edge Function change was requested or made. | — | — |
+| B02 | Seller request ellipsis and authorized request/profile-scoped bulk discard, retaining ineligible purchases and history. | `9abc7ae` | `e4c75d2` |
+| B03 | Generic compact proposal comparison, full details, labelled photos and explicit required delivery selection. | `6684bea` | `1a2a4c5` |
+| B04 | Responsive canonical-summary control keeps the amount and label inside the glass surface. | `32d479b` | — |
+| B05 | DB-owned deadline labels distinguish availability from completion limits and explain overdue behavior. | `47a8d8b` | `b6a0cd4` |
+| I01 | Approved navigation above the composer, Mostrar/Ocultar mensajes, immutable request context and brief SYSTEM publication events for new conversations. Existing stored messages are preserved. | `28d915f` | `74ebe58` |
+
+Migrations replay in version order: `20261003195303_b02_seller_request_discard_all`, `20261004013000_conversation_deadline_clarity`, `20261005033153_i01_chat_navigation`, then `20261005033602_b03_generic_proposal_review`. The full chain contains 102 migrations. A fresh reset exposed that the baseline action/role catalogs are populated by the seed after B02 runs; the seed now installs its two discard transitions idempotently. Conversation catalog, authorized-RPC and single-menu-action tests were updated to the current contracts without changing those runtime rules.
+
+Combined verification passed: 398 app tests, TypeScript, full-project ESLint, a fresh migration/seed reset, all 63 database suites / 1,912 assertions, public/private SQL lint at error level, four bulk-discard races and 17 proposal/fulfillment races. SQL and race tests ran only in an isolated local stack and disposable clones. All task commits and both previous main baselines remain ancestors of main; task worktrees were clean when audited.
+
+Native coverage remains the individual task coverage: I01 navigation/keyboard and B04 layout fixtures passed native checks; B02 menu, B03 comparison and B05 deadline integration still need native QA. B03/B05 browser checks and SQL tests do not constitute a native or deployed pass. B01's six simulated tests do not establish real-model behavior.
