@@ -126,6 +126,8 @@ export type ConversationViewSlot = {
   message: string | null;
   due_at: string | null;
   formatted_due_at: string | null;
+  availability?: { label: string; formatted_at: string } | null;
+  deadline_message?: string | null;
   due_at_epoch: number | null;
   seconds_remaining: number | null;
   is_overdue: boolean;
@@ -530,6 +532,9 @@ function parseConversationViewSlot(raw: unknown): ConversationViewSlot | null {
   const value = raw as Record<string, unknown>;
   const code = typeof value.code === "string" ? value.code : "";
   if (!code) return null;
+  const availability = value.availability && typeof value.availability === "object"
+    ? value.availability as Record<string, unknown>
+    : null;
 
   return {
     code,
@@ -546,6 +551,12 @@ function parseConversationViewSlot(raw: unknown): ConversationViewSlot | null {
     due_at: typeof value.due_at === "string" ? value.due_at : null,
     formatted_due_at:
       typeof value.formatted_due_at === "string" ? value.formatted_due_at : null,
+    availability:
+      availability && typeof availability.label === "string" && typeof availability.formatted_at === "string"
+        ? { label: availability.label, formatted_at: availability.formatted_at }
+        : null,
+    deadline_message:
+      typeof value.deadline_message === "string" ? value.deadline_message : null,
     due_at_epoch: parseNullableNumber(value.due_at_epoch),
     seconds_remaining: parseNullableNumber(value.seconds_remaining),
     is_overdue: value.is_overdue === true,

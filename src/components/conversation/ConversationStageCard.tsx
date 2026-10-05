@@ -62,7 +62,7 @@ export default function ConversationStageCard({
   };
   const deadlines = view.slots.flatMap((slot) => {
     const date = formatDeadline(slot);
-    return date ? [{ slot, date }] : [];
+    return date || slot.availability || slot.deadline_message ? [{ slot, date }] : [];
   });
 
   if (!presentation && !fallbackSlot && actions.length === 0) return null;
@@ -135,14 +135,30 @@ export default function ConversationStageCard({
         ) : null}
 
         {deadlines.map(({ slot, date }, index) => (
-          <View key={`${slot.code}-${index}`} style={{ gap: t.spacing.xs }} accessible
-            accessibilityLabel={`${slot.section_label || (slot.is_overdue ? "Plazo vencido" : "Plazo")}: ${date}`}>
-            <Text variant="small" color={slot.is_overdue ? "error" : "textMedium"}>
-              {slot.section_label || (slot.is_overdue ? "Plazo vencido" : "Plazo")}
-            </Text>
-            <Text variant="body" color={slot.is_overdue ? "error" : "textDark"} maxFontSizeMultiplier={2}>
-              {date}
-            </Text>
+          <View key={`${slot.code}-${index}`} style={{ gap: t.spacing.md }}>
+            {slot.availability ? (
+              <View style={{ gap: t.spacing.xs }} accessible
+                accessibilityLabel={`${slot.availability.label}: ${slot.availability.formatted_at}`}>
+                <Text variant="small" color="textMedium">{slot.availability.label}</Text>
+                <Text variant="body" maxFontSizeMultiplier={2}>{slot.availability.formatted_at}</Text>
+              </View>
+            ) : null}
+            {date ? (
+              <View style={{ gap: t.spacing.xs }} accessible
+                accessibilityLabel={`${slot.section_label || (slot.is_overdue ? "Plazo vencido" : "Plazo")}: ${date}`}>
+                <Text variant="small" color={slot.is_overdue ? "error" : "textMedium"}>
+                  {slot.section_label || (slot.is_overdue ? "Plazo vencido" : "Plazo")}
+                </Text>
+                <Text variant="body" color={slot.is_overdue ? "error" : "textDark"} maxFontSizeMultiplier={2}>
+                  {date}
+                </Text>
+              </View>
+            ) : null}
+            {slot.deadline_message ? (
+              <Text variant="small" color="textMedium" maxFontSizeMultiplier={2}>
+                {slot.deadline_message}
+              </Text>
+            ) : null}
           </View>
         ))}
 
