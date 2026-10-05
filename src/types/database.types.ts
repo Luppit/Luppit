@@ -5588,6 +5588,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_seller_request_offers_menu: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: Json
+      }
       get_seller_visible_buyer_profile: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -5880,6 +5884,15 @@ export type Database = {
           p_conversation_id: string
           p_payload?: Json
           p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_discard_request_offers: {
+        Args: {
+          p_action_code?: string
+          p_payload?: Json
+          p_profile_id: string
+          p_purchase_request_id: string
         }
         Returns: Json
       }

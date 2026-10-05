@@ -62,6 +62,8 @@ export const RPC_FUNCTIONS = {
     "get_or_create_seller_offer_seed_conversation",
   GET_SELLER_REQUEST_OFFER_CONVERSATIONS:
     "get_seller_request_offer_conversations",
+  GET_SELLER_REQUEST_OFFERS_MENU: "get_seller_request_offers_menu",
+  SELLER_DISCARD_REQUEST_OFFERS: "seller_discard_request_offers",
   GET_PURCHASE_REQUEST_STATUS_UI_OPTIONS:
     "get_purchase_request_status_ui_options",
   GET_PURCHASE_REQUEST_VISUALIZATION_COUNT:
