@@ -1,4 +1,6 @@
 import ConversationStageCard from "@/src/components/conversation/ConversationStageCard";
+import useConversationScroll from "@/src/components/conversation/useConversationScroll";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import ConversationOfferDetails from "@/src/components/conversation/ConversationOfferDetails";
 import Button from "@/src/components/button/Button";
 import { Icon } from "@/src/components/Icon";
@@ -80,12 +82,13 @@ export default function ConversationChatScreen() {
   );
   const [previewImages, setPreviewImages] = useState<ConversationImagePreview[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
-  const scrollViewRef = React.useRef<ScrollView | null>(null);
+  const expandHistory = useCallback(() => setHistoryExpanded(true), []);
+  const scroll = useConversationScroll(`${conversationId}:${profileId}`, historyExpanded, expandHistory);
+  const { scrollViewRef, atBottomRef, scrollToBottom: navigateToBottom } = scroll;
   const prefetchedPreviewUrisRef = React.useRef<Set<string>>(new Set());
   const imageMessageWidth = Math.max(1, Math.min(230,
     (width - t.spacing.md * 2) * 0.88 - t.spacing.md * 2));
   const loadGenerationRef = React.useRef(0);
-  const atBottomRef = React.useRef(false);
   const historyLoadedRef = React.useRef(false);
   const previousMessageKeysRef = React.useRef<Set<string>>(new Set());
   const visibleMessages = useMemo(() => {
@@ -120,11 +123,9 @@ export default function ConversationChatScreen() {
   }, [visibleMessages]);
   const activePreviewImage = previewImages[previewIndex] ?? null;
   const scrollToBottom = useCallback((animated = false) => {
-    atBottomRef.current = true;
-    setHistoryExpanded(true);
+    navigateToBottom(animated);
     setNewMessageCount(0);
-    requestAnimationFrame(() => scrollViewRef.current?.scrollToEnd({ animated }));
-  }, []);
+  }, [navigateToBottom]);
 
   const loadMessages = useCallback(async () => {
     const generation = ++loadGenerationRef.current;
@@ -159,7 +160,7 @@ export default function ConversationChatScreen() {
     atBottomRef.current = false;
     historyLoadedRef.current = false;
     previousMessageKeysRef.current.clear();
-  }, [conversationId, profileId]);
+  }, [conversationId, profileId, atBottomRef]);
 
   useEffect(() => {
     if (isFocused) void loadMessages();
@@ -168,7 +169,9 @@ export default function ConversationChatScreen() {
 
   useEffect(() => {
     const previous = previousMessageKeysRef.current;
-    const incoming = visibleMessages.filter((message) => !previous.has(getConversationMessageLogicalKey(message)));
+    const incoming = visibleMessages.filter((message) =>
+      (message.message_kind ?? "TEXT").toUpperCase() !== "SYSTEM" &&
+      !previous.has(getConversationMessageLogicalKey(message)));
     previousMessageKeysRef.current = new Set(visibleMessages.map(getConversationMessageLogicalKey));
     const initialLoad = !historyLoadedRef.current;
     if (!isLoadingMessages) historyLoadedRef.current = true;
@@ -182,7 +185,7 @@ export default function ConversationChatScreen() {
     } else {
       setNewMessageCount((count) => count + incoming.length);
     }
-  }, [visibleMessages, profileId, historyExpanded, isLoadingMessages, scrollToBottom]);
+  }, [visibleMessages, profileId, historyExpanded, isLoadingMessages, scrollToBottom, atBottomRef]);
 
   useEffect(() => {
     let active = true;
@@ -563,18 +566,19 @@ export default function ConversationChatScreen() {
         contentContainerStyle={{ padding: t.spacing.md, paddingBottom: t.spacing.xl, gap: t.spacing.md }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={32}
-        onScroll={({ nativeEvent }) => {
-          const { contentOffset, contentSize, layoutMeasurement } = nativeEvent;
-          atBottomRef.current = contentSize.height - contentOffset.y - layoutMeasurement.height < 64;
+        onLayout={scroll.onLayout}
+        onScrollBeginDrag={scroll.onScrollBeginDrag}
+        onScroll={(event) => {
+          scroll.onScroll(event);
           if (atBottomRef.current && historyExpanded) setNewMessageCount(0);
         }}
-        onContentSizeChange={() => {
-          if (atBottomRef.current && historyExpanded) scrollViewRef.current?.scrollToEnd({ animated: false });
-        }}
+        onContentSizeChange={scroll.onContentSizeChange}
       >
         <ConversationOfferDetails view={conversationView} profileId={profileId} disabled={isExecutingAction} />
-        <ConversationStageCard view={conversationView} disabled={isExecutingAction}
-          loadingActionId={executingActionId} onPress={handleActionPress} />
+        <View onLayout={scroll.onStageLayout}>
+          <ConversationStageCard view={conversationView} disabled={isExecutingAction}
+            loadingActionId={executingActionId} onPress={handleActionPress} onCardLayout={scroll.onCardLayout} />
+        </View>
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
           <Text variant="body" style={{ flex: 1, fontFamily: t.typography.subtitle.fontFamily }}>
@@ -582,12 +586,12 @@ export default function ConversationChatScreen() {
           </Text>
           {renderItems.length > 0 ? (
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: historyExpanded }}
-              onPress={() => { setHistoryExpanded((current) => !current); atBottomRef.current = false; }}
+              onPress={() => { scroll.toggleHistory(); setHistoryExpanded((current) => !current); }}
               style={{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: t.spacing.xs }}>
               <Text variant="small" color="textMedium">
                 {historyExpanded
-                  ? conversationView.presentation?.history_collapse_label ?? "Ocultar historial"
-                  : conversationView.presentation?.history_expand_label ?? "Ver historial"}
+                  ? conversationView.presentation?.history_collapse_label ?? "Ocultar mensajes"
+                  : conversationView.presentation?.history_expand_label ?? "Mostrar mensajes"}
               </Text>
               <Icon name={historyExpanded ? "chevron-up" : "chevron-down"} size={18} />
             </Pressable>
@@ -606,7 +610,7 @@ export default function ConversationChatScreen() {
           <View style={{ paddingVertical: t.spacing.lg, alignItems: "center", gap: t.spacing.sm }}>
             <Icon name="message-square" size={28} color={t.colors.textMedium} />
             <Text variant="body">Aún no hay mensajes</Text>
-            <Text variant="small" color="textMedium" align="center">Aquí aparecerá el historial de esta conversación.</Text>
+            <Text variant="small" color="textMedium" align="center">Aquí aparecerán los mensajes de esta conversación.</Text>
           </View>
         ) : null}
         {historyExpanded ? renderItems.map((item, index) => {
@@ -624,13 +628,44 @@ export default function ConversationChatScreen() {
           );
         }) : null}
       </ScrollView>
-      {newMessageCount > 0 ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`${newMessageCount} mensajes nuevos. Ver mensajes`}
-          onPress={() => scrollToBottom(true)}
-          style={{ padding: t.spacing.sm, minHeight: 44, flexDirection: "row", justifyContent: "center", gap: t.spacing.sm }}>
-          <Icon name="chevron-down" size={18} />
-          <Text variant="body">Nuevos mensajes ({newMessageCount})</Text>
-        </Pressable>
+      {scroll.destinations.state || (renderItems.length > 0 &&
+        (!historyExpanded || scroll.destinations.latest || newMessageCount > 0)) ? (
+        <View style={{ paddingHorizontal: t.spacing.md, paddingTop: t.spacing.xs,
+          paddingBottom: conversationView.permissions.can_send_messages && !conversationView.presentation?.locked
+            ? 0 : Math.max(insets.bottom, t.spacing.sm) }}>
+          <GlassSurface variant="control" contentStyle={{ flexDirection: "row", flexWrap: "wrap" }}>
+            {scroll.destinations.state ? (
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={`Ir a ${conversationView.presentation?.navigation_state_label ?? "Estado actual"}`}
+                onPress={() => scroll.scrollToState(conversationView.presentation?.navigation_state_label ?? "Estado actual")}
+                style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, minHeight: 44, padding: t.spacing.sm, flexDirection: "row",
+                  alignItems: "center", justifyContent: "center", gap: t.spacing.xs }}>
+                <Icon name="chevron-up" size={18} />
+                <Text variant="small" style={{ flexShrink: 1 }}>{conversationView.presentation?.navigation_state_label ?? "Estado actual"}</Text>
+              </Pressable>
+            ) : null}
+            {renderItems.length > 0 && (!historyExpanded || scroll.destinations.latest || newMessageCount > 0) ? (
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={`${newMessageCount > 0 ? `${newMessageCount} ${newMessageCount === 1 ? "mensaje nuevo" : "mensajes nuevos"}. ` : ""}Ir a los últimos mensajes`}
+                onPress={() => {
+                  scroll.scrollToBottom(true, conversationView.presentation?.navigation_latest_label ?? "Últimos mensajes");
+                  setNewMessageCount(0);
+                }}
+                style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, minHeight: 44, padding: t.spacing.sm, flexDirection: "row",
+                  alignItems: "center", justifyContent: "center", gap: t.spacing.xs }}>
+                <Icon name="chevron-down" size={18} />
+                <Text variant="small" style={{ flexShrink: 1 }}>
+                  {historyExpanded
+                    ? conversationView.presentation?.navigation_latest_label ?? "Últimos mensajes"
+                    : conversationView.presentation?.navigation_expand_label ?? "Ver mensajes"}
+                  {newMessageCount > 0 ? ` · ${newMessageCount} ${newMessageCount === 1
+                    ? conversationView.presentation?.navigation_new_singular_label ?? "nuevo"
+                    : conversationView.presentation?.navigation_new_label ?? "nuevos"}` : ""}
+                </Text>
+              </Pressable>
+            ) : null}
+          </GlassSurface>
+        </View>
       ) : null}
 
       <Modal
