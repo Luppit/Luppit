@@ -127,3 +127,38 @@ export function buildOfferPricingRows(context: Record<string, unknown>) {
   }
   return rows;
 }
+
+export function buildOfferPriceRows(context: Record<string, unknown>) {
+  const amount = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
+  if (!amount || !["UNIT", "TOTAL"].includes(String(context.offer_price_basis))) return [];
+  const unit = displayText(context.offer_unit_label) ?? "unidad";
+  const quantity = context.offer_quantity_offered;
+  const rows: { label: string; detail?: string; value?: string }[] = [{
+    label: "Concepto principal",
+    detail: context.offer_price_basis === "UNIT"
+      ? `${typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0 ? `${quantity} × ` : ""}${amount} por ${unit}`
+      : `Por el conjunto${typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0 ? ` · ${quantity}${displayText(context.offer_unit_label) ? " × " : " "}${displayText(context.offer_unit_label) ?? "unidades"}` : ""}`,
+    value: context.offer_price_basis === "UNIT"
+      ? formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code) ?? undefined : amount,
+  }];
+  for (const component of normalizeOfferComponents(context.offer_components)) {
+    const componentAmount = formatOfferAmount(component.amount, context.offer_currency_code);
+    rows.push({
+      label: component.description,
+      detail: component.charge_mode === "INCLUDED" ? undefined
+        : component.basis === "UNIT"
+          ? `${componentAmount ?? "Importe pendiente"} por ${component.unit_label ?? "unidad pendiente"} × ${component.quantity ?? "cantidad pendiente"}`
+          : component.basis === "TOTAL" ? "Por el conjunto" : "Alcance pendiente",
+      value: component.charge_mode === "INCLUDED" ? "Incluido"
+        : component.charge_mode === "UNRESOLVED" ? "Pendiente"
+        : component.basis === "UNIT" ? formatOfferAmount(component.subtotal, context.offer_currency_code) ?? undefined
+          : componentAmount ?? "Pendiente",
+    });
+  }
+  return rows;
+}
+
+export function formatOfferTotalLabel(value: string) {
+  const money = /^Total:\s*([A-Z]{3})\s+([0-9]+(?:\.[0-9]+)?)$/.exec(value.trim());
+  return money ? formatOfferAmount(Number(money[2]), money[1])! : value.replace(/^Total:\s*/, "");
+}

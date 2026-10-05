@@ -184,9 +184,46 @@ test("both delivery methods and supplied costs/timing survive with explicit sele
   );
   assert.equal(summary.rows.length, 4);
   assert.deepEqual(Array.from(summary.offerVisual.deliveryRows, (row: any) => ({ ...row })), [
-    { label: "Envío", detail: "Costo de envío no especificado · Coordinar entrega", icon: undefined },
-    { label: "Retiro en tienda · Seleccionado", detail: "Disponible en 2 días · Total: ₡160,000", icon: undefined },
+    { label: "Envío", selected: false, detail: "Costo de envío no especificado · Coordinar entrega", icon: undefined },
+    { label: "Retiro en tienda", selected: true, detail: "Disponible en 2 días", icon: undefined },
   ]);
+  assert.equal(summary.offerVisual.price.label, "Total a pagar");
+  assert.equal(summary.offerVisual.price.value, "₡160,000");
+});
+
+test("selected fulfillment uses its server total and keeps alternative methods separate", () => {
+  const summary = buildConversationOfferSummary({ ...complementaryContext,
+    selected_fulfillment_catalog_id: "ship", fulfillment_options: [
+      { catalog_id: "ship", label: "Envío", fee_label: "Costo: USD 25", total_label: "Total: USD 173.25" },
+      { catalog_id: "pickup", label: "Retiro", total_label: "Total: USD 165" },
+    ],
+  });
+  assert.equal(summary.offerVisual.price.label, "Total a pagar");
+  assert.equal(summary.offerVisual.price.value, "$173.25");
+  assert.equal(summary.offerVisual.deliveryRows[0].detail, "Costo: USD 25");
+  assert.equal(summary.offerVisual.deliveryRows[1].detail, "Total: USD 165");
+  assert.equal(summary.offerVisual.pricingRows[0].value, "₡160,000");
+  assert.equal(summary.offerVisual.pricingRows[1].value, "₡5,000");
+  const unknown = buildConversationOfferSummary({ ...complementaryContext,
+    selected_fulfillment_catalog_id: "ship", fulfillment_options: [{ catalog_id: "ship", label: "Envío" }],
+  });
+  assert.equal(unknown.offerVisual.price.value, "Por confirmar");
+});
+
+test("generic price panels use charging units and server subtotals without multiplying components", () => {
+  const rows = pricing.buildOfferPriceRows({ offer_price_amount: 12.5, offer_price_basis: "UNIT",
+    offer_quantity_offered: 2.5, offer_unit_label: "kg", offer_product_subtotal: 31.25,
+    offer_currency_code: "USD", offer_components: [
+      { id: "work", description: "Corte a medida", charge_mode: "EXTRA", amount: 7, basis: "UNIT", quantity: 2.5, unit_label: "hora", subtotal: 18 },
+      { id: "pack", description: "Embalaje", charge_mode: "INCLUDED" },
+      { id: "pending", description: "Transporte especial", charge_mode: "UNRESOLVED" },
+    ] });
+  assert.equal(rows[0].detail, "2.5 × $12.50 por kg");
+  assert.equal(rows[0].value, "$31.25");
+  assert.equal(rows[1].detail, "$7 por hora × 2.5");
+  assert.equal(rows[1].value, "$18");
+  assert.equal(rows[2].value, "Incluido");
+  assert.equal(rows[3].value, "Pendiente");
 });
 
 test("delivery options without details appear once under a shared heading", () => {

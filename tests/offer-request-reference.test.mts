@@ -982,6 +982,10 @@ test("seller review popup preserves complementary pricing for a package principa
   assert.equal(review.price.value, "₡165,000");
   assert.equal(review.rows[1].label, "Alineado");
   assert.equal(review.rows[1].value, "₡5,000 · por el conjunto");
+  assert.equal(review.pricingRows[0].detail, "Por el conjunto · 4 × llanta");
+  assert.equal(review.pricingRows[0].value, "₡160,000");
+  assert.equal(review.pricingRows[1].detail, "Por el conjunto");
+  assert.equal(review.pricingRows[1].value, "₡5,000");
 });
 
 test("context popups close when source changes or editor leaves, without closing another popup", () => {

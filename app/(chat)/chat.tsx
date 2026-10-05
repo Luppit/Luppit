@@ -129,6 +129,7 @@ function PublishRequestCard({
       description={description}
       rows={details}
       rowsTitle="Detalles de la solicitud"
+      photosTitle="Fotos de referencia"
       notices={missingFields.length > 0 ? [{
         text: `Falta completar: ${missingFields.map(humanizeAttributeLabel).join(", ")}.`,
         tone: "error",

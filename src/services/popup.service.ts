@@ -50,6 +50,7 @@ export type PopupSummaryImage = {
 
 export type PopupOfferVisual = {
   rows?: { label: string; value: string }[];
+  pricingRows?: { label: string; detail?: string; value?: string }[];
   title: string;
   subtitle?: string;
   quantity?: string;
@@ -59,6 +60,7 @@ export type PopupOfferVisual = {
     detail?: string;
     amount?: string;
     icon?: "truck" | "store";
+    selected?: boolean;
   }[];
 };
 

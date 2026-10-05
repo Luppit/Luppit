@@ -2,7 +2,8 @@ import {
   formatConversationOfferTotal,
   formatOfferAmount,
   buildOfferPricingRows,
-  normalizeOfferComponents,
+  buildOfferPriceRows,
+  formatOfferTotalLabel,
 } from "./conversationOfferPrice";
 
 import type { PopupOfferAcceptance, PopupSummaryInput } from "../services/popup.service";
@@ -46,11 +47,19 @@ export function buildConversationOfferSummary(
   const options = Array.isArray(context.fulfillment_options)
     ? context.fulfillment_options
     : [];
+  const selectedOption = options.find((option) => option && typeof option === "object" &&
+    context.selected_fulfillment_catalog_id != null &&
+    (option.catalog_id ?? option.value) === context.selected_fulfillment_catalog_id);
+  const selectedTotal = selectedOption
+    ? { label: "Total a pagar", value: displayText(selectedOption.total_label)
+      ? formatOfferTotalLabel(selectedOption.total_label) : "Por confirmar" }
+    : undefined;
   const deliveryOptions: string[] = [];
   const deliveryRows: {
     label: string;
     detail?: string;
     icon?: "truck" | "store";
+    selected?: boolean;
   }[] = [];
   for (const raw of options) {
     if (!raw || typeof raw !== "object") continue;
@@ -61,7 +70,7 @@ export function buildConversationOfferSummary(
       context.selected_fulfillment_catalog_id != null &&
       (option.catalog_id ?? option.value) ===
         context.selected_fulfillment_catalog_id;
-    const details = [option.fee_label, option.timing_label, option.total_label]
+    const details = [option.fee_label, option.timing_label]
       .map(displayText)
       .filter(Boolean);
     const catalogId = option.catalog_id ?? option.value;
@@ -102,13 +111,14 @@ export function buildConversationOfferSummary(
     }
     const optionLabel = selected ? `${label} · Seleccionado` : label;
     deliveryRows.push({
-      label: optionLabel,
-      detail: details.join(" · ") || undefined,
+      label,
+      selected,
+      detail: [...details, !selected ? displayText(option.total_label) : undefined].filter(Boolean).join(" · ") || undefined,
       icon: stored?.method_kind === "shipping" ? "truck"
         : stored?.method_kind === "pickup" ? "store" : undefined,
     });
     deliveryOptions.push(
-      [`• ${optionLabel}`, ...details.map((detail) => `  ${detail}`)].join("\n"),
+      [`• ${optionLabel}`, ...[...details, displayText(option.total_label)].filter(Boolean).map((detail) => `  ${detail}`)].join("\n"),
     );
   }
   if (deliveryOptions.length > 0) {
@@ -129,7 +139,7 @@ export function buildConversationOfferSummary(
     offerVisual: {
       title: displayText(context.offer_name) ?? displayText(context.request_title) ?? "Oferta",
       quantity: quantityLabel,
-      price: total
+      price: selectedTotal ?? (total
         ? {
             label: hasComponents ? "Subtotal de la oferta" : context.offer_price_basis === "UNIT" ? "Total de productos" : "Precio total",
             value: total,
@@ -139,8 +149,9 @@ export function buildConversationOfferSummary(
           }
         : unitPrice && context.offer_price_basis === "UNIT"
           ? { label: "Precio por unidad", value: unitPrice }
-          : undefined,
+          : undefined),
       rows: pricingRows,
+      pricingRows: buildOfferPriceRows(context),
       deliveryRows,
     },
   };
@@ -153,35 +164,11 @@ export function buildOfferAcceptancePresentation(
 ): PopupOfferAcceptance {
   const amount = formatOfferAmount(context.offer_price_amount, context.offer_currency_code);
   const subtotal = formatConversationOfferTotal(context);
-  const principalSubtotal = formatOfferAmount(context.offer_product_subtotal, context.offer_currency_code);
-  const unit = displayText(context.offer_unit_label) ?? "unidad";
-  const quantity = context.offer_quantity_offered;
-  const components = normalizeOfferComponents(context.offer_components);
   if (!amount || !subtotal || !["UNIT", "TOTAL"].includes(String(context.offer_price_basis))) {
     return { rows: [{ label: priceField.label, detail: priceField.value }], descriptionLabel: "Descripción" };
   }
 
-  const rows: PopupOfferAcceptance["rows"] = [{
-    label: "Concepto principal",
-    detail: context.offer_price_basis === "UNIT"
-      ? `${typeof quantity === "number" && Number.isFinite(quantity) && quantity > 0 ? `${quantity} × ` : ""}${amount} por ${unit}`
-      : "Por el conjunto",
-    value: context.offer_price_basis === "UNIT" ? principalSubtotal ?? undefined : amount,
-  }];
-  for (const component of components) {
-    const componentAmount = formatOfferAmount(component.amount, context.offer_currency_code);
-    rows.push({
-      label: component.description,
-      detail: component.charge_mode === "INCLUDED" ? undefined
-        : component.basis === "UNIT"
-          ? `${componentAmount ?? "Importe pendiente"} por ${component.unit_label ?? "unidad pendiente"} × ${component.quantity ?? "cantidad pendiente"}`
-          : component.basis === "TOTAL" ? "Por el conjunto" : "Alcance pendiente",
-      value: component.charge_mode === "INCLUDED" ? "Incluido"
-        : component.charge_mode === "UNRESOLVED" ? "Pendiente"
-        : component.basis === "UNIT" ? undefined : componentAmount ?? "Pendiente",
-    });
-  }
-  return { rows, subtotal: { label: "Subtotal de la oferta", value: subtotal }, descriptionLabel: "Descripción" };
+  return { rows: buildOfferPriceRows(context), subtotal: { label: "Subtotal de la oferta", value: subtotal }, descriptionLabel: "Descripción" };
 }
 
 export function getOfferAcceptanceTotal(
@@ -193,9 +180,8 @@ export function getOfferAcceptanceTotal(
   const option = input?.options?.find((candidate) => candidate.value === values[input.id] && !candidate.disabled);
   if (!option) return presentation.subtotal;
   if (!option.totalLabel) return { label: "Total a pagar", value: "Por confirmar" };
-  const money = /^Total:\s*([A-Z]{3})\s+([0-9]+(?:\.[0-9]+)?)$/.exec(option.totalLabel.trim());
   return {
     label: "Total a pagar",
-    value: money ? formatOfferAmount(Number(money[2]), money[1])! : option.totalLabel,
+    value: formatOfferTotalLabel(option.totalLabel),
   };
 }

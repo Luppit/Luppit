@@ -1,4 +1,5 @@
-import { buildOfferPricingRows } from "@/src/utils/conversationOfferPrice";
+import { buildOfferPriceRows, buildOfferPricingRows } from "@/src/utils/conversationOfferPrice";
+import { Icon } from "@/src/components/Icon";
 import { getCurrentProfile, subscribeActiveProfile } from "@/src/services/active.profile.service";
 import { getOrCreateCurrentSellerOfferSeedConversation } from "@/src/services/seller.request.offers.service";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
@@ -192,13 +193,15 @@ function getOfferVisual(
       ? `Disponible en ${summary.retiroDespuesDeDias} día(s)` : undefined,
     icon: "store",
   });
+  const pricingContext = { offer_components: summary?.componentes, offer_price_amount: summary?.precio,
+    offer_price_basis: summary?.basePrecio, offer_quantity_offered: summary?.cantidadOfrecida, offer_unit_label: summary?.unidadCobro,
+    offer_product_subtotal: summary?.subtotalPrincipal, offer_currency_code: summary?.moneda };
   return {
     title: title?.trim() || "Oferta",
     quantity,
     price,
-    rows: buildOfferPricingRows({ offer_components: summary?.componentes, offer_price_amount: summary?.precio,
-      offer_price_basis: summary?.basePrecio, offer_quantity_offered: summary?.cantidadOfrecida, offer_unit_label: summary?.unidadCobro,
-      offer_product_subtotal: summary?.subtotalPrincipal, offer_currency_code: summary?.moneda }),
+    rows: buildOfferPricingRows(pricingContext),
+    pricingRows: buildOfferPriceRows(pricingContext),
     deliveryRows,
   };
 }
@@ -334,6 +337,7 @@ function OfferSummaryCard({
       images={offerImages.map((image) => ({ uri: image.url }))}
       imageNoun={offerImages.length === 1 ? "foto" : "fotos"}
       price={visual.price}
+      pricingRows={visual.pricingRows}
       deliveryRows={visual.deliveryRows}
       description={summary?.descripcion ?? "Sin descripción todavía"}
       rows={visual.rows ?? []}
@@ -1199,23 +1203,28 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
           const selected = selectedIds.includes(option.id);
           const visual = getOfferVisual(option.summary, requestReference.title);
           return <View key={option.id}
-            style={[createRoundedSurfaceStyle(t), {
-              padding: t.spacing.md, gap: t.spacing.sm,
-              borderWidth: 1, borderColor: selected ? t.colors.primary : t.colors.border,
+            style={{
+              gap: t.spacing.sm,
               opacity: option.isReadyToSend ? 1 : 0.75,
-            }]}>
+            }}>
             <Pressable accessibilityRole="checkbox"
               accessibilityLabel={`Seleccionar opción ${index + 1}`}
               accessibilityState={{ checked: selected, disabled: !option.isReadyToSend || busy }}
               disabled={!option.isReadyToSend || busy}
+              style={[createRoundedSurfaceStyle(t), { padding: t.spacing.md,
+                borderRadius: t.borders.md, borderWidth: 1,
+                borderColor: selected ? t.colors.primary : t.colors.border,
+                flexDirection: "row", alignItems: "center", gap: t.spacing.sm }]}
               onPress={() => setSelectedIds((current) => selected
                 ? current.filter((id) => id !== option.id) : [...current, option.id])}>
-              <Text variant="subtitle">{selected ? "☑" : "☐"} Opción {index + 1}</Text>
+              <Icon name={selected ? "check-circle" : "square"} size={22}
+                color={selected ? t.colors.primary : t.colors.textMedium} />
+              <Text variant="subtitle">Opción {index + 1}</Text>
             </Pressable>
             <SummaryReviewContent title={visual.title} quantity={visual.quantity}
               images={option.offerImages.map((image) => ({ uri: image.url }))}
               imageNoun={option.offerImages.length === 1 ? "foto" : "fotos"}
-              rows={visual.rows} rowsTitle="Desglose de la oferta" price={visual.price} deliveryRows={visual.deliveryRows}
+              rows={visual.rows} rowsTitle="Desglose de la oferta" pricingRows={visual.pricingRows} price={visual.price} deliveryRows={visual.deliveryRows}
               description={option.summary?.descripcion ?? "Descripción pendiente"} />
             {option.missingFields.length ? <Text variant="small" color="error">
               Falta: {option.missingFields.join(", ")}

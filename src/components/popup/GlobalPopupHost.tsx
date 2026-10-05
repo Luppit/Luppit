@@ -788,7 +788,7 @@ export default function GlobalPopupHost() {
         {total ? (
           <View accessible accessibilityLabel={`${total.label}: ${total.value}`}
             style={[s.offerAcceptanceRow, stack ? { flexDirection: "column", alignItems: "stretch" } : null]}>
-            <Text variant="body" style={s.offerAcceptanceCopy}>{total.label}</Text>
+            <Text variant="body" style={{ flex: 1 }}>{total.label}</Text>
             <Text variant="title" align={stack ? "left" : "right"}
               style={stack ? undefined : s.offerAcceptanceTotal}>{total.value}</Text>
           </View>
@@ -1785,6 +1785,7 @@ export default function GlobalPopupHost() {
                           rows={summaryConfig.offerVisual.rows}
                           rowsTitle="Desglose de la oferta"
                           price={summaryConfig.offerVisual.price}
+                          pricingRows={summaryConfig.offerVisual.pricingRows}
                           description={summaryConfig.description}
                           deliveryRows={summaryConfig.offerVisual.deliveryRows}
                         />
