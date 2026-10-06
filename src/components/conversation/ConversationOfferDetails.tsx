@@ -126,7 +126,7 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
   const pillStyle = { borderRadius: t.glass.radius.chip };
   return (
     <View style={{ alignItems: "flex-start" }}>
-      <GlassSurface variant="control" style={[pillStyle, { maxWidth: "100%", width: stack ? "100%" : undefined }]} clipStyle={pillStyle}>
+      <GlassSurface variant="control" style={[pillStyle, { maxWidth: "100%", width: "100%" }]} clipStyle={pillStyle}>
         <Pressable
           onPress={openSummary}
           disabled={disabled || loadingSummary}
@@ -151,7 +151,7 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
             <View style={{ width: stack ? "100%" : StyleSheet.hairlineWidth,
               height: stack ? StyleSheet.hairlineWidth : 24, backgroundColor: t.colors.border }} />
           ) : null}
-          <View style={{ flexShrink: stack ? 0 : 1 }}>
+          <View style={{ flex: stack ? undefined : 1, flexShrink: stack ? 0 : 1 }}>
             <Text variant="body" maxFontSizeMultiplier={2} style={{ opacity: loadingSummary ? 0 : 1 }}>
               {label}
             </Text>
@@ -160,6 +160,7 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
                 style={StyleSheet.absoluteFillObject} />
             ) : null}
           </View>
+          {!stack ? <Icon name="chevron-right" size={18} color={t.colors.textDark} /> : null}
         </Pressable>
       </GlassSurface>
     </View>

@@ -1,4 +1,5 @@
 import { Icon } from "@/src/components/Icon";
+import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Text } from "@/src/components/Text";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import type {
@@ -8,10 +9,10 @@ import type {
 } from "@/src/services/conversation.service";
 import { useTheme } from "@/src/themes";
 import React from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import type { LayoutChangeEvent } from "react-native";
 import ConversationActionButtons from "./ConversationActionButtons";
-import { normalizeOptionalIcon, toTopButtonConfig } from "./useConversationActions";
+import { normalizeOptionalIcon, normalizeStyleFlags, toTopButtonConfig } from "./useConversationActions";
 
 type Props = {
   view: ConversationView;
@@ -19,6 +20,9 @@ type Props = {
   loadingActionId?: string | null;
   onPress: (action: ConversationViewAction) => void;
   onCardLayout?: (event: LayoutChangeEvent) => void;
+  compact?: boolean;
+  reserveCollapseControl?: boolean;
+  compactMaxHeight?: number;
 };
 
 function formatDeadline(slot: ConversationViewSlot) {
@@ -34,9 +38,15 @@ export default function ConversationStageCard({
   loadingActionId,
   onPress,
   onCardLayout,
+  compact = false,
+  reserveCollapseControl = false,
+  compactMaxHeight,
 }: Props) {
   const t = useTheme();
   const { width, fontScale } = useWindowDimensions();
+  const [compactActionHeight, setCompactActionHeight] = React.useState(
+    fontScale > 1.3 ? t.typography.body.lineHeight * Math.min(fontScale, 2) * 2 + t.spacing.sm * 2 + 2 : 48,
+  );
   const stackComparison = width < 360 || fontScale > 1.3;
   const presentation = view.presentation;
   const fallbackSlot = view.slots[0];
@@ -70,13 +80,62 @@ export default function ConversationStageCard({
 
   if (!presentation && !fallbackSlot && actions.length === 0) return null;
 
+  if (compact) {
+    const compactAction = actions.find((action) => {
+      const { isPrimary, isDanger } = normalizeStyleFlags(action.style_code);
+      return isPrimary && !isDanger;
+    }) ?? actions.find((action) => !normalizeStyleFlags(action.style_code).isDanger);
+    const deadline = deadlines.find(({ date }) => date);
+    const hint = card.supporting?.title || (deadline
+      ? `${deadline.slot.section_label || (deadline.slot.is_overdue ? "Plazo vencido" : "Plazo")}: ${deadline.date}`
+      : presentation?.rating_message);
+    const hintContent = hint ? (
+      <Text variant="small" color={deadline?.slot.is_overdue ? "error" : "textMedium"}
+        maxFontSizeMultiplier={2}>{hint}</Text>
+    ) : null;
+    return (
+      <GlassSurface variant="chrome" style={{ borderRadius: t.glass.radius.surface }}
+        clipStyle={{ borderRadius: t.glass.radius.surface }}
+        contentStyle={{ padding: t.spacing.sm + t.spacing.xs, gap: t.spacing.sm }}>
+        <View onLayout={(event) => setCompactActionHeight(event.nativeEvent.layout.height)}
+          style={{ flexDirection: fontScale > 1.3 ? "column" : "row", gap: t.spacing.sm }}>
+          <View style={{ flex: fontScale > 1.3 ? undefined : 1, minWidth: 0 }}>
+            {compactAction ? (
+              <ConversationActionButtons buttons={[toTopButtonConfig(compactAction)]}
+                disabled={disabled} loadingButtonId={loadingActionId}
+                onPress={() => onPress(compactAction)} />
+            ) : (
+              <View style={{ minHeight: 48, flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
+                {cardIcon ? <Icon name={cardIcon} size={22} color={accentColor} /> : null}
+                <Text variant="body" maxFontSizeMultiplier={2} style={{ flex: 1 }}>{card.title}</Text>
+              </View>
+            )}
+          </View>
+          {fontScale <= 1.3 ? <View style={{ width: 48 }} /> : null}
+        </View>
+        {hint || fontScale > 1.3 ? (
+          <View style={{ minHeight: fontScale > 1.3 ? 48 : undefined,
+            paddingRight: fontScale > 1.3 ? 48 + t.spacing.sm : 0, justifyContent: "center" }}>
+            {hintContent && compactMaxHeight != null ? (
+              <ScrollView style={{ maxHeight: Math.max(48, compactMaxHeight - compactActionHeight -
+                (t.spacing.sm + t.spacing.xs) * 2 - t.spacing.sm - 2) }} nestedScrollEnabled
+                keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
+                {hintContent}
+              </ScrollView>
+            ) : hintContent}
+          </View>
+        ) : null}
+      </GlassSurface>
+    );
+  }
+
   return (
     <View style={{ gap: t.spacing.md }}>
       {presentation?.request_brief ? (
         <View style={surface}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
             <Icon name="file-text" size={20} color={t.colors.textMedium} />
-            <Text variant="small" color="textMedium" style={{ flex: 1 }}>
+            <Text variant="small" color="textMedium" style={{ flex: 1, paddingRight: reserveCollapseControl ? 48 : 0 }}>
               {presentation.request_brief.label}
             </Text>
           </View>
@@ -87,7 +146,9 @@ export default function ConversationStageCard({
       ) : null}
 
       <View style={surface} onLayout={onCardLayout}>
-        {card.label ? <Text variant="small" color="textMedium">{card.label}</Text> : null}
+        {card.label ? <Text variant="small" color="textMedium"
+          style={reserveCollapseControl ? { paddingRight: 48 } : undefined}>{card.label}</Text>
+          : reserveCollapseControl ? <View style={{ height: t.spacing.lg }} /> : null}
         <View style={{ flexDirection: "row", alignItems: "flex-start", gap: t.spacing.sm }}>
           {cardIcon ? <Icon name={cardIcon} size={26} color={accentColor} /> : null}
           <View style={{ flex: 1, gap: t.spacing.sm }}>

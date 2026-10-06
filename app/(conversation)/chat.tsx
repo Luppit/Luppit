@@ -1,4 +1,4 @@
-import ConversationStageCard from "@/src/components/conversation/ConversationStageCard";
+import ConversationFloatingCard from "@/src/components/conversation/ConversationFloatingCard";
 import useConversationScroll from "@/src/components/conversation/useConversationScroll";
 import GlassSurface from "@/src/components/glass/GlassSurface";
 import ConversationOfferDetails from "@/src/components/conversation/ConversationOfferDetails";
@@ -56,7 +56,7 @@ async function getCounterpartDisplayNameByConversationId(conversationId: string)
 
 export default function ConversationChatScreen() {
   const t = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { activeProfile, refreshUnreadNotificationCount } = useActiveProfile();
   const isFocused = useIsFocused();
@@ -70,6 +70,7 @@ export default function ConversationChatScreen() {
     handleActionPress,
     isExecutingAction,
     executingActionId,
+    cardExpansion,
   } = useConversationLayout();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -82,6 +83,15 @@ export default function ConversationChatScreen() {
   );
   const [previewImages, setPreviewImages] = useState<ConversationImagePreview[]>([]);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [cardViewportHeight, setCardViewportHeight] = useState(0);
+  const [summaryHeight, setSummaryHeight] = useState(0);
+  const [compactCardHeight, setCompactCardHeight] = useState(0);
+  const hideSummaryForKeyboard = cardExpansion.keyboardVisible && fontScale > 1.3;
+  const visibleSummaryHeight = hideSummaryForKeyboard ? 0 : summaryHeight;
+  const resetCardExpansion = cardExpansion.reset;
+  useEffect(() => {
+    if (isFocused) resetCardExpansion();
+  }, [conversationId, profileId, isFocused, resetCardExpansion]);
   const expandHistory = useCallback(() => setHistoryExpanded(true), []);
   const scroll = useConversationScroll(`${conversationId}:${profileId}`, historyExpanded, expandHistory);
   const { scrollViewRef, atBottomRef, scrollToBottom: navigateToBottom } = scroll;
@@ -559,27 +569,44 @@ export default function ConversationChatScreen() {
 
   return (
     <>
+      <View onLayout={(event) => setSummaryHeight(event.nativeEvent.layout.height)}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 6, backgroundColor: "transparent",
+          display: hideSummaryForKeyboard ? "none" : "flex",
+          paddingHorizontal: t.spacing.md, paddingTop: t.spacing.md, paddingBottom: t.spacing.sm }}>
+        <ConversationOfferDetails view={conversationView} profileId={profileId} disabled={isExecutingAction} />
+      </View>
+      <View pointerEvents="box-none" style={{ position: "absolute", top: visibleSummaryHeight,
+        left: t.spacing.sm, right: t.spacing.sm, zIndex: 5, backgroundColor: "transparent" }}>
+        <ConversationFloatingCard view={conversationView} disabled={isExecutingAction}
+          loadingActionId={executingActionId} onPress={handleActionPress}
+          expanded={cardExpansion.expanded} onToggle={cardExpansion.toggle}
+          reduceMotion={cardExpansion.reduceMotion} maxHeight={Math.max(0, cardViewportHeight - t.spacing.md)}
+          onCompactLayout={(event) => setCompactCardHeight(event.nativeEvent.layout.height)} />
+      </View>
       <ScrollView
         ref={scrollViewRef}
+        style={{ flex: 1, backgroundColor: "transparent" }}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ padding: t.spacing.md, paddingBottom: t.spacing.xl, gap: t.spacing.md }}
+        contentContainerStyle={{ padding: t.spacing.md,
+          paddingTop: visibleSummaryHeight + compactCardHeight + t.spacing.sm + t.spacing.md,
+          paddingBottom: t.spacing.xl, gap: t.spacing.md }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={32}
-        onLayout={scroll.onLayout}
-        onScrollBeginDrag={scroll.onScrollBeginDrag}
+        onLayout={(event) => {
+          scroll.onLayout(event);
+          setCardViewportHeight(event.nativeEvent.layout.height - visibleSummaryHeight);
+        }}
+        onScrollBeginDrag={() => {
+          cardExpansion.collapse();
+          scroll.onScrollBeginDrag();
+        }}
         onScroll={(event) => {
           scroll.onScroll(event);
           if (atBottomRef.current && historyExpanded) setNewMessageCount(0);
         }}
         onContentSizeChange={scroll.onContentSizeChange}
       >
-        <ConversationOfferDetails view={conversationView} profileId={profileId} disabled={isExecutingAction} />
-        <View onLayout={scroll.onStageLayout}>
-          <ConversationStageCard view={conversationView} disabled={isExecutingAction}
-            loadingActionId={executingActionId} onPress={handleActionPress} onCardLayout={scroll.onCardLayout} />
-        </View>
-
         <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm }}>
           <Text variant="body" style={{ flex: 1, fontFamily: t.typography.subtitle.fontFamily }}>
             {conversationView.presentation?.history_label ?? "Conversación"}
@@ -628,42 +655,25 @@ export default function ConversationChatScreen() {
           );
         }) : null}
       </ScrollView>
-      {scroll.destinations.state || (renderItems.length > 0 &&
-        (!historyExpanded || scroll.destinations.latest || newMessageCount > 0)) ? (
-        <View style={{ paddingHorizontal: t.spacing.md, paddingTop: t.spacing.xs,
-          paddingBottom: conversationView.permissions.can_send_messages && !conversationView.presentation?.locked
-            ? 0 : Math.max(insets.bottom, t.spacing.sm) }}>
-          <GlassSurface variant="control" contentStyle={{ flexDirection: "row", flexWrap: "wrap" }}>
-            {scroll.destinations.state ? (
-              <Pressable accessibilityRole="button"
-                accessibilityLabel={`Ir a ${conversationView.presentation?.navigation_state_label ?? "Estado actual"}`}
-                onPress={() => scroll.scrollToState(conversationView.presentation?.navigation_state_label ?? "Estado actual")}
-                style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, minHeight: 44, padding: t.spacing.sm, flexDirection: "row",
-                  alignItems: "center", justifyContent: "center", gap: t.spacing.xs }}>
-                <Icon name="chevron-up" size={18} />
-                <Text variant="small" style={{ flexShrink: 1 }}>{conversationView.presentation?.navigation_state_label ?? "Estado actual"}</Text>
-              </Pressable>
-            ) : null}
-            {renderItems.length > 0 && (!historyExpanded || scroll.destinations.latest || newMessageCount > 0) ? (
-              <Pressable accessibilityRole="button"
-                accessibilityLabel={`${newMessageCount > 0 ? `${newMessageCount} ${newMessageCount === 1 ? "mensaje nuevo" : "mensajes nuevos"}. ` : ""}Ir a los últimos mensajes`}
-                onPress={() => {
-                  scroll.scrollToBottom(true, conversationView.presentation?.navigation_latest_label ?? "Últimos mensajes");
-                  setNewMessageCount(0);
-                }}
-                style={{ flexGrow: 1, flexShrink: 1, minWidth: 0, minHeight: 44, padding: t.spacing.sm, flexDirection: "row",
-                  alignItems: "center", justifyContent: "center", gap: t.spacing.xs }}>
-                <Icon name="chevron-down" size={18} />
-                <Text variant="small" style={{ flexShrink: 1 }}>
-                  {historyExpanded
-                    ? conversationView.presentation?.navigation_latest_label ?? "Últimos mensajes"
-                    : conversationView.presentation?.navigation_expand_label ?? "Ver mensajes"}
-                  {newMessageCount > 0 ? ` · ${newMessageCount} ${newMessageCount === 1
-                    ? conversationView.presentation?.navigation_new_singular_label ?? "nuevo"
-                    : conversationView.presentation?.navigation_new_label ?? "nuevos"}` : ""}
-                </Text>
-              </Pressable>
-            ) : null}
+      {!cardExpansion.expanded && renderItems.length > 0 &&
+        (!historyExpanded || scroll.destinations.latest || newMessageCount > 0) ? (
+        <View style={{ position: "absolute", bottom: t.spacing.sm, right: t.spacing.md, zIndex: 4 }}>
+          <GlassSurface variant="control" style={{ borderRadius: t.glass.radius.chip }}>
+            <Pressable accessibilityRole="button"
+              accessibilityLabel={`${newMessageCount > 0 ? `${newMessageCount} ${newMessageCount === 1 ? "mensaje nuevo" : "mensajes nuevos"}. ` : ""}Ir a los últimos mensajes`}
+              onPress={() => {
+                scroll.scrollToBottom(true, conversationView.presentation?.navigation_latest_label ?? "Últimos mensajes");
+                setNewMessageCount(0);
+              }}
+              style={{ minWidth: 48, minHeight: 48, padding: t.spacing.sm, flexDirection: "row",
+                alignItems: "center", justifyContent: "center", gap: t.spacing.xs }}>
+              <Icon name="chevron-down" size={18} />
+              {newMessageCount > 0 ? <Text variant="small" style={{ flexShrink: 1 }}>
+                {`${newMessageCount} ${newMessageCount === 1
+                  ? conversationView.presentation?.navigation_new_singular_label ?? "nuevo"
+                  : conversationView.presentation?.navigation_new_label ?? "nuevos"}`}
+              </Text> : null}
+            </Pressable>
           </GlassSurface>
         </View>
       ) : null}

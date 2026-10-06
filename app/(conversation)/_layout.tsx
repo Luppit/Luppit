@@ -5,6 +5,7 @@ import {
 } from "@/src/components/conversation/useConversationActions";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import { useRatingReminder } from "@/src/components/conversation/useRatingReminder";
+import useConversationCardExpansion from "@/src/components/conversation/useConversationCardExpansion";
 import { useAndroidBackAction } from "@/src/utils/useAndroidBackAction";
 import { useFocusEffect } from "@react-navigation/native";
 import Button from "@/src/components/button/Button";
@@ -57,6 +58,7 @@ import {
   Platform,
   Pressable,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -76,6 +78,7 @@ type ConversationLayoutContextValue = {
   messageRefreshTick: number;
   optimisticMessages: ConversationMessage[];
   clearOptimisticMessages: (messageIds: string[]) => void;
+  cardExpansion: ReturnType<typeof useConversationCardExpansion>;
 };
 
 const ConversationLayoutContext = createContext<ConversationLayoutContextValue | null>(
@@ -137,6 +140,7 @@ function getRealtimeRefreshTargets(
 
 export default function ConversationLayout() {
   const t = useTheme();
+  const { fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useChatKeyboardVisible();
   const params = useGlobalSearchParams<{
@@ -416,6 +420,9 @@ export default function ConversationLayout() {
     showComposer && hasComposerDraft, isExecutingAction || pendingMessageCount > 0
   );
   useRatingReminder(conversationView, profileId, isExecutingAction, handleActionPress);
+  const cardExpansion = useConversationCardExpansion(
+    `${conversationId}:${profileId}`, isKeyboardVisible, isExecutingAction,
+  );
   const closeConversation = useCallback(async () => {
     if (isClosingRef.current) return;
     isClosingRef.current = true;
@@ -553,12 +560,16 @@ export default function ConversationLayout() {
     messageRefreshTick,
     optimisticMessages,
     clearOptimisticMessages,
+    cardExpansion,
   };
 
   return (
     <ConversationLayoutContext.Provider value={providerValue}>
       <ChatKeyboardAvoidingView
         style={{ flex: 1, backgroundColor: t.colors.background }}
+        onTouchStart={cardExpansion.collapse}
+        onPointerDown={cardExpansion.collapse}
+        {...(Platform.OS === "web" ? { onWheel: cardExpansion.collapse } : {})}
       >
         <View style={{ flex: 1 }}>
           <GlassSurface
@@ -613,7 +624,7 @@ export default function ConversationLayout() {
                   maxFontSizeMultiplier={2} accessibilityRole="header">
                   {title}
                 </Text>
-                {conversationView.presentation?.terms_version ? (
+                {conversationView.presentation?.terms_version && !(isKeyboardVisible && fontScale > 1.3) ? (
                   <Text variant="small" color="textMedium" align="center" maxFontSizeMultiplier={2}>
                     {conversationView.presentation.terms_version}
                   </Text>

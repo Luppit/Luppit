@@ -118,6 +118,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     react: h.react,
     "@/src/icons/lucide": { lucideIcons: { smartphone: true, send: true, ellipsis: true } },
     "@/src/services/popup.service": {
+      hasOpenPopup: () => popupState.config != null,
       openPopup: (popup: any) => { popups.push(popup); popupState = { config: popup, visible: true }; popupListeners.forEach((listener) => listener(popupState)); },
       closePopup: () => { calls.push("closePopup"); popupState = { config: null, visible: false }; popupListeners.forEach((listener) => listener(popupState)); },
       subscribePopup: (listener: Function) => { popupListeners.add(listener); listener(popupState); return () => popupListeners.delete(listener); },
@@ -171,11 +172,19 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
   }).default;
   const nativeComponent = (name: string) => ({ default: name, __esModule: true });
   const channel = { on: () => channel, subscribe: () => channel };
+  const cardExpansion = load("../src/components/conversation/useConversationCardExpansion.ts", {
+    ...modules,
+    "react-native": { Keyboard: { dismiss() {} }, AccessibilityInfo: {
+      isScreenReaderEnabled: async () => false, isReduceMotionEnabled: async () => true,
+      addEventListener: () => ({ remove() {} }), announceForAccessibility() {},
+    } },
+  });
   const conversation = load("../app/(conversation)/_layout.tsx", {
     ...modules,
     "@/src/lib/supabase/errors": { fromAppError: (type: string) => ({ type, message: "Error de red" }) },
     "@/src/components/conversation/useConversationActions": shared,
     "@/src/components/conversation/useRatingReminder": { useRatingReminder() {} },
+    "@/src/components/conversation/useConversationCardExpansion": cardExpansion,
     "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => async (navigate: Function) => navigate() },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
     "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
@@ -192,11 +201,14 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     "@/src/services/toast.service": { clearToastBottomInset() {}, setToastBottomInset() {} },
     "@/src/utils/conversationOfferPrice": { formatConversationOfferPrice: () => null },
     "expo-router": { ...modules["expo-router"], useGlobalSearchParams: () => ({ conversationId: "conversation-A" }), Redirect: "Redirect", Slot: "Slot" },
-    "react-native": { ...modules["react-native"], Platform: { OS: "ios" }, Keyboard: {}, Pressable: "Pressable", StyleSheet: { create: (styles: any) => styles } },
+    "react-native": { ...modules["react-native"], Platform: { OS: "ios" }, Keyboard: {}, Pressable: "Pressable",
+      useWindowDimensions: () => ({ width: 390, fontScale: 1 }), StyleSheet: { create: (styles: any) => styles } },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) },
   }).default;
+  const cardHooks = hooks();
   const stageCard = load("../src/components/conversation/ConversationStageCard.tsx", {
-    ...modules,
+    ...modules, react: cardHooks.react,
+    "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({ borderRadius: 28 }) },
     "./ConversationActionButtons": nativeComponent("ActionButtons"),
@@ -225,9 +237,9 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     draw: () => h.render(() => component(props)),
     drawConversation: () => h.render(() => conversation()),
     drawDetails: (view: any) => h.render(() => offerDetails({ view, profileId: "buyer-profile", disabled: false })),
-    drawCard: (tree: any) => stageCard({ view: tree.props.value.conversationView,
+    drawCard: (tree: any) => cardHooks.render(() => stageCard({ view: tree.props.value.conversationView,
       disabled: tree.props.value.isExecutingAction, loadingActionId: tree.props.value.executingActionId,
-      onPress: tree.props.value.handleActionPress }),
+      onPress: tree.props.value.handleActionPress })),
     hook: (overrides = {}) => { hookOptions = { ...hookOptions, ...overrides }; return h.render(() => shared.useConversationActions(hookOptions)); },
   };
 }
@@ -1055,6 +1067,9 @@ function historyFixture() {
     conversationId: "conversation-A", profileId: "buyer-profile", conversationView: viewResult().data,
     messageRefreshTick: 0, optimisticMessages: [], clearOptimisticMessages() {},
     handleActionPress() {}, isExecutingAction: false, executingActionId: null,
+    cardExpansion: { expanded: true, keyboardVisible: false, reduceMotion: true,
+      collapse: () => { context.cardExpansion.expanded = false; },
+      toggle: () => { context.cardExpansion.expanded = !context.cardExpansion.expanded; }, reset() {} },
   };
   const profile = { activeProfile: { role: "buyer" }, refreshUnreadNotificationCount() {} };
   const scrollHook = load("../src/components/conversation/useConversationScroll.ts", {
@@ -1063,10 +1078,10 @@ function historyFixture() {
   const component = load("../app/(conversation)/chat.tsx", {
     react: h.react,
     "react-native": { View: "View", Pressable: "Pressable", ScrollView: "ScrollView", Modal: "Modal",
-      Image: { prefetch: async () => {} }, useWindowDimensions: () => ({ width: 320 }) },
+      Image: { prefetch: async () => {} }, useWindowDimensions: () => ({ width: 320, fontScale: 1 }) },
     "@/src/components/conversation/useConversationScroll": scrollHook,
     "@/src/components/glass/GlassSurface": { default: "GlassSurface", __esModule: true },
-    "@/src/components/conversation/ConversationStageCard": { default: "StageCard", __esModule: true },
+    "@/src/components/conversation/ConversationFloatingCard": { default: "FloatingCard", __esModule: true },
     "@/src/components/conversation/ConversationOfferDetails": { default: "OfferDetails", __esModule: true },
     "@/src/components/button/Button": { default: "Button", __esModule: true },
     "@/src/components/Icon": { Icon: "Icon" },
@@ -1095,13 +1110,17 @@ const historyMessage = (id: string, overrides: any = {}) => ({ id, sender_profil
   message_kind: "TEXT", text: id, created_at: "2026-10-02T12:00:00Z", ...overrides });
 const historyText = (tree: any) => nodes(tree).flatMap((node) => node.props.children).filter((child) => typeof child === "string");
 
-test("current terms and stage precede dated history without an initial jump to the bottom", async () => {
+test("current terms and floating stage stay accessible above dated history without an initial jump to the bottom", async () => {
   const f = historyFixture(); f.draw();
   f.reads[0].resolve({ ok: true, data: [historyMessage("message-A")] }); await flush();
   const tree = f.draw();
   const types = nodes(tree).map((node) => node.type);
-  assert.ok(types.indexOf("OfferDetails") < types.indexOf("StageCard"));
-  assert.ok(types.indexOf("StageCard") < nodes(tree).findIndex((node) => node.props.children?.includes("message-A")));
+  assert.ok(types.indexOf("OfferDetails") < types.indexOf("FloatingCard"));
+  const card = nodes(tree).find((node) => node.type === "FloatingCard")!;
+  assert.equal(card.props.expanded, true);
+  card.props.onCompactLayout({ nativeEvent: { layout: { height: 100 } } });
+  const updated = f.draw();
+  assert.equal(nodes(updated).find((node) => node.type === "ScrollView")!.props.contentContainerStyle.paddingTop, 124);
   assert.ok(historyText(tree).includes("2 Oct, 2026"));
   nodes(tree).find((node) => node.type === "ScrollView")!.props.onContentSizeChange(320, 1800);
   assert.equal(f.scrolls.length, 0);
@@ -1111,6 +1130,7 @@ test("new messages preserve older reading position and the cue opens collapsed h
   const f = historyFixture(); f.draw();
   f.reads[0].resolve({ ok: true, data: [historyMessage("message-A")] }); await flush(); f.draw();
   const tree = f.draw();
+  nodes(tree).find((node) => node.type === "ScrollView")!.props.onScrollBeginDrag();
   nodes(tree).find((node) => node.props.accessibilityState?.expanded === true)!.props.onPress(); f.draw();
   f.update({ messageRefreshTick: 1 }); f.draw();
   f.reads[1].resolve({ ok: true, data: [historyMessage("message-A"), historyMessage("message-B")] }); await flush(); f.draw();
@@ -1144,7 +1164,7 @@ test("first optimistic send opens the history and saved grouped replacement does
 test("history errors preserve the stage card, allow retry and ignore stale responses after a profile change", async () => {
   const f = historyFixture(); f.draw(); f.reads[0].reject(new Error("offline")); await flush();
   let tree = f.draw();
-  assert.ok(nodes(tree).some((node) => node.type === "StageCard"));
+  assert.ok(nodes(tree).some((node) => node.type === "FloatingCard"));
   assert.ok(!nodes(tree).some((node) => node.type === "LoadingState"));
   nodes(tree).find((node) => node.type === "Button" && node.props.title === "Reintentar")!.props.onPress();
   f.update({ profileId: "other-profile" }); f.draw(); f.draw();

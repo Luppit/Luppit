@@ -60,6 +60,8 @@ El vidrio pertenece a `GlassSurface`, con materiales de `src/themes/glass.ts`: c
 
 Los accesos de Inicio, incluidas las calificaciones pendientes, reutilizan `HomeShortcut`: mismos márgenes, círculo de icono, texto de apoyo y chevron. Las compras por calificar reutilizan `MarketplaceCardFrame`, como las solicitudes y ofertas: título completo, contexto discreto, material `surface` y acción de ancho completo separada por un divisor.
 
+La conversación conserva el contenido de `ConversationStageCard` en una tarjeta expandida blanca y opaca, con sus acciones al final y en el orden del servidor. `ConversationFloatingCard` usa vidrio `chrome` en la versión compacta y un chevron independiente sin contador. La acción compacta prioriza el estilo positivo/primario del servidor, después una acción no destructiva; si no existe ninguna, muestra el estado pasivo. El contenedor flotante es transparente; el historial reserva esa altura compacta con padding y puede desplazarse detrás del vidrio. El acceso canónico a Resumen permanece bajo la cabecera y reutiliza su popup existente. La expansión es estado visual local; etiquetas, plazos, elegibilidad y acciones siguen siendo del servidor.
+
 ## Do's and Don'ts
 
 - Mantener etiquetas y elegibilidad de acciones en RPCs y metadatos del servidor.
