@@ -12,13 +12,15 @@ import {
 import { useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, View } from "react-native";
+import { AppState, View, useWindowDimensions } from "react-native";
 
 type Props = {
   conversationId: string;
   purchaseRequestId: string;
   purchaseOfferId: string;
   onRefresh: () => void;
+  onConnect?: () => void;
+  connectLabel?: string;
 };
 
 export default function SelectedOfferPickupAction({
@@ -26,8 +28,12 @@ export default function SelectedOfferPickupAction({
   purchaseRequestId,
   purchaseOfferId,
   onRefresh,
+  onConnect,
+  connectLabel = "Ver chat",
 }: Props) {
   const t = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const stackActions = width < 390 || fontScale >= 1.35;
   const [view, setView] = useState<ConversationView | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,9 +109,20 @@ export default function SelectedOfferPickupAction({
   const action = view?.actions.find((item) =>
     item.code === "BUYER_REQUEST_PICKUP_CODE" && item.ui_slot?.toUpperCase() === "TOP"
   );
+  const chatButton = onConnect ? (
+    <ConversationActionButtons
+      buttons={[{ id: "offer-chat", label: connectLabel, icon: "message-circle", tone: action ? "secondary" : "primary" }]}
+      onPress={onConnect}
+    />
+  ) : null;
 
   if (isLoading && !isExecutingAction) {
-    return <Text variant="small" color="textMedium">Cargando acciones…</Text>;
+    return (
+      <View style={{ gap: t.spacing.sm }}>
+        <Text variant="small" color="textMedium">Cargando acciones…</Text>
+        {chatButton}
+      </View>
+    );
   }
   if (loadFailed) {
     return (
@@ -114,20 +131,30 @@ export default function SelectedOfferPickupAction({
           No pudimos cargar las acciones de esta compra.
         </Text>
         <Button title="Reintentar" onPress={() => void loadView()} />
+        {chatButton}
       </View>
     );
   }
-  if (!action) return null;
+  if (!action) return chatButton;
 
   return (
-    <ConversationActionButtons
-      buttons={[toTopButtonConfig(action)]}
-      disabled={isLoading || isExecutingAction}
-      loadingButtonId={executingActionId}
-      onPress={() => {
-        if (loadingRef.current || isExecutingAction) return;
-        handleActionPress(action);
-      }}
-    />
+    <View style={{ flexDirection: stackActions ? "column" : "row", alignItems: "stretch", gap: t.spacing.sm }}>
+      <View style={stackActions ? undefined : { flex: 3, minWidth: 0 }}>
+        <ConversationActionButtons
+          buttons={[toTopButtonConfig(action)]}
+          disabled={isLoading || isExecutingAction}
+          loadingButtonId={executingActionId}
+          onPress={() => {
+            if (loadingRef.current || isExecutingAction) return;
+            handleActionPress(action);
+          }}
+        />
+      </View>
+      {chatButton ? (
+        <View style={stackActions ? undefined : { flex: 2, minWidth: 0 }}>
+          {chatButton}
+        </View>
+      ) : null}
+    </View>
   );
 }

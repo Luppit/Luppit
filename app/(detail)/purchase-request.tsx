@@ -699,6 +699,8 @@ export default function PurchaseRequestDetailScreen() {
                         purchaseRequestId={purchaseRequestId}
                         purchaseOfferId={offer.id}
                         onRefresh={refreshTimeline}
+                        onConnect={() => void openOfferConversation(offer.id)}
+                        connectLabel="Ver chat"
                       />
                     ) : undefined
                   }

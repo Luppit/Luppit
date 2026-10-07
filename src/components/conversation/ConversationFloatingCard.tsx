@@ -64,8 +64,8 @@ export default function ConversationFloatingCard({
           top: !expanded && fontScale > 1.3 ? undefined : t.spacing.sm + t.spacing.xs,
           bottom: !expanded && fontScale > 1.3 ? t.spacing.sm + t.spacing.xs : undefined,
           width: 48, height: 48, alignItems: "center", justifyContent: "center",
-          borderRadius: t.borders.md, borderWidth: expanded ? 0 : 1, borderColor: t.glass.headerControl.borderColor,
-          backgroundColor: expanded ? "transparent" : t.glass.headerControl.backgroundColor,
+          borderRadius: t.borders.md, borderWidth: expanded ? 0 : 1, borderColor: t.colors.border,
+          backgroundColor: expanded ? "transparent" : t.colors.backgroudWhite,
           opacity: disabled ? 0.55 : pressed ? 0.72 : 1 })}>
         <Icon name={expanded ? "chevron-up" : "chevron-down"} size={expanded ? 18 : 22} />
       </Pressable> : null}

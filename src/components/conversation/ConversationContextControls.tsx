@@ -1,6 +1,6 @@
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import { Text } from "@/src/components/Text";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { useTheme } from "@/src/themes";
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -26,7 +26,8 @@ export default function ConversationContextControls({ price, primary, secondary 
   const t = useTheme();
   const { width, fontScale } = useWindowDimensions();
   const stack = fontScale > 1.3 || width < 360 || (price?.length ?? 0) > 12;
-  const pillStyle = { borderRadius: t.glass.radius.chip };
+  const pillStyle = { ...createRoundedSurfaceStyle(t), borderRadius: t.glass.radius.chip,
+    borderCurve: "continuous" as const, borderWidth: 1, borderColor: t.colors.border };
   const controlPadding = {
     paddingHorizontal: t.spacing.md,
     paddingVertical: t.spacing.sm,
@@ -35,11 +36,9 @@ export default function ConversationContextControls({ price, primary, secondary 
   return (
     <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: t.spacing.sm }}>
       {primary ? (
-        <GlassSurface
-          variant="control"
-          style={[pillStyle, { flexGrow: secondary ? 1 : 0, flexBasis: stack ? "100%" : secondary ? 0 : "auto" }]}
-          clipStyle={pillStyle}
-          contentStyle={{ flexDirection: "row", alignItems: "center" }}
+        <View
+          style={[pillStyle, { flexGrow: secondary ? 1 : 0, flexBasis: stack ? "100%" : secondary ? 0 : "auto",
+            flexDirection: "row", alignItems: "center" }]}
         >
           {price ? (
             <>
@@ -61,10 +60,10 @@ export default function ConversationContextControls({ price, primary, secondary 
             <Text variant="body" style={{ opacity: primary.busy ? 0 : 1 }}>{primary.label}</Text>
             {primary.busy ? <ActivityIndicator size="small" color={t.colors.textDark} style={{ position: "absolute", alignSelf: "center" }} /> : null}
           </Pressable>
-        </GlassSurface>
+        </View>
       ) : null}
       {secondary ? (
-        <GlassSurface variant="control" style={pillStyle} clipStyle={pillStyle}>
+        <View style={pillStyle}>
           <Pressable
             ref={secondary.triggerRef}
             onPress={secondary.onPress}
@@ -77,7 +76,7 @@ export default function ConversationContextControls({ price, primary, secondary 
             <Text variant="body">{secondary.label}</Text>
             {secondary.icon ? <Icon name={secondary.icon} size={18} /> : null}
           </Pressable>
-        </GlassSurface>
+        </View>
       ) : null}
     </View>
   );

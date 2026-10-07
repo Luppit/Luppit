@@ -1,7 +1,7 @@
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Icon } from "@/src/components/Icon";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
+import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import {
   getCurrentConversationOfferSummary,
   type ConversationView,
@@ -123,10 +123,11 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
   if (!showTerms) return null;
 
   const stack = price != null && (fontScale > 1.3 || width < 360 || price.length > 12);
-  const pillStyle = { borderRadius: t.glass.radius.chip };
+  const pillStyle = { ...createRoundedSurfaceStyle(t), borderRadius: t.glass.radius.chip,
+    borderCurve: "continuous" as const, borderWidth: 1, borderColor: t.colors.border };
   return (
     <View style={{ alignItems: "flex-start" }}>
-      <GlassSurface variant="control" style={[pillStyle, { maxWidth: "100%", width: "100%" }]} clipStyle={pillStyle}>
+      <View style={[pillStyle, { maxWidth: "100%", width: "100%" }]}>
         <Pressable
           onPress={openSummary}
           disabled={disabled || loadingSummary}
@@ -162,7 +163,7 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
           </View>
           {!stack ? <Icon name="chevron-right" size={18} color={t.colors.textDark} /> : null}
         </Pressable>
-      </GlassSurface>
+      </View>
     </View>
   );
 }

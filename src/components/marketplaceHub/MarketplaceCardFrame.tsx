@@ -12,6 +12,7 @@ type MarketplaceCardFrameProps = {
   title: string;
   subtitle?: string | null;
   headerMeta?: ReactNode;
+  headerDetails?: ReactNode;
   headerRight?: ReactNode;
   body?: ReactNode;
   footerLeft?: ReactNode;
@@ -31,6 +32,7 @@ export default function MarketplaceCardFrame({
   title,
   subtitle,
   headerMeta,
+  headerDetails,
   headerRight,
   body,
   footerLeft,
@@ -70,6 +72,7 @@ export default function MarketplaceCardFrame({
               {subtitle}
             </Text>
           ) : null}
+          {headerDetails}
         </View>
 
         {headerRight}

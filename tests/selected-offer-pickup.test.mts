@@ -159,7 +159,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
       focus(); return () => blur?.();
     }, [cb]) },
     "@/src/themes": { useTheme: () => theme },
-    "react-native": { View: "View", AppState: { currentState: "active", addEventListener: (_: string, cb: Function) => {
+    "react-native": { View: "View", useWindowDimensions: () => ({ width: 390, fontScale: 1 }), AppState: { currentState: "active", addEventListener: (_: string, cb: Function) => {
       onAppState = cb; return { remove() { onAppState = undefined; } };
     } } },
     "@/src/components/Text": { Text: "Text" },
@@ -220,7 +220,7 @@ function fixture(draftMode: "create" | "batch" | null = null, activeOffers: any[
     ...modules,
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({ activeProfile: { profile: { id: "buyer-profile" } } }) },
-    "@/src/components/glass/GlassSurface": nativeComponent("GlassSurface"),
+    "@/src/components/surface/styles": { createRoundedSurfaceStyle: () => ({ borderRadius: 28 }) },
     "@/src/utils/conversationOfferPrice": { formatConversationOfferTotal: () => "₡160.000" },
     "@/src/utils/conversationOfferSummary": { buildConversationOfferSummary: () => ({ rows: [] }) },
     "react-native": { ...modules["react-native"], Keyboard: { dismiss() {} }, Pressable: "Pressable", StyleSheet: { hairlineWidth: 1 },
@@ -336,6 +336,45 @@ test("allowed pickup appears from DB metadata without generating anything on mou
   assert.equal(confirm(f).icon, "send");
   assert.equal(confirm(f).backgroundColorKey, "primary");
   assert.equal(confirm(f).textColorKey, "backgroudWhite");
+});
+
+test("selected offer chat remains available while loading and beside the configured pickup action", async () => {
+  const f = fixture();
+  Object.assign(f.props, { onConnect: () => f.calls.push("openChat"), connectLabel: "Ver chat" });
+  const chat = (tree: any) => nodes(tree).find((node) =>
+    node.type === "ActionButtons" && node.props.buttons[0].id === "offer-chat"
+  )!;
+  chat(f.draw()).props.onPress();
+  assert.equal(f.calls.includes("openChat"), true);
+  assert.equal(executions(f).length, 0);
+  assert.equal(f.popups.length, 0);
+  f.reads[0].resolve(viewResult()); await flush();
+  const tree = f.draw();
+  assert.equal(chat(tree).props.buttons[0].label, "Ver chat");
+  assert.equal(chat(tree).props.buttons[0].tone, "secondary");
+  chat(tree).props.onPress();
+  assert.equal(f.popups.length, 0);
+  buttons(tree)!.props.onPress();
+  assert.equal(f.popups[0].title, "Confirmación desde DB");
+  assert.equal(executions(f).length, 0);
+});
+
+test("selected offer chat survives missing pickup eligibility and action-load failure", async () => {
+  for (const result of [viewResult({ actions: [] }), { ok: false, error: { type: "network" } }]) {
+    const f = fixture();
+    Object.assign(f.props, { onConnect: () => f.calls.push("openChat") });
+    f.draw(); f.reads[0].resolve(result); await flush();
+    const tree = f.draw();
+    const actions = nodes(tree).filter((node) => node.type === "ActionButtons");
+    assert.equal(actions.length, 1);
+    assert.equal(actions[0].props.buttons[0].id, "offer-chat");
+    assert.equal(actions[0].props.buttons[0].tone, "primary");
+    actions[0].props.onPress();
+    assert.equal(f.calls.includes("openChat"), true);
+    assert.equal(f.popups.length, 0);
+    assert.equal(executions(f).length, 0);
+    if (!result.ok) assert.ok(nodes(tree).some((node) => node.type === "Button" && node.props.title === "Reintentar"));
+  }
 });
 
 test("does not invent eligibility for shipping, pending, canceled, completed or restricted views", async () => {

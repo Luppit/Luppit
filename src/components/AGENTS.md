@@ -22,7 +22,7 @@ Applies to shared React Native UI components and app screens that consume shared
 - Use app spacing tokens (`t.spacing.*`) rather than raw spacing values unless matching an existing local pattern.
 
 ## Conversation Context Controls
-- The seller offer-edit assistant uses `conversation/ConversationContextControls.tsx` for its two compact context controls. Preserve its glass surfaces, spacing, price divider, loading state, and narrow-screen wrapping. The purchase conversation uses the separate stage-card and offer-details presentation.
+- The seller offer-edit assistant uses `conversation/ConversationContextControls.tsx` for its two compact context controls. Keep these controls solid white, matching the purchase conversation's compact stage card and offer-details control. Preserve spacing, price divider, loading state, and narrow-screen wrapping. The purchase conversation uses the separate stage-card and offer-details presentation.
 - In the edit assistant, keep `Oferta` and `Solicitud` above the transcript. Their read-only summaries use the shared popup; offer context reflects the saved private draft and never substitutes for the explicit review/publish flow. Close owned context popups when the source changes or the screen loses focus.
 
 ## Keyboard Handling

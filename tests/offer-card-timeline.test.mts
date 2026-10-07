@@ -21,14 +21,14 @@ const history = [
 function nodes(value: any): Element[] {
   if (Array.isArray(value)) return value.flatMap(nodes);
   if (!value?.props) return [];
-  return [value, ...nodes(value.props.children), ...nodes(value.props.body), ...nodes(value.props.footerLeft), ...nodes(value.props.headerRight)];
+  return [value, ...nodes(value.props.children), ...nodes(value.props.body), ...nodes(value.props.footerLeft), ...nodes(value.props.headerRight), ...nodes(value.props.headerDetails)];
 }
 
 function visibleText(value: any): string[] {
   if (Array.isArray(value)) return value.flatMap(visibleText);
   if (typeof value === "string") return [value];
   if (!value?.props) return [];
-  return [value.props.children, value.props.body, value.props.footerLeft, value.props.headerRight].flatMap(visibleText);
+  return [value.props.children, value.props.body, value.props.footerLeft, value.props.headerRight, value.props.headerDetails].flatMap(visibleText);
 }
 
 function fixture() {
@@ -53,7 +53,7 @@ function fixture() {
   runInNewContext(ts.transpileModule(pricingSource, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: pricingExports });
   const modules: Record<string, any> = {
     react,
-    "react-native": { View: "View", Pressable: "Pressable", StyleSheet: { create: (styles: object) => styles, hairlineWidth: 0.5 } },
+    "react-native": { View: "View", Pressable: "Pressable", useWindowDimensions: () => ({ width: 390, fontScale: 1 }), StyleSheet: { create: (styles: object) => styles, hairlineWidth: 0.5 } },
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/Text": { Text: "Text" },
     "@/src/components/button/Button": { default: "Button", __esModule: true },

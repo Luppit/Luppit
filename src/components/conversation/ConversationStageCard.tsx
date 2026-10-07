@@ -1,5 +1,4 @@
 import { Icon } from "@/src/components/Icon";
-import GlassSurface from "@/src/components/glass/GlassSurface";
 import { Text } from "@/src/components/Text";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import type {
@@ -94,9 +93,9 @@ export default function ConversationStageCard({
         maxFontSizeMultiplier={2}>{hint}</Text>
     ) : null;
     return (
-      <GlassSurface variant="chrome" style={{ borderRadius: t.glass.radius.surface }}
-        clipStyle={{ borderRadius: t.glass.radius.surface }}
-        contentStyle={{ padding: t.spacing.sm + t.spacing.xs, gap: t.spacing.sm }}>
+      <View style={{ ...createRoundedSurfaceStyle(t), borderRadius: t.glass.radius.surface,
+        borderCurve: "continuous", borderWidth: 1, borderColor: t.colors.border,
+        padding: t.spacing.sm + t.spacing.xs, gap: t.spacing.sm }}>
         <View onLayout={(event) => setCompactActionHeight(event.nativeEvent.layout.height)}
           style={{ flexDirection: fontScale > 1.3 ? "column" : "row", gap: t.spacing.sm }}>
           <View style={{ flex: fontScale > 1.3 ? undefined : 1, minWidth: 0 }}>
@@ -125,7 +124,7 @@ export default function ConversationStageCard({
             ) : hintContent}
           </View>
         ) : null}
-      </GlassSurface>
+      </View>
     );
   }
 

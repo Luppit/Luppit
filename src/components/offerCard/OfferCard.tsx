@@ -8,7 +8,7 @@ import { PurchaseOfferCardData } from "@/src/services/purchase.offer.service";
 import { Theme, useTheme } from "@/src/themes";
 import { formatConversationOfferPrice, formatConversationOfferTotal, formatOfferAmount } from "@/src/utils/conversationOfferPrice";
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 
 export type OfferCardTimelineItem = {
   code: string;
@@ -72,6 +72,8 @@ export default function OfferCard({
 }: OfferCardProps) {
   const t = useTheme();
   const s = useMemo(() => createOfferCardStyles(t), [t]);
+  const { width, fontScale } = useWindowDimensions();
+  const stackPrice = width < 390 || fontScale >= 1.2;
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const businessName = offer.business_name?.trim() || "Negocio";
   const province = offer.business_province?.trim();
@@ -177,6 +179,15 @@ export default function OfferCard({
       title={businessName}
       subtitle={province}
       fullText
+      prominentTitle
+      headerDetails={rating != null ? (
+        <View style={s.ratingRow}>
+          <Icon name="star" size={18} color={t.colors.accentYellow} />
+          <Text variant="body">
+            {rating.toFixed(1)}{numRatings != null ? ` (${numRatings})` : ""}
+          </Text>
+        </View>
+      ) : null}
       headerRight={onMenuPress ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Más opciones de la oferta"
           onPress={onMenuPress} style={s.menuButton}>
@@ -187,43 +198,49 @@ export default function OfferCard({
       accessibilityLabel={`Oferta de ${businessName} por ${formattedPrice}`}
       body={
         <View style={s.body}>
-          {description ? (
-            <Text variant="body" color="textMedium">{description}</Text>
-          ) : null}
-          <View style={s.pricing}>
-            {productTotal ? (
-              <>
-                {unitPrice ? (
-                  <View style={s.priceRow}>
-                    <Text variant="small" color="textMedium" style={s.priceLabel}>
-                      {offer.quantity_offered != null
-                        ? `${offer.quantity_offered} ${offer.offer_unit_label ?? (offer.quantity_offered === 1 ? "unidad" : "unidades")}`
-                        : "Precio por unidad"}
-                    </Text>
-                    <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice}{offer.offer_unit_label ? ` / ${offer.offer_unit_label}` : " c/u"}</Text>
-                  </View>
+          <View style={s.quoteSection}>
+            <View style={[
+              s.pricing,
+              !hasTimelineSection && !stackPrice ? s.comparisonPricing : null,
+            ]}>
+              <View style={s.totalColumn}>
+                {productTotal && hasTimelineSection ? (
+                  <Text variant="small" color="textMedium">
+                    {offer.pricing_version === 2 ? "Subtotal de la oferta" : "Total de productos"}
+                  </Text>
                 ) : null}
-                <View style={s.priceRow}>
-                  <Text variant="small" color="textMedium" style={s.priceLabel}>{offer.pricing_version === 2 ? "Subtotal de la oferta" : "Total de productos"}</Text>
-                  <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
-                </View>
-              </>
-            ) : (
-              <Text variant="body" style={s.price}>{formattedPrice}</Text>
-            )}
-            {rating != null ? (
-              <View style={s.ratingRow}>
-                <Icon name="star" size={16} color={t.colors.accentYellow} />
-                <Text variant="small">
-                  {rating.toFixed(1)}{numRatings != null ? ` (${numRatings})` : ""}
+                <Text variant={productTotal ? "price" : "subtitle"} style={s.price}>
+                  {productTotal ?? formattedPrice}
                 </Text>
+                {productTotal && !hasTimelineSection ? (
+                  <Text variant="small" color="textMedium">
+                    {offer.pricing_version === 2 ? "Subtotal de la oferta" : "Total de productos"}
+                  </Text>
+                ) : null}
               </View>
+              {productTotal && unitPrice ? (
+                <View style={[
+                  s.unitPricing,
+                  hasTimelineSection || stackPrice ? s.priceRow : s.unitColumn,
+                ]}>
+                  <Text variant="small" color="textMedium" style={s.priceLabel}>
+                    {offer.quantity_offered != null
+                      ? `${offer.quantity_offered} ${offer.offer_unit_label ?? (offer.quantity_offered === 1 ? "unidad" : "unidades")}`
+                      : "Precio por unidad"}
+                  </Text>
+                  <Text variant="small" color="textMedium" style={s.unitPrice}>
+                    {unitPrice}{offer.offer_unit_label ? ` / ${offer.offer_unit_label}` : " c/u"}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {description ? (
+              <Text variant="body" color="textMedium">{description}</Text>
             ) : null}
           </View>
 
           {hasTimelineSection ? (
             <View style={s.timelineSection}>
-              {timelineActions}
               {(timelineLoading || timelineError || summaryItems.length === 0) && methodLabel ? (
                 <LuppitChip
                   label={methodLabel}
@@ -278,7 +295,9 @@ export default function OfferCard({
         <View style={s.footerContent}>
           <View style={s.footer}>
             <View style={s.connectButtonSlot}>
-              <Button title={connectLabel} icon="message-circle" onPress={onConnect} />
+              {timelineActions ?? (
+                <Button title={connectLabel} icon="message-circle" onPress={onConnect} />
+              )}
             </View>
           </View>
           {showHistory ? (
@@ -323,13 +342,38 @@ function createOfferCardStyles(t: Theme) {
     pricing: {
       gap: t.spacing.sm,
     },
+    quoteSection: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.colors.border,
+      paddingTop: t.spacing.md,
+      gap: t.spacing.md,
+    },
+    comparisonPricing: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: t.spacing.md,
+    },
+    totalColumn: {
+      flexGrow: 1,
+      flexShrink: 1,
+      minWidth: 0,
+      gap: t.spacing.xs,
+    },
+    unitPricing: {
+      gap: t.spacing.sm,
+    },
+    unitColumn: {
+      flexGrow: 1,
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: t.colors.border,
+      paddingLeft: t.spacing.md,
+      maxWidth: "40%",
+    },
     priceLabel: {
       flexShrink: 1,
     },
-    priceValue: {
+    unitPrice: {
       flexShrink: 1,
-      textAlign: "right",
-      marginLeft: "auto",
     },
     priceRow: {
       flexWrap: "wrap",
@@ -339,8 +383,7 @@ function createOfferCardStyles(t: Theme) {
       gap: t.spacing.md,
     },
     price: {
-      color: t.colors.primary,
-      fontFamily: t.typography.subtitle.fontFamily,
+      color: t.colors.textDark,
     },
     ratingRow: {
       flexDirection: "row",
@@ -458,13 +501,10 @@ function createOfferCardStyles(t: Theme) {
     historyHeading: {
       flex: 1,
       minWidth: 0,
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "center",
-      gap: t.spacing.sm,
+      alignItems: "flex-start",
+      gap: t.spacing.xs,
     },
     historyTitle: {
-      flexGrow: 1,
       maxWidth: "100%",
     },
     footer: {
