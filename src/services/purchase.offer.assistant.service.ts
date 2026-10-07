@@ -2,6 +2,7 @@ import { normalizeOfferComponents, type OfferPricingComponent } from "../utils/c
 import type { ChatImage } from "../components/inputChat/inputChat";
 import { getSession } from "../lib/supabase";
 import { AppError, fromAppError } from "../lib/supabase/errors";
+import { requireCurrentSellerBusinessSetup } from "./seller.business.setup.service";
 import {
   getCurrentProfile,
   registerProfileScopedAbortController,
@@ -506,6 +507,31 @@ export async function callSellerOfferAssistant(
       ok: false,
       error: fromAppError("auth"),
       statusCode: 401,
+      requestId: null,
+      retryAfterSeconds: null,
+      backendMessage: null,
+    };
+  }
+
+  if (input.mode !== "edit" && input.uiAction !== "DISCARD") {
+    const setup = await requireCurrentSellerBusinessSetup();
+    if (!setup.ok) {
+      return {
+        ok: false,
+        error: setup.error,
+        statusCode: 403,
+        requestId: null,
+        retryAfterSeconds: null,
+        backendMessage: setup.error.message,
+      };
+    }
+  }
+
+  if (input.signal?.aborted || getCurrentProfile()?.id !== activeProfile.id) {
+    return {
+      ok: false,
+      error: { type: "unknown", code: PROFILE_SCOPED_REQUEST_ABORTED, message: "Solicitud cancelada." },
+      statusCode: null,
       requestId: null,
       retryAfterSeconds: null,
       backendMessage: null,

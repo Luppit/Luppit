@@ -290,6 +290,7 @@ export type Database = {
       }
       business: {
         Row: {
+          commercial_name_confirmed_at: string | null
           created_at: string
           id: string
           id_document: string | null
@@ -300,6 +301,7 @@ export type Database = {
           privacy_purge_after: string | null
         }
         Insert: {
+          commercial_name_confirmed_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
@@ -310,6 +312,7 @@ export type Database = {
           privacy_purge_after?: string | null
         }
         Update: {
+          commercial_name_confirmed_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
@@ -5212,6 +5215,10 @@ export type Database = {
       }
       get_current_safety_blocks: {
         Args: { p_profile_id: string }
+        Returns: Json
+      }
+      get_current_seller_business_setup: {
+        Args: { p_notifications_enabled?: boolean; p_profile_id: string }
         Returns: Json
       }
       get_current_seller_purchase_offers: {

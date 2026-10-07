@@ -402,6 +402,10 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "auth",
     message: "Este perfil vendedor ya no tiene acceso a un negocio.",
   },
+  seller_business_setup_required: {
+    type: "validation",
+    message: "Completa la configuración del negocio en Solicitudes para hacer ofertas.",
+  },
   notification_input_required: {
     type: "validation",
     message: "No pudimos identificar la notificación.",

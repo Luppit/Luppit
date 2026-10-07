@@ -160,6 +160,8 @@ export function GroupedListRow({
 
   return (
     <View
+      accessible={Boolean(accessibilityLabel)}
+      accessibilityLabel={accessibilityLabel}
       style={[
         s.row,
         labelMaxLines !== 1 ? s.rowWithWrappedLabel : null,

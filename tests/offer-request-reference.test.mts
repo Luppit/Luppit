@@ -20,6 +20,9 @@ function load(path: string, modules: Record<string, unknown>, expose = "") {
   const exports: Record<string, any> = {};
   runInNewContext(outputText, { exports, AbortController, console, setTimeout,
     require(name: string) {
+      if (name === "./seller.business.setup.service" && !(name in modules)) {
+        return { requireCurrentSellerBusinessSetup: async () => ({ ok: true }) };
+      }
       if (name === "../utils/conversationOfferPrice" || name === "@/src/utils/conversationOfferPrice") return offerPricing;
       assert.ok(name in modules, `Unmocked import: ${name}`);
       return modules[name];
@@ -253,6 +256,40 @@ test("seller summary control serializes the user's acknowledgement with its exis
     client_request_id: identity.clientRequestId, idempotency_key: identity.idempotencyKey, active_profile_id: "seller",
     mode: "create", expected_draft_version: null, expected_offer_revision: null,
   });
+});
+
+test("new and batch offer requests stop before the assistant when setup is incomplete", async () => {
+  const error = { type: "validation", code: "seller_business_setup_required", message: "Completa la configuración" };
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": { getSession: async () => ({ access_token: "test-session" }) },
+    "../lib/supabase/errors": {},
+    "./active.profile.service": { getCurrentProfile: () => ({ id: "seller" }) },
+    "./seller.business.setup.service": { requireCurrentSellerBusinessSetup: async () => ({ ok: false, error }) },
+  });
+  for (const mode of ["create", "batch"]) {
+    const result = await service.callSellerOfferAssistant({ mode, conversationId: "conversation", prompt: "Oferta" });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, error.code);
+    assert.equal(result.statusCode, 403);
+  }
+});
+
+test("switching profiles while checking seller setup cancels the assistant request", async () => {
+  const readiness = deferred();
+  let active = { id: "seller-a" };
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": { getSession: async () => ({ access_token: "test-session" }) },
+    "../lib/supabase/errors": {},
+    "./active.profile.service": { getCurrentProfile: () => active },
+    "./seller.business.setup.service": { requireCurrentSellerBusinessSetup: () => readiness.promise },
+  });
+  const pending = service.callSellerOfferAssistant({ conversationId: "conversation", prompt: "Oferta" });
+  await flush();
+  active = { id: "seller-b" };
+  readiness.resolve({ ok: true });
+  const result = await pending;
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "PROFILE_SCOPED_REQUEST_ABORTED");
 });
 
 test("batch publication sends selected option IDs and parses independent reviews", () => {

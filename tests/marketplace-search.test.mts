@@ -72,6 +72,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   const routes: any[] = [];
   let popup: any;
   let segment = "todas";
+  let sellerSetup: any = { ok: true, data: { isComplete: true } };
   let segmentListener = (_value: string) => {};
   const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters) };
   const request = (...args: any[]) => { const response = deferred(); calls.push({ args, response }); return response.promise; };
@@ -82,6 +83,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
       ...Object.fromEntries(["Image", "Pressable", "ScrollView", "View", "FlatList", "ActivityIndicator"].map((name) => [name, name])),
       StyleSheet: { create: (styles: any) => styles }, Platform: { OS: "ios" },
       AccessibilityInfo: { announceForAccessibility() {} },
+      AppState: { addEventListener: () => ({ remove() {} }) },
     },
     "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 }, borders: { md: 20 }, colors: {}, glass: { radius: { chrome: 28 } }, typography: { subtitle: { lineHeight: 24 }, small: { lineHeight: 18 } } }) },
     "@react-navigation/native": { useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]) },
@@ -101,6 +103,9 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     "@/src/services/buyer.home.filters.service": buyerFilters,
     "@/src/services/seller.home.filters.service": sellerFilters,
     "@/src/services/conversation.service": {},
+    "@/src/services/seller.business.setup.service": {
+      getCurrentSellerBusinessSetup: async () => sellerSetup,
+    },
     "@/src/services/profile.service": {
       getCurrentProfileEmailSetupStatus: async () => ({ ok: true, data: { isComplete: true } }),
       getCurrentSellerBusinessCategorySetupStatus: async () => ({ ok: true, data: { isComplete: true } }),
@@ -123,6 +128,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   for (const [path, name] of Object.entries({
     "button/Button": "Button", "chip/LuppitChip": "LuppitChip", "loading/LoadingState": "LoadingState",
     "marketplaceHub/HomeShortcut": "HomeShortcut",
+    "marketplaceHub/SellerBusinessSetupChecklist": "SellerBusinessSetupChecklist",
     "marketplaceHub/MarketplaceRequestCard": "MarketplaceRequestCard", "role/RoleGate": "RoleGate",
     "glass/GlassSurface": "GlassSurface", "standaloneList/StandaloneListEmptyState": "StandaloneListEmptyState",
   })) modules[`@/src/components/${path}`] = name;
@@ -137,6 +143,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   return {
     ...runtime, calls, routes, params, modules, exports, filterService, emptyFilters,
     getPopup: () => popup,
+    setSetup(value: any) { sellerSetup = value; },
     screen: () => runtime.render(component),
     setFilters(filters: any) { (role === "buyer" ? buyerFilters.setBuyerHomeFilters : sellerFilters.setSellerHomeFilters)(filters); },
     setSegment(value: string) { segment = value; segmentListener(value); },
@@ -155,6 +162,23 @@ function hub(selected: string, counts: Record<string, number>, items: any[] = []
 }
 function item(id: string, category_id = "furniture") { return { id, purchase_request_id: id, category_id, title: `Silla ${id}` }; }
 function resolve(call: { response: ReturnType<typeof deferred> }, data: any) { call.response.resolve({ ok: true, data }); }
+
+test("seller setup blocks discovery until all requirements are complete, including load failure", async (t) => {
+  const f = fixture("seller"); t.after(f.cleanup);
+  f.setSetup({ ok: true, data: { isComplete: false, completedCount: 2, totalCount: 6 } });
+  f.screen(); await flush();
+  const pending = f.screen();
+  assert.equal(pending.props.sellerSetup.completedCount, 2);
+  assert.equal(f.calls.length, 0);
+  const view = fixture("seller"); t.after(view.cleanup);
+  const rendered = view.render(view.exports.MarketplaceHomeContent, pending.props);
+  assert.equal(rendered.type, "SellerBusinessSetupChecklist");
+  f.setSetup({ ok: false, error: { message: "offline" } });
+  pending.props.onRetry(); await flush();
+  const failed = f.screen();
+  assert.equal(failed.props.sellerSetup, null);
+  assert.equal(f.calls.length, 0);
+});
 
 for (const role of ["buyer", "seller"] as const) {
   test(`${role}: new queries reveal matching stages, preserve explicit selection, and clear safely`, async (t) => {

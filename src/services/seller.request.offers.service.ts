@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getCurrentProfileResult } from "./active.profile.service";
 import { parseConversationViewAction, type ConversationViewAction } from "./conversation.service";
+import { requireCurrentSellerBusinessSetup } from "./seller.business.setup.service";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: AppError };
 
@@ -96,6 +97,11 @@ export async function getOrCreateCurrentSellerOfferSeedConversation(
   if (!purchaseRequestId) return { ok: false, error: fromAppError("validation") };
   const profile = await currentSellerProfileId();
   if (!profile.ok) return profile;
+  const setup = await requireCurrentSellerBusinessSetup();
+  if (!setup.ok) return setup;
+  const currentProfile = await currentSellerProfileId();
+  if (!currentProfile.ok) return currentProfile;
+  if (currentProfile.data !== profile.data) return { ok: false, error: fromAppError("auth") };
   const result = await supabase.rpc(
     RPC_FUNCTIONS.GET_OR_CREATE_SELLER_OFFER_SEED_CONVERSATION,
     { p_purchase_request_id: purchaseRequestId, p_profile_id: profile.data }

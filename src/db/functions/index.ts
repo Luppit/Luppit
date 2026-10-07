@@ -52,6 +52,7 @@ export const RPC_FUNCTIONS = {
     "get_current_legal_acceptance_state",
   GET_CURRENT_SAFETY_BLOCKS: "get_current_safety_blocks",
   GET_CURRENT_SELLER_PURCHASE_OFFERS: "get_current_seller_purchase_offers",
+  GET_CURRENT_SELLER_BUSINESS_SETUP: "get_current_seller_business_setup",
   GET_CURRENT_USER_BUSINESS_INVITATIONS:
     "get_current_user_business_invitations",
   GET_CURRENT_USER_PROFILES: "get_current_user_profiles",

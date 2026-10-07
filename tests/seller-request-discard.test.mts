@@ -199,6 +199,7 @@ function serviceFixture() {
     "../lib/supabase/errors": { fromAppError: (code: string) => ({ code }), fromSupabaseError: (error: any) => error },
     "./active.profile.service": { getCurrentProfileResult: async () => profile },
     "./conversation.service": { parseConversationViewAction: (value: any) => value },
+    "./seller.business.setup.service": { requireCurrentSellerBusinessSetup: async () => ({ ok: true }) },
   };
   const source = readFileSync(new URL("../src/services/seller.request.offers.service.ts", import.meta.url).pathname, "utf8");
   const exports: any = {};

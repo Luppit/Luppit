@@ -5,6 +5,7 @@ export const TB_BUSINESS = "business" as const satisfies TableName;
 export const COL_BUSINESS = {
   id: "id",
   created_at: "created_at",
+  commercial_name_confirmed_at: "commercial_name_confirmed_at",
   name: "name",
   id_document: "id_document",
   legal_name: "legal_name",

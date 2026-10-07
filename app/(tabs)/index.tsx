@@ -4,13 +4,13 @@ import PendingRatingsEntry from "@/src/components/conversation/PendingRatingsEnt
 import { BundledSvg } from "@/src/components/BundledSvg";
 import LuppitChip from "@/src/components/chip/LuppitChip";
 import LoadingState from "@/src/components/loading/LoadingState";
+import SellerBusinessSetupChecklist from "@/src/components/marketplaceHub/SellerBusinessSetupChecklist";
 import HomeShortcut from "@/src/components/marketplaceHub/HomeShortcut";
 import MarketplaceRequestCard from "@/src/components/marketplaceHub/MarketplaceRequestCard";
 import { openPurchaseRequestCardMenu } from "@/src/components/marketplaceHub/openPurchaseRequestCardMenu";
 import { openSellerRequest } from "@/src/components/marketplaceHub/openSellerRequest";
 import usePurchaseRequestFavorites from "@/src/components/marketplaceHub/usePurchaseRequestFavorites";
 import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
-import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import RoleGate from "@/src/components/role/RoleGate";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
@@ -21,7 +21,6 @@ import {
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
 import {
-  getCurrentSellerBusinessCategorySetupStatus,
   getCurrentProfileEmailSetupStatus,
 } from "@/src/services/profile.service";
 import {
@@ -33,6 +32,7 @@ import {
   MarketplaceHubRole,
   MarketplaceHubStage,
 } from "@/src/services/purchase.request.service";
+import { getCurrentSellerBusinessSetup, SellerBusinessSetup } from "@/src/services/seller.business.setup.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   getSellerHomeFilters,
@@ -50,11 +50,11 @@ import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, FlatList, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 const BUYER_DEFAULT_STAGE = "all";
 const SELLER_DEFAULT_STAGE = "for_you";
-type AccountSetupRequirement = "email" | "seller_categories";
+type AccountSetupRequirement = "email";
 
 export default function HomeScreen() {
   const t = useTheme();
@@ -289,7 +289,7 @@ function BuyerHomeContent() {
 
 function SellerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
+  const [sellerSetup, setSellerSetup] = useState<SellerBusinessSetup | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const requestGenerationRef = useRef(0);
   const loadedCriteriaRef = useRef<string | null>(null);
@@ -305,39 +305,21 @@ function SellerHomeContent() {
   const loadHub = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
     setIsLoading(true);
-    const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    const setupResult = await getCurrentSellerBusinessSetup();
     if (generation !== requestGenerationRef.current) return;
-    if (!emailSetupResult.ok) {
-      setSetupRequirement(null);
+    if (!setupResult.ok) {
+      setSellerSetup(null);
+      setHub(null);
+      setIsLoading(false);
+      return;
+    }
+    setSellerSetup(setupResult.data);
+    if (!setupResult.data.isComplete) {
       setHub(null);
       setIsLoading(false);
       return;
     }
 
-    if (!emailSetupResult.data.isComplete) {
-      setSetupRequirement("email");
-      setHub(null);
-      setIsLoading(false);
-      return;
-    }
-
-    const categorySetupResult = await getCurrentSellerBusinessCategorySetupStatus();
-    if (generation !== requestGenerationRef.current) return;
-    if (!categorySetupResult.ok) {
-      setSetupRequirement(null);
-      setHub(null);
-      setIsLoading(false);
-      return;
-    }
-
-    if (!categorySetupResult.data.isComplete) {
-      setSetupRequirement("seller_categories");
-      setHub(null);
-      setIsLoading(false);
-      return;
-    }
-
-    setSetupRequirement(null);
     const result = await getCurrentSellerMarketplaceHub(
       filters,
       selectedSegmentSvgName,
@@ -365,7 +347,11 @@ function SellerHomeContent() {
   useFocusEffect(
     useCallback(() => {
       void loadHub();
+      const subscription = AppState.addEventListener("change", (nextState) => {
+        if (nextState === "active") void loadHub();
+      });
       return () => {
+        subscription.remove();
         requestGenerationRef.current += 1;
       };
     }, [loadHub])
@@ -375,7 +361,8 @@ function SellerHomeContent() {
     <MarketplaceHomeContent
       role="seller"
       isLoading={isLoading}
-      setupRequirement={setupRequirement}
+      setupRequirement={null}
+      sellerSetup={sellerSetup}
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
@@ -394,6 +381,7 @@ function MarketplaceHomeContent({
   role,
   isLoading,
   setupRequirement,
+  sellerSetup,
   hub,
   filters,
   selectedStageCode,
@@ -408,6 +396,7 @@ function MarketplaceHomeContent({
   role: MarketplaceHubRole;
   isLoading: boolean;
   setupRequirement: AccountSetupRequirement | null;
+  sellerSetup?: SellerBusinessSetup | null;
   hub: MarketplaceHub | null;
   filters: BuyerHomeFilters | SellerHomeFilters;
   selectedStageCode: string;
@@ -473,12 +462,13 @@ function MarketplaceHomeContent({
   }, [selectedStageCode]);
 
   useEffect(() => {
-    if (isLoading || setupRequirement || !hub) return;
+    if (role !== "buyer" || isLoading || setupRequirement || !hub) return;
     void presentInitialPushPermissionPrompt("home");
   }, [
     hub,
     isLoading,
     presentInitialPushPermissionPrompt,
+    role,
     setupRequirement,
   ]);
 
@@ -501,10 +491,14 @@ function MarketplaceHomeContent({
     return <LoadingState label="Cargando solicitudes..." />;
   }
 
+  if (sellerSetup && !sellerSetup.isComplete) {
+    return <SellerBusinessSetupChecklist setup={sellerSetup}
+      topContentInset={topContentInset} onRefresh={onRetry} />;
+  }
+
   if (setupRequirement) {
     return (
       <AccountSetupRequiredState
-        requirement={setupRequirement}
         topContentInset={topContentInset}
       />
     );
@@ -769,18 +763,12 @@ function HomeRailEmptyState({ message }: { message: string }) {
 }
 
 function AccountSetupRequiredState({
-  requirement,
   topContentInset,
 }: {
-  requirement: AccountSetupRequirement;
   topContentInset: number;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
-  const { activeProfile } = useActiveProfile();
-  const requiresSellerCategories = requirement === "seller_categories";
-  const isMemberWaitingForCategories =
-    requiresSellerCategories && activeProfile?.membershipRole === "member";
 
   return (
     <View
@@ -799,48 +787,28 @@ function AccountSetupRequiredState({
         }
       />
       <Text align="center" variant="body">
-        {isMemberWaitingForCategories
-          ? "El negocio necesita al menos una categoría de venta. Pedile al administrador principal que la configure para recibir oportunidades."
-          : requiresSellerCategories
-          ? "Necesitas configurar al menos una categoría de venta para que Luppit pueda mostrarte oportunidades relevantes."
-          : "Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar."}
+        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar.
       </Text>
       <View style={s.stateAction}>
         <Button
           variant="dark"
-          title={
-            isMemberWaitingForCategories
-              ? "Pendiente del administrador principal"
-              : requiresSellerCategories
-                ? "Configurar categorías"
-                : "Completar configuración"
-          }
-          disabled={isMemberWaitingForCategories}
-          onPress={() =>
-            requiresSellerCategories
-              ? router.push({
-                  pathname: "/(detail)/business-categories",
-                  params: { title: "Categorías de venta", hideMenu: "true" },
-                })
-              : router.push({
-                  pathname: "/(modal)/email-setup",
-                  params: { title: "Verificar correo" },
-                })
-          }
+          title="Completar configuración"
+          onPress={() => router.push({
+            pathname: "/(modal)/email-setup",
+            params: { title: "Verificar correo" },
+          })}
         />
       </View>
-      {!requiresSellerCategories ? (
-        <Pressable
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={openSignOutConfirmation}
-          style={s.stateSignOut}
-        >
-          <Text variant="body" color="error">
-            Cerrar sesión
-          </Text>
-        </Pressable>
-      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={openSignOutConfirmation}
+        style={s.stateSignOut}
+      >
+        <Text variant="body" color="error">
+          Cerrar sesión
+        </Text>
+      </Pressable>
     </View>
   );
 }
