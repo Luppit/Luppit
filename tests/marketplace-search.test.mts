@@ -165,7 +165,7 @@ function resolve(call: { response: ReturnType<typeof deferred> }, data: any) { c
 
 test("seller setup blocks discovery until all requirements are complete, including load failure", async (t) => {
   const f = fixture("seller"); t.after(f.cleanup);
-  f.setSetup({ ok: true, data: { isComplete: false, completedCount: 2, totalCount: 6 } });
+  f.setSetup({ ok: true, data: { isComplete: false, completedCount: 2, totalCount: 5 } });
   f.screen(); await flush();
   const pending = f.screen();
   assert.equal(pending.props.sellerSetup.completedCount, 2);

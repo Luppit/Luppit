@@ -5,9 +5,9 @@ import { fromSupabaseError } from "../src/lib/supabase/errors.ts";
 
 function setup(completed = 2) {
   return {
-    business_id: "business", commercial_name: "Negocio", location_id: null,
-    completed_count: completed, total_count: 6, is_complete: completed === 6,
-    steps: ["email", "categories", "commercial_name", "location", "photo", "notifications"]
+    business_id: "business", location_id: null,
+    completed_count: completed, total_count: 5, is_complete: completed === 5,
+    steps: ["email", "categories", "location", "photo", "notifications"]
       .map((code, index) => ({ code, label: code, icon: "mail", action_label: code,
         is_complete: index < completed, can_edit: true, description: null })),
   };
@@ -21,12 +21,21 @@ test("keeps the server's ordered checklist, completion and membership permission
   assert.equal(parsed?.completedCount, 2);
   assert.equal(parsed?.isComplete, false);
   assert.equal(parsed?.steps[0].code, "notifications");
-  assert.equal(parsed?.steps.find((step) => step.code === "commercial_name")?.canEdit, false);
+  assert.equal(parsed?.totalCount, 5);
+  assert.equal(parsed?.steps.find((step) => step.code === "location")?.canEdit, false);
 });
 
 test("requires the notification step even when every saved business field is complete", () => {
-  assert.equal(parseSellerBusinessSetup(setup(5))?.isComplete, false);
-  assert.equal(parseSellerBusinessSetup(setup(6))?.isComplete, true);
+  assert.equal(parseSellerBusinessSetup(setup(4))?.isComplete, false);
+  assert.equal(parseSellerBusinessSetup(setup(5))?.isComplete, true);
+});
+
+test("completes the five-step checklist without a business-name setup field", () => {
+  const parsed = parseSellerBusinessSetup(setup(5));
+  assert.equal(parsed?.isComplete, true);
+  assert.deepEqual(parsed?.steps.map((step) => step.code), [
+    "email", "categories", "location", "photo", "notifications",
+  ]);
 });
 
 test("rejects incomplete, duplicate, unknown and inconsistent readiness responses", () => {
@@ -35,13 +44,13 @@ test("rejects incomplete, duplicate, unknown and inconsistent readiness response
   missing.steps.pop();
   assert.equal(parseSellerBusinessSetup(missing), null);
   const duplicate = setup();
-  duplicate.steps[5].code = "email";
+  duplicate.steps[4].code = "email";
   assert.equal(parseSellerBusinessSetup(duplicate), null);
   const unknown = setup();
-  unknown.steps[5].code = "unknown";
+  unknown.steps[4].code = "unknown";
   assert.equal(parseSellerBusinessSetup(unknown), null);
   assert.equal(parseSellerBusinessSetup({ ...setup(), is_complete: true }), null);
-  assert.equal(parseSellerBusinessSetup({ ...setup(), completed_count: 6 }), null);
+  assert.equal(parseSellerBusinessSetup({ ...setup(), completed_count: 5 }), null);
 });
 
 test("shows a safe actionable message when an offer is blocked by setup", () => {

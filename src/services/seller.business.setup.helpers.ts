@@ -1,7 +1,6 @@
 export type SellerBusinessSetupStepCode =
   | "email"
   | "categories"
-  | "commercial_name"
   | "location"
   | "photo"
   | "notifications";
@@ -18,7 +17,6 @@ export type SellerBusinessSetupStep = {
 
 export type SellerBusinessSetup = {
   businessId: string;
-  commercialName: string | null;
   locationId: string | null;
   locationLabel: string | null;
   completedCount: number;
@@ -28,7 +26,7 @@ export type SellerBusinessSetup = {
 };
 
 const stepCodes: SellerBusinessSetupStepCode[] = [
-  "email", "categories", "commercial_name", "location", "photo", "notifications",
+  "email", "categories", "location", "photo", "notifications",
 ];
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -76,7 +74,6 @@ export function parseSellerBusinessSetup(raw: unknown): SellerBusinessSetup | nu
 
   return {
     businessId: value.business_id,
-    commercialName: nullableString(value.commercial_name),
     locationId: nullableString(value.location_id),
     locationLabel: nullableString(value.location_label),
     completedCount: value.completed_count,

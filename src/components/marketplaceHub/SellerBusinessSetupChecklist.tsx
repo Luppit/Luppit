@@ -39,10 +39,6 @@ export default function SellerBusinessSetupChecklist({
         router.push({ pathname: "/(detail)/business-categories",
           params: { title: step.label, hideMenu: "true" } });
         break;
-      case "commercial_name":
-        router.push({ pathname: "/(modal)/business-name-edit",
-          params: { title: step.label, value: setup.commercialName ?? "" } });
-        break;
       case "location":
         router.push({ pathname: "/(modal)/business-location-edit", params: {
           title: step.label, locationId: setup.locationId ?? "",

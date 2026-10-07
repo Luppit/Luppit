@@ -290,7 +290,6 @@ export type Database = {
       }
       business: {
         Row: {
-          commercial_name_confirmed_at: string | null
           created_at: string
           id: string
           id_document: string | null
@@ -301,7 +300,6 @@ export type Database = {
           privacy_purge_after: string | null
         }
         Insert: {
-          commercial_name_confirmed_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
@@ -312,7 +310,6 @@ export type Database = {
           privacy_purge_after?: string | null
         }
         Update: {
-          commercial_name_confirmed_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
