@@ -73,6 +73,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   let popup: any;
   let segment = "todas";
   let sellerSetup: any = { ok: true, data: { isComplete: true } };
+  let dimensions = { width: 430, height: 932, scale: 3, fontScale: 1 };
   let segmentListener = (_value: string) => {};
   const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters) };
   const request = (...args: any[]) => { const response = deferred(); calls.push({ args, response }); return response.promise; };
@@ -84,8 +85,9 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
       StyleSheet: { create: (styles: any) => styles }, Platform: { OS: "ios" },
       AccessibilityInfo: { announceForAccessibility() {} },
       AppState: { addEventListener: () => ({ remove() {} }) },
+      useWindowDimensions: () => dimensions,
     },
-    "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 }, borders: { md: 20 }, colors: {}, glass: { radius: { chrome: 28 } }, typography: { subtitle: { lineHeight: 24 }, small: { lineHeight: 18 } } }) },
+    "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 }, borders: { md: 20 }, colors: {}, glass: { radius: { chrome: 28, chip: 22 } }, typography: { subtitle: { lineHeight: 24 }, small: { lineHeight: 18 } } }) },
     "@react-navigation/native": { useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]) },
     "expo-router": { router: { push: (route: any) => routes.push(route) }, useGlobalSearchParams: () => params },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 44, bottom: 34 }) },
@@ -144,6 +146,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     ...runtime, calls, routes, params, modules, exports, filterService, emptyFilters,
     getPopup: () => popup,
     setSetup(value: any) { sellerSetup = value; },
+    setDimensions(width: number, fontScale = 1) { dimensions = { ...dimensions, width, fontScale }; },
     screen: () => runtime.render(component),
     setFilters(filters: any) { (role === "buyer" ? buyerFilters.setBuyerHomeFilters : sellerFilters.setSellerHomeFilters)(filters); },
     setSegment(value: string) { segment = value; segmentListener(value); },
@@ -245,16 +248,18 @@ test("category and segment changes retain server filter scope when revealing mat
   assert.deepEqual(plain(f.calls[2].args), [filters, "productos", "needs_attention"]);
 });
 
-test("filtered home shows matching stages in one row and carries criteria into Ver todas", (t) => {
+test("filtered home retains every stage in DB order and carries criteria into Ver todas", (t) => {
   const f = fixture("seller"); t.after(f.cleanup);
-  const data = hub("needs_attention", { for_you: 0, needs_attention: 21, in_progress: 4 }, [item("a"), item("b", "office")]);
+  const data = hub("needs_attention", { for_you: 0, needs_attention: 21, negotiating: 4 }, [item("a"), item("b", "office")]);
   const filters = { ...f.emptyFilters, searchValue: "silla", selectedCategoryIds: ["furniture", "office"] };
   const tree = f.render(f.exports.MarketplaceHomeContent, { role: "seller", hub: data, filters, selectedStageCode: "needs_attention", selectedSegmentSvgName: "productos", hasActiveFilters: true, hasFilterChip: true, onSelectStage() {}, onRetry() {} });
-  const chips = nodes(tree).filter((node) => node.type === "LuppitChip");
-  assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["needs_attention", 21], ["in_progress", 4]]);
-  const stageRow = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
-  assert.equal(stageRow?.props.contentContainerStyle?.flexWrap, undefined);
-  assert.deepEqual(nodes(stageRow).filter((node) => node.type === "LuppitChip").map((node) => node.props.label), ["needs_attention", "in_progress"]);
+  const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+  assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["for_you", 0], ["needs_attention", 21], ["negotiating", 4]]);
+  const stageRow = nodes(tree).find((node) => node.type === "View" && node.props.children.flat().includes(chips[0]));
+  assert.ok(stageRow, "the stages share one non-scrolling control");
+  assert.equal(stageRow.props.style.flexDirection, "row");
+  assert.equal(nodes(tree).some((node) => node.type === "ScrollView" && node.props.horizontal), false);
+  assert.deepEqual(chips.map((node) => node.props.selected), [false, true, false]);
   assert.match(text(tree), /Resultados para “silla”21 solicitudes en needs_attention/);
   assert.equal(nodes(tree).find((node) => node.type === "FlatList")!.props.data, data.rail.items);
   nodes(tree).find((node) => node.type === "Pressable" && text(node).includes("Ver todas"))!.props.onPress();
@@ -263,42 +268,105 @@ test("filtered home shows matching stages in one row and carries criteria into V
   assert.equal(f.routes[0].params.segmentSvgName, "productos");
 });
 
-test("filtered home keeps an explicitly selected empty stage beside the matching stage", (t) => {
+test("home stage selection forwards the DB code without reordering or hiding empty views", (t) => {
   const f = fixture("seller"); t.after(f.cleanup);
-  const tree = f.render(f.exports.MarketplaceHomeContent, {
-    role: "seller", hub: hub("for_you", { for_you: 0, needs_attention: 1, in_progress: 0 }),
+  const selectedCodes: string[] = [];
+  const props = {
+    role: "seller", hub: hub("for_you", { for_you: 0, needs_attention: 1, negotiating: 0 }),
     filters: { ...f.emptyFilters, searchValue: "silla" }, selectedStageCode: "for_you",
     selectedSegmentSvgName: "todas", hasActiveFilters: true, hasFilterChip: true,
-    onSelectStage() {}, onRetry() {},
-  });
-  const row = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
-  assert.deepEqual(nodes(row).filter((node) => node.type === "LuppitChip").map((node) => node.props.label), ["for_you", "needs_attention"]);
+    onSelectStage(code: string) { selectedCodes.push(code); }, onRetry() {},
+  };
+  const order = ["for_you", "needs_attention", "negotiating"];
+  for (const [index, code] of order.entries()) {
+    const tree = f.render(f.exports.MarketplaceHomeContent, { ...props, selectedStageCode: code });
+    const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+    assert.deepEqual(chips.map((node) => node.props.label), order);
+    assert.deepEqual(chips.map((node) => node.props.count), [0, 1, 0]);
+    assert.deepEqual(chips.map((node) => node.props.selected), order.map((stage) => stage === code), "current selection takes precedence over the previous RPC selection");
+    chips[index].props.onPress();
+  }
+  assert.deepEqual(selectedCodes, order);
 });
 
-test("one matching stage and many empty stages render only one chip before the request", (t) => {
+test("one matching stage keeps the other fixed views visible with zero counts", (t) => {
   const f = fixture("seller"); t.after(f.cleanup);
-  const counts = {
-    for_you: 0, needs_attention: 1, in_progress: 0, best: 0,
-    low_competition: 0, active_offers: 0, favorites: 0, history: 0,
-  };
+  const counts = { for_you: 0, needs_attention: 1, negotiating: 0 };
   const tree = f.render(f.exports.MarketplaceHomeContent, {
     role: "seller", hub: hub("needs_attention", counts, [item("march")]),
     filters: { ...f.emptyFilters, searchValue: "March" }, selectedStageCode: "needs_attention",
     selectedSegmentSvgName: "todas", hasActiveFilters: true, hasFilterChip: true,
     onSelectStage() {}, onRetry() {},
   });
-  const row = nodes(tree).find((node) => node.type === "ScrollView" && node.props.horizontal);
-  const chips = nodes(row).filter((node) => node.type === "LuppitChip");
-  assert.deepEqual(chips.map((node) => node.props.label), ["needs_attention"]);
+  const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+  assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["for_you", 0], ["needs_attention", 1], ["negotiating", 0]]);
+  assert.equal(chips[0].props.accessibilityLabel, "for_you, 0 solicitudes");
+  assert.equal(chips[1].props.accessibilityLabel, "needs_attention, 1 solicitud");
   assert.equal(nodes(tree).find((node) => node.type === "FlatList")?.props.data[0].id, "march");
   assert.match(text(tree), /Resultados para “March”1 solicitud en needs_attention/);
 });
+
+for (const role of ["buyer", "seller"] as const) {
+  const firstStage = role === "buyer" ? "all" : "for_you";
+  const lastStage = role === "buyer" ? "history" : "negotiating";
+  const counts = { [firstStage]: 1, needs_attention: 0, [lastStage]: 0 };
+
+  test(`${role}: fixed stage control remains usable while results load and when no filters match`, (t) => {
+    const f = fixture(role); t.after(f.cleanup);
+    const selections: string[] = [];
+    const props = {
+      role, filters: { ...f.emptyFilters, searchValue: "silla" }, hasActiveFilters: true,
+      selectedStageCode: lastStage, onSelectStage(code: string) { selections.push(code); }, onRetry() {},
+    };
+    const loading = f.render(f.exports.MarketplaceHomeContent, {
+      ...props, hub: hub(firstStage, counts, [item("old")]), isLoading: true,
+    });
+    const loadingChips = nodes(loading).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+    assert.deepEqual(loadingChips.map((node) => node.props.label), [firstStage, "needs_attention", lastStage]);
+    assert.deepEqual(loadingChips.map((node) => node.props.selected), [false, false, true]);
+    assert.ok(nodes(loading).some((node) => node.type === "View" && node.props.accessibilityState?.busy));
+    assert.match(text(loading), /Actualizando resultados/);
+    assert.doesNotMatch(text(loading), /1 solicitud en/, "a previous total is not relabeled as the pending view");
+    assert.equal(nodes(loading).some((node) => node.type === "Pressable" && text(node).includes("Ver todas")), false);
+    assert.equal(nodes(loading).some((node) => node.type === "FlatList"), false, "stale request cards stay hidden during loading");
+    loadingChips[0].props.onPress();
+    assert.deepEqual(selections, [firstStage]);
+
+    const empty = f.render(f.exports.MarketplaceHomeContent, {
+      ...props, hub: hub(lastStage, { [firstStage]: 0, needs_attention: 0, [lastStage]: 0 }), isLoading: false,
+    });
+    const emptyChips = nodes(empty).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+    assert.deepEqual(emptyChips.map((node) => [node.props.label, node.props.count]), [[firstStage, 0], ["needs_attention", 0], [lastStage, 0]]);
+    assert.match(nodes(empty).find((node) => typeof node.type === "function" && node.type.name === "HomeRailEmptyState")!.props.message, /No hay resultados para esta etapa/);
+    assert.equal(nodes(empty).some((node) => node.type === "ScrollView" && node.props.horizontal), false);
+
+    const initialLoading = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: null, isLoading: true });
+    assert.equal(initialLoading.type, "LoadingState", "initial load still has a dedicated loading state");
+  });
+
+  test(`${role}: narrow screens and enlarged text stack stage counts without removing views`, (t) => {
+    const f = fixture(role); t.after(f.cleanup);
+    const props = {
+      role, hub: hub(firstStage, counts, [item("a")]), filters: f.emptyFilters,
+      selectedStageCode: firstStage, onSelectStage() {}, onRetry() {},
+    };
+    for (const [width, fontScale, stacked] of [[430, 1, false], [375, 1, true], [430, 1.3, true], [320, 1.3, true]] as const) {
+      f.setDimensions(width, fontScale);
+      const tree = f.render(f.exports.MarketplaceHomeContent, props);
+      const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
+      assert.equal(chips.length, 3);
+      assert.deepEqual(chips.map((node) => node.props.stacked), [stacked, stacked, stacked], `width ${width}, fontScale ${fontScale}`);
+      assert.ok(chips.every((node) => node.props.labelMaxLines === 0), "stage labels can wrap instead of being truncated");
+    }
+  });
+}
 
 test("empty copy distinguishes actual zero matches, other stages, omitted previews, and load errors", (t) => {
   const f = fixture("buyer"); t.after(f.cleanup);
   const props = { role: "buyer", filters: { ...f.emptyFilters, searchValue: "silla" }, hasActiveFilters: true, selectedStageCode: "all", onSelectStage() {}, onRetry() {} };
   const empty = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: hub("all", { all: 0, history: 0 }) });
-  assert.match(empty.props.message, /No encontramos solicitudes con los filtros aplicados/);
+  assert.match(nodes(empty).find((node) => typeof node.type === "function" && node.type.name === "HomeRailEmptyState")!.props.message, /No hay resultados para esta etapa/);
+  assert.deepEqual(nodes(empty).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage").map((node) => node.props.count), [0, 0]);
   const other = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: hub("all", { all: 0, history: 1 }) });
   const railEmpty = nodes(other).find((node) => typeof node.type === "function" && node.type.name === "HomeRailEmptyState")!;
   assert.match(railEmpty.props.message, /Hay solicitudes que coinciden en otras etapas/);

@@ -50,7 +50,7 @@ import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, FlatList, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, FlatList, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
 const BUYER_DEFAULT_STAGE = "all";
 const SELLER_DEFAULT_STAGE = "for_you";
@@ -412,14 +412,15 @@ function MarketplaceHomeContent({
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
   const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
-  const stageScrollRef = useRef<ScrollView | null>(null);
+  const { width, fontScale } = useWindowDimensions();
+  const stackStageCounts = width < 390 || fontScale > 1;
   const topContentInset = useMemo(
     () => getHomeTopContentInset(t, hasFilterChip),
     [hasFilterChip, t]
   );
   const selectedStage =
-    hub?.stages.find((stage) => stage.is_selected) ??
-    hub?.stages.find((stage) => stage.code === selectedStageCode) ?? null;
+    hub?.stages.find((stage) => stage.code === selectedStageCode) ??
+    hub?.stages.find((stage) => stage.is_selected) ?? null;
   const items = hub?.rail.items ?? [];
   const hasMatches = Boolean(
     items.length || hub?.rail.total || hub?.stages.some((stage) => stage.count > 0)
@@ -437,29 +438,11 @@ function MarketplaceHomeContent({
   const selectedSortLabel =
     sortConfig?.options.find((option) => option.code === resolvedSortCode)?.label ??
     "Orden";
-  const orderedStages = useMemo(() => {
-    const stages = hub?.stages ?? [];
-    const selected = stages.find((stage) => stage.code === selectedStageCode);
-    if (!selected) return stages;
-
-    return [selected, ...stages.filter((stage) => stage.code !== selectedStageCode)];
-  }, [hub?.stages, selectedStageCode]);
-  const visibleStages = hasActiveFilters
-    ? orderedStages.filter((stage) => stage.count > 0 || stage.code === selectedStage?.code)
-    : orderedStages;
 
   useEffect(() => {
     if (!hub || hub.stages.some((stage) => stage.code === selectedStageCode)) return;
     onSelectStage(role === "buyer" ? BUYER_DEFAULT_STAGE : SELLER_DEFAULT_STAGE);
   }, [hub, onSelectStage, role, selectedStageCode]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      stageScrollRef.current?.scrollTo({ x: 0, animated: true });
-    }, 0);
-
-    return () => clearTimeout(timer);
-  }, [selectedStageCode]);
 
   useEffect(() => {
     if (role !== "buyer" || isLoading || setupRequirement || !hub) return;
@@ -487,7 +470,7 @@ function MarketplaceHomeContent({
     });
   }, [onSelectSort, resolvedSortCode, role, sortConfig]);
 
-  if (isLoading) {
+  if (isLoading && !hub) {
     return <LoadingState label="Cargando solicitudes..." />;
   }
 
@@ -514,7 +497,7 @@ function MarketplaceHomeContent({
     );
   }
 
-  if ((hasActiveFilters && !hasMatches) || (hub.stages.length === 0 && !hasMatches)) {
+  if (hub.stages.length === 0 && !hasMatches) {
     return (
       <HomeEmptyState
         topContentInset={topContentInset}
@@ -546,7 +529,9 @@ function MarketplaceHomeContent({
         </Text>
         {hasActiveFilters ? (
           <Text variant="body" color="textMedium" accessibilityLiveRegion="polite">
-            {hub.rail.total} {hub.rail.total === 1 ? "solicitud" : "solicitudes"} en {selectedStage?.name ?? hub.rail.title}
+            {isLoading
+              ? "Actualizando resultados..."
+              : `${hub.rail.total} ${hub.rail.total === 1 ? "solicitud" : "solicitudes"} en ${selectedStage?.name ?? hub.rail.title}`}
           </Text>
         ) : (
           <>
@@ -614,29 +599,28 @@ function MarketplaceHomeContent({
         />
       ) : null}
 
-      <ScrollView
-        ref={stageScrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.stageListContent}
-      >
-        {visibleStages.map((stage) => (
+      <View style={s.stageList}>
+        {hub.stages.map((stage, index) => (
           <LuppitChip
             key={stage.code}
             label={stage.name}
             count={stage.count}
             selected={stage.code === selectedStage?.code}
+            variant="homeStage"
+            stacked={stackStageCounts}
+            labelMaxLines={0}
+            style={index > 0 ? s.stageDivider : undefined}
             accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
             onPress={() => onSelectStage(stage.code)}
           />
         ))}
-      </ScrollView>
+      </View>
 
       <View style={s.railSection}>
         <View style={s.railHeader}>
           <View style={s.railHeaderTop}>
             <Text variant="body" style={s.railTitle}>
-              {hub.rail.title}
+              {isLoading ? selectedStage?.name ?? hub.rail.title : hub.rail.title}
             </Text>
             <View style={s.railHeaderActions}>
               {role === "buyer" && (sortConfig?.options.length ?? 0) > 1 ? (
@@ -649,7 +633,7 @@ function MarketplaceHomeContent({
                   <Icon name="arrow-up-down" size={22} color={t.colors.textDark} />
                 </Pressable>
               ) : null}
-              {hub.rail.total > 0 ? (
+              {!isLoading && hub.rail.total > 0 ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() =>
@@ -690,7 +674,11 @@ function MarketplaceHomeContent({
           ) : null}
         </View>
 
-        {items.length > 0 ? (
+        {isLoading ? (
+          <View style={s.railLoading} accessibilityState={{ busy: true }}>
+            <LoadingState variant="inline" label="Cargando solicitudes..." />
+          </View>
+        ) : items.length > 0 ? (
           <FlatList
             horizontal
             data={items}
@@ -867,12 +855,25 @@ function createMarketplaceHomeStyles(t: Theme) {
       gap: t.spacing.xs,
       paddingHorizontal: t.spacing.md,
     },
-    stageListContent: {
-      gap: t.spacing.sm,
-      paddingHorizontal: t.spacing.md,
+    stageList: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      marginHorizontal: t.spacing.md,
+      borderRadius: t.glass.radius.chip,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.backgroudWhite,
+      overflow: "hidden",
+    },
+    stageDivider: {
+      borderLeftWidth: 1,
+      borderLeftColor: t.colors.border,
     },
     railSection: {
       gap: t.spacing.md,
+    },
+    railLoading: {
+      minHeight: 176,
     },
     railHeader: {
       gap: t.spacing.xs,

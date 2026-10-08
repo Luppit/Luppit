@@ -17,6 +17,8 @@ type LuppitChipProps = {
   removeAccessibilityLabel?: string;
   labelMaxLines?: number;
   bordered?: boolean;
+  variant?: "default" | "homeStage";
+  stacked?: boolean;
   style?: ViewStyle;
 };
 
@@ -31,6 +33,8 @@ export default function LuppitChip({
   removeAccessibilityLabel,
   labelMaxLines = 1,
   bordered = false,
+  variant = "default",
+  stacked = false,
   style,
 }: LuppitChipProps) {
   const t = useTheme();
@@ -42,7 +46,7 @@ export default function LuppitChip({
     <>
       {icon ? <Icon name={icon} size={16} color={contentColor} /> : null}
       <Text
-        variant="body"
+        variant={variant === "homeStage" ? "small" : "body"}
         maxLines={labelMaxLines}
         style={[s.label, selected ? s.labelSelected : null]}
       >
@@ -80,6 +84,9 @@ export default function LuppitChip({
     selected ? s.chipSelected : null,
     bordered && selected ? s.chipBorderedSelected : null,
     onRemove ? s.chipRemovable : null,
+    variant === "homeStage" ? s.homeStage : null,
+    variant === "homeStage" && !selected ? s.homeStageUnselected : null,
+    stacked ? s.chipStacked : null,
     style,
   ];
 
@@ -116,6 +123,21 @@ function createLuppitChipStyles(t: Theme) {
     },
     chipSelected: {
       backgroundColor: t.colors.textDark,
+    },
+    homeStage: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: 0,
+      paddingLeft: t.spacing.xs,
+      paddingRight: t.spacing.xs,
+      paddingVertical: t.spacing.sm,
+      gap: t.spacing.xs,
+    },
+    homeStageUnselected: {
+      backgroundColor: "transparent",
+    },
+    chipStacked: {
+      flexDirection: "column",
     },
     chipBordered: {
       borderWidth: 1,
