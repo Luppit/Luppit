@@ -609,7 +609,10 @@ function MarketplaceHomeContent({
             variant="homeStage"
             stacked={stackStageCounts}
             labelMaxLines={0}
-            style={index > 0 ? s.stageDivider : undefined}
+            style={{
+              ...(index > 0 ? s.stageDivider : undefined),
+              ...(role === "seller" && !stackStageCounts ? s.sellerStage : undefined),
+            }}
             accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
             onPress={() => onSelectStage(stage.code)}
           />
@@ -868,6 +871,12 @@ function createMarketplaceHomeStyles(t: Theme) {
     stageDivider: {
       borderLeftWidth: 1,
       borderLeftColor: t.colors.border,
+    },
+    sellerStage: {
+      flex: 0,
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: "auto",
     },
     railSection: {
       gap: t.spacing.md,
