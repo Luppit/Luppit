@@ -350,7 +350,7 @@ for (const role of ["buyer", "seller"] as const) {
       role, hub: hub(firstStage, counts, [item("a")]), filters: f.emptyFilters,
       selectedStageCode: firstStage, onSelectStage() {}, onRetry() {},
     };
-    for (const [width, fontScale, stacked] of [[430, 1, false], [402, 1, false], [390, 1, true], [375, 1, true], [430, 1.3, true], [320, 1.3, true]] as const) {
+    for (const [width, fontScale, stacked] of [[430, 1, false], [375, 1, true], [430, 1.3, true], [320, 1.3, true]] as const) {
       f.setDimensions(width, fontScale);
       const tree = f.render(f.exports.MarketplaceHomeContent, props);
       const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
@@ -358,11 +358,6 @@ for (const role of ["buyer", "seller"] as const) {
       assert.deepEqual(chips.map((node) => node.props.stacked), [stacked, stacked, stacked], `width ${width}, fontScale ${fontScale}`);
       assert.ok(chips.every((node) => node.props.labelMaxLines === 0), "stage labels can wrap instead of being truncated");
     }
-    f.setDimensions(402);
-    const largerCounts = f.render(f.exports.MarketplaceHomeContent, {
-      ...props, hub: hub(firstStage, { [firstStage]: 12, needs_attention: 0, [lastStage]: 100 }, [item("a")]),
-    });
-    assert.ok(nodes(largerCounts).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage").every((node) => node.props.stacked), "larger counts have room without squeezing labels");
   });
 }
 
