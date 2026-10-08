@@ -413,7 +413,8 @@ function MarketplaceHomeContent({
   const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
   const { width, fontScale } = useWindowDimensions();
-  const stackStageCounts = width < 390 || fontScale > 1;
+  const stackStageCounts =
+    width < 400 || fontScale > 1 || Boolean(hub?.stages.some((stage) => stage.count > 9));
   const topContentInset = useMemo(
     () => getHomeTopContentInset(t, hasFilterChip),
     [hasFilterChip, t]
@@ -600,7 +601,7 @@ function MarketplaceHomeContent({
       ) : null}
 
       <View style={s.stageList}>
-        {hub.stages.map((stage, index) => (
+        {hub.stages.map((stage) => (
           <LuppitChip
             key={stage.code}
             label={stage.name}
@@ -609,7 +610,6 @@ function MarketplaceHomeContent({
             variant="homeStage"
             stacked={stackStageCounts}
             labelMaxLines={0}
-            style={index > 0 ? s.stageDivider : undefined}
             accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
             onPress={() => onSelectStage(stage.code)}
           />
@@ -859,15 +859,10 @@ function createMarketplaceHomeStyles(t: Theme) {
       flexDirection: "row",
       alignItems: "stretch",
       marginHorizontal: t.spacing.md,
+      padding: t.spacing.xs,
+      gap: t.spacing.xs,
       borderRadius: t.glass.radius.chip,
-      borderWidth: 1,
-      borderColor: t.colors.border,
       backgroundColor: t.colors.backgroudWhite,
-      overflow: "hidden",
-    },
-    stageDivider: {
-      borderLeftWidth: 1,
-      borderLeftColor: t.colors.border,
     },
     railSection: {
       gap: t.spacing.md,

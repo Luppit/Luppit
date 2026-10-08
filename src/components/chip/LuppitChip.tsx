@@ -48,7 +48,11 @@ export default function LuppitChip({
       <Text
         variant={variant === "homeStage" ? "small" : "body"}
         maxLines={labelMaxLines}
-        style={[s.label, selected ? s.labelSelected : null]}
+        style={[
+          s.label,
+          variant === "homeStage" && !stacked ? s.homeStageLabel : null,
+          selected ? s.labelSelected : null,
+        ]}
       >
         {label}
       </Text>
@@ -125,16 +129,20 @@ function createLuppitChipStyles(t: Theme) {
       backgroundColor: t.colors.textDark,
     },
     homeStage: {
-      flex: 1,
+      flexGrow: 1,
+      flexShrink: 1,
       minWidth: 0,
-      borderRadius: 0,
-      paddingLeft: t.spacing.xs,
-      paddingRight: t.spacing.xs,
+      borderRadius: t.glass.radius.chip,
+      paddingLeft: t.spacing.sm,
+      paddingRight: t.spacing.sm,
       paddingVertical: t.spacing.sm,
       gap: t.spacing.xs,
     },
     homeStageUnselected: {
       backgroundColor: "transparent",
+    },
+    homeStageLabel: {
+      flexShrink: 0,
     },
     chipStacked: {
       flexDirection: "column",
