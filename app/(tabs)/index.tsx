@@ -552,7 +552,7 @@ function MarketplaceHomeContent({
                   : `${attentionCount} necesitan atención.`
                 : role === "buyer"
                   ? "No tienes solicitudes que necesiten atención."
-                  : "No tienes negociaciones pendientes."}
+                  : "No tienes acciones pendientes."}
             </Text>
           </>
         )}
