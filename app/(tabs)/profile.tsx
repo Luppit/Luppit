@@ -93,6 +93,7 @@ function BuyerProfileContent() {
         <Text variant="title">Mi cuenta</Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Configuración de la cuenta"
           hitSlop={10}
           onPress={() =>
             router.push({
@@ -258,6 +259,7 @@ function SellerProfileContent() {
         <Text variant="title">Mi cuenta</Text>
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Configuración de la cuenta"
           hitSlop={10}
           onPress={() =>
             router.push({

@@ -9,7 +9,11 @@ import {
 } from "../src/utils/assistantSummaryReply.ts";
 
 test("only an explicit whole-message acknowledgment opens the summary", () => {
-  for (const value of ["Sí", "Sí, por favor!", "Ver resumen", "  OK.  "]) {
+  for (const value of [
+    "Sí", "Sí, por favor!", "Ver resumen", "  OK.  ", "Sí, muestra el resumen.",
+    "Claro, muéstrame el resumen por favor", "Sí, por favor, muestra el resumen",
+    "Muestra el resumen", "Ver el resumen", "Quiero ver el resumen",
+  ]) {
     assert.equal(shouldOpenAssistantSummary(value), true, value);
   }
 });
@@ -35,22 +39,22 @@ test("seller filtering hides only exact control copy and keeps the source transc
   assert.equal(isSellerOfferReviewInstruction(`${instruction} Falta una foto.`), false);
 });
 
-test("seller explicit summary requests work without treating every ready-draft acknowledgement as review", () => {
-  const invitation = { sender: "assistant" as const, text: "Tu oferta está lista. ¿Deseas ver el resumen?" };
-  assert.equal(isSellerOfferSummaryReply("Sí", invitation), true);
-  assert.equal(isSellerOfferSummaryReply("Sí", undefined), false);
-  assert.equal(isSellerOfferSummaryReply("Sí", { ...invitation, sender: "user" }), false);
-  assert.equal(isSellerOfferSummaryReply("Sí", { ...invitation, text: "¿Confirmas el plazo?" }), false);
-  assert.equal(isSellerOfferSummaryReply("Ver resumen", undefined), true);
-  assert.equal(isSellerOfferSummaryReply("Sí, pero cambia el precio", invitation), false);
+test("seller confirmation uses persisted pending action rather than the last transcript message", () => {
+  assert.equal(isSellerOfferSummaryReply("Sí", "ASK_SHOW_SUMMARY"), true);
+  assert.equal(isSellerOfferSummaryReply("Sí", null), false);
+  assert.equal(isSellerOfferSummaryReply("Sí", "CONFIRM_DELIVERY"), false);
+  assert.equal(isSellerOfferSummaryReply("Ver resumen", null), true);
+  assert.equal(isSellerOfferSummaryReply("Sí, muestra el resumen.", null), true);
+  assert.equal(isSellerOfferSummaryReply("Sí, pero cambia el precio", "ASK_SHOW_SUMMARY"), false);
 });
 
 test("corrections, negations, and mixed instructions reach the assistant", () => {
   for (const value of [
-    "Necesito 3 llantas", "Sin envío, solo retiro", "No quiero ver resumen",
+    "Necesito 3 plantas", "Sin envío, solo retiro", "No quiero ver resumen",
     "No, suave, quiero que esté barato", "No", "No gracias", "Todavía no",
     "Sí, pero quiero que esté barato", "Sí, quiero ver el resumen pero cambia el precio",
-    "Sí, pero cambia la cantidad a 3", "Ver resumen después de cambiar a dólares", "",
+    "Sí, pero cambia la cantidad a 3", "Ver resumen después de cambiar a dólares",
+    "Si muestra el resumen pero agrega una planta", "No, muestra el resumen", "",
   ]) {
     assert.equal(shouldOpenAssistantSummary(value), false, value);
   }

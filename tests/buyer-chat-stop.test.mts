@@ -619,7 +619,7 @@ test("unmount aborts the request and prevents a late reply", async () => {
 });
 
 test("pending summary acceptance opens backend review and retains the draft summary", async () => {
-  for (const reply of ["Si", "Sí", "Sí, por favor"]) {
+  for (const reply of ["Si", "Sí", "Sí, por favor", "Si, muestra el resumen.", "Claro, muéstrame el resumen por favor"]) {
     const session = await createSession();
     const progress = createChatView(session);
     const initial = session.state.sendMessage({ text: "2", images: [] });
@@ -726,7 +726,7 @@ test("Bug25 restored buyer draft keeps refusals and mixed edits on the message p
 
 test("buyer summary acknowledgement uses restored pending action and explicit requests still reach Edge", async () => {
   for (const pendingAction of [null, "ASK_SHOW_SUMMARY"]) {
-    for (const text of ["Sí", "Ver resumen"]) {
+    for (const text of ["Sí", "Ver resumen", "Si, muestra el resumen."]) {
       const session = await createSession({ restore: success({ status: "ready", isReadyToPublish: true, pendingAction }) });
       const sending = session.state.sendMessage({ text, images: [] });
       assert.equal(session.calls[0].input.ui_action, pendingAction ? "SHOW_SUMMARY" : undefined);

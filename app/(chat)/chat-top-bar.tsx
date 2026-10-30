@@ -90,6 +90,8 @@ export default function ChatTopBar({
       </View>
 
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Cerrar asistente"
         onPress={onClose}
         style={[s.iconSlot, { alignItems: "flex-end" }]}
         hitSlop={12}

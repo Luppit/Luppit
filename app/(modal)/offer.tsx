@@ -393,6 +393,7 @@ function OfferAssistantScreen({
   const offerRevisionRef = useRef<string | null>(null);
   const successfulOfferPhotoCount = offerImages.length;
   const [showSummary, setShowSummary] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [hasComposerDraft, setHasComposerDraft] = useState(false);
   useAndroidLeaveGuard(!offerDraftId && (hasComposerDraft || messages.length > 0 || isBusy));
@@ -432,6 +433,7 @@ function OfferAssistantScreen({
 
   const clearReviewState = useCallback(() => {
     setShowSummary(false);
+    setPendingAction(null);
     setIsReadyToSend(false);
     setSummary(null);
     setMissingFields([]);
@@ -517,8 +519,9 @@ function OfferAssistantScreen({
       const isContinueAction = input.uiAction === "CONTINUE";
       const isSummaryAction = input.uiAction === "SHOW_SUMMARY";
       const isReadyResult =
-        result.isReadyToSend && result.missingFields.length === 0;
+        result.status === "ready" && result.isReadyToSend && result.missingFields.length === 0;
       setIsReadyToSend(isReadyResult);
+      setPendingAction(result.pendingAction);
       setMissingFields(result.missingFields);
       if (isContinueAction || !isReadyResult) {
         setShowSummary(false);
@@ -531,15 +534,14 @@ function OfferAssistantScreen({
       if (
         input.uiAction !== "RESTORE" &&
         result.assistantMessage &&
-        !isSellerOfferReviewInstruction(result.assistantMessage) &&
+        !((result.uiState === "review" || isSummaryAction) && isReadyResult &&
+          result.summary && isSellerOfferReviewInstruction(result.assistantMessage)) &&
         !(isContinueAction && isSellerOfferSummaryInvitation(result.assistantMessage))
       ) {
         appendAssistantMessage(result.assistantMessage);
       }
-      if (input.uiAction === "RESTORE") setShowSummary(result.uiState === "review" && isReadyResult);
-      if (isSummaryAction) {
-        setShowSummary(isReadyResult && result.summary !== null);
-      }
+      setShowSummary(!isContinueAction && isReadyResult && result.summary !== null &&
+        (result.uiState === "review" || isSummaryAction));
 
       if (result.status === "sent") {
         if (result.purchaseOfferId) {
@@ -689,7 +691,7 @@ function OfferAssistantScreen({
         !showSummary &&
         status === "ready" &&
         isReadyToSend &&
-        isSellerOfferSummaryReply(userText, visibleMessages[visibleMessages.length - 1]);
+        isSellerOfferSummaryReply(userText, pendingAction);
 
       if (!shouldOpenSummary) {
         clearReviewState();
@@ -736,7 +738,7 @@ function OfferAssistantScreen({
       offerDraftId,
       showSummary,
       status,
-      visibleMessages,
+      pendingAction,
     ]
   );
 

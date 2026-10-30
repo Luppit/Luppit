@@ -7,11 +7,19 @@ export function shouldOpenAssistantSummary(value: string) {
     .replace(/\s+/g, " ")
     .trim();
 
-  return [
+  if ([
     "si", "si ok", "si por favor", "si porfa", "yes", "ok", "dale", "claro",
-    "mostrar resumen", "ver resumen", "revisar resumen", "muestrame el resumen",
-    "ensename el resumen", "si quiero ver el resumen",
-  ].includes(reply);
+  ].includes(reply)) return true;
+
+  const request = reply
+    .replace(/^(?:si|yes|ok|dale|claro) (?:por favor |porfa )?/, "")
+    .replace(/ (?:por favor|porfa)$/, "");
+  return [
+    "mostrar resumen", "mostrar el resumen", "ver resumen", "ver el resumen",
+    "revisar resumen", "revisar el resumen", "muestra el resumen", "muestrame el resumen",
+    "ensename el resumen", "quiero ver el resumen", "puedes mostrarme el resumen",
+    "me puedes mostrar el resumen",
+  ].includes(request);
 }
 
 export function isAssistantReviewInstruction(value: string) {
@@ -63,10 +71,10 @@ export function getVisibleSellerOfferMessages<T extends SellerOfferTranscriptMes
 
 export function isSellerOfferSummaryReply(
   value: string,
-  previousMessage: SellerOfferTranscriptMessage | undefined
+  pendingAction: string | null
 ) {
   return shouldOpenAssistantSummary(value) && (
     /resumen/i.test(value) ||
-    (previousMessage?.sender === "assistant" && isSellerOfferSummaryInvitation(previousMessage.text))
+    pendingAction === "ASK_SHOW_SUMMARY"
   );
 }

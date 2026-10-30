@@ -7,6 +7,7 @@ Entrypoint for repository guidance. Keep this file compact; put only durable, hi
 - Prefer the smallest change that fully solves the task.
 - Preserve existing architecture, naming, shared UI behavior, and service/RPC boundaries.
 - Reuse current services, RPCs, tables, and shared components before adding new abstractions.
+- Keep marketplace behavior category-independent. Product semantics, units, validation, pricing, prompts, and UI must support new categories through metadata and generic contracts; never hardcode the current tire category.
 - Ask before changing public APIs, schemas, navigation structure, or established app architecture.
 - Do not add dependencies unless they clearly reduce complexity.
 - Never log or expose secrets, tokens, API keys, OTPs, Supabase sessions, or refresh tokens.

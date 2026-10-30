@@ -87,6 +87,7 @@ export type SellerOfferAssistantSuccess = {
   changedFields: string[];
   offerImages: SellerOfferAssistantImage[];
   uiState: string | null;
+  pendingAction: string | null;
   ok: true;
   offerDraftId: string | null;
   purchaseOfferId: string | null;
@@ -331,6 +332,7 @@ function toSuccessPayload(
     hasChanges: payload.has_changes !== false,
     changedFields: normalizeStringArray(payload.changed_fields),
     uiState: normalizeString(payload.ui_state),
+    pendingAction: normalizeString(payload.pending_action),
     offerImages: Array.isArray(payload.offer_images) ? payload.offer_images.flatMap((value) => {
       if (!value || typeof value !== "object") return [];
       const item = value as Record<string, unknown>;

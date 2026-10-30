@@ -51,6 +51,8 @@ export default function ModalTopBar({
 
       {back ? <View style={{ width: 40 }} /> : glass ? (
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
           onPress={goBackOrHome}
           hitSlop={12}
           style={{ width: 40, alignItems: "flex-end", justifyContent: "center" }}
@@ -59,6 +61,8 @@ export default function ModalTopBar({
         </Pressable>
       ) : (
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Cerrar"
           onPress={goBackOrHome}
           hitSlop={12}
           style={{ width: 40, alignItems: "flex-end" }}

@@ -258,6 +258,14 @@ test("seller summary control serializes the user's acknowledgement with its exis
   });
 });
 
+test("seller response metadata preserves the authoritative summary pending action", () => {
+  const service = load("../src/services/purchase.offer.assistant.service.ts", {
+    "../lib/supabase": {}, "../lib/supabase/errors": {}, "./active.profile.service": {},
+  }, "\nexport { toSuccessPayload };\n");
+  assert.equal(service.toSuccessPayload({ pending_action: "ASK_SHOW_SUMMARY" }, null).pendingAction, "ASK_SHOW_SUMMARY");
+  assert.equal(service.toSuccessPayload({ pending_action: null }, null).pendingAction, null);
+});
+
 test("new and batch offer requests stop before the assistant when setup is incomplete", async () => {
   const error = { type: "validation", code: "seller_business_setup_required", message: "Completa la configuración" };
   const service = load("../src/services/purchase.offer.assistant.service.ts", {
@@ -392,13 +400,13 @@ test("reference persists through first message, images, review and corrections w
   assertReference();
   assert.equal(f.aiCalls[1].input.prompt, "Ofrezco 4 llantas");
   assert.equal(f.aiCalls[1].input.images[0], image);
-  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "draft-A", status: "ready", isReadyToSend: true, assistantMessage: "Tu oferta está lista. ¿Deseas ver el resumen?" })); await flush();
+  f.aiCalls[1].response.resolve(aiSuccess({ offerDraftId: "draft-A", status: "ready", pendingAction: "ASK_SHOW_SUMMARY", isReadyToSend: true, assistantMessage: "Tu oferta está lista. ¿Deseas ver el resumen?" })); await flush();
   nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onSend({ text: "Sí", images: [] });
   assert.equal(f.aiCalls[2].input.uiAction, "SHOW_SUMMARY");
   assert.equal(typeof nodes(f.assistant()).find((n) => n.type === "InputChat")!.props.onStop, "function");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.variant, "thinking");
   assert.equal(nodes(f.assistant()).find((n) => n.type === "Progress")!.props.onStop, undefined);
-  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", offerImages: [{ storageRef: "storage://offers/seller/photo", url: "https://example.test/photo" }], isReadyToSend: true, summary: { descripcion: "4 llantas" } })); await flush();
+  f.aiCalls[2].response.resolve(aiSuccess({ offerDraftId: "draft-A", status: "ready", uiState: "review", offerImages: [{ storageRef: "storage://offers/seller/photo", url: "https://example.test/photo" }], isReadyToSend: true, summary: { descripcion: "4 llantas" } })); await flush();
   assertReference();
   const review = nodes(f.assistant()).find((n) => typeof n.type === "function" && n.type.name === "OfferSummaryCard")!;
   assert.ok(review);
@@ -495,6 +503,7 @@ const offerInvitation = "Tu oferta está lista. ¿Deseas ver el resumen?";
 const offerReviewInstruction = "Aquí tienes el resumen de la oferta. ¿Deseas enviarla o seguir ajustando?";
 const readyOffer = {
   offerDraftId: "saved", status: "ready", isReadyToSend: true,
+  pendingAction: "ASK_SHOW_SUMMARY",
   offerImages: [{ storageRef: "storage://offers/seller/photo", url: "https://example.test/photo" }],
   hasChanges: true, draftVersion: 2, baseOfferRevision: "published-revision",
   summary: { descripcion: "3 llantas", precio: 55000, basePrecio: "UNIT", cantidadOfrecida: 3, precioTotal: 165000, moneda: "COL" },
@@ -719,7 +728,7 @@ test("restored control announcements are filtered without deleting real replies,
   assert.equal(view.messages.filter((m) => m.text === offerInvitation).length, 2, "A real correction may earn a new invitation");
 });
 
-test("offer acknowledgements require an actual pending invitation and never publish or reopen a visible summary", async () => {
+test("offer acknowledgements require the persisted pending action and never publish or reopen a visible summary", async () => {
   for (const scenario of ["review", "guidance", "blocked", "mixed", "images"] as const) {
     const f = screenFixture();
     await restoreReadyOffer(f);
@@ -728,6 +737,7 @@ test("offer acknowledgements require an actual pending invitation and never publ
       assistantView(f).composer.onSend({ text: "Confirma las condiciones", images: [] });
       f.aiCalls.at(-1)!.response.resolve(aiSuccess({
         ...readyOffer,
+        pendingAction: null,
         ...(scenario === "blocked" ? { status: "draft", isReadyToSend: false, missingFields: ["confirmacion de oferta"] } : {}),
         assistantMessage: "Para completar la oferta, necesito confirmar: confirmacion de oferta. ¿Me ayudas con ese dato?",
       }));
@@ -1339,4 +1349,40 @@ test("a late offer discard after unmount cannot restore, and a published offer r
   assert.equal(await oldConfirm(), false);
   assert.equal(published.aiCalls.length, 2);
   assert.equal(assistantView(published).composer.disabled, true);
+});
+
+test("natural summary confirmation opens review and a stopped acknowledgement can resume from persisted state", async () => {
+  const f = screenFixture();
+  await restoreReadyOffer(f);
+  const stopped = assistantView(f).composer.onSend({ text: "Sí, muestra el resumen.", images: [] });
+  const pending = f.aiCalls.at(-1)!;
+  assert.equal(pending.input.uiAction, "SHOW_SUMMARY");
+  assistantView(f).composer.onStop();
+  pending.response.resolve(aiSuccess({ ...readyOffer, uiState: "review", assistantMessage: offerReviewInstruction }));
+  await assert.rejects(stopped, /Seller offer message failed/);
+  assert.equal(assistantView(f).review, undefined, "A stopped response cannot open review late");
+
+  const resumed = screenFixture();
+  await restoreReadyOffer(resumed, [
+    { id: "photo", role: "user", content: "Ofrezco 4 plantas", imageUrls: ["https://example.test/photo"] },
+    { id: "ready", role: "assistant", content: offerInvitation, imageUrls: [] },
+    { id: "stopped", role: "user", content: "Sí, muestra el resumen.", imageUrls: [] },
+  ]);
+  await openOfferSummary(resumed, "Sí");
+  assert.ok(assistantView(resumed).review);
+  assert.equal(assistantView(resumed).review!.offerImages, readyOffer.offerImages);
+});
+
+test("a normal seller turn renders an authoritative ready review result and rejects inconsistent readiness", async () => {
+  for (const status of ["ready", "draft", "sent", "cancelled"]) {
+    const f = screenFixture();
+    await restoreReadyOffer(f);
+    const send = assistantView(f).composer.onSend({ text: "Revisa lo que te envié", images: [] });
+    assert.equal(f.aiCalls.at(-1)!.input.uiAction, null);
+    f.aiCalls.at(-1)!.response.resolve(aiSuccess({
+      ...readyOffer, status, uiState: "review", assistantMessage: offerReviewInstruction,
+    }));
+    await send;
+    assert.equal(Boolean(assistantView(f).review), status === "ready", status);
+  }
 });
