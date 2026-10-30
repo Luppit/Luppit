@@ -67,9 +67,9 @@ export const createNavbarStyles = (t: Theme) => {
       maxWidth: "100%",
       height: 62,
       borderRadius: 31,
-      backgroundColor: "rgba(241,245,246,0.88)",
+      backgroundColor: t.colors.primaryLight,
       borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.72)",
+      borderColor: t.colors.primaryLight,
     },
     itemInnerDisabled: {
       opacity: 0.48,

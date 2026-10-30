@@ -1,10 +1,10 @@
 export const colors = {
-  primary: "#83A31E",
+  primary: "#52670F",
   primaryLight: "#DBE4D0",
   secondary: "#CA7330",
   secondaryLight: "#FFC861",
 
-  success: "#83A31E",
+  success: "#52670F",
   info: "#77BEF0",
   warning: "#FFC861",
   error: "#A52100",
@@ -16,6 +16,8 @@ export const colors = {
 
   textDark: "#1C1C1C",
   textMedium: "#333333",
+  textMuted: "#62665D",
+  white: "#FFFFFF",
   border: "#DDDDDD",
   background: "#F9FAFB",
   IconColorGray: "#BBBBBB",
@@ -25,4 +27,28 @@ export const colors = {
    shadow:"#000",
    ripple :"rgba(0,0,0,0.10)",
 };
- 
+
+export const darkColors: typeof colors = {
+  ...colors,
+  primary: "#B9D779",
+  primaryLight: "#2C3B20",
+  secondary: "#E4A878",
+  secondaryLight: "#463423",
+  success: "#B9D779",
+  info: "#8DCDF6",
+  warning: "#E3BD67",
+  error: "#FFB09B",
+  stateConfirmed: "#E3BD67",
+  stateCanceled: "#F18D86",
+  stateCompleted: "#8DCDF6",
+  stateAnulated: "#6B7567",
+  textDark: "#F2F4ED",
+  textMedium: "#C7CEBF",
+  textMuted: "#A9B29F",
+  border: "#3D473B",
+  background: "#111610",
+  IconColorGray: "#8B9683",
+  backgroudWhite: "#1D251C",
+  accentYellow: "#E8C460",
+  ripple: "rgba(237,245,226,0.12)",
+};

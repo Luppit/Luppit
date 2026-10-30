@@ -492,8 +492,8 @@ function SellerOffersContent() {
               : "Buscar y filtrar ofertas"
           }
         >
-          <Icon name="search" size={20} color={t.colors.stateAnulated} />
-          <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+          <Icon name="search" size={20} color={t.colors.textMuted} />
+          <Text variant="body" color="textMuted" style={s.searchTriggerText}>
             {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
           </Text>
         </Pressable>
@@ -504,7 +504,7 @@ function SellerOffersContent() {
           accessibilityRole="button"
           accessibilityLabel="Ordenar ofertas"
         >
-          <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+          <Icon name="arrow-up-down" size={24} color={t.colors.textMuted} />
         </Pressable>
     </View>
   );

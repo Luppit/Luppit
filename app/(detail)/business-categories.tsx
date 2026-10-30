@@ -308,8 +308,8 @@ export default function BusinessCategoriesScreen() {
               <GroupedListSection title={selectedSectionTitle}>
                 {selectedCategoryRows.length === 0 ? (
                   <View style={s.emptyCategoryRow}>
-                    <Text color="stateAnulated">Aún no has elegido categorías.</Text>
-                    <Text variant="small" color="stateAnulated">
+                    <Text color="textMuted">Aún no has elegido categorías.</Text>
+                    <Text variant="small" color="textMuted">
                       Selecciona las líneas de productos que vende tu negocio.
                     </Text>
                   </View>
@@ -355,7 +355,7 @@ export default function BusinessCategoriesScreen() {
 
                 {categoryBrowserItems.length === 0 ? (
                   <View style={s.emptyCategoryRow}>
-                    <Text color="stateAnulated">
+                    <Text color="textMuted">
                       {getEmptyCategoryBrowserCopy()}
                     </Text>
                   </View>
@@ -442,7 +442,7 @@ function SelectedCategoryRow({
           onPress={onRemove}
           style={s.categoryActionButton}
         >
-          <Icon name="trash-2" size={18} color={t.colors.stateAnulated} />
+          <Icon name="trash-2" size={18} color={t.colors.textMuted} />
         </Pressable>
       }
     />
@@ -530,13 +530,13 @@ function CategoryToggleRow({
       style={[s.categoryRow, showSeparator ? s.categoryRowWithSeparator : null]}
     >
       <View style={s.categoryIcon}>
-        <Icon name="tag" size={20} color={t.colors.stateAnulated} />
+        <Icon name="tag" size={20} color={t.colors.textMuted} />
       </View>
       <View style={s.rowText}>
         <Text variant="body" style={s.categoryLabel} maxLines={2}>
           {category.name}
         </Text>
-        <Text variant="small" color="stateAnulated" maxLines={2}>
+        <Text variant="small" color="textMuted" maxLines={2}>
           {breadcrumb || "Categoría completa"}
         </Text>
       </View>

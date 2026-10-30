@@ -82,7 +82,7 @@ export default function FaqScreen() {
     return (
       <View style={s.centerState}>
         <View style={s.emptyIconBadge}>
-          <Icon name="help-circle" size={28} color={t.colors.stateAnulated} />
+          <Icon name="help-circle" size={28} color={t.colors.textMuted} />
         </View>
         <Text variant="subtitle" align="center">
           No se pudo cargar la ayuda.
@@ -180,7 +180,7 @@ function FaqAccordionRow({
         <Icon
           name={isExpanded ? "chevron-down" : "chevron-right"}
           size={18}
-          color={t.colors.stateAnulated}
+          color={t.colors.textMuted}
         />
       </Pressable>
 

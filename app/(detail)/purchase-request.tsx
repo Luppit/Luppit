@@ -525,7 +525,7 @@ export default function PurchaseRequestDetailScreen() {
   if (!purchaseRequest) {
     return (
       <View style={s.centerState}>
-        <Text align="center" color="stateAnulated">
+        <Text align="center" color="textMuted">
           No encontramos esta solicitud.
         </Text>
       </View>
@@ -544,9 +544,9 @@ export default function PurchaseRequestDetailScreen() {
           </Text>
 
           <View style={s.viewsRow}>
-            <Text color="stateAnulated">Visualizaciones</Text>
-            <Icon name="eye" size={20} color={t.colors.stateAnulated} />
-            <Text color="stateAnulated">{String(viewsCount)}</Text>
+            <Text color="textMuted">Visualizaciones</Text>
+            <Icon name="eye" size={20} color={t.colors.textMuted} />
+            <Text color="textMuted">{String(viewsCount)}</Text>
           </View>
         </View>
 
@@ -603,7 +603,7 @@ export default function PurchaseRequestDetailScreen() {
                   <Icon
                     name="sliders-horizontal"
                     size={18}
-                    color={t.colors.stateAnulated}
+                    color={t.colors.textMuted}
                   />
                 </Pressable>
                 <Pressable
@@ -616,7 +616,7 @@ export default function PurchaseRequestDetailScreen() {
                   <Icon
                     name="arrow-up-down"
                     size={18}
-                    color={t.colors.stateAnulated}
+                    color={t.colors.textMuted}
                   />
                 </Pressable>
               </View>
@@ -661,7 +661,7 @@ export default function PurchaseRequestDetailScreen() {
               </Text>
               <Text
                 variant="small"
-                color="stateAnulated"
+                color="textMuted"
                 align="center"
                 style={s.emptyOffersDescription}
               >

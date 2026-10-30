@@ -14,7 +14,7 @@ export const Text: React.FC<TextProps> = ({
   color = "textDark",
   align = "left",
   maxLines,
-  maxFontSizeMultiplier = 1.3,
+  maxFontSizeMultiplier = 2,
   style,
   children,
   ...rest

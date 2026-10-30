@@ -1,11 +1,12 @@
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
-import { colors, spacing } from "@/src/themes";
+import { spacing, useTheme } from "@/src/themes";
 import { Redirect, Slot, usePathname } from "expo-router";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AuthLayout() {
+  const t = useTheme();
   const { state } = useActiveProfile();
   const pathname = usePathname();
 
@@ -44,7 +45,7 @@ export default function AuthLayout() {
   }
 
   return (
-    <SafeAreaView style={authLayoutStyles.container}>
+    <SafeAreaView style={[authLayoutStyles.container, { backgroundColor: t.colors.background }]}>
       <View style={authLayoutStyles.viewStyles}>
         <Slot />
       </View>
@@ -54,7 +55,6 @@ export default function AuthLayout() {
 
 const authLayoutStyles = StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
     flex: 1,
   },
   viewStyles: {

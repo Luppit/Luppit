@@ -203,7 +203,7 @@ export default function BusinessLocationEditScreen() {
         >
           <GroupedListSection title="Ubicación">
             <View style={s.errorState} accessibilityLiveRegion="polite">
-              <Icon name="map-pin" size={28} color={t.colors.stateAnulated} />
+              <Icon name="map-pin" size={28} color={t.colors.textMuted} />
               <Text align="center">No pudimos cargar las ubicaciones.</Text>
               <Pressable
                 accessibilityRole="button"
@@ -245,7 +245,7 @@ export default function BusinessLocationEditScreen() {
                   {initialLocationLabel ? (
                     <Text maxLines={2}>{initialLocationLabel}</Text>
                   ) : null}
-                  <Text color="stateAnulated">
+                  <Text color="textMuted">
                     Esta ubicación ya no está disponible. Selecciona una ubicación válida para actualizarla.
                   </Text>
                 </View>
@@ -289,7 +289,7 @@ export default function BusinessLocationEditScreen() {
         }
         ListEmptyComponent={
           <View style={s.emptyState} accessibilityLiveRegion="polite">
-            <Text color="stateAnulated" align="center">
+            <Text color="textMuted" align="center">
               {trimmedQuery
                 ? `No encontramos ubicaciones para “${trimmedQuery}”.`
                 : "No encontramos ubicaciones disponibles."}
@@ -393,7 +393,7 @@ function LocationOptionRow({
           {label}
         </Text>
         {description ? (
-          <Text variant="small" color="stateAnulated" maxLines={2}>
+          <Text variant="small" color="textMuted" maxLines={2}>
             {description}
           </Text>
         ) : null}

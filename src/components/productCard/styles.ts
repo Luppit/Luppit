@@ -56,7 +56,7 @@ export function createProductCardStyles(t: Theme): ProductCardStyles {
       flexShrink: 0,
     },
     viewsText: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
     },
     offersMetric: {
       maxWidth: "72%",

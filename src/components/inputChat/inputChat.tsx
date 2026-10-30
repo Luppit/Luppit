@@ -266,13 +266,14 @@ export default function InputChat({
               ref={inputRef}
               style={[styles.textInput, styles.textInputOverlay]}
               placeholder={placeholder}
-              placeholderTextColor={t.colors.stateAnulated}
+              placeholderTextColor={t.colors.textMuted}
               value={text}
               onChangeText={handleTextChange}
               editable={!isBlocked}
               accessibilityLabel="Mensaje"
               autoFocus={autoFocus}
               multiline={true}
+              maxFontSizeMultiplier={2}
               returnKeyType={sendOnReturn ? "send" : "default"}
               submitBehavior={sendOnReturn ? "submit" : "newline"}
               scrollEnabled

@@ -387,7 +387,7 @@ export default function ConversationChatScreen() {
             backgroundColor: "rgba(0,0,0,0.36)",
           }}
         >
-          <Text variant="body" style={{ color: t.colors.backgroudWhite }}>
+          <Text variant="body" style={{ color: t.colors.white }}>
             +{hiddenImageCount}
           </Text>
         </View>
@@ -510,7 +510,7 @@ export default function ConversationChatScreen() {
                 {senderName}
               </Text>
             </Pressable>
-            <Text variant="small" color="stateAnulated" style={{ flexShrink: 0 }}>
+            <Text variant="small" color="textMuted" style={{ flexShrink: 0 }}>
               {formatTime(message.created_at)}
             </Text>
           </View>
@@ -711,7 +711,7 @@ export default function ConversationChatScreen() {
               backgroundColor: "rgba(255,255,255,0.16)",
             }}
           >
-            <Icon name="x" size={24} color={t.colors.backgroudWhite} />
+            <Icon name="x" size={24} color={t.colors.white} />
           </Pressable>
 
           {activePreviewImage ? (
@@ -759,7 +759,7 @@ export default function ConversationChatScreen() {
                 <Icon
                   name="arrow-left"
                   size={24}
-                  color={t.colors.backgroudWhite}
+                  color={t.colors.white}
                 />
               </Pressable>
               <Pressable
@@ -782,14 +782,14 @@ export default function ConversationChatScreen() {
                 <Icon
                   name="arrow-right"
                   size={24}
-                  color={t.colors.backgroudWhite}
+                  color={t.colors.white}
                 />
               </Pressable>
               <Text
                 variant="small"
                 align="center"
                 style={{
-                  color: t.colors.backgroudWhite,
+                  color: t.colors.white,
                   position: "absolute",
                   bottom: Math.max(insets.bottom, t.spacing.xl),
                   alignSelf: "center",

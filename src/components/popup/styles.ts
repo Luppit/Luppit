@@ -5,8 +5,6 @@ import {
 import { fontFamilies, Theme } from "@/src/themes";
 import { ImageStyle, StyleSheet, TextStyle, ViewStyle } from "react-native";
 
-const SOFT_BORDER_COLOR = "rgba(0,0,0,0.08)";
-const SOFT_SEPARATOR_COLOR = "rgba(0,0,0,0.08)";
 
 export type GlobalPopupStyles = {
   backdrop: ViewStyle;
@@ -213,7 +211,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       width: 44,
       height: 5,
       borderRadius: 999,
-      backgroundColor: t.colors.stateAnulated,
+      backgroundColor: t.colors.textMuted,
       opacity: 0.45,
     },
     optionButton: {
@@ -234,7 +232,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     separator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
       marginLeft: 48,
     },
     section: {
@@ -249,7 +247,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       height: 48,
       borderRadius: t.borders.md,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       justifyContent: "center",
@@ -267,7 +265,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       height: 48,
       borderRadius: t.borders.md,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       backgroundColor: t.colors.backgroudWhite,
       paddingHorizontal: t.spacing.md,
       flexDirection: "row",
@@ -301,7 +299,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       gap: t.spacing.xs,
       paddingHorizontal: t.spacing.md,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
     },
     filterActionButtonPrimary: {
       backgroundColor: t.colors.primary,
@@ -339,7 +337,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       height: 24,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -354,7 +352,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     sortSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
       marginLeft: 56,
     },
     summaryHeaderBlock: {
@@ -369,7 +367,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryHeaderSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
     },
     summaryTitle: {
       flex: 1,
@@ -395,7 +393,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       padding: t.spacing.md,
       gap: t.spacing.sm,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
     },
     offerAcceptanceRow: {
       flexDirection: "row",
@@ -454,7 +452,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       marginTop: t.spacing.xs,
       overflow: "hidden",
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       ...createRoundedSurfaceStyle(t),
     },
     choiceOption: {
@@ -464,7 +462,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       gap: t.spacing.md,
       padding: t.spacing.md,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       borderRadius: ROUNDED_SURFACE_RADIUS,
       backgroundColor: t.colors.backgroudWhite,
     },
@@ -485,7 +483,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     choiceOptionCompactWithSeparator: {
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: SOFT_SEPARATOR_COLOR,
+      borderBottomColor: t.colors.border,
     },
     choiceSelectTrigger: {
       minHeight: 54,
@@ -505,7 +503,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       color: t.colors.textDark,
     },
     choiceSelectPlaceholder: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
     },
     choicePickerHeader: {
       minHeight: 44,
@@ -622,7 +620,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     summaryRowSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
       marginHorizontal: t.spacing.md,
     },
     summaryImageBlock: {
@@ -649,7 +647,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       borderRadius: t.borders.sm,
       overflow: "hidden",
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       backgroundColor: t.colors.background,
     },
     summaryImage: {
@@ -681,7 +679,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     datePickerCard: {
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       backgroundColor: t.colors.backgroudWhite,
       borderRadius: t.borders.md,
       padding: t.spacing.md,
@@ -708,14 +706,15 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       flexDirection: "row",
       gap: t.spacing.xs,
       borderWidth: 1,
-      borderColor: SOFT_BORDER_COLOR,
+      borderColor: t.colors.border,
       paddingHorizontal: t.spacing.sm,
+      paddingVertical: t.spacing.sm,
     },
     summaryActionButtonSingle: {
       flex: 0,
       width: "100%",
     },
-    summaryActionLabel: {},
+    summaryActionLabel: { flexShrink: 1 },
     helperContentScroll: {
       borderRadius: ROUNDED_SURFACE_RADIUS,
     },
@@ -751,7 +750,7 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
     },
     helperRowSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
     },
     helperOverlayBackdrop: {
       flex: 1,
@@ -808,13 +807,13 @@ export function createGlobalPopupStyles(t: Theme): GlobalPopupStyles {
       marginTop: 5,
     },
     profileSwitcherMetaText: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
       flex: 1,
       minWidth: 0,
     },
     profileSwitcherSeparator: {
       borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: SOFT_SEPARATOR_COLOR,
+      borderTopColor: t.colors.border,
       marginLeft: 72,
     },
     profileSwitcherAction: {

@@ -68,7 +68,7 @@ export function createOptionsChecklistCardStyles(t: Theme): OptionsChecklistCard
       height: checkboxSize,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: t.colors.stateAnulated,
+      borderColor: t.colors.textMuted,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.backgroudWhite,

@@ -71,26 +71,6 @@ export default function HomeScreen() {
   );
 }
 
-function getHomeTopContentInset(t: Theme, hasFilterChip: boolean) {
-  const profileHeight =
-    t.typography.subtitle.lineHeight +
-    t.spacing.sm +
-    t.typography.small.lineHeight;
-  const searchHeight = 48;
-  const segmentHeight = 58;
-  const headerHeight =
-    t.spacing.lg +
-    profileHeight +
-    t.spacing.md +
-    searchHeight +
-    t.spacing.md +
-    segmentHeight +
-    t.spacing.md;
-  const filterChipHeight = hasFilterChip ? 36 + t.spacing.md : 0;
-
-  return headerHeight + filterChipHeight + t.spacing.md;
-}
-
 function toPurchaseRequestParam(item: MarketplaceHubItem) {
   return {
     id: item.id,
@@ -278,7 +258,6 @@ function BuyerHomeContent() {
       selectedStageCode={selectedStageCode}
       selectedSortCode={selectedSortCode}
       selectedSegmentSvgName={selectedSegmentSvgName}
-      hasFilterChip={hasBuyerHomeFilters(filters)}
       hasActiveFilters={hasActiveFilters}
       onSelectStage={setSelectedStageCode}
       onSelectSort={setSelectedSortCode}
@@ -368,7 +347,6 @@ function SellerHomeContent() {
       selectedStageCode={selectedStageCode}
       selectedSortCode={null}
       selectedSegmentSvgName={selectedSegmentSvgName}
-      hasFilterChip={hasSellerHomeFilters(filters)}
       hasActiveFilters={hasActiveFilters}
       onSelectStage={setSelectedStageCode}
       onSelectSort={undefined}
@@ -387,7 +365,6 @@ function MarketplaceHomeContent({
   selectedStageCode,
   selectedSortCode,
   selectedSegmentSvgName,
-  hasFilterChip,
   hasActiveFilters,
   onSelectStage,
   onSelectSort,
@@ -402,7 +379,6 @@ function MarketplaceHomeContent({
   selectedStageCode: string;
   selectedSortCode: string | null;
   selectedSegmentSvgName: string;
-  hasFilterChip: boolean;
   hasActiveFilters: boolean;
   onSelectStage: (stageCode: string) => void;
   onSelectSort?: (sortCode: string) => void;
@@ -413,11 +389,9 @@ function MarketplaceHomeContent({
   const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const { favoriteIds, toggle: toggleFavorite } = usePurchaseRequestFavorites(role);
   const { width, fontScale } = useWindowDimensions();
+  const stackStages = fontScale > 1.3;
   const stackStageCounts = width < 390 || fontScale > 1;
-  const topContentInset = useMemo(
-    () => getHomeTopContentInset(t, hasFilterChip),
-    [hasFilterChip, t]
-  );
+  const topContentInset = t.spacing.xs;
   const selectedStage =
     hub?.stages.find((stage) => stage.code === selectedStageCode) ??
     hub?.stages.find((stage) => stage.is_selected) ?? null;
@@ -513,6 +487,21 @@ function MarketplaceHomeContent({
   }
 
   const attentionStage = hub.stages.find((stage) => stage.code === "needs_attention") ?? null;
+  const renderRequestCard = (item: MarketplaceHubItem, compact: boolean) => (
+    <MarketplaceRequestCard
+      compact={compact}
+      item={item}
+      role={role}
+      showSellerStatus={role === "seller"}
+      onPress={() => role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item)}
+      onLongPress={() => openPurchaseRequestCardMenu({
+        item,
+        role,
+        isFavorite: favoriteIds.has(item.id),
+        onToggleFavorite: () => void toggleFavorite(item.id),
+      })}
+    />
+  );
 
   return (
     <ScrollView
@@ -520,13 +509,11 @@ function MarketplaceHomeContent({
       contentContainerStyle={[s.scrollContent, { paddingTop: topContentInset }]}
     >
       <View style={s.summaryBlock}>
-        <Text variant="small" color="textMedium">
-          {hasActiveFilters && filters.searchValue
-            ? `Resultados para “${filters.searchValue}”`
-            : hasActiveFilters
-              ? "Resultados"
-              : "Resumen"}
-        </Text>
+        {hasActiveFilters ? (
+          <Text variant="small" color="textMedium">
+            {filters.searchValue ? `Resultados para “${filters.searchValue}”` : "Resultados"}
+          </Text>
+        ) : null}
         {hasActiveFilters ? (
           <Text variant="body" color="textMedium" accessibilityLiveRegion="polite">
             {isLoading
@@ -545,7 +532,7 @@ function MarketplaceHomeContent({
                   ? "oportunidad disponible"
                   : "oportunidades disponibles"}
             </Text>
-            <Text variant="body" color="stateAnulated">
+            <Text variant="body" color="textMuted">
               {attentionCount > 0
                 ? attentionCount === 1
                   ? "Una necesita atención."
@@ -599,7 +586,7 @@ function MarketplaceHomeContent({
         />
       ) : null}
 
-      <View style={s.stageList}>
+      <View style={[s.stageList, stackStages ? s.stageListLarge : null]}>
         {hub.stages.map((stage, index) => (
           <LuppitChip
             key={stage.code}
@@ -607,11 +594,12 @@ function MarketplaceHomeContent({
             count={stage.count}
             selected={stage.code === selectedStage?.code}
             variant="homeStage"
-            stacked={stackStageCounts}
+            stacked={stackStageCounts && !stackStages}
             labelMaxLines={0}
             style={{
-              ...(index > 0 ? s.stageDivider : undefined),
+              ...(index > 0 ? stackStages ? s.stageDividerLarge : s.stageDivider : undefined),
               ...(role === "seller" && !stackStageCounts ? s.sellerStage : undefined),
+              ...(stackStages ? s.stageLarge : undefined),
             }}
             accessibilityLabel={`${stage.name}, ${stage.count} ${stage.count === 1 ? "solicitud" : "solicitudes"}`}
             onPress={() => onSelectStage(stage.code)}
@@ -681,32 +669,16 @@ function MarketplaceHomeContent({
           <View style={s.railLoading} accessibilityState={{ busy: true }}>
             <LoadingState variant="inline" label="Cargando solicitudes..." />
           </View>
-        ) : items.length > 0 ? (
+        ) : items.length === 1 ? (
+          <View style={s.singleCard}>{renderRequestCard(items[0], false)}</View>
+        ) : items.length > 1 ? (
           <FlatList
             horizontal
             data={items}
             keyExtractor={(item) => item.purchase_request_id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={s.cardRailContent}
-            renderItem={({ item }) => (
-              <MarketplaceRequestCard
-                compact
-                item={item}
-                role={role}
-                showSellerStatus={role === "seller"}
-                onPress={() =>
-                  role === "buyer" ? openBuyerRequest(item) : void openSellerRequest(item)
-                }
-                onLongPress={() =>
-                  openPurchaseRequestCardMenu({
-                    item,
-                    role,
-                    isFavorite: favoriteIds.has(item.id),
-                    onToggleFavorite: () => void toggleFavorite(item.id),
-                  })
-                }
-              />
-            )}
+            renderItem={({ item }) => renderRequestCard(item, true)}
           />
         ) : (
           <HomeRailEmptyState
@@ -733,20 +705,9 @@ function HomeRailEmptyState({ message }: { message: string }) {
   return (
     <View style={s.inlineEmptyState}>
       <View style={s.inlineEmptyIllustration}>
-        <BundledSvg
-          asset={require("../../assets/images/empty_box.svg")}
-          width={112}
-          height={112}
-          fallback={
-            <Image
-              source={require("../../assets/images/icon.png")}
-              style={s.inlineEmptyFallbackImage}
-              resizeMode="contain"
-            />
-          }
-        />
+        <Icon name="folder-closed" size={24} color={t.colors.primary} />
       </View>
-      <Text variant="small" color="stateAnulated" align="center" style={s.inlineEmptyText}>
+      <Text variant="small" color="textMuted" align="center" style={s.inlineEmptyText}>
         {message}
       </Text>
     </View>
@@ -848,20 +809,19 @@ function createMarketplaceHomeStyles(t: Theme) {
     screen: {
       flex: 1,
       backgroundColor: t.colors.background,
-      padding: t.spacing.xs,
     },
     scrollContent: {
       paddingBottom: 112,
-      gap: t.spacing.lg,
+      gap: t.spacing.md,
     },
     summaryBlock: {
       gap: t.spacing.xs,
-      paddingHorizontal: t.spacing.md,
+      paddingHorizontal: t.spacing.sm,
     },
     stageList: {
       flexDirection: "row",
       alignItems: "stretch",
-      marginHorizontal: t.spacing.md,
+      marginHorizontal: t.spacing.sm,
       borderRadius: t.glass.radius.chip,
       borderWidth: 1,
       borderColor: t.colors.border,
@@ -871,6 +831,19 @@ function createMarketplaceHomeStyles(t: Theme) {
     stageDivider: {
       borderLeftWidth: 1,
       borderLeftColor: t.colors.border,
+    },
+    stageListLarge: {
+      flexDirection: "column",
+      borderRadius: t.borders.md,
+    },
+    stageDividerLarge: {
+      borderTopWidth: 1,
+      borderTopColor: t.colors.border,
+    },
+    stageLarge: {
+      flex: 0,
+      justifyContent: "space-between",
+      paddingHorizontal: t.spacing.md,
     },
     sellerStage: {
       flex: 0,
@@ -886,7 +859,7 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     railHeader: {
       gap: t.spacing.xs,
-      paddingHorizontal: t.spacing.md,
+      paddingHorizontal: t.spacing.sm,
     },
     railHeaderTop: {
       flexDirection: "row",
@@ -929,7 +902,10 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     cardRailContent: {
       gap: t.spacing.md,
-      paddingHorizontal: t.spacing.md,
+      paddingHorizontal: t.spacing.sm,
+    },
+    singleCard: {
+      marginHorizontal: t.spacing.sm,
     },
     inlineEmptyState: {
       minHeight: 176,
@@ -942,17 +918,15 @@ function createMarketplaceHomeStyles(t: Theme) {
       ...createRoundedSurfaceStyle(t),
     },
     inlineEmptyIllustration: {
-      width: 120,
-      height: 112,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: t.colors.primaryLight,
       alignItems: "center",
       justifyContent: "center",
     },
     inlineEmptyText: {
       maxWidth: 240,
-    },
-    inlineEmptyFallbackImage: {
-      width: 84,
-      height: 84,
     },
     stateContent: {
       flex: 1,

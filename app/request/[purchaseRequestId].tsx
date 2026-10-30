@@ -155,7 +155,7 @@ export default function SharedPurchaseRequestResolver() {
       }}
     >
       {errorMessage ? (
-        <Text align="center" color="stateAnulated">
+        <Text align="center" color="textMuted">
           {errorMessage}
         </Text>
       ) : (

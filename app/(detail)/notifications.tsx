@@ -589,7 +589,7 @@ function NotificationRow({
           >
             {title}
           </Text>
-          <Text variant="small" color="stateAnulated" maxLines={1} style={s.rowTime}>
+          <Text variant="small" color="textMuted" maxLines={1} style={s.rowTime}>
             {formatNotificationTime(notification.createdAt)}
           </Text>
         </View>

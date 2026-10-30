@@ -101,7 +101,7 @@ export default function SellerBusinessSetupChecklist({
                 <View style={s.check} accessibilityElementsHidden importantForAccessibility="no">
                   <Icon name="check" size={16} color={t.colors.backgroudWhite} />
                 </View>
-              ) : <Text variant="small" color="stateAnulated">Pendiente</Text>}
+              ) : <Text variant="small" color="textMuted">Pendiente</Text>}
             />
           ))}
         </GroupedList>
@@ -112,7 +112,7 @@ export default function SellerBusinessSetupChecklist({
             ? "Abrir ajustes" : nextStep.actionLabel : "Pendiente del administrador principal"}
           onPress={nextStep ? () => void openStep(nextStep) : undefined}
         />
-        <Text variant="small" color="stateAnulated" align="center">
+        <Text variant="small" color="textMuted" align="center">
           {remaining === 1 ? "Falta 1 paso" : `Faltan ${remaining} pasos`}
         </Text>
       </View>

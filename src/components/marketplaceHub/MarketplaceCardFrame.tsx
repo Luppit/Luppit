@@ -66,7 +66,7 @@ export default function MarketplaceCardFrame({
           {subtitle ? (
             <Text
               variant="small"
-              color="stateAnulated"
+              color="textMuted"
               maxLines={fullText ? undefined : 1}
             >
               {subtitle}

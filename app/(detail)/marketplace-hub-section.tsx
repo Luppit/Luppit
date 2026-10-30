@@ -995,11 +995,11 @@ export default function MarketplaceHubSectionScreen() {
               <Icon
                 name="sliders-horizontal"
                 size={20}
-                color={t.colors.stateAnulated}
+                color={t.colors.textMuted}
               />
               <Text
                 variant="body"
-                color="stateAnulated"
+                color="textMuted"
                 style={s.searchTriggerText}
               >
                 {activeFilterCount > 0
@@ -1020,7 +1020,7 @@ export default function MarketplaceHubSectionScreen() {
               <Icon
                 name="arrow-up-down"
                 size={24}
-                color={t.colors.stateAnulated}
+                color={t.colors.textMuted}
               />
             </Pressable>
           </View>

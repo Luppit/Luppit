@@ -21,7 +21,7 @@ import { showError } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React from "react";
-import { Platform, Pressable, SectionList, StyleSheet, View } from "react-native";
+import { Platform, Pressable, SectionList, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const EMPTY_CHAT_FILTERS: ConversationListFilters = {
@@ -440,8 +440,8 @@ function ChatsContent({
           hasActiveFilters ? "Editar filtros aplicados" : "Buscar y filtrar chats"
         }
       >
-        <Icon name="search" size={20} color={t.colors.stateAnulated} />
-        <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+        <Icon name="search" size={20} color={t.colors.textMuted} />
+        <Text variant="body" color="textMuted" style={s.searchTriggerText}>
           {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
         </Text>
       </Pressable>
@@ -474,6 +474,8 @@ function ChatListRow({
   onPress: () => void;
 }) {
   const t = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const stackMeta = fontScale > 1.3;
   const s = React.useMemo(() => createChatsScreenStyles(t), [t]);
   const preview = getMessagePreview(item);
   const counterpartName = item.display_name || "Contacto";
@@ -514,7 +516,7 @@ function ChatListRow({
           kind={counterpartKind}
           name={counterpartName}
           imagePath={item.counterpart_image_path}
-          size={52}
+          size={40}
           accessible={false}
         />
         {item.has_unopened ? (
@@ -530,33 +532,27 @@ function ChatListRow({
         <View style={s.chatTitleRow}>
           <Text
             variant="body"
-            maxLines={2}
             style={[s.chatRequestTitle, item.has_unopened ? s.chatRequestTitleUnread : null]}
           >
             {requestTitle}
           </Text>
-          <Text variant="small" color="stateAnulated" maxLines={1} style={s.chatTime}>
-            {timeLabel}
-          </Text>
         </View>
-        <Text variant="small" color="textMedium" maxLines={1}>
-          {counterpartName}
-        </Text>
+        <View style={[s.chatMetaRow, stackMeta ? s.chatMetaRowLarge : null]}>
+          <Text variant="small" color="textMedium"
+            style={[s.counterpartName, stackMeta ? s.counterpartNameLarge : null]}>
+            {counterpartName}
+          </Text>
+          <Text variant="small" color="textMuted"
+            style={[s.chatTime, stackMeta ? s.chatTimeLarge : null]}>{timeLabel}</Text>
+        </View>
 
         {statusLabel ? (
-          <View style={s.chatStatusRow}>
-            <Text variant="small" color="stateAnulated" maxLines={1}>
-              Estado
-            </Text>
-            <Text variant="small" color="textMedium" maxLines={1} style={s.chatStatus}>
-              {statusLabel}
-            </Text>
-          </View>
+          <Text variant="small" color="textMuted">Estado: {statusLabel}</Text>
         ) : null}
         <Text
           variant="small"
-          color="stateAnulated"
-          maxLines={1}
+          color="textMuted"
+          maxLines={2}
           style={[s.chatPreview, item.has_unopened ? s.chatPreviewUnread : null]}
         >
           {preview}
@@ -739,7 +735,7 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       minHeight: 116,
       flexDirection: "row",
       alignItems: "flex-start",
-      gap: t.spacing.md,
+      gap: t.spacing.sm,
       marginHorizontal: t.spacing.md,
       paddingHorizontal: t.spacing.md,
       paddingVertical: t.spacing.md,
@@ -757,8 +753,8 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       backgroundColor: t.colors.primaryLight,
     },
     avatarShell: {
-      width: 52,
-      height: 52,
+      width: 40,
+      height: 40,
       position: "relative",
       marginTop: t.spacing.xs,
     },
@@ -767,9 +763,10 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       right: -5,
       bottom: -4,
       minWidth: 20,
-      height: 20,
+      minHeight: 20,
       borderRadius: 10,
       paddingHorizontal: 4,
+      paddingVertical: 2,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.primary,
@@ -796,19 +793,27 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       flex: 1,
       minWidth: 0,
       color: t.colors.textDark,
+      fontFamily: t.typography.subtitle.fontFamily,
     },
     chatRequestTitleUnread: {
       fontFamily: t.typography.subtitle.fontFamily,
     },
-    chatStatus: {
+    chatMetaRow: {
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: t.spacing.sm,
+    },
+    counterpartName: {
       flex: 1,
       minWidth: 0,
     },
-    chatStatusRow: {
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
+    chatMetaRowLarge: {
+      flexDirection: "column",
       gap: t.spacing.xs,
+    },
+    counterpartNameLarge: {
+      flex: 0,
     },
     chatPreview: {
       minWidth: 0,
@@ -818,14 +823,17 @@ function createChatsScreenStyles(t: Theme, topInset = 0, hasTopBarAccessory = fa
       color: t.colors.textMedium,
     },
     chatTime: {
-      maxWidth: 72,
+      maxWidth: "35%",
       flexShrink: 1,
       textAlign: "right",
-      paddingTop: 2,
+    },
+    chatTimeLarge: {
+      maxWidth: "100%",
+      textAlign: "left",
     },
     chatRowSeparator: {
       position: "absolute",
-      left: t.spacing.md + 52 + t.spacing.md,
+      left: t.spacing.md + 40 + t.spacing.sm,
       right: t.spacing.md,
       bottom: 0,
       height: StyleSheet.hairlineWidth,

@@ -887,7 +887,7 @@ export default function GlobalPopupHost() {
                         <Icon
                           name={isExpanded ? "chevron-down" : "chevron-right"}
                           size={20}
-                          color={t.colors.stateAnulated}
+                          color={t.colors.textMuted}
                         />
                       ) : null}
                     </Pressable>
@@ -1325,12 +1325,12 @@ export default function GlobalPopupHost() {
                                 <Text
                                   variant="body"
                                   style={s.filterDateFieldInput}
-                                  color={filterStartDate ? "textDark" : "stateAnulated"}
+                                  color={filterStartDate ? "textDark" : "textMuted"}
                                   maxLines={1}
                                 >
                                   {filterStartDate || filterConfig.dateRangeField.startPlaceholder || ""}
                                 </Text>
-                                <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                                <Icon name="chevron-down" size={18} color={t.colors.textMuted} />
                               </Pressable>
 
                               <Pressable
@@ -1340,12 +1340,12 @@ export default function GlobalPopupHost() {
                                 <Text
                                   variant="body"
                                   style={s.filterDateFieldInput}
-                                  color={filterEndDate ? "textDark" : "stateAnulated"}
+                                  color={filterEndDate ? "textDark" : "textMuted"}
                                   maxLines={1}
                                 >
                                   {filterEndDate || filterConfig.dateRangeField.endPlaceholder || ""}
                                 </Text>
-                                <Icon name="chevron-down" size={18} color={t.colors.stateAnulated} />
+                                <Icon name="chevron-down" size={18} color={t.colors.textMuted} />
                               </Pressable>
                             </View>
                           </View>
@@ -1981,7 +1981,7 @@ export default function GlobalPopupHost() {
                                       <Icon
                                         name="chevron-down"
                                         size={18}
-                                        color={t.colors.stateAnulated}
+                                        color={t.colors.textMuted}
                                       />
                                     </Pressable>
                                     {!optionsAvailable ? (
@@ -2522,7 +2522,7 @@ export default function GlobalPopupHost() {
             <Image source={{ uri: previewUri }} style={s.summaryImagePreviewImage} />
           ) : null}
           <View style={s.summaryImagePreviewClose}>
-            <Icon name="x" size={20} color={t.colors.backgroudWhite} />
+            <Icon name="x" size={20} color={t.colors.white} />
           </View>
         </Pressable>
         {offerPreviewIndex >= 0 && offerPreviewImages.length > 1 ? (
@@ -2534,7 +2534,7 @@ export default function GlobalPopupHost() {
               style={{ position: "absolute", left: t.spacing.md, top: "48%",
                 width: 44, height: 44, borderRadius: 22, alignItems: "center",
                 justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
-              <Icon name="arrow-left" size={24} color={t.colors.backgroudWhite} />
+              <Icon name="arrow-left" size={24} color={t.colors.white} />
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Imagen siguiente"
               onPress={() => setPreviewUri(offerPreviewImages[
@@ -2543,9 +2543,9 @@ export default function GlobalPopupHost() {
               style={{ position: "absolute", right: t.spacing.md, top: "48%",
                 width: 44, height: 44, borderRadius: 22, alignItems: "center",
                 justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
-              <Icon name="arrow-right" size={24} color={t.colors.backgroudWhite} />
+              <Icon name="arrow-right" size={24} color={t.colors.white} />
             </Pressable>
-            <Text variant="small" style={{ color: t.colors.backgroudWhite,
+            <Text variant="small" style={{ color: t.colors.white,
               position: "absolute", bottom: t.spacing.xl, alignSelf: "center" }}>
               {offerPreviewIndex + 1} / {offerPreviewImages.length}
             </Text>

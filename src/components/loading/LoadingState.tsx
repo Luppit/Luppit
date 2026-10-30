@@ -20,7 +20,7 @@ export default function LoadingState({
 }: LoadingStateProps) {
   const t = useTheme();
   const isScreen = variant === "screen";
-  const textColor = dimmed ? "backgroudWhite" : "stateAnulated";
+  const textColor = dimmed ? "white" : "textMuted";
 
   return (
     <View
@@ -38,7 +38,7 @@ export default function LoadingState({
         style,
       ]}
     >
-      <ActivityIndicator color={dimmed ? t.colors.backgroudWhite : t.colors.primary} />
+      <ActivityIndicator color={dimmed ? t.colors.white : t.colors.primary} />
       <Text color={textColor} align="center">
         {label}
       </Text>

@@ -624,8 +624,8 @@ function CompletedListLayout<T>({
         onPress={onOpenFilters}
         style={s.searchTrigger}
       >
-        <Icon name="search" size={20} color={t.colors.stateAnulated} />
-        <Text variant="body" color="stateAnulated" style={s.searchText}>
+        <Icon name="search" size={20} color={t.colors.textMuted} />
+        <Text variant="body" color="textMuted" style={s.searchText}>
           {activeFilterCount > 0 ? "Filtros aplicados" : "Buscar"}
         </Text>
       </Pressable>
@@ -635,7 +635,7 @@ function CompletedListLayout<T>({
         onPress={onOpenSort}
         style={s.sortButton}
       >
-        <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+        <Icon name="arrow-up-down" size={24} color={t.colors.textMuted} />
       </Pressable>
     </View>
   );

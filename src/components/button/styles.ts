@@ -27,10 +27,11 @@ export function createButtonStyles(t: Theme): ButtonStyles {
         borderRadius: t.borders.md,
         padding: 10,
         width: "100%",
-        height: 44
+        minHeight: 44
       },
       label: {
         textAlign: "center",
+        flexShrink: 1,
       },
       shadow: {
         shadowColor: t.colors.shadow,

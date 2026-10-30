@@ -57,7 +57,7 @@ export default function SellerRequestOffersScreen() {
       justifyContent: "space-between", gap: t.spacing.md },
     priceLabel: { flexShrink: 1 },
     priceValue: { flexShrink: 1, textAlign: "right", marginLeft: "auto" },
-    price: { color: t.colors.primary, fontFamily: t.typography.subtitle.fontFamily },
+    price: { color: t.colors.textDark, fontFamily: t.typography.subtitle.fontFamily },
   }), [insets.bottom, insets.top, t]);
   const params = useLocalSearchParams<{ purchaseRequestId?: string | string[] }>();
   const purchaseRequestId = firstParam(params.purchaseRequestId);
@@ -266,7 +266,6 @@ export default function SellerRequestOffersScreen() {
                       styleCode={offer.conversation_status_style_code} allowWrap />
                   ) : null}
                   body={<View style={s.optionBody}>
-                    <Text variant="body" color="textMedium">{offer.description?.trim() || "Sin descripción"}</Text>
                     <View style={s.pricing}>
                       {productTotal ? (
                         <>
@@ -280,15 +279,16 @@ export default function SellerRequestOffersScreen() {
                               <Text variant="small" color="textMedium" style={s.priceValue}>{unitPrice} c/u</Text>
                             </View>
                           ) : null}
-                          <View style={s.priceRow}>
+                          <View style={s.pricing}>
                             <Text variant="small" color="textMedium" style={s.priceLabel}>Total de productos</Text>
-                            <Text variant="body" style={[s.priceValue, s.price]}>{productTotal}</Text>
+                            <Text variant="price" style={s.price}>{productTotal}</Text>
                           </View>
                         </>
                       ) : (
-                        <Text variant="body" style={s.price}>{formattedPrice}</Text>
+                        <Text variant="price" style={s.price}>{formattedPrice}</Text>
                       )}
                     </View>
+                    <Text variant="body" color="textMedium">{offer.description?.trim() || "Sin descripción"}</Text>
                   </View>}
                   footerLeft={<Button title="Ver conversación" icon="message-circle"
                     disabled={!conversationId} onPress={conversationId ? () => router.push({

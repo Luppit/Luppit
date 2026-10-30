@@ -24,13 +24,14 @@ export function createInputFieldStyles(t: Theme): InputFieldStyles {
       borderWidth: 1,
       borderRadius: t.borders.md,
       borderColor: t.colors.border,
-      height: 48,
+      minHeight: 48,
       paddingHorizontal: t.spacing.md,
       backgroundColor: t.colors.backgroudWhite,
     },
     input: {
       flex: 1,
       ...t.typography.body,
+      color: t.colors.textDark,
       ...Platform.select({
         web: {
           outlineWidth: 0,

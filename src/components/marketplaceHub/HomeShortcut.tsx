@@ -36,11 +36,11 @@ export default function HomeShortcut({
           <Text variant="body" style={s.shortcutTitle}>
             {title}
           </Text>
-          <Text variant="body" color="stateAnulated">
+          <Text variant="body" color="textMuted">
             {description}
           </Text>
         </View>
-        <Icon name="chevron-right" size={20} color={t.colors.stateAnulated} />
+        <Icon name="chevron-right" size={20} color={t.colors.textMuted} />
       </View>
     </Pressable>
   );

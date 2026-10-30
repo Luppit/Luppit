@@ -1,4 +1,4 @@
-import { colors, useTheme } from "@/src/themes";
+import { useTheme } from "@/src/themes";
 import React, { useMemo, useState } from "react";
 import {
   Pressable,
@@ -59,7 +59,7 @@ export default function TextFieldWithToggle<T extends string = string>({
 
   return (
     <View style={s.container}>
-      {label ? <Text color="stateAnulated" style={s.label}>{label}</Text> : null}
+      {label ? <Text color="textMuted" style={s.label}>{label}</Text> : null}
 
       <View style={s.row}>
         <View
@@ -82,7 +82,7 @@ export default function TextFieldWithToggle<T extends string = string>({
               setFocused(false);
               onBlur?.(event);
             }}
-            placeholderTextColor={colors.stateAnulated}
+            placeholderTextColor={t.colors.textMuted}
           />
         </View>
 
@@ -103,7 +103,7 @@ export default function TextFieldWithToggle<T extends string = string>({
                   variant="small"
                   style={[
                     s.toggleLabel,
-                    { color: active ? t.colors.textDark : t.colors.stateAnulated },
+                    { color: active ? t.colors.backgroudWhite : t.colors.textMuted },
                   ]}
                 >
                   {option.label}

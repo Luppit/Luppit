@@ -105,7 +105,7 @@ export default function FilePicker({
 
   return (
     <View style={s.container}>
-      <Text color="stateAnulated" style={s.label}>
+      <Text color="textMuted" style={s.label}>
         {label}
       </Text>
 
@@ -138,7 +138,7 @@ export default function FilePicker({
               disabled={!canAddMore}
             >
               <View style={s.addTileIcon}>
-                <Icon name="plus" size={26} color={t.colors.stateAnulated} />
+                <Icon name="plus" size={26} color={t.colors.textMuted} />
               </View>
             </Pressable>
 
@@ -195,7 +195,7 @@ export default function FilePicker({
             <Image source={{ uri: previewUri }} style={s.previewImage} />
           ) : null}
           <View style={s.previewClose}>
-            <Icon name="x" size={20} color={t.colors.backgroudWhite} />
+            <Icon name="x" size={20} color={t.colors.white} />
           </View>
         </Pressable>
       </Modal>

@@ -93,7 +93,7 @@ export default function LegalDocumentScreen() {
     return (
       <View style={s.centerState}>
         <View style={s.emptyIconBadge}>
-          <Icon name="file-text" size={28} color={t.colors.stateAnulated} />
+          <Icon name="file-text" size={28} color={t.colors.textMuted} />
         </View>
         <Text variant="subtitle" align="center">
           No se pudo cargar el documento.

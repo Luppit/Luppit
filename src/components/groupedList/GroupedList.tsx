@@ -86,7 +86,7 @@ export function GroupedListRow({
   showSeparator = true,
   showChevron,
   descriptionMaxLines = 2,
-  descriptionColor = "stateAnulated",
+  descriptionColor = "textMuted",
   rightAccessory,
   accessibilityLabel,
   onPress,
@@ -120,7 +120,7 @@ export function GroupedListRow({
             {label}
           </Text>
           {value ? (
-            <Text color="stateAnulated" maxLines={2} style={s.rowValue}>
+            <Text color="textMuted" maxLines={2} style={s.rowValue}>
               {value}
             </Text>
           ) : null}
@@ -134,7 +134,7 @@ export function GroupedListRow({
       </View>
       {rightAccessory}
       {shouldShowChevron ? (
-        <Icon name="chevron-right" size={18} color={t.colors.stateAnulated} />
+        <Icon name="chevron-right" size={18} color={t.colors.textMuted} />
       ) : null}
     </>
   );
@@ -189,9 +189,10 @@ function createGroupedListStyles(t: Theme) {
     },
     countPill: {
       minWidth: 28,
-      height: 22,
+      minHeight: 22,
       borderRadius: 11,
       paddingHorizontal: t.spacing.sm,
+      paddingVertical: 2,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.primary,
@@ -269,7 +270,7 @@ function createGroupedListStyles(t: Theme) {
       right: 0,
       bottom: 0,
       height: StyleSheet.hairlineWidth,
-      backgroundColor: "rgba(0,0,0,0.08)",
+      backgroundColor: t.colors.border,
     },
   });
 }

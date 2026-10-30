@@ -3,12 +3,13 @@ version: alpha
 name: Luppit
 description: Conversaciones de compra con estado claro y listas tranquilas para volver a lo pendiente.
 colors:
-  primary: "#83A31E"
+  primary: "#52670F"
   primaryLight: "#DBE4D0"
   background: "#F9FAFB"
   surface: "#FFFFFF"
   text: "#1C1C1C"
   secondaryText: "#333333"
+  mutedText: "#62665D"
   border: "#DDDDDD"
   danger: "#A52100"
 typography:
@@ -36,15 +37,21 @@ Este documento registra el diseño existente. Los propietarios de los valores si
 
 ## Colors
 
-Verde oliva para la acción primaria y los contadores de acciones, con números blancos. Los contadores no se muestran cuando su cantidad es cero. Superficies blancas sobre el fondo casi blanco. Texto principal oscuro y texto de apoyo `textMedium`; el color de peligro acompaña resultados negativos, sin convertirlos en compras exitosas. Reutilizar los roles semánticos del tema.
+Verde oliva para la acción primaria y los contadores de acciones, con números de alto contraste. Los contadores no se muestran cuando su cantidad es cero. Texto principal `textDark`, apoyo `textMedium` y metadatos legibles `textMuted`; no reutilizar colores de estados para texto de apoyo. El color de peligro acompaña resultados negativos, sin convertirlos en compras exitosas. Reutilizar los roles semánticos del tema.
+
+`ThemeProvider` sigue la apariencia del sistema. `colors`/`darkColors` y `glass`/`darkGlass` mantienen los mismos roles para superficies claras y oscuras. `backgroudWhite` conserva su nombre por compatibilidad con la configuración existente, pero representa la superficie del tema. `white` es tinta blanca invariable para controles sobre fotos o fondos negros. El logotipo conserva su oliva original; los controles usan un oliva más oscuro en modo claro y más luminoso en modo oscuro para mantener contraste.
 
 ## Typography
 
 Usar las variantes de `Text`: títulos y subtítulos para la pantalla; `body` para filas y formularios; `small` para fechas, cantidades y apoyo. La escala y altura de línea viven en el tema. Permitir salto de línea y crecimiento de texto; no reducir la fuente para acomodar nombres largos.
 
+El límite compartido de ampliación es 2×. El espejo y el campo del compositor usan el mismo límite. Las etiquetas compactas de navegación conservan un límite explícito de 1.3× dentro de la barra de cinco destinos; su nombre accesible permanece completo. Filas, botones, pestañas internas y contadores crecen verticalmente con su texto. Con ampliación mayor a 1.3×, las etapas del inicio usan filas completas y los metadatos del chat apilan contraparte y hora para conservar palabras y cantidades completas.
+
 ## Layout
 
 Espaciado del tema y áreas seguras nativas. Filas de ajustes con `GroupedListRow`, listas con desplazamiento propio y carga paginada. Una fila con descripción necesita más aire que una opción breve. Un único propietario de teclado por contenedor.
+
+La cabecera de Inicio participa en el flujo del layout y posee su área segura superior; el contenido no calcula una copia de su altura. Un solo resultado usa el ancho disponible; varios conservan el carrusel. Las tarjetas y los textos siguen siendo genéricos para cualquier categoría del servidor. Chats muestra el título completo, contraparte y fecha alineadas, estado completo y una vista previa de dos líneas. Copiar y compartir mensajes se agrupan en el menú de cada mensaje; reintentar sigue visible ante fallos.
 
 ## Elevation & Depth
 
@@ -65,6 +72,8 @@ Las vistas de Inicio usan la variante `homeStage` de `LuppitChip` dentro de un c
 La conversación conserva el contenido de `ConversationStageCard` en una tarjeta expandida blanca y opaca, con sus acciones al final y en el orden del servidor. `ConversationFloatingCard` mantiene una superficie blanca opaca también en la versión compacta y un chevron independiente sin contador. La acción compacta prioriza el estilo positivo/primario del servidor, después una acción no destructiva; si no existe ninguna, muestra el estado pasivo. El contenedor flotante es transparente; el historial reserva esa altura compacta con padding y puede desplazarse detrás de la tarjeta. El acceso canónico a Resumen permanece bajo la cabecera, usa una superficie blanca opaca y reutiliza su popup existente. Los controles de contexto de crear/modificar oferta siguen el mismo material blanco. La expansión es estado visual local; etiquetas, plazos, elegibilidad y acciones siguen siendo del servidor.
 
 Las tarjetas de Ofertas agrupan vendedor, provincia y calificación en la cabecera. El total en carbón precede a la descripción completa; las ofertas para comparar muestran cantidad y precio unitario a su derecha cuando hay espacio. La oferta seleccionada separa cotización y estado de entrega, con Generar código junto a Ver chat cuando el servidor habilita esa acción. En pantallas estrechas o con texto ampliado los bloques se apilan. El historial permanece desplegable dentro de la misma tarjeta, con su contador debajo del título. Los datos, textos, acciones y popups existentes conservan sus propietarios.
+
+Los resúmenes separan precio, descripción, fotos y entrega mediante ritmo vertical y divisores, sin anidar una tarjeta por sección. El detalle de ofertas del vendedor presenta el total con la misma jerarquía tipográfica que el comprador, antes de la descripción. Las confirmaciones de salida enfatizan seguir editando y conservan sus acciones y semántica de borrador.
 
 ## Do's and Don'ts
 

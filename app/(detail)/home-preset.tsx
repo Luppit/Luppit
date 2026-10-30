@@ -114,8 +114,8 @@ export default function HomePresetScreen() {
       >
         {options.length === 0 ? (
           <View style={s.emptyState}>
-            <Icon name="folder-closed" size={28} color={t.colors.stateAnulated} />
-            <Text align="center" color="stateAnulated">
+            <Icon name="folder-closed" size={28} color={t.colors.textMuted} />
+            <Text align="center" color="textMuted">
               No hay vistas disponibles por ahora.
             </Text>
           </View>
@@ -171,7 +171,7 @@ function PresetOptionCard({
         <View style={s.optionTitleBlock}>
           <Text variant="subtitle">{option.name}</Text>
           {option.description ? (
-            <Text color="stateAnulated">
+            <Text color="textMuted">
               {option.description}
             </Text>
           ) : null}
@@ -194,7 +194,7 @@ function PresetBlueprint({ groups }: { groups: HomePresetPreviewGroup[] }) {
   if (groups.length === 0) {
     return (
       <View style={s.previewEmpty}>
-        <Text color="stateAnulated">Esta vista no tiene secciones configuradas.</Text>
+        <Text color="textMuted">Esta vista no tiene secciones configuradas.</Text>
       </View>
     );
   }
@@ -220,7 +220,7 @@ function PresetBlueprintGroup({ group }: { group: HomePresetPreviewGroup }) {
         <Text variant="small" maxLines={1} style={s.previewGroupName}>
           {group.name}
         </Text>
-        <Text variant="small" color="stateAnulated">
+        <Text variant="small" color="textMuted">
           Máx. {group.maxItems}
         </Text>
       </View>

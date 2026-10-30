@@ -257,7 +257,7 @@ test("filtered home retains every stage in DB order and carries criteria into Ve
   assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["for_you", 0], ["needs_attention", 21], ["negotiating", 4]]);
   const stageRow = nodes(tree).find((node) => node.type === "View" && node.props.children.flat().includes(chips[0]));
   assert.ok(stageRow, "the stages share one non-scrolling control");
-  assert.equal(stageRow.props.style.flexDirection, "row");
+  assert.equal(Object.assign({}, ...stageRow.props.style.filter(Boolean)).flexDirection, "row");
   assert.equal(nodes(tree).some((node) => node.type === "ScrollView" && node.props.horizontal), false);
   assert.deepEqual(chips.map((node) => node.props.selected), [false, true, false]);
   assert.match(text(tree), /Resultados para “silla”21 solicitudes en needs_attention/);
@@ -302,7 +302,9 @@ test("one matching stage keeps the other fixed views visible with zero counts", 
   assert.deepEqual(chips.map((node) => [node.props.label, node.props.count]), [["for_you", 0], ["needs_attention", 1], ["negotiating", 0]]);
   assert.equal(chips[0].props.accessibilityLabel, "for_you, 0 solicitudes");
   assert.equal(chips[1].props.accessibilityLabel, "needs_attention, 1 solicitud");
-  assert.equal(nodes(tree).find((node) => node.type === "FlatList")?.props.data[0].id, "march");
+  const requestCard = nodes(tree).find((node) => node.type === "MarketplaceRequestCard");
+  assert.equal(requestCard?.props.item.id, "march");
+  assert.equal(requestCard?.props.compact, false);
   assert.match(text(tree), /Resultados para “March”1 solicitud en needs_attention/);
 });
 
@@ -350,13 +352,18 @@ for (const role of ["buyer", "seller"] as const) {
       role, hub: hub(firstStage, counts, [item("a")]), filters: f.emptyFilters,
       selectedStageCode: firstStage, onSelectStage() {}, onRetry() {},
     };
-    for (const [width, fontScale, stacked] of [[430, 1, false], [375, 1, true], [430, 1.3, true], [320, 1.3, true]] as const) {
+    for (const [width, fontScale, stacked] of [[430, 1, false], [375, 1, true], [430, 1.3, true], [320, 1.3, true], [430, 2, false]] as const) {
       f.setDimensions(width, fontScale);
       const tree = f.render(f.exports.MarketplaceHomeContent, props);
       const chips = nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage");
       assert.equal(chips.length, 3);
       assert.deepEqual(chips.map((node) => node.props.stacked), [stacked, stacked, stacked], `width ${width}, fontScale ${fontScale}`);
       assert.ok(chips.every((node) => node.props.labelMaxLines === 0), "stage labels can wrap instead of being truncated");
+      if (fontScale === 2) {
+        const group = nodes(tree).find((node) => node.type === "View" && node.props.children.flat().includes(chips[0]));
+        assert.equal(Object.assign({}, ...group!.props.style.filter(Boolean)).flexDirection, "column");
+        assert.deepEqual(chips.map((node) => node.props.count), Object.values(counts));
+      }
     }
   });
 }

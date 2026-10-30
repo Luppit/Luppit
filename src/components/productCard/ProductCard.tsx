@@ -126,7 +126,7 @@ export default function ProductCard({
 
           <View style={s.bottomRow}>
             <View style={s.viewsRow}>
-              <Icon name="eye" size={20} color={t.colors.stateAnulated} />
+              <Icon name="eye" size={20} color={t.colors.textMuted} />
               <Text variant="body" maxLines={1} style={s.viewsText}>
                 {views}
               </Text>

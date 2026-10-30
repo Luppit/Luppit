@@ -268,7 +268,7 @@ export default function ProfilePictureEditScreen() {
           <Text variant="subtitle" align="center">
             No se pudo cargar la foto
           </Text>
-          <Text color="stateAnulated" align="center">
+          <Text color="textMuted" align="center">
             {loadError || "Intenta nuevamente."}
           </Text>
           <View style={s.fullWidth}>

@@ -95,7 +95,7 @@ export default function BusinessProfileScreen() {
         <Text variant="subtitle" align="center">
           No encontramos un negocio asociado
         </Text>
-        <Text color="stateAnulated" align="center">
+        <Text color="textMuted" align="center">
           Cuando el perfil tenga un negocio vinculado, la información aparecerá aquí.
         </Text>
       </View>

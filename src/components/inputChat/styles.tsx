@@ -168,9 +168,9 @@ export function createInputChatStyles(t: Theme): InputChatStyles {
       borderRadius: 11,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "rgba(255,255,255,0.9)",
+      backgroundColor: t.colors.backgroudWhite,
       borderWidth: 1,
-      borderColor: "rgba(221,221,221,0.7)",
+      borderColor: t.colors.border,
     },
   };
 }

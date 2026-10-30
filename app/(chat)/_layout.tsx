@@ -77,7 +77,7 @@ function ChatLayoutContent() {
       dismissOnBackdropPress: true,
       dismissOnAndroidBack: true,
       actions: [
-        { id: "continue-request", label: "Seguir editando", accessibilityLabel: "Seguir editando la solicitud", icon: "arrow-left" },
+        { id: "continue-request", label: "Seguir editando", accessibilityLabel: "Seguir editando la solicitud", icon: "arrow-left", backgroundColorKey: "primary", textColorKey: "backgroudWhite", iconColorKey: "backgroudWhite" },
         { id: "exit-request", label: "Salir", accessibilityLabel: "Salir y conservar el borrador de la solicitud", icon: "log-out", backgroundColorKey: "backgroudWhite", textColorKey: "textDark", iconColorKey: "textDark", onPress: () => setExitAction(data.action) },
         { id: "discard-request-draft", label: "Descartar", accessibilityLabel: "Descartar el borrador de la solicitud", icon: "trash-2", backgroundColorKey: "backgroudWhite", textColorKey: "error", iconColorKey: "error", disabled: isSendingMessage || isRestoring, showPendingState: true,
           onPress: async () => {

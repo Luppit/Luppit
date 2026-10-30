@@ -103,7 +103,7 @@ export default function SellerOfferCard({
               allowWrap
             />
           ) : (
-            <Text variant="small" color="stateAnulated">
+            <Text variant="small" color="textMuted">
               Estado no disponible
             </Text>
           )}

@@ -462,16 +462,16 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
       clipStyle={s.containerClip}
       contentStyle={s.containerContent}
     >
-      <Pressable onPress={() => void openProfileSwitcher()}>
+      <Pressable accessibilityRole="button" onPress={() => void openProfileSwitcher()}>
         <View style={s.profileIdentity}>
           <View style={s.profileRow}>
-            <Text variant="subtitle">{activeProfile?.profile.name ?? "Mi perfil"}</Text>
+            <Text variant="subtitle" style={s.profileName}>{activeProfile?.profile.name ?? "Mi perfil"}</Text>
             <Icon name="chevron-down" size={18} />
           </View>
           {activeProfileSubtitle ? (
             <Text
               variant="small"
-              color="stateAnulated"
+              color="textMuted"
               maxLines={1}
               style={s.profileSubtitle}
             >
@@ -488,7 +488,7 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
             style={[s.searchTrigger, shouldBlockHomeControls && s.searchTriggerDisabled]}
             onPress={() => void openFiltersPopup()}
           >
-            <Icon name="search" size={20} color={t.colors.stateAnulated} />
+            <Icon name="search" size={20} color={t.colors.textMuted} />
             <Text variant="body" style={s.searchTriggerText}>
               Buscar en Luppit
             </Text>
@@ -561,8 +561,8 @@ function SharedTopNavbarContent({ role }: { role: "buyer" | "seller" }) {
                 {segmentIconAsset ? (
                   <BundledSvg
                     asset={segmentIconAsset}
-                    width={isSelected ? 38 : 34}
-                    height={isSelected ? 38 : 34}
+                    width={28}
+                    height={28}
                     fallback={fallbackImage}
                   />
                 ) : (

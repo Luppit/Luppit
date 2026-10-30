@@ -67,7 +67,7 @@ export default function AssistantProcessingProgress({
             gap: t.spacing.sm,
           }}
         >
-          <ActivityIndicator size="small" color={t.colors.stateAnulated} />
+          <ActivityIndicator size="small" color={t.colors.textMuted} />
           <Text variant="body" color="textMedium">
             Pensando…
           </Text>
@@ -141,7 +141,7 @@ export default function AssistantProcessingProgress({
                       borderWidth: isComplete ? 0 : 2,
                       borderColor: isActive
                         ? t.colors.textDark
-                        : t.colors.stateAnulated,
+                        : t.colors.textMuted,
                       backgroundColor: isComplete
                         ? t.colors.textDark
                         : t.colors.background,
@@ -162,7 +162,7 @@ export default function AssistantProcessingProgress({
 
                 <Text
                   variant="body"
-                  color={isActive || isComplete ? "textDark" : "stateAnulated"}
+                  color={isActive || isComplete ? "textDark" : "textMuted"}
                   style={{
                     flex: 1,
                     paddingTop: t.spacing.xs,
@@ -178,7 +178,7 @@ export default function AssistantProcessingProgress({
           })}
         </View>
 
-        <Text variant="small" color="stateAnulated">
+        <Text variant="small" color="textMuted">
           Esto puede tomar unos segundos.
         </Text>
       </View>

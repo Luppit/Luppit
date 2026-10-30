@@ -146,7 +146,8 @@ export default function ConversationOfferDetails({ view, profileId, disabled }: 
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: t.spacing.sm, flexShrink: stack ? 0 : 1 }}>
             <Icon name="file-text" size={20} color={t.colors.textDark} />
-            {price ? <Text variant="body" maxFontSizeMultiplier={2} style={{ flexShrink: 1 }}>{price}</Text> : null}
+            {price ? <Text variant="body" maxFontSizeMultiplier={2}
+              style={stack ? { flex: 1, minWidth: 0 } : { flexShrink: 1 }}>{price}</Text> : null}
           </View>
           {price ? (
             <View style={{ width: stack ? "100%" : StyleSheet.hairlineWidth,

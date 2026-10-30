@@ -50,9 +50,9 @@ export default function BuyerProfileScreen() {
   if (!profile || error) {
     return (
       <View style={s.center}>
-        <Icon name="user" size={28} color={t.colors.stateAnulated} />
+        <Icon name="user" size={28} color={t.colors.textMuted} />
         <Text variant="subtitle" align="center">No se pudo cargar el comprador</Text>
-        <Text color="stateAnulated" align="center">{error}</Text>
+        <Text color="textMuted" align="center">{error}</Text>
       </View>
     );
   }

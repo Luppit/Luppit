@@ -33,7 +33,7 @@ export default function StandaloneListEmptyState({
       <Text variant="body" style={s.emptyTitle} align="center">
         {title}
       </Text>
-      <Text variant="small" color="stateAnulated" align="center" style={s.emptyDescription}>
+      <Text variant="small" color="textMuted" align="center" style={s.emptyDescription}>
         {description}
       </Text>
       {actionLabel && onAction ? (

@@ -41,7 +41,7 @@ export default function TextArea({
 
   return (
     <View style={[s.baseContainer, baseContainerStyle]}>
-      {label ? <Text color="stateAnulated" style={s.label}>{label}</Text> : null}
+      {label ? <Text color="textMuted" style={s.label}>{label}</Text> : null}
 
       <View
         style={[

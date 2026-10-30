@@ -1,4 +1,4 @@
-import { colors, useTheme } from "@/src/themes";
+import { useTheme } from "@/src/themes";
 import { useMemo, useState } from "react";
 import {
   Pressable,
@@ -58,7 +58,7 @@ export const TextField: React.FC<TextFieldProps> = ({
   return (
     <View style={[s.baseContainer, baseContainerStyle]}>
       {label ? (
-        <Text color="stateAnulated" style={s.label}>
+        <Text color="textMuted" style={s.label}>
           {label}:
         </Text>
       ) : null}
@@ -72,22 +72,22 @@ export const TextField: React.FC<TextFieldProps> = ({
       >
         {readOnly ? (
           <Pressable style={s.inputContent} onPress={onPress}>
-            {leftIcon ? <Icon name={leftIcon} size={20} color={colors.stateAnulated} /> : null}
+            {leftIcon ? <Icon name={leftIcon} size={20} color={t.colors.textMuted} /> : null}
             <Text
               style={[
                 s.input,
                 inputStyle,
-                isPlaceholder ? { color: colors.stateAnulated } : null,
+                isPlaceholder ? { color: t.colors.textMuted } : null,
               ]}
               numberOfLines={1}
             >
               {displayValue}
             </Text>
-            {rightIcon ? <Icon name={rightIcon} size={20} color={colors.stateAnulated} /> : null}
+            {rightIcon ? <Icon name={rightIcon} size={20} color={t.colors.textMuted} /> : null}
           </Pressable>
         ) : (
           <View style={s.inputContent}>
-            {leftIcon ? <Icon name={leftIcon} size={20} color={colors.stateAnulated} /> : null}
+            {leftIcon ? <Icon name={leftIcon} size={20} color={t.colors.textMuted} /> : null}
             <TextInput
               {...textInputProps}
               style={[s.input, inputStyle]}
@@ -100,9 +100,9 @@ export const TextField: React.FC<TextFieldProps> = ({
                 setFocused(false);
                 textInputProps.onBlur?.(event);
               }}
-              placeholderTextColor={colors.stateAnulated}
+              placeholderTextColor={t.colors.textMuted}
             />
-            {rightIcon ? <Icon name={rightIcon} size={20} color={colors.stateAnulated} /> : null}
+            {rightIcon ? <Icon name={rightIcon} size={20} color={t.colors.textMuted} /> : null}
           </View>
         )}
       </View>

@@ -108,7 +108,7 @@ export default function SellerHomeGroupScreen() {
   if (items.length === 0) {
     return (
       <View style={{ paddingTop: topContentInset + t.spacing.md }}>
-        <Text color="stateAnulated">No hay solicitudes para mostrar.</Text>
+        <Text color="textMuted">No hay solicitudes para mostrar.</Text>
       </View>
     );
   }

@@ -853,6 +853,9 @@ function OfferAssistantScreen({
           {
             id: "continue-offer",
             label: "Seguir editando",
+            backgroundColorKey: "primary",
+            textColorKey: "backgroudWhite",
+            iconColorKey: "backgroudWhite",
             accessibilityLabel: isEditMode ? "Seguir modificando la oferta" : "Seguir editando la oferta",
             icon: "arrow-left",
           },
@@ -894,7 +897,7 @@ function OfferAssistantScreen({
           gap: t.spacing.md,
         }}
       >
-        <Text align="center" color="stateAnulated">
+        <Text align="center" color="textMuted">
           No encontramos la conversación asociada.
         </Text>
         <Button title="Volver" onPress={() => router.back()} />

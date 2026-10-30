@@ -73,7 +73,7 @@ function loadComponent<T>(path: string, modules: Record<string, unknown>, expose
   });
   const exports = {};
   runInNewContext(outputText, {
-    exports, AbortController, console,
+    exports, AbortController, console, setTimeout, clearTimeout,
     React: modules.react,
     require(name: string) {
       assert.ok(name in modules, `Unmocked import: ${name}`);
@@ -367,6 +367,7 @@ test("image-only failed messages show a retry action", () => {
       "expo-clipboard": {},
       "@/src/components/Icon": { Icon: "Icon" },
       "@/src/themes": { useTheme: () => ({ spacing: { xs: 4 }, colors: {} }) },
+      "@/src/services/popup.service": { openPopup() {} },
       "@/src/utils/useToast": { showError() {}, showSuccess() {} },
     },
   );
@@ -377,6 +378,36 @@ test("image-only failed messages show a retry action", () => {
   retry.props.onPress();
   assert.equal(retries, 1);
   assert.equal(view.some((node) => node.props.accessibilityLabel === "Copiar mensaje"), false);
+});
+
+test("message options retain full-text copy and sharing without sending anything on open", async (t) => {
+  const runtime = createHooks();
+  t.after(runtime.unmount);
+  let menu: { options: { id: string; onPress: () => Promise<void> }[] } | undefined;
+  let copied: string | undefined;
+  let shared: string | undefined;
+  const module = loadComponent<{ default: (props: { text: string }) => Element }>(
+    "../src/components/message/MessageUtilities.tsx",
+    {
+      react: runtime.hooks,
+      "react-native": { AccessibilityInfo: { announceForAccessibility() {} }, Pressable: "Pressable", Share: { async share(payload: { message: string }) { shared = payload.message; } }, View: "View" },
+      "expo-clipboard": { async setStringAsync(value: string) { copied = value; } },
+      "@/src/components/Icon": { Icon: "Icon" },
+      "@/src/themes": { useTheme: () => ({ spacing: { xs: 4 }, colors: {} }) },
+      "@/src/services/popup.service": { openPopup(config: typeof menu) { menu = config; } },
+      "@/src/utils/useToast": { showError() {}, showSuccess() {} },
+    },
+  );
+  const original = "Mensaje completo de una compra de cualquier categoría";
+  const view = elements(runtime.render(() => module.default({ text: original })));
+  view.find((node) => node.props.accessibilityLabel === "Opciones del mensaje")!.props.onPress();
+  assert.equal(copied, undefined);
+  assert.equal(shared, undefined);
+  assert.ok(menu);
+  await menu.options.find((option) => option.id === "share-message")!.onPress();
+  assert.equal(shared, original);
+  await menu.options.find((option) => option.id === "copy-message")!.onPress();
+  assert.equal(copied, original);
 });
 
 test("buyer composer keeps return as newline", () => {

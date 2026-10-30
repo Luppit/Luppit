@@ -80,6 +80,7 @@ export default function NavbarItem({
         </View>
         <Text
           variant="small"
+          maxFontSizeMultiplier={1.3}
           maxLines={1}
           ellipsizeMode="tail"
           adjustsFontSizeToFit

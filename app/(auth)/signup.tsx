@@ -10,7 +10,7 @@ import {
   verifySellerPhoneOtp,
 } from "@/src/lib/supabase/auth";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
-import { borders, colors, spacing } from "@/src/themes";
+import { borders, spacing, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
@@ -124,6 +124,7 @@ function LegalAcceptance({
   accepted: boolean;
   onToggle: () => void;
 }) {
+  const t = useTheme();
   return (
     <View style={styles.legalAcceptance}>
       <Pressable
@@ -136,14 +137,15 @@ function LegalAcceptance({
         <View
           style={[
             styles.checkbox,
-            accepted ? styles.checkboxSelected : null,
+            { borderColor: t.colors.textDark },
+            accepted ? { backgroundColor: t.colors.textDark } : null,
           ]}
         >
           {accepted ? (
-            <Icon name="check" size={15} color={colors.backgroudWhite} />
+            <Icon name="check" size={15} color={t.colors.background} />
           ) : null}
         </View>
-        <Text variant="small" style={styles.acceptanceLabel}>
+        <Text variant="small">
           He leído y acepto los documentos legales.
         </Text>
       </Pressable>
@@ -320,17 +322,9 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 1,
-    borderColor: colors.textDark,
     borderRadius: borders.sm,
     alignItems: "center",
     justifyContent: "center",
-  },
-  checkboxSelected: {
-    borderColor: colors.textDark,
-    backgroundColor: colors.textDark,
-  },
-  acceptanceLabel: {
-    color: colors.textDark,
   },
   legalLinks: {
     flexDirection: "row",

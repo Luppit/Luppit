@@ -7,7 +7,7 @@ import {
   useAccountSetupGate,
 } from "@/src/components/navbar/useEmailSetupGate";
 import { RoleProvider } from "@/src/components/role/RoleContext";
-import { colors, spacing } from "@/src/themes";
+import { spacing, useTheme } from "@/src/themes";
 import { Redirect, Slot, usePathname } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { consumePendingSharedPurchaseRequest } from "@/src/services/shared.purchase.request.service";
 
 export default function TabsLayout() {
+  const t = useTheme();
   const pathname = usePathname();
   const { state, activeProfile, revision } = useActiveProfile();
   const isReady = state === "ready";
@@ -122,15 +123,18 @@ export default function TabsLayout() {
   return (
     <View
       key={activeProfile?.profile.id + ":" + revision}
-      style={layoutStyles.root}
+      style={[layoutStyles.root, { backgroundColor: t.colors.background }]}
     >
       <RoleProvider>
-        <SafeAreaView style={layoutStyles.view}>
+        {hidesTopNavbar ? null : <TopNavbar />}
+        <SafeAreaView
+          edges={hidesTopNavbar ? undefined : ["left", "right", "bottom"]}
+          style={[layoutStyles.view, { backgroundColor: t.colors.background }]}
+        >
           <View style={layoutStyles.container}>
             <Slot />
           </View>
         </SafeAreaView>
-        {hidesTopNavbar ? null : <TopNavbar />}
       </RoleProvider>
       <Navbar />
     </View>
@@ -140,7 +144,6 @@ export default function TabsLayout() {
 const layoutStyles = {
   root: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -148,6 +151,5 @@ const layoutStyles = {
   view: {
     flex: 1,
     padding: spacing.md,
-    backgroundColor: colors.background,
   },
 };

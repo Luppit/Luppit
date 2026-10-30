@@ -33,7 +33,7 @@ export function createOtpValidatorStyles(t: Theme): OtpValidatorStyles {
       alignSelf: "center",
     },
     helperText: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
       textDecorationLine: "underline",
       textAlign: "center",
       alignSelf: "center",

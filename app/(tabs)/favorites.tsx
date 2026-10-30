@@ -478,8 +478,8 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
           onPress={openSearchPopup}
           accessibilityRole="button"
         >
-          <Icon name="search" size={20} color={t.colors.stateAnulated} />
-          <Text variant="body" color="stateAnulated" style={s.searchTriggerText}>
+          <Icon name="search" size={20} color={t.colors.textMuted} />
+          <Text variant="body" color="textMuted" style={s.searchTriggerText}>
             {hasActiveFilters ? "Filtros aplicados" : "Buscar"}
           </Text>
         </Pressable>
@@ -490,7 +490,7 @@ function FavoriteRequestsContent({ role }: { role: FavoriteRole }) {
           accessibilityRole="button"
           accessibilityLabel="Ordenar favoritas"
         >
-          <Icon name="arrow-up-down" size={24} color={t.colors.stateAnulated} />
+          <Icon name="arrow-up-down" size={24} color={t.colors.textMuted} />
         </Pressable>
       </View>
   );

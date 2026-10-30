@@ -1,5 +1,4 @@
 import { Icon } from "@/src/components/Icon";
-import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
 import { useTheme } from "@/src/themes";
 import React, { useState } from "react";
@@ -54,13 +53,16 @@ export default function SummaryReviewContent({
   const activeImage = previewIndex === null ? null : images[previewIndex];
   const { width, fontScale } = useWindowDimensions();
   const stack = width < 360 || fontScale > 1.3;
-  const panelStyle = [createRoundedSurfaceStyle(t), {
-    borderRadius: t.borders.md,
-    borderWidth: 1,
-    borderColor: t.colors.border,
-    padding: t.spacing.md,
+  const panelStyle = {
+    paddingVertical: t.spacing.sm,
     gap: t.spacing.sm,
-  }];
+  };
+  const pricingPanelStyle = {
+    paddingBottom: t.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: t.colors.border,
+    gap: t.spacing.sm,
+  };
   const separatorStyle = { height: 1, backgroundColor: t.colors.border };
   const rowStyle = {
     flexDirection: stack ? "column" as const : "row" as const,
@@ -71,9 +73,9 @@ export default function SummaryReviewContent({
   const hasPricing = pricingRows.length > 0;
 
   return (
-    <View style={{ gap: t.spacing.md }}>
+    <View style={{ gap: t.spacing.lg }}>
       {price || hasPricing ? (
-        <View style={[panelStyle, { gap: t.spacing.xs }]}>
+        <View style={[pricingPanelStyle, { gap: t.spacing.xs }]}>
           {pricingRows.map((row, index) => (
             <React.Fragment key={`${row.label}-${index}`}>
               <View accessible accessibilityLabel={[row.label, row.detail, row.value].filter(Boolean).join(". ")}
@@ -121,7 +123,7 @@ export default function SummaryReviewContent({
 
       <View style={panelStyle}>
         <Text variant="subtitle" accessibilityRole="header">Descripción</Text>
-        <Text variant="body">{title}</Text>
+        <Text variant="body" style={{ fontFamily: t.typography.subtitle.fontFamily }}>{title}</Text>
         {description ? <Text variant="body" color="textMedium">{description}</Text> : null}
         {rows.length === 0 && !hasPricing && subtitle ? <Text variant="small" color="textMedium">{subtitle}</Text> : null}
         {rows.length === 0 && !hasPricing && quantity ? <Text variant="small" color="textMedium">{quantity}</Text> : null}
@@ -143,8 +145,8 @@ export default function SummaryReviewContent({
                   flexDirection: "row", alignItems: "center", gap: t.spacing.xs,
                   paddingHorizontal: t.spacing.sm, paddingVertical: t.spacing.xs,
                   borderRadius: t.borders.sm, backgroundColor: "rgba(25,25,25,0.84)" }}>
-                  <Icon name="image" size={14} color={t.colors.backgroudWhite} />
-                  <Text variant="small" style={{ color: t.colors.backgroudWhite }}>Ver foto</Text>
+                  <Icon name="image" size={14} color={t.colors.white} />
+                  <Text variant="small" style={{ color: t.colors.white }}>Ver foto</Text>
                 </View>
               </Pressable>
             ))}
@@ -191,7 +193,7 @@ export default function SummaryReviewContent({
               alignItems: "center", justifyContent: "center",
               backgroundColor: "rgba(255,255,255,0.16)" }}
           >
-            <Icon name="x" size={24} color={t.colors.backgroudWhite} />
+            <Icon name="x" size={24} color={t.colors.white} />
           </Pressable>
           {activeImage ? (
             <Image source={{ uri: activeImage.uri }} resizeMode="contain"
@@ -206,7 +208,7 @@ export default function SummaryReviewContent({
                 style={{ position: "absolute", left: t.spacing.md, top: "48%",
                   width: 44, height: 44, borderRadius: 22, alignItems: "center",
                   justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
-                <Icon name="arrow-left" size={24} color={t.colors.backgroudWhite} />
+                <Icon name="arrow-left" size={24} color={t.colors.white} />
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel="Imagen siguiente"
                 onPress={() => setPreviewIndex((previewIndex + 1) % images.length)}
@@ -214,9 +216,9 @@ export default function SummaryReviewContent({
                 style={{ position: "absolute", right: t.spacing.md, top: "48%",
                   width: 44, height: 44, borderRadius: 22, alignItems: "center",
                   justifyContent: "center", backgroundColor: "rgba(255,255,255,0.16)" }}>
-                <Icon name="arrow-right" size={24} color={t.colors.backgroudWhite} />
+                <Icon name="arrow-right" size={24} color={t.colors.white} />
               </Pressable>
-              <Text variant="small" style={{ color: t.colors.backgroudWhite,
+              <Text variant="small" style={{ color: t.colors.white,
                 position: "absolute", bottom: t.spacing.xl, alignSelf: "center" }}>
                 {previewIndex + 1} / {images.length}
               </Text>

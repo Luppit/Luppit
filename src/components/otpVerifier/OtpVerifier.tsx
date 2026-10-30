@@ -260,7 +260,7 @@ export const OtpVerifier = ({
   return (
     <View>
       <View style={s.label}>
-        <Text variant="body" color="stateAnulated">
+        <Text variant="body" color="textMuted">
           Se ha enviado un código a {maskPhone(phoneNumber)}
         </Text>
       </View>

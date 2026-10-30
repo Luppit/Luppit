@@ -162,9 +162,10 @@ function createLuppitChipStyles(t: Theme) {
     },
     countBadge: {
       minWidth: 24,
-      height: 24,
+      minHeight: 24,
       borderRadius: 12,
       paddingHorizontal: 6,
+      paddingVertical: 2,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: t.colors.background,

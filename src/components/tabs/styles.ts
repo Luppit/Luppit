@@ -22,7 +22,7 @@ export function createTabsStyles(t: Theme): TabsStyles {
     return {
         base: {
             container: {
-                height: 44,
+                minHeight: 44,
             },
             content: {
                 flex: 1,
@@ -51,7 +51,6 @@ export function createTabsStyles(t: Theme): TabsStyles {
             },
             tabLabelInactive: {
                 color: t.colors.textMedium,
-                opacity: 0.64,
             }
         },
         content: {

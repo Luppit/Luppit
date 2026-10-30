@@ -29,7 +29,7 @@ export const InputPhone = ({
   error,
   hasError,
   baseContainerStyle,
-  labelColor = "stateAnulated",
+  labelColor = "textMuted",
   ...props
 }: InputPhoneProps) => {
   const t = useTheme();
@@ -72,7 +72,7 @@ export const InputPhone = ({
               setFocused(false);
               textInputProps.onBlur?.(event);
             }}
-            placeholderTextColor={t.colors.stateAnulated}
+            placeholderTextColor={t.colors.textMuted}
           />
         </View>
       </View>

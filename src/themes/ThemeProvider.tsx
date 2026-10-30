@@ -1,8 +1,10 @@
 import React, { createContext, useContext } from "react";
+import { useColorScheme } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { borders } from "./borders";
-import { colors } from "./colors";
+import { colors, darkColors } from "./colors";
 import { fontSizes, lineHeights } from "./fontScale";
-import { glass } from "./glass";
+import { glass, darkGlass } from "./glass";
 import { spacing } from "./spacing";
 import { typography } from "./typography";
 
@@ -27,9 +29,16 @@ const defaultTheme: Theme = {
 };
 
 const ThemeCtx = createContext<Theme>(defaultTheme);
+const darkTheme: Theme = { ...defaultTheme, colors: darkColors, glass: darkGlass };
 
 export const useTheme = () => useContext(ThemeCtx);
 
-export const ThemeProvider = ({ children }: { children: React.ReactNode }) => (
-  <ThemeCtx.Provider value={defaultTheme}>{children}</ThemeCtx.Provider>
-);
+export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
+  const isDark = useColorScheme() === "dark";
+  return (
+    <ThemeCtx.Provider value={isDark ? darkTheme : defaultTheme}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      {children}
+    </ThemeCtx.Provider>
+  );
+};

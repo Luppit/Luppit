@@ -1,5 +1,6 @@
 import { Icon } from "@/src/components/Icon";
 import { useTheme } from "@/src/themes";
+import { openPopup } from "@/src/services/popup.service";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -68,7 +69,7 @@ export default function MessageUtilities({
 
   const utilityButtonStyle = ({ pressed }: { pressed: boolean }) => ({
     width: 44,
-    height: 36,
+    height: 44,
     alignItems: "center" as const,
     justifyContent: "center" as const,
     opacity: pressed ? 0.55 : 1,
@@ -86,33 +87,33 @@ export default function MessageUtilities({
       {hasText ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={isCopied ? "Mensaje copiado" : "Copiar mensaje"}
-          accessibilityHint="Copia el texto al portapapeles"
+          accessibilityLabel={isCopied ? "Mensaje copiado" : "Opciones del mensaje"}
+          accessibilityHint="Permite copiar o compartir el mensaje"
           hitSlop={4}
-          onPress={() => void copyMessage()}
+          onPress={() =>
+            openPopup({
+              options: [
+                {
+                  id: "copy-message",
+                  label: "Copiar mensaje",
+                  icon: "copy",
+                  onPress: () => void copyMessage(),
+                },
+                {
+                  id: "share-message",
+                  label: "Compartir mensaje",
+                  icon: "share-2",
+                  onPress: () => void shareMessage(),
+                },
+              ],
+            })
+          }
           style={utilityButtonStyle}
         >
           <Icon
-            name={isCopied ? "check" : "copy"}
-            size={20}
-            color={isCopied ? t.colors.primary : t.colors.stateAnulated}
-            strokeWidth={1.8}
-          />
-        </Pressable>
-      ) : null}
-      {hasText ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Compartir mensaje"
-          accessibilityHint="Abre las opciones para compartir el texto"
-          hitSlop={4}
-          onPress={() => void shareMessage()}
-          style={utilityButtonStyle}
-        >
-          <Icon
-            name="share-2"
-            size={20}
-            color={t.colors.stateAnulated}
+            name={isCopied ? "check" : "ellipsis"}
+            size={18}
+            color={isCopied ? t.colors.primary : t.colors.textMuted}
             strokeWidth={1.8}
           />
         </Pressable>

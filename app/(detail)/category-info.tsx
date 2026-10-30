@@ -160,9 +160,9 @@ export default function CategoryInfoScreen() {
     return (
       <View style={s.centerState}>
         <View style={s.emptyIconBadge}>
-          <Icon name="circle-help" size={28} color={t.colors.stateAnulated} />
+          <Icon name="circle-help" size={28} color={t.colors.textMuted} />
         </View>
-        <Text color="stateAnulated" align="center">
+        <Text color="textMuted" align="center">
           {state.message}
         </Text>
       </View>

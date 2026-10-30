@@ -584,7 +584,7 @@ function FormSection({
         {title}
       </Text>
       <View style={styles.formSurface}>
-        <Text variant="small" color="stateAnulated">
+        <Text variant="small" color="textMuted">
           {helper}
         </Text>
         {children}

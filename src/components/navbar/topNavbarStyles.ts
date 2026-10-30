@@ -4,10 +4,7 @@ import { Platform, StyleSheet } from "react-native";
 export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
   return StyleSheet.create({
     container: {
-      position: "absolute",
-      left: 0,
-      right: 0,
-      top: 0,
+      flexShrink: 0,
       zIndex: 10,
       elevation: Platform.OS === "android" ? 4 : 10,
       borderTopLeftRadius: 0,
@@ -23,13 +20,13 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       overflow: "hidden",
     },
     containerContent: {
-      paddingTop: topInset + t.spacing.lg,
-      paddingHorizontal: t.spacing.xl,
-      paddingBottom: t.spacing.md,
-      gap: t.spacing.md,
+      paddingTop: topInset + t.spacing.sm,
+      paddingHorizontal: t.spacing.lg,
+      paddingBottom: t.spacing.sm,
+      gap: t.spacing.sm,
     },
     profileIdentity: {
-      gap: t.spacing.sm,
+      gap: t.spacing.xs,
     },
     profileRow: {
       flexDirection: "row",
@@ -38,6 +35,10 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
     },
     profileSubtitle: {
       maxWidth: "100%",
+    },
+    profileName: {
+      flex: 1,
+      minWidth: 0,
     },
     searchInputContainer: {
       borderRadius: 999,
@@ -55,7 +56,7 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
     },
     searchTriggerText: {
       flex: 1,
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
     },
     searchTriggerDisabled: {
       opacity: 0.45,
@@ -71,7 +72,7 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       alignItems: "center",
       justifyContent: "center",
       minWidth: 60,
-      minHeight: 58,
+      minHeight: 54,
       paddingHorizontal: t.spacing.sm,
       paddingVertical: 2,
       borderRadius: 999,
@@ -83,8 +84,8 @@ export const createTopNavbarStyles = (t: Theme, topInset = 0) => {
       transform: [{ translateY: -1 }],
     },
     categoryImageContainer: {
-      width: 34,
-      height: 34,
+      width: 28,
+      height: 28,
       marginBottom: 2,
       alignItems: "center",
       justifyContent: "center",

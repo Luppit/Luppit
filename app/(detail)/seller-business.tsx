@@ -99,12 +99,12 @@ export default function SellerBusinessScreen() {
     return (
       <View style={s.emptyState}>
         <View style={s.emptyIcon}>
-          <Icon name="house" size={24} color={t.colors.stateAnulated} />
+          <Icon name="house" size={24} color={t.colors.textMuted} />
         </View>
         <Text variant="subtitle" align="center">
           No se pudo cargar el negocio
         </Text>
-        <Text color="stateAnulated" align="center">
+        <Text color="textMuted" align="center">
           {loadError ?? "Intenta abrirlo de nuevo desde la oferta o conversación."}
         </Text>
       </View>
@@ -138,7 +138,7 @@ export default function SellerBusinessScreen() {
           <Text variant="title" maxLines={2}>
             {business.name || "Negocio sin nombre"}
           </Text>
-          <Text color="stateAnulated" maxLines={2}>
+          <Text color="textMuted" maxLines={2}>
             {categoryPreview || locationLabel || "Información del vendedor"}
           </Text>
         </View>
@@ -209,7 +209,7 @@ function ChipSection({
       </Text>
       <View style={s.surface}>
         {chips.length === 0 ? (
-          <Text color="stateAnulated">{emptyLabel}</Text>
+          <Text color="textMuted">{emptyLabel}</Text>
         ) : (
           <View style={s.chipRow}>
             {chips.map((chip) => (
@@ -237,7 +237,7 @@ function ReviewSection({ reviews }: { reviews: BuyerBusinessReview[] }) {
       </Text>
       <View style={s.reviewsSurface}>
         {reviews.length === 0 ? (
-          <Text color="stateAnulated">
+          <Text color="textMuted">
             Este negocio todavía no tiene comentarios visibles.
           </Text>
         ) : (
@@ -248,7 +248,7 @@ function ReviewSection({ reviews }: { reviews: BuyerBusinessReview[] }) {
                   <StarRating stars={review.stars} />
                   <Text
                     variant="small"
-                    color="stateAnulated"
+                    color="textMuted"
                     maxLines={1}
                     style={s.reviewDate}
                   >
@@ -259,7 +259,7 @@ function ReviewSection({ reviews }: { reviews: BuyerBusinessReview[] }) {
                 {review.tags.length > 0 ? (
                   <View style={s.reviewTags}>
                     {review.tags.map((tag) => (
-                      <Text key={tag} variant="small" color="stateAnulated">
+                      <Text key={tag} variant="small" color="textMuted">
                         {tag}
                       </Text>
                     ))}

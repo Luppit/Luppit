@@ -57,7 +57,7 @@ export function createFilePickerStyles(t: Theme): FilePickerStyles {
       justifyContent: "center",
     },
     emptyText: {
-      color: t.colors.stateAnulated,
+      color: t.colors.textMuted,
     },
     highlightText: {
       color: t.colors.primary,

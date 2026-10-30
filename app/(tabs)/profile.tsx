@@ -124,7 +124,7 @@ function BuyerProfileContent() {
                 {overview?.profile.name?.trim() || "Perfil de comprador"}
               </Text>
               <View style={s.identityDetail}>
-                <Text variant="small" color="stateAnulated">
+                <Text variant="small" color="textMuted">
                   Número telefónico
                 </Text>
                 <Text maxLines={1} style={s.flexText}>
@@ -290,7 +290,7 @@ function SellerProfileContent() {
                 {business?.name?.trim() || "Perfil de vendedor"}
               </Text>
               <View style={s.identityDetail}>
-                <Text variant="small" color="stateAnulated">
+                <Text variant="small" color="textMuted">
                   Número telefónico
                 </Text>
                 <Text maxLines={1} style={s.flexText}>
@@ -401,7 +401,7 @@ function StatCard({
             {value}
           </Text>
           <Text
-            color="stateAnulated"
+            color="textMuted"
             maxLines={1}
             style={[s.flexText, wide ? s.statWideDetail : null]}
           >
