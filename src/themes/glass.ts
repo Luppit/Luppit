@@ -125,21 +125,21 @@ export const glass = {
 } as const;
 
 const darkEdge = {
-  borderColor: "rgba(177,193,163,0.18)",
-  borderTopColor: "rgba(215,229,202,0.16)",
-  borderLeftColor: "rgba(215,229,202,0.12)",
-  borderRightColor: "rgba(177,193,163,0.14)",
-  borderBottomColor: "rgba(177,193,163,0.18)",
+  borderColor: "rgba(190,196,186,0.18)",
+  borderTopColor: "rgba(220,224,216,0.16)",
+  borderLeftColor: "rgba(220,224,216,0.12)",
+  borderRightColor: "rgba(190,196,186,0.14)",
+  borderBottomColor: "rgba(190,196,186,0.18)",
 };
 
 export const darkGlass: typeof glass = {
   ...glass,
-  surface: { ...glass.surface, ...darkEdge, backgroundColor: "#1D251C" },
-  chrome: { ...glass.chrome, ...darkEdge, backgroundColor: platformValue("rgba(23,30,22,0.88)", "#171E16") },
-  nav: { ...glass.nav, ...darkEdge, backgroundColor: platformValue("rgba(29,37,28,0.88)", "#1D251C") },
-  sheet: { ...glass.sheet, ...darkEdge, backgroundColor: platformValue("rgba(29,37,28,0.96)", "#1D251C") },
-  chip: { ...glass.chip, ...darkEdge, backgroundColor: "#273024" },
-  control: { ...glass.control, ...darkEdge, backgroundColor: "#273024" },
-  headerControl: { ...glass.headerControl, ...darkEdge, backgroundColor: "#242D21" },
-  segmentActive: { ...glass.segmentActive, ...darkEdge, backgroundColor: "#35432C" },
+  surface: { ...glass.surface, ...darkEdge, backgroundColor: "#252925" },
+  chrome: { ...glass.chrome, ...darkEdge, backgroundColor: platformValue("rgba(28,32,28,0.88)", "#1C201C") },
+  nav: { ...glass.nav, ...darkEdge, backgroundColor: platformValue("rgba(37,41,37,0.88)", "#252925") },
+  sheet: { ...glass.sheet, ...darkEdge, backgroundColor: platformValue("rgba(45,50,45,0.96)", "#2D322D") },
+  chip: { ...glass.chip, ...darkEdge, backgroundColor: "#303530" },
+  control: { ...glass.control, ...darkEdge, backgroundColor: "#303530" },
+  headerControl: { ...glass.headerControl, ...darkEdge, backgroundColor: "#303530" },
+  segmentActive: { ...glass.segmentActive, ...darkEdge, backgroundColor: "#303A24" },
 };
