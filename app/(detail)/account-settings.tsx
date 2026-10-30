@@ -28,7 +28,7 @@ import {
 import { Roles } from "@/src/services/role.service";
 import { getSupportEmail } from "@/src/services/support.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
-import { Theme, useTheme } from "@/src/themes";
+import { AppearanceMode, Theme, useAppearance, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
 import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
@@ -42,6 +42,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
+
+const APPEARANCE_OPTIONS: { id: AppearanceMode; label: string }[] = [
+  { id: "light", label: "Claro" },
+  { id: "dark", label: "Oscuro" },
+  { id: "system", label: "Sistema" },
+];
 
 export default function AccountSettingsScreen() {
   const [role, setRole] = useState<Roles | null>(null);
@@ -193,6 +199,8 @@ function AccountSettingsContent({
   hasProfileImage: boolean;
 }) {
   const t = useTheme();
+  const { mode: appearanceMode, setMode: setAppearanceMode } = useAppearance();
+  const appearanceLabel = APPEARANCE_OPTIONS.find((option) => option.id === appearanceMode)!.label;
   const insets = useSafeAreaInsets();
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = useMemo(
@@ -251,6 +259,28 @@ function AccountSettingsContent({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={s.content}
     >
+      <GroupedListSection title="Preferencias">
+        <GroupedListRow
+          icon="sun-moon"
+          label="Apariencia"
+          value={appearanceLabel}
+          accessibilityLabel={`Apariencia: ${appearanceLabel}`}
+          showSeparator={false}
+          onPress={() => openPopup({
+            type: "sort",
+            title: "Apariencia",
+            options: APPEARANCE_OPTIONS,
+            initialSelectedId: appearanceMode,
+            onSelect: (id) => {
+              const option = APPEARANCE_OPTIONS.find((item) => item.id === id);
+              if (option) void setAppearanceMode(option.id).catch(() => {
+                showError("No se pudo guardar la apariencia", "Intenta de nuevo.");
+              });
+            },
+          })}
+        />
+      </GroupedListSection>
+
       <GroupedListSection title="Cuenta">
         {!isSeller ? (
           <GroupedListRow

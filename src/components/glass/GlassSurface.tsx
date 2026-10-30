@@ -5,7 +5,6 @@ import {
   Platform,
   StyleProp,
   StyleSheet,
-  useColorScheme,
   View,
   ViewProps,
   ViewStyle,
@@ -31,7 +30,6 @@ export default function GlassSurface({
   ...viewProps
 }: GlassSurfaceProps) {
   const t = useTheme();
-  const colorScheme = useColorScheme();
   const variantStyle = t.glass[variant];
   const radius = t.glass.radius[variant];
   const blurKey = blur === false ? null : blur ?? (variant === "chip" ? "surface" : variant);
@@ -68,7 +66,7 @@ export default function GlassSurface({
           <BlurView
             intensity={t.glass.blurIntensity[layeredBlurKey]}
             tint={
-              colorScheme === "dark"
+              t.colorScheme === "dark"
                 ? "systemUltraThinMaterialDark"
                 : t.glass.blurTint[layeredBlurKey]
             }

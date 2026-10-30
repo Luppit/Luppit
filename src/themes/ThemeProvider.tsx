@@ -1,5 +1,6 @@
-import React, { createContext, useContext } from "react";
-import { useColorScheme } from "react-native";
+import { createKVStorage } from "@/src/store/factory";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { Appearance, useColorScheme } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { borders } from "./borders";
 import { colors, darkColors } from "./colors";
@@ -9,6 +10,7 @@ import { spacing } from "./spacing";
 import { typography } from "./typography";
 
 export type Theme = {
+  colorScheme: "light" | "dark";
   colors: typeof colors;
   spacing: typeof spacing;
   typography: typeof typography;
@@ -19,6 +21,7 @@ export type Theme = {
 };
 
 const defaultTheme: Theme = {
+  colorScheme: "light",
   colors,
   spacing,
   typography,
@@ -29,16 +32,50 @@ const defaultTheme: Theme = {
 };
 
 const ThemeCtx = createContext<Theme>(defaultTheme);
-const darkTheme: Theme = { ...defaultTheme, colors: darkColors, glass: darkGlass };
+const darkTheme: Theme = { ...defaultTheme, colorScheme: "dark", colors: darkColors, glass: darkGlass };
+
+export type AppearanceMode = "light" | "dark" | "system";
+const APPEARANCE_MODE_KEY = "appearance_mode";
+const storage = createKVStorage();
+const AppearanceCtx = createContext<{
+  mode: AppearanceMode;
+  setMode: (mode: AppearanceMode) => Promise<void>;
+}>({ mode: "system", setMode: async () => {} });
 
 export const useTheme = () => useContext(ThemeCtx);
+export const useAppearance = () => useContext(AppearanceCtx);
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
-  const isDark = useColorScheme() === "dark";
+  const colorScheme = useColorScheme();
+  const [mode, setMode] = useState<AppearanceMode | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void storage.getItem(APPEARANCE_MODE_KEY).then((savedMode) => {
+      if (active) setMode(savedMode === "light" || savedMode === "dark" ? savedMode : "system");
+    }).catch(() => {
+      if (active) setMode("system");
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (mode !== null) Appearance.setColorScheme?.(mode === "system" ? null : mode);
+  }, [mode]);
+
+  const changeMode = useCallback(async (nextMode: AppearanceMode) => {
+    await storage.setItem(APPEARANCE_MODE_KEY, nextMode);
+    setMode(nextMode);
+  }, []);
+
+  if (mode === null) return null;
+  const isDark = (mode === "system" ? colorScheme : mode) === "dark";
   return (
     <ThemeCtx.Provider value={isDark ? darkTheme : defaultTheme}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      {children}
+      <AppearanceCtx.Provider value={{ mode, setMode: changeMode }}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        {children}
+      </AppearanceCtx.Provider>
     </ThemeCtx.Provider>
   );
 };

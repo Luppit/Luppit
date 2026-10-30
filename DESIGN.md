@@ -39,7 +39,7 @@ Este documento registra el diseño existente. Los propietarios de los valores si
 
 Verde oliva para la acción primaria y los contadores de acciones, con números de alto contraste. Los contadores no se muestran cuando su cantidad es cero. Texto principal `textDark`, apoyo `textMedium` y metadatos legibles `textMuted`; no reutilizar colores de estados para texto de apoyo. El color de peligro acompaña resultados negativos, sin convertirlos en compras exitosas. Reutilizar los roles semánticos del tema.
 
-`ThemeProvider` sigue la apariencia del sistema. `colors`/`darkColors` y `glass`/`darkGlass` mantienen los mismos roles para superficies claras y oscuras. `backgroudWhite` conserva su nombre por compatibilidad con la configuración existente, pero representa la superficie del tema. `white` es tinta blanca invariable para controles sobre fotos o fondos negros. El logotipo conserva su oliva original; los controles usan un oliva más oscuro en modo claro y más luminoso en modo oscuro para mantener contraste.
+`ThemeProvider` permite Claro, Oscuro o Sistema desde Configuración → Apariencia. Sistema es la opción inicial; la preferencia se guarda en el dispositivo y se comparte entre perfiles. La apariencia resuelta controla colores, vidrio, barra de estado y controles nativos de la app. `colors`/`darkColors` y `glass`/`darkGlass` mantienen los mismos roles para superficies claras y oscuras. `backgroudWhite` conserva su nombre por compatibilidad con la configuración existente, pero representa la superficie del tema. `white` es tinta blanca invariable para controles sobre fotos o fondos negros. El logotipo conserva su oliva original; los controles usan un oliva más oscuro en modo claro y más luminoso en modo oscuro para mantener contraste.
 
 ## Typography
 

@@ -49,6 +49,7 @@ import {
   Share2,
   SlidersHorizontal,
   Smartphone,
+  SunMoon,
   Sparkles,
   Square,
   Star,
@@ -65,6 +66,7 @@ import {
 } from "lucide-react-native";
 
 export const lucideIcons = {
+  "sun-moon": SunMoon,
   ban: Ban,
   heart: Heart,
   check: Check,
