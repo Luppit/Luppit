@@ -40,7 +40,7 @@ const storage = createKVStorage();
 const AppearanceCtx = createContext<{
   mode: AppearanceMode;
   setMode: (mode: AppearanceMode) => Promise<void>;
-}>({ mode: "system", setMode: async () => {} });
+}>({ mode: "light", setMode: async () => {} });
 
 export const useTheme = () => useContext(ThemeCtx);
 export const useAppearance = () => useContext(AppearanceCtx);
@@ -52,9 +52,9 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let active = true;
     void storage.getItem(APPEARANCE_MODE_KEY).then((savedMode) => {
-      if (active) setMode(savedMode === "light" || savedMode === "dark" ? savedMode : "system");
+      if (active) setMode(savedMode === "light" || savedMode === "dark" || savedMode === "system" ? savedMode : "light");
     }).catch(() => {
-      if (active) setMode("system");
+      if (active) setMode("light");
     });
     return () => { active = false; };
   }, []);

@@ -80,13 +80,16 @@ for (const savedMode of [null, "unexpected", "system", "light", "dark"]) {
     assert.equal(f.render(), null);
     await flush();
     const tree = f.render();
-    assert.equal(preference(tree).mode, savedMode === "light" || savedMode === "dark" ? savedMode : "system");
-    assert.equal(tree.props.value.colorScheme, savedMode === "light" ? "light" : "dark");
+    const expectedMode = savedMode === "dark" || savedMode === "system" ? savedMode : "light";
+    assert.equal(preference(tree).mode, expectedMode);
+    assert.equal(tree.props.value.colorScheme, expectedMode === "light" ? "light" : "dark");
+    assert.equal(f.nativeModes.at(-1), expectedMode === "system" ? null : expectedMode);
+    assert.equal(f.saved.get("appearance_mode"), savedMode ?? undefined);
   });
 }
 
 test("System follows device changes while explicit modes override them and native appearance", async () => {
-  const f = fixture(); f.render(); await flush();
+  const f = fixture(new Map([["appearance_mode", "system"]])); f.render(); await flush();
   let tree = f.render();
   assert.equal(tree.props.value.colorScheme, "light");
   assert.equal(f.nativeModes.at(-1), null);
@@ -127,14 +130,17 @@ test("failed preference writes preserve the previous selection and report failur
   const f = fixture(); f.render(); await flush();
   f.setWrite(async () => { throw new Error("storage unavailable"); });
   await assert.rejects(preference(f.render()).setMode("dark"), /storage unavailable/);
-  assert.equal(preference(f.render()).mode, "system");
+  assert.equal(preference(f.render()).mode, "light");
   assert.equal(f.saved.size, 0);
 });
 
-test("unavailable preference storage falls back to System", async () => {
-  const f = fixture(); f.setRead(async () => { throw new Error("unavailable"); });
+test("unavailable preference storage falls back to Light even on a dark device", async () => {
+  const f = fixture(new Map(), "dark"); f.setRead(async () => { throw new Error("unavailable"); });
   f.render(); await flush();
-  assert.equal(preference(f.render()).mode, "system");
+  const tree = f.render();
+  assert.equal(preference(tree).mode, "light");
+  assert.equal(tree.props.value.colorScheme, "light");
+  assert.equal(f.nativeModes.at(-1), "light");
 });
 
 test("glass follows the resolved app theme rather than the device setting", () => {
