@@ -19,8 +19,8 @@ test("LAN development server targets the installed dev client and skips Sentry u
 test("simulator builds and opens the local iOS app without EAS or Sentry upload", () => {
   const plan = createLaunchPlan("simulator");
 
-  assert.equal(plan.command, "npx");
-  assert.deepEqual(plan.args, ["expo", "run:ios"]);
+  assert.equal(plan.command, "node");
+  assert.deepEqual(plan.args, ["./scripts/run-ios.mjs"]);
   assert.equal(plan.env.EXPO_PUBLIC_BUILD_PROFILE, "development");
   assert.equal(plan.env.SENTRY_DISABLE_AUTO_UPLOAD, "true");
   assert.match(plan.sentry, /no EAS build/i);

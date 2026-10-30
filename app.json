@@ -244,7 +244,8 @@
           "androidVariant": "autodetection"
         }
       ],
-      "./plugins/withAndroidBackupRulesOverride"
+      "./plugins/withAndroidBackupRulesOverride",
+      "./plugins/withIosSimulatorDeploymentTarget"
     ],
     "experiments": {
       "typedRoutes": true,

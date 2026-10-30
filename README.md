@@ -40,3 +40,7 @@ npm run app -- release all
 The Android submission requires a Google Play app and a Google Service Account key uploaded to the project's EAS credentials. The iOS submission prompts for any missing App Store Connect credentials. Neither path submits the app for a public production release.
 
 The current profile is shown in the app under **Configuración → Versión**.
+
+The local iOS Simulator launcher supports Device Hub in Xcode 27 and the Simulator app in older Xcode versions. With Expo SDK 54, use `npm run app -- simulator` for Device Hub compatibility.
+
+The iOS config plugin raises outdated CocoaPods simulator deployment targets to the app's minimum iOS version (15.1 by default), preserving higher targets and physical-device settings. This is applied during Expo prebuild and CocoaPods installation. To reuse an existing simulator binary, run `EXPO_PUBLIC_BUILD_PROFILE=development SENTRY_DISABLE_AUTO_UPLOAD=true node scripts/run-ios.mjs --binary /absolute/path/to/Luppit.app`.

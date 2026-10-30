@@ -106,8 +106,8 @@ export function createLaunchPlan(modeInput, platformInput) {
       mode: "iOS Simulator",
       description:
         "Builds and installs the local Debug app using Xcode's incremental cache, starts Metro, and opens Luppit in the simulator.",
-      command: "npx",
-      args: ["expo", "run:ios"],
+      command: "node",
+      args: ["./scripts/run-ios.mjs"],
       env: PROFILE_ENV.development,
       sentry: "Artifact upload is disabled; no EAS build is created.",
     };
