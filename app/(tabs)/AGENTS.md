@@ -11,7 +11,8 @@ Applies to tab screens, buyer/seller home behavior, profile tab, and standalone 
 - Buyer cards open `/(detail)/purchase-request`; seller cards open `/(conversation)/offer` through `get_or_create_seller_purchase_request_conversation(...)`.
 - Seller open side effects, including visualization tracking, belong to the seller-open RPC.
 - Favorites are role-specific and must preload/mutate through buyer/seller favorite RPC wrappers.
-- Email setup gates buyer/seller home: if incomplete, do not call home RPCs; show the account-setup state and route the CTA to `/(modal)/email-setup`.
+- Buyer/seller home uses the shared setup checklist before calling home RPCs. Buyer setup includes email, district, photo, and native notification permission; seller setup additionally includes business categories.
+- Seller location availability is a persisted database decision. Unavailable sellers route to the availability screen across login and profile changes, while location correction and account escape actions remain available.
 - Keep home behavior presentation-only: loading/empty states, carousels, navigation, long-press menus, and shared card styling.
 
 ## Profile And Account

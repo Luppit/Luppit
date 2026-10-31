@@ -406,6 +406,14 @@ const SAFE_SUPABASE_ERROR_MESSAGES: Record<string, { type: AppErrorType; message
     type: "validation",
     message: "Completa la configuración del negocio en Solicitudes para hacer ofertas.",
   },
+  buyer_profile_setup_required: {
+    type: "validation",
+    message: "Completa la configuración de tu perfil en Solicitudes para crear solicitudes.",
+  },
+  seller_location_unavailable: {
+    type: "validation",
+    message: "Luppit todavía no está disponible en la ubicación de este negocio. Te avisaremos cuando llegue a tu zona.",
+  },
   notification_input_required: {
     type: "validation",
     message: "No pudimos identificar la notificación.",

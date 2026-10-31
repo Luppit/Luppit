@@ -20,9 +20,8 @@ import {
   hasBuyerHomeFilters,
   subscribeBuyerHomeFilters,
 } from "@/src/services/buyer.home.filters.service";
-import {
-  getCurrentProfileEmailSetupStatus,
-} from "@/src/services/profile.service";
+import { getCurrentBuyerProfileSetup, type BuyerProfileSetup } from "@/src/services/buyer.profile.setup.service";
+import { type ProfileSetupChecklist } from "@/src/services/seller.business.setup.helpers";
 import {
   DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
   getCurrentBuyerMarketplaceHub,
@@ -46,7 +45,6 @@ import {
   subscribeSelectedSegment,
 } from "@/src/services/segment.service";
 import { type Theme, useTheme } from "@/src/themes";
-import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -54,7 +52,6 @@ import { AppState, FlatList, Image, Pressable, ScrollView, StyleSheet, useWindow
 
 const BUYER_DEFAULT_STAGE = "all";
 const SELLER_DEFAULT_STAGE = "for_you";
-type AccountSetupRequirement = "email";
 
 export default function HomeScreen() {
   const t = useTheme();
@@ -165,7 +162,7 @@ function getMatchingStageCode(hub: MarketplaceHub, revealMatches: boolean) {
 
 function BuyerHomeContent() {
   const [isLoading, setIsLoading] = useState(true);
-  const [setupRequirement, setSetupRequirement] = useState<AccountSetupRequirement | null>(null);
+  const [buyerSetup, setBuyerSetup] = useState<BuyerProfileSetup | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
   const requestGenerationRef = useRef(0);
   const loadedCriteriaRef = useRef<string | null>(null);
@@ -184,23 +181,22 @@ function BuyerHomeContent() {
   const loadHub = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
     setIsLoading(true);
-    const emailSetupResult = await getCurrentProfileEmailSetupStatus();
+    const setupResult = await getCurrentBuyerProfileSetup();
     if (generation !== requestGenerationRef.current) return;
-    if (!emailSetupResult.ok) {
-      setSetupRequirement(null);
+    if (!setupResult.ok) {
+      setBuyerSetup(null);
       setHub(null);
       setIsLoading(false);
       return;
     }
 
-    if (!emailSetupResult.data.isComplete) {
-      setSetupRequirement("email");
+    setBuyerSetup(setupResult.data);
+    if (!setupResult.data.isComplete) {
       setHub(null);
       setIsLoading(false);
       return;
     }
 
-    setSetupRequirement(null);
     const result = await getCurrentBuyerMarketplaceHub(
       filters,
       selectedSegmentSvgName,
@@ -242,7 +238,11 @@ function BuyerHomeContent() {
   useFocusEffect(
     useCallback(() => {
       void loadHub();
+      const subscription = AppState.addEventListener("change", (nextState) => {
+        if (nextState === "active") void loadHub();
+      });
       return () => {
+        subscription.remove();
         requestGenerationRef.current += 1;
       };
     }, [loadHub])
@@ -252,7 +252,7 @@ function BuyerHomeContent() {
     <MarketplaceHomeContent
       role="buyer"
       isLoading={isLoading}
-      setupRequirement={setupRequirement}
+      profileSetup={buyerSetup}
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
@@ -340,8 +340,7 @@ function SellerHomeContent() {
     <MarketplaceHomeContent
       role="seller"
       isLoading={isLoading}
-      setupRequirement={null}
-      sellerSetup={sellerSetup}
+      profileSetup={sellerSetup}
       hub={hub}
       filters={filters}
       selectedStageCode={selectedStageCode}
@@ -358,8 +357,7 @@ function SellerHomeContent() {
 function MarketplaceHomeContent({
   role,
   isLoading,
-  setupRequirement,
-  sellerSetup,
+  profileSetup,
   hub,
   filters,
   selectedStageCode,
@@ -372,8 +370,7 @@ function MarketplaceHomeContent({
 }: {
   role: MarketplaceHubRole;
   isLoading: boolean;
-  setupRequirement: AccountSetupRequirement | null;
-  sellerSetup?: SellerBusinessSetup | null;
+  profileSetup?: ProfileSetupChecklist | null;
   hub: MarketplaceHub | null;
   filters: BuyerHomeFilters | SellerHomeFilters;
   selectedStageCode: string;
@@ -419,14 +416,13 @@ function MarketplaceHomeContent({
   }, [hub, onSelectStage, role, selectedStageCode]);
 
   useEffect(() => {
-    if (role !== "buyer" || isLoading || setupRequirement || !hub) return;
+    if (role !== "buyer" || isLoading || !hub) return;
     void presentInitialPushPermissionPrompt("home");
   }, [
     hub,
     isLoading,
     presentInitialPushPermissionPrompt,
     role,
-    setupRequirement,
   ]);
 
   const openSortPopup = useCallback(() => {
@@ -448,17 +444,9 @@ function MarketplaceHomeContent({
     return <LoadingState label="Cargando solicitudes..." />;
   }
 
-  if (sellerSetup && !sellerSetup.isComplete) {
-    return <SellerBusinessSetupChecklist setup={sellerSetup}
+  if (profileSetup && !profileSetup.isComplete) {
+    return <SellerBusinessSetupChecklist role={role} setup={profileSetup}
       topContentInset={topContentInset} onRefresh={onRetry} />;
-  }
-
-  if (setupRequirement) {
-    return (
-      <AccountSetupRequiredState
-        topContentInset={topContentInset}
-      />
-    );
   }
 
   if (!hub) {
@@ -714,57 +702,6 @@ function HomeRailEmptyState({ message }: { message: string }) {
   );
 }
 
-function AccountSetupRequiredState({
-  topContentInset,
-}: {
-  topContentInset: number;
-}) {
-  const t = useTheme();
-  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
-
-  return (
-    <View
-      style={[s.stateContent, { paddingTop: topContentInset }]}
-    >
-      <BundledSvg
-        asset={require("../../assets/images/empty_box.svg")}
-        width={240}
-        height={220}
-        fallback={
-          <Image
-            source={require("../../assets/images/icon.png")}
-            style={s.stateFallbackImage}
-            resizeMode="contain"
-          />
-        }
-      />
-      <Text align="center" variant="body">
-        Necesitas terminar la configuración de tu cuenta. Agrega tu correo y autoriza recibir emails de Luppit para continuar.
-      </Text>
-      <View style={s.stateAction}>
-        <Button
-          variant="dark"
-          title="Completar configuración"
-          onPress={() => router.push({
-            pathname: "/(modal)/email-setup",
-            params: { title: "Verificar correo" },
-          })}
-        />
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={openSignOutConfirmation}
-        style={s.stateSignOut}
-      >
-        <Text variant="body" color="error">
-          Cerrar sesión
-        </Text>
-      </Pressable>
-    </View>
-  );
-}
-
 function HomeEmptyState({
   topContentInset,
   message,
@@ -942,11 +879,6 @@ function createMarketplaceHomeStyles(t: Theme) {
     },
     stateAction: {
       width: "100%",
-    },
-    stateSignOut: {
-      alignSelf: "center",
-      paddingHorizontal: t.spacing.md,
-      paddingVertical: t.spacing.sm,
     },
   });
 }

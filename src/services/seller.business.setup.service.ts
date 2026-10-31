@@ -3,9 +3,24 @@ import { supabase } from "../lib/supabase/client";
 import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/errors";
 import { getCurrentProfileResult } from "./active.profile.service";
 import { getPushPermissionStatus } from "./push-notification.service";
-import { parseSellerBusinessSetup, SellerBusinessSetup } from "./seller.business.setup.helpers";
+import { parseSellerBusinessSetup, parseSellerLocationAvailability, SellerBusinessSetup, type SellerLocationAvailability } from "./seller.business.setup.helpers";
 
 export type { SellerBusinessSetup, SellerBusinessSetupStep } from "./seller.business.setup.helpers";
+export type { SellerLocationAvailability } from "./seller.business.setup.helpers";
+
+export async function getCurrentSellerLocationAvailability(): Promise<
+  { ok: true; data: SellerLocationAvailability } | { ok: false; error: AppError }
+> {
+  const profile = await getCurrentProfileResult();
+  if (profile?.ok === false) return profile;
+  if (!profile) return { ok: false, error: fromAppError("auth") };
+  const result = await supabase.rpc(RPC_FUNCTIONS.GET_CURRENT_SELLER_LOCATION_AVAILABILITY, {
+    p_profile_id: profile.data.id,
+  });
+  if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+  const data = parseSellerLocationAvailability(result.data);
+  return data ? { ok: true, data } : { ok: false, error: fromAppError("unknown") };
+}
 
 export async function getCurrentSellerBusinessSetup(): Promise<
   { ok: true; data: SellerBusinessSetup } | { ok: false; error: AppError }

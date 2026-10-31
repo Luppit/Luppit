@@ -16,7 +16,9 @@ Applies to DB table usage, schema contracts, SQL RPCs, and transition procedures
 - Home configuration: `home_group`, `home_group_preset`, `home_group_preset_item`, `profile_home_group_preset`; group limits come from `max_items`, not RPC params.
 - Seller discovery scope: `business_category_preference`; buyer request ownership: `purchase_request.profile_id`.
 - Request presentation: lifecycle in `purchase_request_status`, status text/style in `purchase_request_status_ui`, visualizations in `purchase_request_visualization`, favorites in role-specific `purchase_request_favorite`.
-- Locations: `business.location_id -> location.id`; runtime selectors use active Costa Rica district rows and save only district ids.
+- Locations: `business.location_id` and buyer `profile.location_id` reference `location.id`; publication snapshots the buyer district in `purchase_request.location_id`. Runtime selectors use active Costa Rica district rows and save only district ids.
+- Availability: seller province coverage comes from `app_config.seller_available_province_codes`; persisted business/profile availability and expansion notification enrollment are database-owned.
+- Distance: RPCs return approximate straight-line distances between district reference centers and own nearest-first ordering, including unavailable distances sorted last.
 - Notifications: `notification`, `notification_type_catalog`, `profile_notification`; active unread means `dismissed_at is null and read_at is null`, while dismissed rows remain retained history.
 
 ## Home, Favorites, And Listings

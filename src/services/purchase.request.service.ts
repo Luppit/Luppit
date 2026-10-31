@@ -59,6 +59,8 @@ export type SellerHomePurchaseRequestItem = {
   created_at: string;
   views_count: number;
   offers_count?: number | null;
+  distance_km?: number | null;
+  distance_label?: string | null;
   seller_interaction_state?: SellerHomeInteractionState | null;
 };
 
@@ -524,6 +526,11 @@ function parseSellerHomePurchaseRequestItem(
         value.visualizations_count
     ),
     offers_count: typeof value.offers_count === "number" ? value.offers_count : null,
+    distance_km:
+      typeof value.distance_km === "number" && Number.isFinite(value.distance_km)
+        ? value.distance_km
+        : null,
+    distance_label: normalizeNullableString(value.distance_label),
     seller_interaction_state: parseSellerHomeInteractionState(value.seller_interaction_state),
   };
 }

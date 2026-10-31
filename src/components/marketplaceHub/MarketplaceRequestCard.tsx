@@ -13,6 +13,7 @@ export type MarketplaceRequestCardItem = {
   created_at: string;
   published_at: string | null;
   offers_count?: number | null;
+  distance_label?: string | null;
   buyer_display_name?: string | null;
   status_label?: string | null;
   status_style_code?: string | null;
@@ -139,6 +140,7 @@ export default function MarketplaceRequestCard({
   const s = useMemo(() => createMarketplaceRequestCardStyles(t), [t]);
   const titleLabel = item.title?.trim() || "Solicitud";
   const categoryLabel = item.category_name?.trim();
+  const distanceLabel = role === "seller" ? item.distance_label?.trim() : null;
   const buyerLabel =
     item.buyer_display_name?.trim() || "Comprador no disponible";
   const statusLabel =
@@ -166,6 +168,7 @@ export default function MarketplaceRequestCard({
   const accessibilityLabel = [
     categoryLabel,
     titleLabel,
+    distanceLabel,
     showSellerDiscoveryDetails ? `Comprador: ${buyerLabel}` : undefined,
     statusLabel,
     displayedContext,
@@ -187,6 +190,7 @@ export default function MarketplaceRequestCard({
           </Text>
         ) : null
       }
+      subtitle={distanceLabel}
       compact={compact}
       glassSurface
       fullText={!showSellerDiscoveryDetails}

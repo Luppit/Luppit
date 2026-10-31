@@ -29,6 +29,8 @@ export type PurchaseOffer = Row<"purchase_offer">;
 export type PurchaseOfferCardData = PurchaseOffer & {
   business_name: string | null;
   business_province: string | null;
+  distance_km?: number | null;
+  distance_label?: string | null;
   business_rating: number | null;
   business_num_ratings: number | null;
   offer_currency_code: string | null;
@@ -399,6 +401,12 @@ export async function getCurrentBuyerPurchaseRequestOffers(
       business_name: typeof row.business_name === "string" ? row.business_name : null,
       business_province:
         typeof row.business_province === "string" ? row.business_province : null,
+      distance_km:
+        typeof row.distance_km === "number" && Number.isFinite(row.distance_km)
+          ? row.distance_km
+          : null,
+      distance_label:
+        typeof row.distance_label === "string" ? row.distance_label : null,
       business_rating:
         typeof row.business_rating === "number" ? row.business_rating : null,
       business_num_ratings:

@@ -290,32 +290,41 @@ export type Database = {
       }
       business: {
         Row: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           id: string
           id_document: string | null
           image_path: string | null
           legal_name: string | null
           location_id: string | null
+          marketplace_availability_status: string
           name: string | null
           privacy_purge_after: string | null
         }
         Insert: {
+          availability_notification_requested_at?: string | null
+          availability_notified_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
           image_path?: string | null
           legal_name?: string | null
           location_id?: string | null
+          marketplace_availability_status?: string
           name?: string | null
           privacy_purge_after?: string | null
         }
         Update: {
+          availability_notification_requested_at?: string | null
+          availability_notified_at?: string | null
           created_at?: string
           id?: string
           id_document?: string | null
           image_path?: string | null
           legal_name?: string | null
           location_id?: string | null
+          marketplace_availability_status?: string
           name?: string | null
           privacy_purge_after?: string | null
         }
@@ -2270,12 +2279,15 @@ export type Database = {
         Row: {
           canton: string | null
           canton_code: string | null
+          coordinate_source: string | null
           country_code: string
           created_at: string
           district: string | null
           district_code: string | null
           id: string
           is_active: boolean
+          latitude: number | null
+          longitude: number | null
           province: string | null
           province_code: string | null
           source: string
@@ -2285,12 +2297,15 @@ export type Database = {
         Insert: {
           canton?: string | null
           canton_code?: string | null
+          coordinate_source?: string | null
           country_code?: string
           created_at?: string
           district?: string | null
           district_code?: string | null
           id?: string
           is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
           province?: string | null
           province_code?: string | null
           source?: string
@@ -2300,12 +2315,15 @@ export type Database = {
         Update: {
           canton?: string | null
           canton_code?: string | null
+          coordinate_source?: string | null
           country_code?: string
           created_at?: string
           district?: string | null
           district_code?: string | null
           id?: string
           is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
           province?: string | null
           province_code?: string | null
           source?: string
@@ -2507,6 +2525,35 @@ export type Database = {
             columns: ["purchase_offer_id"]
             isOneToOne: false
             referencedRelation: "purchase_offer"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offer_category_pricing_policy: {
+        Row: {
+          allow_fractional_quantities: boolean
+          allowed_units: string[] | null
+          category_id: string
+          max_components: number
+        }
+        Insert: {
+          allow_fractional_quantities?: boolean
+          allowed_units?: string[] | null
+          category_id: string
+          max_components?: number
+        }
+        Update: {
+          allow_fractional_quantities?: boolean
+          allowed_units?: string[] | null
+          category_id?: string
+          max_components?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offer_category_pricing_policy_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: true
+            referencedRelation: "category"
             referencedColumns: ["id"]
           },
         ]
@@ -2881,6 +2928,8 @@ export type Database = {
       }
       profile: {
         Row: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -2889,11 +2938,15 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
         }
         Insert: {
+          availability_notification_requested_at?: string | null
+          availability_notified_at?: string | null
           created_at?: string
           email?: string | null
           email_opt_in?: boolean
@@ -2902,11 +2955,15 @@ export type Database = {
           id_document?: string | null
           image_path?: string | null
           is_default?: boolean
+          location_id?: string | null
+          marketplace_availability_status?: string
           name: string
           phone?: string | null
           user_id?: string | null
         }
         Update: {
+          availability_notification_requested_at?: string | null
+          availability_notified_at?: string | null
           created_at?: string
           email?: string | null
           email_opt_in?: boolean
@@ -2915,11 +2972,21 @@ export type Database = {
           id_document?: string | null
           image_path?: string | null
           is_default?: boolean
+          location_id?: string | null
+          marketplace_availability_status?: string
           name?: string
           phone?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profile_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_account_deletion_request: {
         Row: {
@@ -3274,79 +3341,6 @@ export type Database = {
           },
         ]
       }
-      purchase_offer_component: {
-        Row: {
-          amount: number | null
-          basis: string | null
-          charge_mode: string
-          description: string
-          id: string
-          purchase_offer_id: string
-          quantity: number | null
-          sort_order: number
-          unit_label: string | null
-        }
-        Insert: {
-          amount?: number | null
-          basis?: string | null
-          charge_mode: string
-          description: string
-          id: string
-          purchase_offer_id: string
-          quantity?: number | null
-          sort_order: number
-          unit_label?: string | null
-        }
-        Update: {
-          amount?: number | null
-          basis?: string | null
-          charge_mode?: string
-          description?: string
-          id?: string
-          purchase_offer_id?: string
-          quantity?: number | null
-          sort_order?: number
-          unit_label?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "purchase_offer_component_purchase_offer_id_fkey"
-            columns: ["purchase_offer_id"]
-            isOneToOne: false
-            referencedRelation: "purchase_offer"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      offer_category_pricing_policy: {
-        Row: {
-          allow_fractional_quantities: boolean
-          allowed_units: string[] | null
-          category_id: string
-          max_components: number
-        }
-        Insert: {
-          allow_fractional_quantities?: boolean
-          allowed_units?: string[] | null
-          category_id: string
-          max_components?: number
-        }
-        Update: {
-          allow_fractional_quantities?: boolean
-          allowed_units?: string[] | null
-          category_id?: string
-          max_components?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "offer_category_pricing_policy_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: true
-            referencedRelation: "category"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       purchase_offer: {
         Row: {
           business_id: string | null
@@ -3414,6 +3408,50 @@ export type Database = {
             columns: ["purchase_request_id"]
             isOneToOne: false
             referencedRelation: "purchase_request"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_offer_component: {
+        Row: {
+          amount: number | null
+          basis: string | null
+          charge_mode: string
+          description: string
+          id: string
+          purchase_offer_id: string
+          quantity: number | null
+          sort_order: number
+          unit_label: string | null
+        }
+        Insert: {
+          amount?: number | null
+          basis?: string | null
+          charge_mode: string
+          description: string
+          id: string
+          purchase_offer_id: string
+          quantity?: number | null
+          sort_order: number
+          unit_label?: string | null
+        }
+        Update: {
+          amount?: number | null
+          basis?: string | null
+          charge_mode?: string
+          description?: string
+          id?: string
+          purchase_offer_id?: string
+          quantity?: number | null
+          sort_order?: number
+          unit_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_offer_component_purchase_offer_id_fkey"
+            columns: ["purchase_offer_id"]
+            isOneToOne: false
+            referencedRelation: "purchase_offer"
             referencedColumns: ["id"]
           },
         ]
@@ -3543,6 +3581,7 @@ export type Database = {
           created_at: string
           draft_id: string | null
           id: string
+          location_id: string | null
           privacy_purge_after: string | null
           profile_id: string
           published_at: string
@@ -3559,6 +3598,7 @@ export type Database = {
           created_at?: string
           draft_id?: string | null
           id?: string
+          location_id?: string | null
           privacy_purge_after?: string | null
           profile_id: string
           published_at?: string
@@ -3575,6 +3615,7 @@ export type Database = {
           created_at?: string
           draft_id?: string | null
           id?: string
+          location_id?: string | null
           privacy_purge_after?: string | null
           profile_id?: string
           published_at?: string
@@ -3596,6 +3637,13 @@ export type Database = {
             columns: ["draft_id"]
             isOneToOne: false
             referencedRelation: "request_draft"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_request_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location"
             referencedColumns: ["id"]
           },
           {
@@ -4264,6 +4312,8 @@ export type Database = {
       accept_current_user_business_invitation: {
         Args: { p_id_document: string; p_invitation_id: string; p_name: string }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4272,6 +4322,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4484,6 +4536,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4492,6 +4546,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4512,6 +4568,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4520,6 +4578,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4542,6 +4602,8 @@ export type Database = {
       create_current_user_buyer_profile_from_verified_identity: {
         Args: never
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4550,6 +4612,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4571,6 +4635,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4579,6 +4645,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4600,6 +4668,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4608,6 +4678,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4629,6 +4701,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4637,6 +4711,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4658,6 +4734,8 @@ export type Database = {
           p_role: string
         }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4666,6 +4744,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4680,6 +4760,8 @@ export type Database = {
       create_current_user_seller_profile_from_verified_identity: {
         Args: { p_invitation_id?: string }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -4688,6 +4770,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null
@@ -4728,6 +4812,25 @@ export type Database = {
           p_pickup_catalog_id?: string
           p_price: number
           p_profile_id: string
+          p_shipping_max_days?: number
+          p_shipping_price?: number
+        }
+        Returns: Json
+      }
+      create_seller_offer_priced_before_components: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_image_paths?: string[]
+          p_currency_id: string
+          p_delivery_catalog_id?: string
+          p_description: string
+          p_offer_image_paths?: string[]
+          p_pickup_after_days?: number
+          p_pickup_catalog_id?: string
+          p_price: number
+          p_price_basis?: string
+          p_profile_id: string
+          p_quantity_offered?: number
           p_shipping_max_days?: number
           p_shipping_price?: number
         }
@@ -4870,6 +4973,42 @@ export type Database = {
         Returns: Json
       }
       get_buyer_purchase_request_offers: {
+        Args: {
+          p_currency_ids?: string[]
+          p_end_date?: string
+          p_profile_id: string
+          p_purchase_request_id: string
+          p_search_text?: string
+          p_sort_code?: string
+          p_start_date?: string
+        }
+        Returns: {
+          business_id: string
+          business_name: string
+          business_num_ratings: number
+          business_province: string
+          business_rating: number
+          conversation_id: string
+          created_at: string
+          currency_id: string
+          description: string
+          distance_km: number
+          distance_label: string
+          id: string
+          offer_components: Json
+          offer_currency_code: string
+          offer_price_summary: string
+          offer_product_subtotal: number
+          offer_subtotal: number
+          offer_unit_label: string
+          price: number
+          price_basis: string
+          pricing_version: number
+          purchase_request_id: string
+          quantity_offered: number
+        }[]
+      }
+      get_buyer_purchase_request_offers_before_location: {
         Args: {
           p_currency_ids?: string[]
           p_end_date?: string
@@ -5085,37 +5224,6 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
-      get_seller_offer_pricing: {
-        Args: {
-          p_conversation_id: string
-          p_draft?: Json
-          p_profile_id: string
-        }
-        Returns: Json
-      }
-      create_seller_offer_priced_before_components: {
-        Args: {
-          p_conversation_id: string
-          p_conversation_image_paths?: string[]
-          p_currency_id: string
-          p_delivery_catalog_id?: string
-          p_description: string
-          p_offer_image_paths?: string[]
-          p_pickup_after_days?: number
-          p_pickup_catalog_id?: string
-          p_price: number
-          p_price_basis?: string
-          p_profile_id: string
-          p_quantity_offered?: number
-          p_shipping_max_days?: number
-          p_shipping_price?: number
-        }
-        Returns: Json
-      }
-      get_conversation_view_before_components: {
-        Args: { p_conversation_id: string; p_profile_id: string }
-        Returns: Json
-      }
       get_conversation_view: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -5128,6 +5236,14 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
+      get_conversation_view_before_action_helper_text: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_view_before_components: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
       get_conversation_view_before_offer_proposals: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
@@ -5137,6 +5253,10 @@ export type Database = {
         Returns: Json
       }
       get_conversation_view_before_safety_20260727: {
+        Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: Json
+      }
+      get_conversation_view_before_seller_offer_guard: {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
@@ -5171,15 +5291,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_buyer_profile_setup: {
+        Args: { p_notifications_enabled?: boolean; p_profile_id: string }
+        Returns: Json
+      }
       get_current_buyer_purchase_request_cancellation_eligibility: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
       get_current_legal_acceptance_state: { Args: never; Returns: Json }
-      get_current_profile_pending_ratings: {
-        Args: { p_profile_id: string; p_page?: number; p_page_size?: number }
-        Returns: Json
-      }
       get_current_profile_conversations: {
         Args: {
           p_category_ids?: string[]
@@ -5210,12 +5330,20 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_profile_pending_ratings: {
+        Args: { p_page?: number; p_page_size?: number; p_profile_id: string }
+        Returns: Json
+      }
       get_current_safety_blocks: {
         Args: { p_profile_id: string }
         Returns: Json
       }
       get_current_seller_business_setup: {
         Args: { p_notifications_enabled?: boolean; p_profile_id: string }
+        Returns: Json
+      }
+      get_current_seller_location_availability: {
+        Args: { p_profile_id: string }
         Returns: Json
       }
       get_current_seller_purchase_offers: {
@@ -5573,16 +5701,13 @@ export type Database = {
         Args: { p_conversation_id: string; p_profile_id: string }
         Returns: Json
       }
-      get_seller_request_offer_conversations: {
-        Args: { p_profile_id: string; p_purchase_request_id: string }
-        Returns: {
-          conversation_id: string
-          purchase_offer_id: string
-          status_code: string
-          description: string
-          price_summary: string | null
-          created_at: string
-        }[]
+      get_seller_offer_pricing: {
+        Args: {
+          p_conversation_id: string
+          p_draft?: Json
+          p_profile_id: string
+        }
+        Returns: Json
       }
       get_seller_purchase_request_favorites: {
         Args: {
@@ -5595,6 +5720,17 @@ export type Database = {
           p_status_codes?: string[]
         }
         Returns: Json
+      }
+      get_seller_request_offer_conversations: {
+        Args: { p_profile_id: string; p_purchase_request_id: string }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          description: string
+          price_summary: string
+          purchase_offer_id: string
+          status_code: string
+        }[]
       }
       get_seller_request_offers_menu: {
         Args: { p_profile_id: string; p_purchase_request_id: string }
@@ -5694,21 +5830,21 @@ export type Database = {
         }
         Returns: string
       }
-      publish_seller_offer_revision: {
-        Args: {
-          p_expected_offer_revision: string
-          p_expected_version: number
-          p_offer_draft_id: string
-          p_profile_id: string
-        }
-        Returns: Json
-      }
       publish_seller_offer_batch: {
         Args: {
           p_expected_version: number
           p_offer_draft_id: string
           p_profile_id: string
           p_selected_option_ids: string[]
+        }
+        Returns: Json
+      }
+      publish_seller_offer_revision: {
+        Args: {
+          p_expected_offer_revision: string
+          p_expected_version: number
+          p_offer_draft_id: string
+          p_profile_id: string
         }
         Returns: Json
       }
@@ -5895,21 +6031,21 @@ export type Database = {
         }
         Returns: Json
       }
-      seller_discard_request_offers: {
-        Args: {
-          p_action_code?: string
-          p_payload?: Json
-          p_profile_id: string
-          p_purchase_request_id: string
-        }
-        Returns: Json
-      }
       seller_discard_request_conversation_base_20260716: {
         Args: {
           p_action_code?: string
           p_conversation_id: string
           p_payload?: Json
           p_profile_id: string
+        }
+        Returns: Json
+      }
+      seller_discard_request_offers: {
+        Args: {
+          p_action_code?: string
+          p_payload?: Json
+          p_profile_id: string
+          p_purchase_request_id: string
         }
         Returns: Json
       }
@@ -6237,6 +6373,10 @@ export type Database = {
         Args: { p_image_path: string; p_profile_id: string }
         Returns: Json
       }
+      set_current_profile_location: {
+        Args: { p_location_id: string; p_profile_id: string }
+        Returns: Json
+      }
       submit_conversation_rating: {
         Args: {
           p_action_code: string
@@ -6299,6 +6439,8 @@ export type Database = {
       update_current_profile_identity_field: {
         Args: { p_field: string; p_profile_id: string; p_value: string }
         Returns: {
+          availability_notification_requested_at: string | null
+          availability_notified_at: string | null
           created_at: string
           email: string | null
           email_opt_in: boolean
@@ -6307,6 +6449,8 @@ export type Database = {
           id_document: string | null
           image_path: string | null
           is_default: boolean
+          location_id: string | null
+          marketplace_availability_status: string
           name: string
           phone: string | null
           user_id: string | null

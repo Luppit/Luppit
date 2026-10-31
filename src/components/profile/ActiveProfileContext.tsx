@@ -39,6 +39,7 @@ export type ActiveProfileState =
   | "no_profile"
   | "identity_required"
   | "business_verification_required"
+  | "location_unavailable"
   | "setup_required"
   | "ready";
 
@@ -68,6 +69,7 @@ const ActiveProfileContext = createContext<ActiveProfileContextValue>({
 
 function getStateForProfile(profile: ActiveProfileSummary | null): ActiveProfileState {
   if (!profile) return "no_profile";
+  if (profile.setupStatus === "location_unavailable") return "location_unavailable";
   if (profile.setupStatus === "business_verification_required") {
     return "business_verification_required";
   }
@@ -131,7 +133,9 @@ export function ActiveProfileProvider({ children }: { children: React.ReactNode 
       setCurrentProfileSummary(nextProfile);
       setState(getStateForProfile(nextProfile));
       setRevision((value) => value + 1);
-      if (navigateHome) router.replace("/");
+      if (navigateHome && nextProfile.setupStatus !== "location_unavailable") {
+        router.replace("/(tabs)");
+      }
     },
     []
   );

@@ -39,6 +39,9 @@ Applies to service modules and RPC integration behavior.
 - Buyer/seller profile overview data belongs in `profile.service.ts`: ratings from summary tables/views, seller membership from `profile_business`, location from `business.location_id -> location`, and presets from `profile_home_group_preset`.
 - Business category and location edits go through `set_current_business_category_preferences` and `set_current_business_location`; UI should keep unsaved local selection until save.
 - Active business locations come from `location` rows with `country_code='CR'` and `is_active=true`; save only the selected district `location.id`.
+- Buyer setup uses `get_current_buyer_profile_setup` and the shared checklist; buyer district edits use `set_current_profile_location`. Request publication snapshots the buyer's district in the database.
+- Seller province availability and expansion notifications belong to the database. Respect `setup_status='location_unavailable'`; the availability screen must still allow location correction, profile switching, and sign-out.
+- Distance estimates and nearest-first ordering come from marketplace RPCs. Render their distance labels without calculating client distances or implying road distance or offer quality.
 
 ## Offer And Timeline Services
 - Offer creation and editing share `purchase.offer.assistant.service` with `mode=create|edit`. Edit RESTORE starts/resumes a private revision; subsequent turns and proposal submission carry the server draft version and source offer revision. `submittedProposalId` means a proposal was sent, not that the agreement changed. Buyer decisions use the DB-configured proposal executor and review token. Use the database revision RPCs through the seller Edge assistant; do not restore direct edit-form saves. Authoritative review photos come from `offer_images`, not transcript attachments.

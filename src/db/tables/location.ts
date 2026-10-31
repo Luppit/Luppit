@@ -16,4 +16,7 @@ export const COL_LOCATION = {
   is_active: "is_active",
   source: "source",
   source_version: "source_version",
+  latitude: "latitude",
+  longitude: "longitude",
+  coordinate_source: "coordinate_source",
 } as const satisfies { [K in keyof Row<"location"> & string]: K };

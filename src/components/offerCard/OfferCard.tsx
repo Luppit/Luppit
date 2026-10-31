@@ -77,6 +77,7 @@ export default function OfferCard({
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const businessName = offer.business_name?.trim() || "Negocio";
   const province = offer.business_province?.trim();
+  const distanceLabel = offer.distance_label?.trim();
   const rating = offer.business_rating;
   const numRatings = offer.business_num_ratings;
   const formattedPrice = formatConversationOfferPrice({
@@ -177,7 +178,7 @@ export default function OfferCard({
   return (
     <MarketplaceCardFrame
       title={businessName}
-      subtitle={province}
+      subtitle={[province, distanceLabel].filter(Boolean).join(" · ")}
       fullText
       prominentTitle
       headerDetails={rating != null ? (
@@ -195,7 +196,7 @@ export default function OfferCard({
         </Pressable>
       ) : null}
       footerDivider={timelineLoading || Boolean(timelineError)}
-      accessibilityLabel={`Oferta de ${businessName} por ${formattedPrice}`}
+      accessibilityLabel={[`Oferta de ${businessName} por ${formattedPrice}`, distanceLabel].filter(Boolean).join(". ")}
       body={
         <View style={s.body}>
           <View style={s.quoteSection}>

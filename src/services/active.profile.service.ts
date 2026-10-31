@@ -17,6 +17,7 @@ export type ActiveProfileSetupStatus =
   | "missing_role"
   | "missing_business"
   | "business_verification_required"
+  | "location_unavailable"
   | "ready";
 
 export type BusinessVerificationStatus =
@@ -154,6 +155,7 @@ function mapProfileSummary(value: unknown): ActiveProfileSummary | null {
     row.setup_status === "missing_role" ||
     row.setup_status === "missing_business" ||
     row.setup_status === "business_verification_required" ||
+    row.setup_status === "location_unavailable" ||
     row.setup_status === "ready"
       ? row.setup_status
       : "missing_role";

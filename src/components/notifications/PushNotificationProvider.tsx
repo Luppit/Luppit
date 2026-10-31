@@ -148,7 +148,8 @@ export function PushNotificationProvider({
     if (
       state !== "ready" &&
       state !== "identity_required" &&
-      state !== "business_verification_required"
+      state !== "business_verification_required" &&
+      state !== "location_unavailable"
     ) {
       return;
     }
@@ -379,7 +380,8 @@ export function PushNotificationProvider({
         nextState !== "active" ||
         (state !== "ready" &&
           state !== "identity_required" &&
-          state !== "business_verification_required")
+          state !== "business_verification_required" &&
+          state !== "location_unavailable")
       ) return;
       void refreshPushPermissionStatus().then((nextStatus) => {
         if (canRegisterForPush(nextStatus)) {
@@ -397,7 +399,8 @@ export function PushNotificationProvider({
       !canRegisterForPush(permissionState.status) ||
       (state !== "ready" &&
         state !== "identity_required" &&
-        state !== "business_verification_required")
+        state !== "business_verification_required" &&
+        state !== "location_unavailable")
     ) {
       return;
     }

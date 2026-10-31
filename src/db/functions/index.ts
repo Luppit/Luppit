@@ -46,6 +46,7 @@ export const RPC_FUNCTIONS = {
     "get_current_buyer_purchase_request_cancellation_eligibility",
   GET_CURRENT_BUYER_FINALIZED_PURCHASE_REQUESTS:
     "get_current_buyer_finalized_purchase_requests",
+  GET_CURRENT_BUYER_PROFILE_SETUP: "get_current_buyer_profile_setup",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
   GET_CURRENT_PROFILE_PENDING_RATINGS: "get_current_profile_pending_ratings",
   GET_CURRENT_LEGAL_ACCEPTANCE_STATE:
@@ -53,6 +54,7 @@ export const RPC_FUNCTIONS = {
   GET_CURRENT_SAFETY_BLOCKS: "get_current_safety_blocks",
   GET_CURRENT_SELLER_PURCHASE_OFFERS: "get_current_seller_purchase_offers",
   GET_CURRENT_SELLER_BUSINESS_SETUP: "get_current_seller_business_setup",
+  GET_CURRENT_SELLER_LOCATION_AVAILABILITY: "get_current_seller_location_availability",
   GET_CURRENT_USER_BUSINESS_INVITATIONS:
     "get_current_user_business_invitations",
   GET_CURRENT_USER_PROFILES: "get_current_user_profiles",
@@ -102,6 +104,7 @@ export const RPC_FUNCTIONS = {
   SET_CURRENT_BUSINESS_CATEGORY_PREFERENCES:
     "set_current_business_category_preferences",
   SET_CURRENT_BUSINESS_LOCATION: "set_current_business_location",
+  SET_CURRENT_PROFILE_LOCATION: "set_current_profile_location",
   SET_CURRENT_BUYER_PROFILE_IMAGE: "set_current_buyer_profile_image",
   SET_CURRENT_BUSINESS_PROFILE_IMAGE: "set_current_business_profile_image",
   UPDATE_CURRENT_PROFILE_IDENTITY_FIELD:

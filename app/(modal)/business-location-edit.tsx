@@ -20,9 +20,10 @@ import {
   getActiveBusinessLocations,
 } from "@/src/services/location.service";
 import { updateCurrentBusinessLocation } from "@/src/services/profile.service";
+import { updateCurrentBuyerLocation } from "@/src/services/buyer.profile.setup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -37,8 +38,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function BusinessLocationEditScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { state: activeProfileState, activeProfile } = useActiveProfile();
+  const { state: activeProfileState, activeProfile, refreshProfiles } = useActiveProfile();
+  const isBuyer = activeProfile?.role === "buyer";
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
+  const canEditLocation = isBuyer || isBusinessOwner;
   const s = useMemo(
     () => createBusinessLocationEditStyles(t, insets.bottom),
     [insets.bottom, t]
@@ -56,7 +59,7 @@ export default function BusinessLocationEditScreen() {
   const [loadError, setLoadError] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const allowNavigation = useAndroidLeaveGuard(
-    !isLoading && isBusinessOwner && Boolean(selectedLocationId) &&
+    !isLoading && canEditLocation && Boolean(selectedLocationId) &&
       selectedLocationId !== initialLocationId,
     isSaving
   );
@@ -74,7 +77,7 @@ export default function BusinessLocationEditScreen() {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
 
-    if (!isBusinessOwner) {
+    if (!canEditLocation) {
       setIsLoading(false);
       return;
     }
@@ -100,7 +103,7 @@ export default function BusinessLocationEditScreen() {
     setLocations(nextLocations);
     setSelectedLocationId(currentLocation?.id ?? null);
     setIsLoading(false);
-  }, [initialLocationId, isBusinessOwner]);
+  }, [initialLocationId, canEditLocation]);
 
   useEffect(() => {
     void loadLocations();
@@ -146,7 +149,7 @@ export default function BusinessLocationEditScreen() {
   }, []);
 
   const saveLocation = async () => {
-    if (!isBusinessOwner) {
+    if (!canEditLocation) {
       showError(
         "Acceso restringido",
         "Solo el administrador principal puede cambiar la ubicación del negocio."
@@ -157,7 +160,9 @@ export default function BusinessLocationEditScreen() {
     if (!selectedLocationId || !canSave) return;
 
     setIsSaving(true);
-    const result = await updateCurrentBusinessLocation(selectedLocationId);
+    const result = isBuyer
+      ? await updateCurrentBuyerLocation(selectedLocationId)
+      : await updateCurrentBusinessLocation(selectedLocationId);
     setIsSaving(false);
 
     if (!result.ok) {
@@ -166,10 +171,15 @@ export default function BusinessLocationEditScreen() {
     }
 
     showSuccess("Ubicación actualizada");
-    allowNavigation(goBackOrHome);
+    if (isBuyer) {
+      allowNavigation(goBackOrHome);
+    } else {
+      await refreshProfiles(activeProfile?.profile.id);
+      allowNavigation(() => router.replace("/(tabs)"));
+    }
   };
 
-  if (activeProfileState !== "loading" && !isBusinessOwner) {
+  if (activeProfileState !== "loading" && !canEditLocation) {
     return (
       <View style={s.container}>
         <ScrollView
@@ -262,6 +272,11 @@ export default function BusinessLocationEditScreen() {
                 showSeparator={false}
               />
             </GroupedListSection>
+            {isBuyer ? (
+              <Text variant="small" color="textMedium">
+                Usaremos tu distrito para mostrar la distancia aproximada de las ofertas. No necesitas compartir tu dirección exacta.
+              </Text>
+            ) : null}
 
             <View style={s.searchSection}>
               <Text variant="small" color="textMedium" style={s.sectionTitle}>

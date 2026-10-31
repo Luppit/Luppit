@@ -70,9 +70,11 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   const emptyFilters = role === "buyer" ? buyerFilters.EMPTY_BUYER_HOME_FILTERS : sellerFilters.EMPTY_SELLER_HOME_FILTERS;
   const calls: { args: any[]; response: ReturnType<typeof deferred> }[] = [];
   const routes: any[] = [];
+  const appStateListeners = new Set<(state: string) => void>();
   let popup: any;
   let segment = "todas";
   let sellerSetup: any = { ok: true, data: { isComplete: true } };
+  let buyerSetup: any = { ok: true, data: { isComplete: true } };
   let dimensions = { width: 430, height: 932, scale: 3, fontScale: 1 };
   let segmentListener = (_value: string) => {};
   const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters) };
@@ -84,7 +86,10 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
       ...Object.fromEntries(["Image", "Pressable", "ScrollView", "View", "FlatList", "ActivityIndicator"].map((name) => [name, name])),
       StyleSheet: { create: (styles: any) => styles }, Platform: { OS: "ios" },
       AccessibilityInfo: { announceForAccessibility() {} },
-      AppState: { addEventListener: () => ({ remove() {} }) },
+      AppState: { addEventListener: (_event: string, listener: (state: string) => void) => {
+        appStateListeners.add(listener);
+        return { remove() { appStateListeners.delete(listener); } };
+      } },
       useWindowDimensions: () => dimensions,
     },
     "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 }, borders: { md: 20 }, colors: {}, glass: { radius: { chrome: 28, chip: 22 } }, typography: { subtitle: { lineHeight: 24 }, small: { lineHeight: 18 } } }) },
@@ -107,6 +112,9 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     "@/src/services/conversation.service": {},
     "@/src/services/seller.business.setup.service": {
       getCurrentSellerBusinessSetup: async () => sellerSetup,
+    },
+    "@/src/services/buyer.profile.setup.service": {
+      getCurrentBuyerProfileSetup: async () => buyerSetup,
     },
     "@/src/services/profile.service": {
       getCurrentProfileEmailSetupStatus: async () => ({ ok: true, data: { isComplete: true } }),
@@ -145,7 +153,8 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   return {
     ...runtime, calls, routes, params, modules, exports, filterService, emptyFilters,
     getPopup: () => popup,
-    setSetup(value: any) { sellerSetup = value; },
+    setSetup(value: any) { if (role === "buyer") buyerSetup = value; else sellerSetup = value; },
+    foreground() { appStateListeners.forEach((listener) => listener("active")); },
     setDimensions(width: number, fontScale = 1) { dimensions = { ...dimensions, width, fontScale }; },
     screen: () => runtime.render(component),
     setFilters(filters: any) { (role === "buyer" ? buyerFilters.setBuyerHomeFilters : sellerFilters.setSellerHomeFilters)(filters); },
@@ -166,22 +175,43 @@ function hub(selected: string, counts: Record<string, number>, items: any[] = []
 function item(id: string, category_id = "furniture") { return { id, purchase_request_id: id, category_id, title: `Silla ${id}` }; }
 function resolve(call: { response: ReturnType<typeof deferred> }, data: any) { call.response.resolve({ ok: true, data }); }
 
-test("seller setup blocks discovery until all requirements are complete, including load failure", async (t) => {
-  const f = fixture("seller"); t.after(f.cleanup);
-  f.setSetup({ ok: true, data: { isComplete: false, completedCount: 2, totalCount: 5 } });
+for (const role of ["buyer", "seller"] as const) {
+test(`${role} reloads setup after returning from system settings and removes its foreground listener`, async (t) => {
+  const f = fixture(role); t.after(f.cleanup);
+  f.setSetup({ ok: true, data: { isComplete: false } });
+  f.screen(); await flush();
+  assert.equal(f.screen().props.profileSetup.isComplete, false);
+  assert.equal(f.calls.length, 0);
+
+  f.setSetup({ ok: true, data: { isComplete: true } });
+  f.foreground(); await flush();
+  assert.equal(f.calls.length, 1, "foreground reads the current setup before discovering requests");
+  const stage = role === "buyer" ? "all" : "for_you";
+  resolve(f.calls[0], hub(stage, { [stage]: 0 })); await flush();
+  assert.equal(f.screen().props.profileSetup.isComplete, true);
+
+  f.cleanup();
+  f.foreground(); await flush();
+  assert.equal(f.calls.length, 1, "an unfocused/unmounted home no longer reloads");
+});
+
+test(`${role} setup blocks discovery until all requirements are complete, including load failure`, async (t) => {
+  const f = fixture(role); t.after(f.cleanup);
+  f.setSetup({ ok: true, data: { isComplete: false, completedCount: 2, totalCount: role === "buyer" ? 4 : 5 } });
   f.screen(); await flush();
   const pending = f.screen();
-  assert.equal(pending.props.sellerSetup.completedCount, 2);
+  assert.equal(pending.props.profileSetup.completedCount, 2);
   assert.equal(f.calls.length, 0);
-  const view = fixture("seller"); t.after(view.cleanup);
+  const view = fixture(role); t.after(view.cleanup);
   const rendered = view.render(view.exports.MarketplaceHomeContent, pending.props);
   assert.equal(rendered.type, "SellerBusinessSetupChecklist");
   f.setSetup({ ok: false, error: { message: "offline" } });
   pending.props.onRetry(); await flush();
   const failed = f.screen();
-  assert.equal(failed.props.sellerSetup, null);
+  assert.equal(failed.props.profileSetup, null);
   assert.equal(f.calls.length, 0);
 });
+}
 
 for (const role of ["buyer", "seller"] as const) {
   test(`${role}: new queries reveal matching stages, preserve explicit selection, and clear safely`, async (t) => {
@@ -495,4 +525,45 @@ test("a populated selected stage stays selected and RPC failure is retryable", a
   assert.equal(screen.props.hub, null);
   screen.props.onRetry(); await flush();
   assert.equal(f.calls[2].args[0].searchValue, "mesa");
+});
+
+test("seller distance sorting uses RPC options, restarts pagination, and preserves order across pages", async (t) => {
+  const f = fixture("seller", true); t.after(f.cleanup);
+  const sort = {
+    default_code: "recommended", selected_code: "recommended",
+    options: [
+      { code: "recommended", label: "Recomendadas", sort_order: 10 },
+      { code: "distance_nearest", label: "Más cercanas", sort_order: 40 },
+    ],
+  };
+  const list = () => nodes(f.screen()).find((node) => node.type === "FlatList")!;
+  f.screen(); await flush();
+  resolve(f.calls[0], { items: [item("far")], total: 3, page: 1, has_more: true, sort });
+  await flush();
+  nodes(f.screen()).find((node) => node.props.accessibilityLabel?.startsWith("Ordenar oportunidades."))!.props.onPress();
+  assert.deepEqual(f.getPopup().options.map((option: any) => option.label), ["Recomendadas", "Más cercanas"]);
+  f.getPopup().onSelect("distance_nearest");
+  f.screen(); await flush();
+  assert.equal(f.calls[1].args[3], 1, "changing distance sort starts at the first page");
+  assert.equal(f.calls[1].args[5], "distance_nearest");
+  resolve(f.calls[1], {
+    items: [{ ...item("near"), distance_km: 1.2, distance_label: "Aprox. 1,2 km" }],
+    total: 3, page: 1, has_more: true,
+    sort: { ...sort, selected_code: "distance_nearest" },
+  });
+  await flush();
+  list().props.onEndReached(); f.screen(); await flush();
+  assert.equal(f.calls[2].args[3], 2);
+  assert.equal(f.calls[2].args[5], "distance_nearest");
+  resolve(f.calls[2], {
+    items: [
+      { ...item("far"), distance_km: 20, distance_label: "Aprox. 20 km" },
+      { ...item("unknown"), distance_km: null, distance_label: null },
+    ],
+    total: 3, page: 2, has_more: false,
+    sort: { ...sort, selected_code: "distance_nearest" },
+  });
+  await flush();
+  assert.deepEqual(plain(list().props.data.map((row: any) => row.id)), ["near", "far", "unknown"]);
+  assert.equal(list().props.data[0].distance_label, "Aprox. 1,2 km");
 });

@@ -1,13 +1,14 @@
 import {
   getCurrentSellerBusinessCategorySetupStatus,
 } from "@/src/services/profile.service";
+import { getCurrentBuyerProfileSetup } from "@/src/services/buyer.profile.setup.service";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Roles } from "@/src/services/role.service";
 import { getCurrentUserRole } from "@/src/services/user.role.service";
 import { useFocusEffect } from "@react-navigation/native";
 import React from "react";
 
-export type AccountSetupBlockReason = "email" | "seller_categories";
+export type AccountSetupBlockReason = "email" | "seller_categories" | "buyer_setup";
 
 type EmailSetupProfile = {
   email: string | null;
@@ -56,6 +57,8 @@ export function isEmailSetupAllowedAppPath(path: string) {
     normalizedPath === "/login" ||
     normalizedPath === "/signup" ||
     normalizedPath === "/email-setup" ||
+    normalizedPath === "/business-location-edit" ||
+    normalizedPath === "/profile-picture-edit" ||
     normalizedPath === "/legal-document" ||
     normalizedPath.startsWith("/request/")
   );
@@ -103,6 +106,18 @@ export function useAccountSetupGate(): AccountSetupGateState {
 
         const roleResult = await getCurrentUserRole();
         if (!active) return;
+
+        if (roleResult.ok && roleResult.data === Roles.BUYER) {
+          const setupResult = await getCurrentBuyerProfileSetup();
+          if (!active) return;
+          const isComplete = setupResult.ok && setupResult.data.isComplete;
+          setState({
+            isAccountSetupBlocked: !isComplete,
+            isLoadingAccountSetupStatus: false,
+            blockReason: isComplete ? null : "buyer_setup",
+          });
+          return;
+        }
 
         if (!roleResult.ok || roleResult.data !== Roles.SELLER) {
           setState({

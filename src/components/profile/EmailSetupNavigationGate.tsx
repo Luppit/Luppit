@@ -30,6 +30,13 @@ export default function EmailSetupNavigationGate({
     pathname === "/account-settings";
 
   if (
+    state === "location_unavailable" &&
+    !["/location-unavailable", "/business-location-edit", "/legal-document", "/faq", "/account-settings"].includes(pathname)
+  ) {
+    return <Redirect href={{ pathname: "/(detail)/location-unavailable", params: { title: "Disponibilidad", hideMenu: "true" } }} />;
+  }
+
+  if (
     state === "business_verification_required" &&
     !isBusinessVerificationAllowedRoute
   ) {

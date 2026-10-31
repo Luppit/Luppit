@@ -36,6 +36,7 @@ import { DETAIL_TOP_BAR_VISIBLE_HEIGHT } from "./detail-top-bar";
 
 const BUYER_OFFER_SORT_OPTIONS = [
   { id: "offer_created_newest", label: "Más recientes" },
+  { id: "distance_nearest", label: "Más cercanas" },
   { id: "offer_created_oldest", label: "Más antiguas" },
   { id: "price_col_low_to_high", label: "COL: menor precio primero" },
   { id: "price_col_high_to_low", label: "COL: mayor precio primero" },

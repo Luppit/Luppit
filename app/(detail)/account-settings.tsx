@@ -14,6 +14,7 @@ import {
   verifyDeletionReauthenticationOtp,
 } from "@/src/lib/supabase";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
+import { getCurrentBuyerProfileSetup, type BuyerProfileSetup } from "@/src/services/buyer.profile.setup.service";
 import { openPopup } from "@/src/services/popup.service";
 import {
   AccountDeletionRequestStatus,
@@ -98,11 +99,15 @@ function BuyerAccountSettingsContent() {
     [t, topContentInset]
   );
   const [overview, setOverview] = useState<BuyerProfileOverview | null>(null);
+  const [buyerSetup, setBuyerSetup] = useState<BuyerProfileSetup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
-    const result = await getCurrentBuyerProfileOverview();
+    const [result, setupResult] = await Promise.all([
+      getCurrentBuyerProfileOverview(), getCurrentBuyerProfileSetup(),
+    ]);
+    setBuyerSetup(setupResult.ok ? setupResult.data : null);
     if (!result.ok) {
       setOverview(null);
       setIsLoading(false);
@@ -130,6 +135,8 @@ function BuyerAccountSettingsContent() {
       role={Roles.BUYER}
       profile={overview?.profile}
       hasProfileImage={hasProfilePicture(overview)}
+      buyerLocationId={buyerSetup?.locationId}
+      buyerLocationLabel={buyerSetup?.locationLabel}
     />
   );
 }
@@ -193,10 +200,14 @@ function AccountSettingsContent({
   role,
   profile,
   hasProfileImage,
+  buyerLocationId,
+  buyerLocationLabel,
 }: {
   role: Roles;
   profile?: Profile | null;
   hasProfileImage: boolean;
+  buyerLocationId?: string | null;
+  buyerLocationLabel?: string | null;
 }) {
   const t = useTheme();
   const { mode: appearanceMode, setMode: setAppearanceMode } = useAppearance();
@@ -293,6 +304,15 @@ function AccountSettingsContent({
                 params: { title: "Foto de perfil" },
               })
             }
+          />
+        ) : null}
+        {!isSeller ? (
+          <GroupedListRow icon="map-pin" label="Ubicación"
+            description={buyerLocationLabel || "Sin ubicación"} descriptionMaxLines={3}
+            accessibilityLabel={`Ubicación: ${buyerLocationLabel || "Sin ubicación"}. Editar ubicación.`}
+            onPress={() => router.push({ pathname: "/(modal)/business-location-edit",
+              params: { title: "Tu ubicación", target: "buyer", locationId: buyerLocationId ?? "",
+                locationLabel: buyerLocationLabel ?? "" } })}
           />
         ) : null}
         <GroupedListRow

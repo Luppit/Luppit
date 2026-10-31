@@ -5,6 +5,7 @@ export const TB_PURCHASE_REQUEST = "purchase_request" as const satisfies TableNa
 export const COL_PURCHASE_REQUEST = {
   id: "id",
   profile_id: "profile_id",
+  location_id: "location_id",
   draft_id: "draft_id",
   category_id: "category_id",
   category_path: "category_path",

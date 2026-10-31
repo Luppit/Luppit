@@ -5,6 +5,7 @@ import {
   getCurrentProfile,
   registerProfileScopedAbortController,
 } from "./active.profile.service";
+import { requireCurrentBuyerProfileSetup } from "./buyer.profile.setup.service";
 
 const PURCHASE_REQUEST_ASSISTANT_EDGE_FUNCTION = "ai-completar";
 const MAX_IMAGES_PER_REQUEST = 3;
@@ -417,6 +418,16 @@ export async function callPurchaseRequestAssistant(
       retryAfterSeconds: null,
       backendMessage: null,
     };
+  }
+
+  if (input.ui_action !== "RESTORE" && input.ui_action !== "DISCARD") {
+    const setup = await requireCurrentBuyerProfileSetup();
+    if (!setup.ok) {
+      return {
+        ok: false, error: setup.error, statusCode: 403, requestId: null,
+        retryAfterSeconds: null, backendMessage: setup.error.message,
+      };
+    }
   }
 
   const functionUrl = buildFunctionUrl();

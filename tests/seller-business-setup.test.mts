@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSellerBusinessSetup } from "../src/services/seller.business.setup.helpers.ts";
+import { parseBuyerProfileSetup, parseSellerBusinessSetup, parseSellerLocationAvailability } from "../src/services/seller.business.setup.helpers.ts";
 import { fromSupabaseError } from "../src/lib/supabase/errors.ts";
 
 function setup(completed = 2) {
@@ -58,4 +58,37 @@ test("shows a safe actionable message when an offer is blocked by setup", () => 
   assert.equal(error.type, "validation");
   assert.equal(error.code, "seller_business_setup_required");
   assert.match(error.message, /Solicitudes/);
+});
+
+test("buyer setup keeps server order and requires location without seller categories", () => {
+  const raw = {
+    profile_id: "buyer", location_id: "district", location_label: "Distrito, Cantón, Provincia",
+    completed_count: 3, total_count: 4, is_complete: false,
+    steps: ["notifications", "photo", "email", "location"].map((code) => ({
+      code, label: code, icon: "map-pin", action_label: code, can_edit: true,
+      is_complete: code !== "location", description: null,
+    })),
+  };
+  const parsed = parseBuyerProfileSetup(raw);
+  assert.equal(parsed?.profileId, "buyer");
+  assert.equal(parsed?.locationId, "district");
+  assert.equal(parsed?.isComplete, false);
+  assert.deepEqual(parsed?.steps.map((step) => step.code), ["notifications", "photo", "email", "location"]);
+  assert.equal(parseBuyerProfileSetup({ ...raw, is_complete: true }), null);
+  assert.equal(parseBuyerProfileSetup({ ...raw, profile_id: null }), null);
+  assert.equal(parseBuyerProfileSetup({ ...raw, steps: [...raw.steps.slice(0, 3), { ...raw.steps[3], code: "categories" }] }), null);
+  assert.equal(parseBuyerProfileSetup(setup()), null);
+});
+
+test("availability comes from the server and preserves correction permissions and waitlist enrollment", () => {
+  const raw = { availability_status: "unavailable", availability_message: "Próximamente en tu zona",
+    notification_requested: true, location_id: "district", location_label: "Distrito",
+    can_edit: false };
+  const parsed = parseSellerLocationAvailability(raw);
+  assert.equal(parsed?.status, "unavailable");
+  assert.equal(parsed?.notificationRequested, true);
+  assert.equal(parsed?.canEdit, false);
+  assert.equal(parsed?.message, raw.availability_message);
+  assert.equal(parseSellerLocationAvailability({ ...raw, availability_status: "unknown" }), null);
+  assert.equal(parseSellerLocationAvailability({ ...raw, notification_requested: undefined }), null);
 });

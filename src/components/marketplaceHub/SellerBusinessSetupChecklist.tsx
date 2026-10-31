@@ -5,9 +5,10 @@ import { usePushNotifications } from "@/src/components/notifications/PushNotific
 import { NAVBAR_HEIGHT } from "@/src/components/navbar/styles";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
-import { SellerBusinessSetup, SellerBusinessSetupStep } from "@/src/services/seller.business.setup.service";
+import { type ProfileSetupChecklist, type SellerBusinessSetupStep } from "@/src/services/seller.business.setup.helpers";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
+import { openSignOutConfirmation } from "@/src/utils/openSignOutConfirmation";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -16,10 +17,12 @@ export default function SellerBusinessSetupChecklist({
   setup,
   topContentInset,
   onRefresh,
+  role = "seller",
 }: {
-  setup: SellerBusinessSetup;
+  setup: ProfileSetupChecklist;
   topContentInset: number;
   onRefresh: () => void;
+  role?: "buyer" | "seller";
 }) {
   const t = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
@@ -29,6 +32,7 @@ export default function SellerBusinessSetupChecklist({
   const nextStep = setup.steps.find((step) => !step.isComplete && step.canEdit);
   const remaining = setup.totalCount - setup.completedCount;
   const needsSettings = !permissionCanAskAgain && permissionStatus !== "undetermined";
+  const setupLabel = role === "buyer" ? "Configuración de tu perfil" : "Configuración del negocio";
 
   const openStep = async (step: SellerBusinessSetupStep) => {
     switch (step.code) {
@@ -43,6 +47,7 @@ export default function SellerBusinessSetupChecklist({
         router.push({ pathname: "/(modal)/business-location-edit", params: {
           title: step.label, locationId: setup.locationId ?? "",
           locationLabel: setup.locationLabel ?? "",
+          target: role,
         } });
         break;
       case "photo":
@@ -71,16 +76,17 @@ export default function SellerBusinessSetupChecklist({
         contentContainerStyle={[s.content, { paddingTop: topContentInset }]}
       >
         <View style={s.summary}>
-          <Text variant="small" color="textMedium">Configuración del negocio</Text>
+          <Text variant="body" color="textMedium">{setupLabel}</Text>
           <Text variant="subtitle" accessibilityLiveRegion="polite">
             {setup.completedCount} de {setup.totalCount} pasos completados
           </Text>
           <Text variant="body" color="textMedium">
-            Completa los pasos pendientes para hacer ofertas.
+            {role === "buyer" ? "Completa los pasos pendientes para crear solicitudes." :
+              "Completa los pasos pendientes para hacer ofertas."}
           </Text>
           <View style={s.progress} accessible accessibilityRole="progressbar"
             accessibilityValue={{ min: 0, max: setup.totalCount, now: setup.completedCount }}
-            accessibilityLabel="Configuración del negocio"
+            accessibilityLabel={setupLabel}
           >
             <View style={[s.progressFill, { width: `${100 * setup.completedCount / setup.totalCount}%` }]} />
           </View>
@@ -115,6 +121,7 @@ export default function SellerBusinessSetupChecklist({
         <Text variant="small" color="textMuted" align="center">
           {remaining === 1 ? "Falta 1 paso" : `Faltan ${remaining} pasos`}
         </Text>
+        <Button variant="white" title="Cerrar sesión" onPress={openSignOutConfirmation} />
       </View>
     </View>
   );

@@ -16,6 +16,7 @@ function createService() {
   let payload: Record<string, unknown> | null = null;
   let switchAfterSession = false;
   let switchAfterResponse = false;
+  let setupComplete = true;
   class NativeFormData {
     entries: [string, unknown][] = [];
     append(name: string, value: unknown) { this.entries.push([name, value]); }
@@ -23,6 +24,11 @@ function createService() {
   const modules = {
     "../lib/supabase": { getSession: async () => { if (switchAfterSession) profile = { id: "other-profile" }; return { access_token: "test-token" }; } },
     "../lib/supabase/errors": { fromAppError: (type: string) => ({ type, message: "Test failure" }) },
+    "./buyer.profile.setup.service": {
+      requireCurrentBuyerProfileSetup: async () => setupComplete ? { ok: true } : {
+        ok: false, error: { type: "validation", code: "buyer_profile_setup_required", message: "Completa tu perfil" },
+      },
+    },
     "./active.profile.service": {
       getCurrentProfile: () => profile,
       registerProfileScopedAbortController: (controller: AbortController) => {
@@ -53,6 +59,7 @@ function createService() {
     get controller() { return registered; },
     get unregistered() { return unregistered; },
     setStatus(value: number) { status = value; },
+    setSetupComplete(value: boolean) { setupComplete = value; },
     clearProfile() { profile = null; },
     setPayload(value: Record<string, unknown>, code = 200) { payload = value; status = code; },
     switchDuring(stage: "session" | "response") { switchAfterSession = stage === "session"; switchAfterResponse = stage === "response"; },
@@ -62,6 +69,22 @@ function createService() {
 }
 
 const identity = { client_request_id: "same-turn", idempotency_key: "same-retry", draft_id: "draft-1" };
+
+test("incomplete buyer setup blocks mutations while existing drafts can be restored or discarded", async () => {
+  const service = createService();
+  service.setSetupComplete(false);
+  for (const ui_action of [undefined, "CONTINUE", "PUBLISH"] as const) {
+    const result = await service.call({ prompt: "Una silla", ...identity, ui_action });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, "buyer_profile_setup_required");
+  }
+  assert.equal(service.calls.length, 0);
+  service.setPayload({ ok: true, draft_id: "draft-1", status: "draft", messages: [] });
+  for (const ui_action of ["RESTORE", "DISCARD"] as const) {
+    assert.equal((await service.call({ prompt: "", ...identity, ui_action })).ok, true);
+  }
+  assert.equal(service.calls.length, 2);
+});
 
 test("text-only messages retain JSON and the current owned profile", async () => {
   const service = createService();

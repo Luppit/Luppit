@@ -11,4 +11,7 @@ export const COL_BUSINESS = {
   location_id: "location_id",
   privacy_purge_after: "privacy_purge_after",
   image_path: "image_path",
+  marketplace_availability_status: "marketplace_availability_status",
+  availability_notification_requested_at: "availability_notification_requested_at",
+  availability_notified_at: "availability_notified_at",
 } as const satisfies { [K in keyof Row<"business"> & string]: K };
