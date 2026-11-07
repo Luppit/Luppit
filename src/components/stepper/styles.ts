@@ -6,6 +6,7 @@ export type StepperStyles = {
   header: {
     container: ViewStyle;
     icon: ViewStyle;
+    backButton: ViewStyle;
     content : ViewStyle;
     contentInfo : ViewStyle;
     description: TextStyle;
@@ -33,6 +34,12 @@ export function createStepperStyles(t: Theme): StepperStyles {
       },
       icon: {
         marginBottom: spacing.lg,
+      },
+      backButton: {
+        minHeight: 48,
+        minWidth: 48,
+        alignSelf: "flex-start",
+        justifyContent: "center",
       },
       content: {
         flexDirection: "row"

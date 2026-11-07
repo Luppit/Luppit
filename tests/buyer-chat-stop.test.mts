@@ -171,6 +171,7 @@ function createChatView(session: Awaited<ReturnType<typeof createSession>>) {
       "@/src/components/button/Button": "Button",
       "@/src/components/assistant/AssistantProcessingProgress": "Progress",
       "@/src/components/assistant/AssistantReviewCard": "ReviewCard",
+      "@/src/components/onboarding/useBuyerPublishSetup": { useBuyerPublishSetup: () => ({ status: "ready" }) },
       "@/src/components/BundledSvg": { BundledSvg: "BundledSvg" },
       "@/src/components/message/MessageUtilities": "MessageUtilities",
       "@/src/components/Text": { Text: "Text" },

@@ -4351,6 +4351,10 @@ export type Database = {
         Args: { p_profile_id: string; p_purchase_request_id: string }
         Returns: Json
       }
+      assert_current_buyer_draft_access: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
       assert_current_seller_marketplace_access: {
         Args: { p_profile_id: string }
         Returns: boolean
@@ -5300,6 +5304,10 @@ export type Database = {
         Returns: Json
       }
       get_current_legal_acceptance_state: { Args: never; Returns: Json }
+      get_current_pending_seller_business_setup: {
+        Args: { p_profile_id: string }
+        Returns: Json
+      }
       get_current_profile_conversations: {
         Args: {
           p_category_ids?: string[]
@@ -5333,6 +5341,13 @@ export type Database = {
       get_current_profile_pending_ratings: {
         Args: { p_page?: number; p_page_size?: number; p_profile_id: string }
         Returns: Json
+      }
+      get_current_profile_verified_email_options: {
+        Args: { p_profile_id: string }
+        Returns: {
+          email: string
+          verified_at: string
+        }[]
       }
       get_current_safety_blocks: {
         Args: { p_profile_id: string }
@@ -5930,6 +5945,10 @@ export type Database = {
           p_payload?: Json
           p_profile_id: string
         }
+        Returns: Json
+      }
+      reuse_current_profile_verified_email: {
+        Args: { p_email: string; p_email_opt_in: boolean; p_profile_id: string }
         Returns: Json
       }
       revoke_current_user_business_invitation: {

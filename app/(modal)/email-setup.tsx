@@ -1,16 +1,19 @@
 import { goBackOrHome } from "@/src/utils/useAndroidBackAction";
 import { useAndroidLeaveGuard } from "@/src/utils/useAndroidLeaveGuard";
 import Button from "@/src/components/button/Button";
-import { GroupedListSection } from "@/src/components/groupedList/GroupedList";
+import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
 import OtpValidator from "@/src/components/otpValidator/OtpValidator";
+import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
 import {
   getCurrentProfileEmailSetupStatus,
+  getCurrentProfileVerifiedEmailOptions,
   requestCurrentProfileEmailSetupVerification,
   resendCurrentProfileEmailSetupVerification,
+  reuseCurrentProfileVerifiedEmail,
   verifyCurrentProfileEmailSetup,
 } from "@/src/services/profile.service";
 import { Theme, useTheme } from "@/src/themes";
@@ -19,7 +22,7 @@ import {
   showMissingFields,
   showSuccess,
 } from "@/src/utils/useToast";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Keyboard,
   Pressable,
@@ -54,6 +57,8 @@ function maskEmail(value: string) {
 
 export default function EmailSetupScreen() {
   const t = useTheme();
+  const { activeProfile } = useActiveProfile();
+  const isSeller = activeProfile?.role === "seller";
   const [step, setStep] = useState<EmailSetupStep>("email");
   const [email, setEmail] = useState("");
   const [emailOptIn, setEmailOptIn] = useState(false);
@@ -67,6 +72,9 @@ export default function EmailSetupScreen() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const [initialEmail, setInitialEmail] = useState("");
   const [initialOptIn, setInitialOptIn] = useState(false);
+  const [verifiedEmails, setVerifiedEmails] = useState<string[]>([]);
+  const [showEmailEntry, setShowEmailEntry] = useState(true);
+  const sendInFlight = useRef(false);
   const allowNavigation = useAndroidLeaveGuard(
     !isLoading && (normalizeEmail(email) !== normalizeEmail(initialEmail) ||
       emailOptIn !== initialOptIn || step === "otp"),
@@ -78,7 +86,10 @@ export default function EmailSetupScreen() {
 
     const loadEmailSetup = async () => {
       setIsLoading(true);
-      const result = await getCurrentProfileEmailSetupStatus();
+      const [result, options] = await Promise.all([
+        getCurrentProfileEmailSetupStatus(),
+        getCurrentProfileVerifiedEmailOptions().catch(() => null),
+      ]);
       if (!active) return;
 
       if (!result.ok) {
@@ -87,9 +98,13 @@ export default function EmailSetupScreen() {
         return;
       }
 
-      setInitialEmail(result.data.email ?? "");
+      const reusableEmails = options?.ok ? options.data : [];
+      const initialValue = result.data.email ?? reusableEmails[0] ?? "";
+      setVerifiedEmails(reusableEmails);
+      setShowEmailEntry(!reusableEmails.includes(normalizeEmail(initialValue)));
+      setInitialEmail(initialValue);
       setInitialOptIn(result.data.emailOptIn);
-      setEmail(result.data.email ?? "");
+      setEmail(initialValue);
       setEmailOptIn(result.data.emailOptIn);
       setIsLoading(false);
     };
@@ -99,7 +114,7 @@ export default function EmailSetupScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [activeProfile?.profile.id]);
 
   useEffect(() => {
     if (resendCountdown <= 0) return;
@@ -112,6 +127,7 @@ export default function EmailSetupScreen() {
   }, [resendCountdown]);
 
   const normalizedEmail = useMemo(() => normalizeEmail(email), [email]);
+  const reusesVerifiedEmail = verifiedEmails.includes(normalizedEmail);
   const isEmailValid =
     normalizedEmail.length > 0 && EMAIL_REGEX.test(normalizedEmail);
   const emailError =
@@ -126,6 +142,7 @@ export default function EmailSetupScreen() {
   const styles = useMemo(() => createEmailSetupStyles(t), [t]);
 
   const handleSendCode = async () => {
+    if (!canAttemptSendCode || sendInFlight.current) return;
     setDidTryEmailSubmit(true);
     setEmailServerError("");
     const missingFields: string[] = [];
@@ -134,18 +151,40 @@ export default function EmailSetupScreen() {
     showMissingFields(missingFields);
     if (missingFields.length > 0 || !isEmailValid) return;
 
+    sendInFlight.current = true;
     setIsSendingCode(true);
-    const result = await requestCurrentProfileEmailSetupVerification({
-      email: normalizedEmail,
-    });
-    setIsSendingCode(false);
+    let result;
+    try {
+      result = reusesVerifiedEmail
+        ? await reuseCurrentProfileVerifiedEmail({ email: normalizedEmail, emailOptIn })
+        : await requestCurrentProfileEmailSetupVerification({ email: normalizedEmail });
+    } catch {
+      showError(reusesVerifiedEmail ? "No se pudo guardar el correo" : "No se pudo enviar el código");
+      return;
+    } finally {
+      sendInFlight.current = false;
+      setIsSendingCode(false);
+    }
 
     if (!result.ok) {
       if (result.error.code === "email_already_in_use") {
+        setShowEmailEntry(true);
         setEmailServerError(result.error.message);
         return;
       }
-      showError("No se pudo enviar el código", result.error.message);
+      if (result.error.code === "email_not_verified_for_account") {
+        setVerifiedEmails((current) => current.filter((address) => address !== normalizedEmail));
+        setShowEmailEntry(true);
+        setEmailServerError(result.error.message);
+        return;
+      }
+      showError(reusesVerifiedEmail ? "No se pudo guardar el correo" : "No se pudo enviar el código", result.error.message);
+      return;
+    }
+
+    if (reusesVerifiedEmail) {
+      showSuccess("Correo guardado");
+      allowNavigation(goBackOrHome);
       return;
     }
 
@@ -229,14 +268,14 @@ export default function EmailSetupScreen() {
   ).padStart(2, "0")}`;
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {isLoading ? (
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View>{isLoading ? (
           <LoadingState
             label="Cargando configuración..."
             variant="inline"
@@ -246,23 +285,60 @@ export default function EmailSetupScreen() {
           <View style={styles.stepContent}>
             <View style={styles.intro}>
               <Text variant="subtitle" accessibilityRole="header">
-                Configura tu correo
+                {isSeller ? "Configurá el correo de tu negocio" : "Configurá tu correo"}
               </Text>
               <Text variant="body" color="textMedium">
-                Aquí recibirás códigos, confirmaciones y avisos importantes.
+                {isSeller
+                  ? "Aquí recibirás los avisos del negocio."
+                  : "Aquí recibirás códigos, confirmaciones y avisos importantes."}
               </Text>
             </View>
 
-            <GroupedListSection title="Datos de contacto">
+            {verifiedEmails.length > 0 ? (
+              <GroupedListSection title="Correos verificados en tu cuenta">
+                {verifiedEmails.map((address) => {
+                  const selected = !showEmailEntry && normalizedEmail === address;
+                  return (
+                    <GroupedListRow
+                      key={address}
+                      icon={selected ? "check" : "mail"}
+                      label={address}
+                      labelMaxLines={2}
+                      accessibilityLabel={`${address}${selected ? ", seleccionado" : ""}`}
+                      showChevron={false}
+                      onPress={canAttemptSendCode ? () => {
+                        setEmail(address);
+                        setEmailServerError("");
+                        setShowEmailEntry(false);
+                      } : undefined}
+                    />
+                  );
+                })}
+                <GroupedListRow
+                  icon="plus"
+                  label={isSeller ? "Verificar otro correo del negocio" : "Verificar otro correo"}
+                  labelMaxLines={2}
+                  showSeparator={false}
+                  onPress={canAttemptSendCode ? () => {
+                    if (!showEmailEntry) setEmail("");
+                    setEmailServerError("");
+                    setShowEmailEntry(true);
+                  } : undefined}
+                />
+              </GroupedListSection>
+            ) : null}
+
+            {showEmailEntry ? <GroupedListSection title="Datos de contacto">
               <View style={styles.formContent}>
                 <Text variant="body">Correo electrónico</Text>
                 <TextField
                   accessibilityLabel="Correo electrónico"
                   accessibilityHint={
                     emailError ||
-                    "Ingresa la dirección que quieres verificar. Cada perfil debe usar un correo diferente."
+                    "Ingresa la dirección que quieres verificar."
                   }
                   value={email}
+                  editable={canAttemptSendCode}
                   onChangeText={(value) => {
                     setEmail(value);
                     if (emailServerError) setEmailServerError("");
@@ -282,17 +358,15 @@ export default function EmailSetupScreen() {
                   error={emailError}
                   baseContainerStyle={styles.inputContainer}
                 />
-                <Text variant="small" color="textMedium">
-                  Cada perfil debe usar un correo diferente.
-                </Text>
               </View>
-            </GroupedListSection>
+            </GroupedListSection> : null}
 
             <GroupedListSection title="Preferencias de correo">
               <Pressable
                 accessibilityRole="checkbox"
-                accessibilityState={{ checked: emailOptIn }}
+                accessibilityState={{ checked: emailOptIn, disabled: !canAttemptSendCode }}
                 accessibilityHint="Necesario para recibir códigos, confirmaciones y avisos de entrega"
+                disabled={!canAttemptSendCode}
                 onPress={() => setEmailOptIn((current) => !current)}
                 style={styles.consentRow}
               >
@@ -321,7 +395,7 @@ export default function EmailSetupScreen() {
 
             <Button
               variant="dark"
-              title="Enviar código"
+              title={reusesVerifiedEmail ? "Usar este correo" : "Enviar código"}
               loading={isSendingCode}
               disabled={!canAttemptSendCode}
               onPress={() => {
@@ -405,9 +479,9 @@ export default function EmailSetupScreen() {
               )}
             </View>
           </View>
-        )}
-      </ScrollView>
-    </TouchableWithoutFeedback>
+        )}</View>
+      </TouchableWithoutFeedback>
+    </ScrollView>
   );
 }
 

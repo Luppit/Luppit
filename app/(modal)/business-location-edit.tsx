@@ -41,7 +41,9 @@ export default function BusinessLocationEditScreen() {
   const { state: activeProfileState, activeProfile, refreshProfiles } = useActiveProfile();
   const isBuyer = activeProfile?.role === "buyer";
   const isBusinessOwner = activeProfile?.membershipRole === "owner";
-  const canEditLocation = isBuyer || isBusinessOwner;
+  const isPreparingBusiness = activeProfile?.role === "seller" &&
+    activeProfile.businessVerificationStatus === "PENDING";
+  const canEditLocation = isBuyer || isBusinessOwner || isPreparingBusiness;
   const s = useMemo(
     () => createBusinessLocationEditStyles(t, insets.bottom),
     [insets.bottom, t]
@@ -171,7 +173,7 @@ export default function BusinessLocationEditScreen() {
     }
 
     showSuccess("Ubicación actualizada");
-    if (isBuyer) {
+    if (isBuyer || activeProfileState === "business_verification_required") {
       allowNavigation(goBackOrHome);
     } else {
       await refreshProfiles(activeProfile?.profile.id);

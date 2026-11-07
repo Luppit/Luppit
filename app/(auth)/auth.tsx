@@ -34,7 +34,7 @@ export default function auth() {
           align="center"
           style={styles.brandDescription}
         >
-          Empieza a comprar y vender en nuestra comunidad.
+          Pedí lo que necesitás y compará las ofertas que recibás. Si vendés, elegí a cuáles solicitudes responder.
         </Text>
       </View>
 

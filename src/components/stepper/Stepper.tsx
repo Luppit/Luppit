@@ -147,9 +147,11 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
                 <View style={s.header.icon}>
                   <Pressable
                     accessibilityRole="button"
+                    accessibilityLabel="Volver"
                     accessibilityState={{ disabled: backDisabled }}
                     disabled={backDisabled}
                     onPress={goBack}
+                    style={s.header.backButton}
                   >
                     <Icon name="arrow-left" size={20}></Icon>
                   </Pressable>

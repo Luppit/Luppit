@@ -61,6 +61,7 @@ export const InputPhone = ({
         <View style={s.baseInputContainer}>
           <TextInput
             {...textInputProps}
+            accessibilityLabel={textInputProps.accessibilityLabel ?? label}
             style={s.input}
             keyboardType="phone-pad"
             onFocus={(event) => {

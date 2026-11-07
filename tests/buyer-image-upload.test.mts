@@ -17,6 +17,7 @@ function createService() {
   let switchAfterSession = false;
   let switchAfterResponse = false;
   let setupComplete = true;
+  let setupChecks = 0;
   class NativeFormData {
     entries: [string, unknown][] = [];
     append(name: string, value: unknown) { this.entries.push([name, value]); }
@@ -25,8 +26,11 @@ function createService() {
     "../lib/supabase": { getSession: async () => { if (switchAfterSession) profile = { id: "other-profile" }; return { access_token: "test-token" }; } },
     "../lib/supabase/errors": { fromAppError: (type: string) => ({ type, message: "Test failure" }) },
     "./buyer.profile.setup.service": {
-      requireCurrentBuyerProfileSetup: async () => setupComplete ? { ok: true } : {
-        ok: false, error: { type: "validation", code: "buyer_profile_setup_required", message: "Completa tu perfil" },
+      requireCurrentBuyerProfileSetup: async () => {
+        setupChecks++;
+        return setupComplete ? { ok: true } : {
+          ok: false, error: { type: "validation", code: "buyer_profile_setup_required", message: "Completa tu perfil" },
+        };
       },
     },
     "./active.profile.service": {
@@ -58,6 +62,7 @@ function createService() {
     call: exports.callPurchaseRequestAssistant, calls,
     get controller() { return registered; },
     get unregistered() { return unregistered; },
+    get setupChecks() { return setupChecks; },
     setStatus(value: number) { status = value; },
     setSetupComplete(value: boolean) { setupComplete = value; },
     clearProfile() { profile = null; },
@@ -70,20 +75,20 @@ function createService() {
 
 const identity = { client_request_id: "same-turn", idempotency_key: "same-retry", draft_id: "draft-1" };
 
-test("incomplete buyer setup blocks mutations while existing drafts can be restored or discarded", async () => {
+test("incomplete buyer setup permits all draft operations and still blocks publication", async () => {
   const service = createService();
   service.setSetupComplete(false);
-  for (const ui_action of [undefined, "CONTINUE", "PUBLISH"] as const) {
-    const result = await service.call({ prompt: "Una silla", ...identity, ui_action });
-    assert.equal(result.ok, false);
-    if (!result.ok) assert.equal(result.error.code, "buyer_profile_setup_required");
-  }
+  const publish = await service.call({ prompt: "", ...identity, ui_action: "PUBLISH" });
+  assert.equal(publish.ok, false);
+  if (!publish.ok) assert.equal(publish.error.code, "buyer_profile_setup_required");
   assert.equal(service.calls.length, 0);
   service.setPayload({ ok: true, draft_id: "draft-1", status: "draft", messages: [] });
-  for (const ui_action of ["RESTORE", "DISCARD"] as const) {
+  assert.equal((await service.call({ prompt: "Una silla" })).ok, true);
+  for (const ui_action of ["CONTINUE", "SHOW_SUMMARY", "RESTORE", "DISCARD"] as const) {
     assert.equal((await service.call({ prompt: "", ...identity, ui_action })).ok, true);
   }
-  assert.equal(service.calls.length, 2);
+  assert.equal(service.calls.length, 5);
+  assert.equal(service.setupChecks, 1);
 });
 
 test("text-only messages retain JSON and the current owned profile", async () => {

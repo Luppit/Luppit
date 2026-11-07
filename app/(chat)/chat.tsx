@@ -8,6 +8,7 @@ import AssistantReviewCard from "@/src/components/assistant/AssistantReviewCard"
 import { BundledSvg } from "@/src/components/BundledSvg";
 import MessageUtilities from "@/src/components/message/MessageUtilities";
 import { Text } from "@/src/components/Text";
+import { useBuyerPublishSetup } from "@/src/components/onboarding/useBuyerPublishSetup";
 import type { PurchaseRequestAssistantSummary } from "@/src/services/purchase.request.assistant.service";
 import { useTheme } from "@/src/themes";
 import {
@@ -97,6 +98,7 @@ function PublishRequestCard({
   disabled,
   continueDisabled,
   loading,
+  setupStatus,
   onPublish,
   onContinue,
 }: {
@@ -108,17 +110,24 @@ function PublishRequestCard({
   disabled: boolean;
   continueDisabled: boolean;
   loading: boolean;
+  setupStatus: ReturnType<typeof useBuyerPublishSetup>["status"];
   onPublish: () => void;
   onContinue: () => void;
 }) {
   const details = buildPurchaseRequestSummaryRows(summary);
   const quantity = details.find((row) => row.label === "Cantidad")?.value;
+  const requiresSetup = setupStatus === "setup_required";
+  const setupFailed = setupStatus === "error";
 
   return (
     <AssistantReviewCard
       completionTitle={isReadyToPublish ? "Solicitud lista" : "Solicitud por completar"}
       completionDescription={isReadyToPublish
-        ? "Revisa los detalles antes de publicar."
+        ? requiresSetup
+          ? "Tu borrador está guardado. Completá tu perfil para publicarlo."
+          : setupFailed
+          ? "No pudimos comprobar tu perfil. Volvé a intentarlo."
+          : "Revisa los detalles antes de publicar."
         : "Completa los datos pendientes para poder publicar."}
       isComplete={isReadyToPublish}
       title={summary?.titulo ?? "Solicitud"}
@@ -134,7 +143,7 @@ function PublishRequestCard({
         text: `Falta completar: ${missingFields.map(humanizeAttributeLabel).join(", ")}.`,
         tone: "error",
       }] : []}
-      primaryLabel="Publicar solicitud"
+      primaryLabel={requiresSetup ? "Completar perfil" : setupFailed ? "Reintentar" : "Publicar solicitud"}
       primaryDisabled={disabled}
       primaryLoading={loading}
       onPrimaryPress={onPublish}
@@ -216,6 +225,7 @@ export default function ChatScreen() {
     status,
   } = useChatSession();
   const isAssistantBusy = isSendingMessage || isExecutingControl || isRestoring;
+  const publishSetup = useBuyerPublishSetup(uiState === "review" && canPublish);
   const reviewImages = React.useMemo(() => {
     const seen = new Set<string>();
     return messages.flatMap((message) => {
@@ -280,11 +290,16 @@ export default function ChatScreen() {
             images={reviewImages}
             isReadyToPublish={isReadyToPublish}
             missingFields={missingFields}
-            disabled={!canPublish || isAssistantBusy}
+            disabled={!canPublish || isAssistantBusy || publishSetup.status === "checking"}
             continueDisabled={isAssistantBusy}
-            loading={isExecutingControl}
+            loading={isExecutingControl || (canPublish && publishSetup.status === "checking")}
+            setupStatus={publishSetup.status}
             onContinue={() => void continueClarifying()}
-            onPublish={() => void publishDraft()}
+            onPublish={() => {
+              if (publishSetup.status === "setup_required") publishSetup.completeSetup();
+              if (publishSetup.status === "error") publishSetup.refresh();
+              if (publishSetup.status === "ready") void publishDraft();
+            }}
           />
           {status === "published" ? (
             <AssistantTextBlock text="Esta solicitud ya fue publicada." />

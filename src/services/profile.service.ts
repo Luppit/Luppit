@@ -38,6 +38,7 @@ import {
 } from "../utils/costaRicaIdDocument";
 import {
     getCurrentProfileResult,
+    getCurrentProfileSummary,
     requestActiveProfileRefresh,
 } from "./active.profile.service";
 import {
@@ -143,7 +144,14 @@ function mapProfileEmailVerificationError(error: unknown): AppError {
         return {
             type: "validation",
             code: "email_already_in_use",
-            message: "Este correo ya está asociado a otro perfil. Cada perfil debe usar un correo diferente.",
+            message: "Este correo ya está asociado a otra cuenta.",
+        };
+    }
+    if (rawMessage.includes("email_not_verified_for_account")) {
+        return {
+            type: "validation",
+            code: "email_not_verified_for_account",
+            message: "Ese correo ya no está disponible para reutilizar. Verificalo con un código o elegí otro.",
         };
     }
 
@@ -970,6 +978,53 @@ export async function getCurrentProfileEmailSetupStatus(): Promise<
         ok: true,
         data: mapProfileEmailSetupStatus(profile?.ok === true ? profile.data : null),
     };
+}
+
+export async function getCurrentProfileVerifiedEmailOptions(): Promise<
+    { ok: true; data: string[] } | { ok: false; error: AppError }
+> {
+    const profile = await getCurrentAuthenticatedProfile();
+    if (!profile.ok) return profile;
+
+    const result = await supabase.rpc(RPC_FUNCTIONS.GET_CURRENT_PROFILE_VERIFIED_EMAIL_OPTIONS, {
+        p_profile_id: profile.data.id,
+    });
+    if (result.error) return { ok: false, error: fromSupabaseError(result.error) };
+    const options = (Array.isArray(result.data) ? result.data : [])
+        .map((value: unknown) => {
+            const row = toRecord(value);
+            if (typeof row?.email !== "string" || typeof row.verified_at !== "string") return null;
+            const email = normalizeProfileEmail(row.email);
+            return email || null;
+        })
+        .filter((email): email is string => email !== null);
+    return { ok: true, data: [...new Set(options)] };
+}
+
+export async function reuseCurrentProfileVerifiedEmail({ email, emailOptIn }: {
+    email: string;
+    emailOptIn: boolean;
+}): Promise<{ ok: true } | { ok: false; error: AppError }> {
+    const profile = await getCurrentAuthenticatedProfile();
+    if (!profile.ok) return profile;
+
+    const normalizedEmail = normalizeProfileEmail(email);
+    if (!normalizedEmail || !emailOptIn) return { ok: false, error: fromAppError("validation") };
+    const result = await supabase.rpc(RPC_FUNCTIONS.REUSE_CURRENT_PROFILE_VERIFIED_EMAIL, {
+        p_profile_id: profile.data.id,
+        p_email: normalizedEmail,
+        p_email_opt_in: emailOptIn,
+    });
+    if (result.error) return { ok: false, error: mapProfileEmailVerificationError(result.error) };
+    const row = toRecord(result.data);
+    if (row?.ok !== true || row.profile_id !== profile.data.id || row.email !== normalizedEmail) {
+        return { ok: false, error: fromAppError("unknown") };
+    }
+
+    if (getCurrentProfileSummary()?.profile.id === profile.data.id) {
+        await requestActiveProfileRefresh(profile.data.id).catch(() => false);
+    }
+    return { ok: true };
 }
 
 type RequestCurrentProfileEmailSetupVerificationInput = {

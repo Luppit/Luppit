@@ -20,6 +20,7 @@ import {
   type ProfileImageFile,
   type ProfileImageKind,
 } from "./profile-image.helpers";
+import { getCurrentPendingSellerBusinessSetup } from "./seller.business.setup.service";
 
 export type { ProfileImageFile } from "./profile-image.helpers";
 
@@ -144,7 +145,7 @@ async function resolveCurrentTarget(): Promise<
   | { ok: true; data: ResolvedProfileImageTarget }
   | { ok: false; error: AppError }
 > {
-  const summary = getCurrentProfileSummary();
+  let summary = getCurrentProfileSummary();
   if (!summary) return { ok: false, error: fromAppError("not_found") };
 
   if (summary.role === "buyer") {
@@ -160,6 +161,33 @@ async function resolveCurrentTarget(): Promise<
         canManage: true,
       },
     };
+  }
+
+  if (summary.role === "seller" && summary.businessVerificationStatus === "PENDING") {
+    const setup = await getCurrentPendingSellerBusinessSetup();
+    if (!setup.ok) return setup;
+    if (getCurrentProfileSummary()?.profile.id !== summary.profile.id) {
+      return { ok: false, error: fromAppError("not_found") };
+    }
+    if (setup.data) {
+      const { applicationId, imagePath, steps } = setup.data;
+      return {
+        ok: true,
+        data: {
+          kind: "pending_business",
+          entityId: applicationId,
+          activeProfileId: summary.profile.id,
+          imagePath,
+          imageUrl: await resolveProfileImageUrl(imagePath),
+          canManage: steps.some((step) => step.code === "photo" && step.canEdit),
+        },
+      };
+    }
+
+    const profileId = summary.profile.id;
+    await refreshActiveProfile(profileId);
+    summary = getCurrentProfileSummary();
+    if (summary?.profile.id !== profileId) return { ok: false, error: fromAppError("not_found") };
   }
 
   if (summary.role === "seller" && summary.businessId) {
@@ -412,7 +440,7 @@ export async function saveCurrentProfileImage(
     return { ok: false, error: fromAppError("validation") };
   }
 
-  await refreshActiveProfile(target.activeProfileId);
+  if (target.kind !== "pending_business") await refreshActiveProfile(target.activeProfileId);
   return {
     ok: true,
     data: {
@@ -430,7 +458,9 @@ export async function removeCurrentProfileImage(): Promise<ProfileImageResult> {
   if (!targetResult.ok) return targetResult;
 
   const target = targetResult.data;
-  if (!target.canManage) return { ok: false, error: MANAGE_FORBIDDEN_ERROR };
+  if (!target.canManage || target.kind === "pending_business") {
+    return { ok: false, error: MANAGE_FORBIDDEN_ERROR };
+  }
 
   if (target.imagePath) {
     const objectPath = getOwnedObjectPath(target.imagePath, target);

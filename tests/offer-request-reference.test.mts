@@ -1006,8 +1006,8 @@ test("context popups preserve the full buyer request, conditions, fulfillment an
   assert.equal(f.popup.descriptionPlacement, "afterRows");
   assert.equal(f.popup.metadata, undefined, "Do not repeat the request title below the popup title");
   assert.deepEqual(Array.from(f.popup.offerVisual.deliveryRows, (row: any) => row.label), ["Envío", "Retiro"]);
-  assert.equal(f.popup.offerVisual.deliveryRows[0].detail, "Máximo 3 día(s)");
-  assert.equal(f.popup.offerVisual.deliveryRows[1].detail, "Disponible en 1 día(s)");
+  assert.equal(f.popup.offerVisual.deliveryRows[0].detail, "Máximo 3 días");
+  assert.equal(f.popup.offerVisual.deliveryRows[1].detail, "Disponible en 1 día");
   assert.equal(f.popup.offerVisual.deliveryRows[0].amount, undefined);
   assert.deepEqual(Array.from(f.popup.images, (image: any) => image.uri), photos.map((photo) => photo.url));
   assert.ok(f.popup.images.every((image: any) => image.caption === undefined));

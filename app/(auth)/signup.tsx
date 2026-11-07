@@ -20,7 +20,7 @@ import { borders, spacing, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
 
@@ -91,11 +91,16 @@ function SignupEntryStep({
           loading={isSendingCode}
           additionalMissingFields={legalMissingFields}
           supportingContent={(
-            <LegalAcceptance
-              accepted={legalAccepted}
-              onToggle={onToggleLegal}
-              onDocumentPress={preserveLegalReview}
-            />
+            <>
+              <Text color="textMedium">
+                Contá qué necesitás una vez y compará las ofertas que recibás. Podés preparar una solicitud mientras completás tu perfil.
+              </Text>
+              <LegalAcceptance
+                accepted={legalAccepted}
+                onToggle={onToggleLegal}
+                onDocumentPress={preserveLegalReview}
+              />
+            </>
           )}
         />
       ),
@@ -317,11 +322,8 @@ export default function Signup() {
         ref={stepperRef}
         backDisabled={isVerifying}
         onBackAtFirstStep={() => {
-          if (Platform.OS === "android" && !router.canGoBack()) {
-            router.replace("/(auth)/auth");
-          } else {
-            router.back();
-          }
+          clearSignupLegalReviewState();
+          router.replace("/(auth)/auth");
         }}
       ></Stepper>
     </View>

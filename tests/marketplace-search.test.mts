@@ -77,7 +77,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
   let buyerSetup: any = { ok: true, data: { isComplete: true } };
   let dimensions = { width: 430, height: 932, scale: 3, fontScale: 1 };
   let segmentListener = (_value: string) => {};
-  const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters) };
+  const params = { role, stageCode: role === "buyer" ? "all" : "for_you", segmentSvgName: "todas", filters: JSON.stringify(initialFilters ?? emptyFilters), resumeBuyerDraft: undefined as string | undefined };
   const request = (...args: any[]) => { const response = deferred(); calls.push({ args, response }); return response.promise; };
   const modules: Record<string, any> = {
     "@/src/components/conversation/PendingRatingsEntry": { default: "PendingRatingsEntry" },
@@ -94,7 +94,11 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     },
     "@/src/themes": { useTheme: () => ({ spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 }, borders: { md: 20 }, colors: {}, glass: { radius: { chrome: 28, chip: 22 } }, typography: { subtitle: { lineHeight: 24 }, small: { lineHeight: 18 } } }) },
     "@react-navigation/native": { useFocusEffect: (callback: Function) => runtime.react.useEffect(callback, [callback]) },
-    "expo-router": { router: { push: (route: any) => routes.push(route) }, useGlobalSearchParams: () => params },
+    "expo-router": {
+      router: { push: (route: any) => routes.push(route), dismissTo: (route: any) => routes.push({ dismissTo: route }) },
+      useGlobalSearchParams: () => params,
+      useLocalSearchParams: () => params,
+    },
     "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 44, bottom: 34 }) },
     "./detail-top-bar": { DETAIL_TOP_BAR_VISIBLE_HEIGHT: 56 },
     "@/src/utils/useAndroidBackAction": { useAndroidBackAction() {} },
@@ -189,6 +193,7 @@ test("a buyer with no publications can start or resume the real request assistan
   assert.equal(f.routes[0], "/(chat)/chat");
 
   const saved = f.render(f.exports.BuyerFirstRequestState, {
+    ...firstUse.props,
     draft: { id: "draft-1", title: "Solicitud guardada", summaryText: "Dos unidades para uso diario" },
   });
   assert.match(text(saved), /Solicitud guardada/);
@@ -279,7 +284,7 @@ for (const latestDraft of [null, {
     assert.ok(action);
     assert.equal(action.props.loading, false);
     action.props.onPress();
-    assert.equal(view.routes[0], "/(chat)/chat");
+    assert.equal(data.routes[0], "/(chat)/chat");
     assert.equal(data.calls.length, 1, "rendering onboarding uses the existing home response");
     assert.equal(view.calls.length, 0, "the visible branch never probes draft state separately");
 
@@ -318,7 +323,36 @@ test("a refreshed incomplete buyer checklist replaces prior onboarding without f
   assert.equal(content.type, "SellerBusinessSetupChecklist");
   assert.equal(content.props.role, "buyer");
   assert.equal(content.props.setup.isComplete, false);
+  assert.equal(content.props.buyerDraftAction, undefined);
   assert.equal(data.calls.length, 1, "setup requirements still prevent marketplace discovery");
+  assert.equal(view.calls.length, 0);
+});
+
+test("an eligible buyer can prepare or resume a draft on the setup checklist without opening marketplace discovery", async (t) => {
+  const data = fixture("buyer"); t.after(data.cleanup);
+  const view = fixture("buyer"); t.after(view.cleanup);
+  const setup = { isComplete: false, canSaveDraft: true, completedCount: 3, totalCount: 4 };
+  const render = () => view.render(view.exports.MarketplaceHomeContent, data.screen().props);
+  data.setSetup({ ok: true, data: { ...setup, onboarding: { hasPublishedRequests: false, latestDraft: null } } });
+  data.screen(); await flush();
+  const checklist = render();
+  assert.equal(checklist.type, "SellerBusinessSetupChecklist");
+  assert.equal(checklist.props.buyerDraftAction.draft, null);
+  assert.equal(checklist.props.buyerDraftAction.disabled, false);
+  checklist.props.buyerDraftAction.onPress();
+  assert.equal(data.routes[0], "/(chat)/chat");
+
+  const draft = { id: "saved-draft", title: "Solicitud guardada", summaryText: "Dos unidades" };
+  data.params.resumeBuyerDraft = "true";
+  data.setSetup({ ok: true, data: { ...setup, onboarding: { hasPublishedRequests: false, latestDraft: draft } } });
+  data.foreground();
+  assert.equal(render().props.buyerDraftAction.disabled, true);
+  await flush();
+  const resume = render().props.buyerDraftAction;
+  assert.equal(resume.draft, draft);
+  resume.onPress();
+  assert.deepEqual(data.routes[1], { dismissTo: "/(chat)/chat" });
+  assert.equal(data.calls.length, 0);
   assert.equal(view.calls.length, 0);
 });
 

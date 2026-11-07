@@ -3,6 +3,7 @@ import FilePicker, { SelectedFile } from "@/src/components/filePicker/FilePicker
 import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
 import LoadingState from "@/src/components/loading/LoadingState";
+import SellerBusinessSetupChecklist from "@/src/components/marketplaceHub/SellerBusinessSetupChecklist";
 import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { getProfilePictureSource } from "@/src/components/profile/ProfilePicture";
@@ -10,6 +11,7 @@ import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { SupportContactRow } from "@/src/components/support/SupportContactRow";
 import { Text } from "@/src/components/Text";
 import { isProfileEmailSetupComplete } from "@/src/components/navbar/useEmailSetupGate";
+import { getCurrentProfileSummary } from "@/src/services/active.profile.service";
 import {
   BusinessVerification,
   getBusinessVerificationReviewEstimate,
@@ -18,6 +20,10 @@ import {
 } from "@/src/services/business-verification.service";
 import { openPopup } from "@/src/services/popup.service";
 import { getBusinessVerificationRefreshMessage } from "@/src/services/business-verification.helpers";
+import {
+  getCurrentPendingSellerBusinessSetup,
+  type PendingSellerBusinessSetup,
+} from "@/src/services/seller.business.setup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showInfo, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -43,6 +49,8 @@ export default function BusinessVerificationScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingSetup, setPendingSetup] = useState<PendingSellerBusinessSetup | null>(null);
+  const [pendingSetupError, setPendingSetupError] = useState(false);
   const mountedRef = useRef(true);
   const requestRef = useRef<{ profileId: string; showProgress: boolean } | null>(null);
   const verificationRef = useRef<BusinessVerification | null>(null);
@@ -60,13 +68,16 @@ export default function BusinessVerificationScreen() {
     requestRef.current = null;
     verificationRef.current = null;
     setVerification(null);
+    setPendingSetup(null);
+    setPendingSetupError(false);
     setFiles([]);
     setIsLoading(true);
     setIsRefreshing(false);
+    setIsSubmitting(false);
     setLoadError(null);
   }, [profileId]);
 
-  const load = useCallback(async (showProgress = false) => {
+  const load = useCallback(async (showProgress = false, submitted?: BusinessVerification) => {
     if (!profileId) return;
     if (requestRef.current?.profileId === profileId) {
       if (showProgress) {
@@ -83,7 +94,9 @@ export default function BusinessVerificationScreen() {
     if (showProgress) setIsRefreshing(true);
     setLoadError(null);
     try {
-      const result = await getCurrentBusinessVerification(profileId);
+      const result = submitted
+        ? { ok: true as const, data: submitted }
+        : await getCurrentBusinessVerification(profileId);
       if (!isCurrent()) return;
       if (!result.ok) {
         setLoadError("No pudimos actualizar el estado. Intentá de nuevo.");
@@ -110,6 +123,22 @@ export default function BusinessVerificationScreen() {
           setLoadError("Tu negocio está aprobado. No pudimos actualizar tu perfil. Intentá de nuevo.");
           showError("No pudimos actualizar tu perfil", "Tu negocio sigue aprobado. Intentá de nuevo.");
         }
+      } else if (result.data.status === "PENDING") {
+        if (getCurrentProfileSummary()?.businessVerificationStatus !== "PENDING") {
+          await refreshProfiles(profileId);
+          if (!isCurrent()) return;
+        }
+        const setup = await getCurrentPendingSellerBusinessSetup().catch(() => null);
+        if (!isCurrent()) return;
+        if (setup?.ok && setup.data && setup.data.applicationId === result.data.applicationId) {
+          setPendingSetup(setup.data);
+          setPendingSetupError(false);
+        } else {
+          setPendingSetupError(true);
+        }
+      } else {
+        setPendingSetup(null);
+        setPendingSetupError(false);
       }
     } catch {
       if (!isCurrent()) return;
@@ -126,7 +155,13 @@ export default function BusinessVerificationScreen() {
 
   useFocusEffect(useCallback(() => {
     void load();
-    return () => {};
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void load();
+    });
+    return () => {
+      subscription.remove();
+      requestRef.current = null;
+    };
   }, [load]));
 
   useFocusEffect(useCallback(() => {
@@ -138,13 +173,6 @@ export default function BusinessVerificationScreen() {
     });
     return () => { active = false; };
   }, []));
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") void load();
-    });
-    return () => subscription.remove();
-  }, [load]);
 
   const hasEmail = isProfileEmailSetupComplete(activeProfile?.profile);
 
@@ -212,14 +240,15 @@ export default function BusinessVerificationScreen() {
       profileId: activeProfile.profile.id,
       files,
     });
+    if (!mountedRef.current || profileIdRef.current !== profileId) return;
     setIsSubmitting(false);
     if (!result.ok) {
       showError("No pudimos enviar la solicitud", result.error.message);
       return;
     }
-    verificationRef.current = result.data;
-    setVerification(result.data);
+    requestRef.current = null;
     setFiles([]);
+    void load(false, result.data);
     showSuccess(
       "Solicitud enviada",
       reviewEstimate
@@ -267,7 +296,7 @@ export default function BusinessVerificationScreen() {
               : "Nuestro equipo revisará los documentos antes de habilitar el negocio."}
           </Text>
           <Text variant="small" color="textMedium">
-            Después de la aprobación, completá categorías, distrito, foto y notificaciones para empezar a ofrecer.
+            Durante la revisión podés guardar tus categorías, distrito y foto del negocio.
           </Text>
         </View>
       ) : null}
@@ -302,6 +331,20 @@ export default function BusinessVerificationScreen() {
               </Text>
             </View>
           </View>
+          {pendingSetup && pendingSetup.applicationId === verification.applicationId ? (
+            <SellerBusinessSetupChecklist
+              setup={pendingSetup}
+              pendingReview
+              topContentInset={0}
+              onRefresh={() => void load()}
+            />
+          ) : pendingSetupError ? (
+            <Text color="error" accessibilityRole="alert" accessibilityLiveRegion="polite">
+              No pudimos cargar los pasos de configuración. Consultá el estado para reintentar.
+            </Text>
+          ) : (
+            <LoadingState label="Cargando pasos de configuración..." variant="inline" />
+          )}
           <Button
             title={isRefreshing ? "Consultando..." : "Consultar estado"}
             icon="refresh-cw"

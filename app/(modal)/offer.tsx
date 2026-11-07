@@ -183,14 +183,19 @@ function getOfferVisual(
   const deliveryRows: NonNullable<PopupOfferVisual["deliveryRows"]> = [];
   if (summary?.entrega) deliveryRows.push({
     label: summary.entrega,
-    detail: summary.envioMaximoDias != null ? `Máximo ${summary.envioMaximoDias} día(s)` : undefined,
+    detail: summary.envioMaximoDias == null ? "Plazo por coordinar"
+      : summary.envioMaximoDias === 0 ? "Envío hoy"
+      : summary.envioMaximoDias === 1 ? "Máximo 1 día"
+      : `Máximo ${summary.envioMaximoDias} días`,
     amount: formatSummaryMoney(summary.precioEnvio, summary.moneda) ?? undefined,
     icon: "truck",
   });
   if (summary?.retiro) deliveryRows.push({
     label: summary.retiro,
-    detail: summary.retiroDespuesDeDias != null
-      ? `Disponible en ${summary.retiroDespuesDeDias} día(s)` : undefined,
+    detail: summary.retiroDespuesDeDias == null ? "Disponibilidad por coordinar"
+      : summary.retiroDespuesDeDias === 0 ? "Disponible hoy"
+      : summary.retiroDespuesDeDias === 1 ? "Disponible en 1 día"
+      : `Disponible en ${summary.retiroDespuesDeDias} días`,
     icon: "store",
   });
   const pricingContext = { offer_components: summary?.componentes, offer_price_amount: summary?.precio,
@@ -320,6 +325,13 @@ function OfferSummaryCard({
     notices.push({
       text: "Adjunta al menos una foto real de la oferta antes de enviarla.",
       tone: "error",
+    });
+  }
+  if (!isEditMode && isComplete && summary &&
+      ((summary.entrega && summary.envioMaximoDias == null) ||
+        (summary.retiro && summary.retiroDespuesDeDias == null))) {
+    notices.push({
+      text: "Si ya tenés un plazo, confirmalo en Seguir ajustando.",
     });
   }
 
@@ -963,6 +975,12 @@ function OfferAssistantScreen({
           ) : null
         ) : <OfferRequestReference reference={requestReference} />}
 
+        {!isEditMode && initialized && visibleMessages.length === 0 && !showSummary ? (
+          <Text color="textMedium">
+            Adjuntá al menos una foto real del producto. Indicá el precio y cómo lo entregarías.
+          </Text>
+        ) : null}
+
         {visibleMessages.map((message) => (
           <AssistantMessageBubble key={message.id} message={message} />
         ))}
@@ -1240,7 +1258,7 @@ function BatchOfferAssistantScreen({ conversationId, requestReference }: {
         <Button title={`Enviar ${selectedIds.length} oferta${selectedIds.length === 1 ? "" : "s"}`}
           disabled={busy || selectedIds.length === 0} loading={busy} onPress={publish} />
       </View> : initialized ? <Text color="textMedium">
-        Cuéntame las opciones que puedes ofrecer, sus precios y qué fotos corresponden a cada una.
+        Contá qué opciones podés ofrecer, sus precios y cómo las entregarías. Adjuntá al menos una foto real de cada opción.
       </Text> : null}
     </ScrollView>
     {status !== "sent" ? <View style={{ paddingTop: t.spacing.sm,

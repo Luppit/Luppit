@@ -354,12 +354,12 @@ function AccountSettingsContent({
         ) : null}
         <GroupedListRow
           icon="mail-warning"
-          label="Correo"
+          label={isSeller ? "Correo del negocio" : "Correo"}
           showSeparator={canAddProfile}
           onPress={() =>
             router.push({
               pathname: "/(modal)/email-setup",
-              params: { title: "Cambiar correo" },
+              params: { title: isSeller ? "Correo del negocio" : "Cambiar correo" },
             })
           }
         />

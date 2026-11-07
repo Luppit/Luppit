@@ -93,13 +93,14 @@ const native = {
 
 function signupHarness() {
   const h = hooks();
+  const replacements: unknown[] = [];
   const module = load<{
     default: () => Node;
     SignupEntryStep: (props: any) => Node;
   }>("../app/(auth)/signup.tsx", {
     react: h.react,
     "react-native": native,
-    "expo-router": { Link: "Link", router: {} },
+    "expo-router": { Link: "Link", router: { replace: (route: unknown) => replacements.push(route) } },
     "@/src/components/inputPhone/InputPhone": { defaultCountryCode: "506" },
     "@/src/components/Icon": { Icon: "Icon" },
     "@/src/components/stepper/Stepper": { __esModule: true, default: "Stepper" },
@@ -119,13 +120,26 @@ function signupHarness() {
   return {
     h,
     module,
-    entry() {
+    replacements,
+    stepper() {
       const tree = h.render(module.default);
-      const stepper = descendants(tree).find((node) => node.type === "Stepper")!;
-      return stepper.props.steps[0].render({ next() {} }) as Node;
+      return descendants(tree).find((node) => node.type === "Stepper")!;
+    },
+    entry() {
+      return this.stepper().props.steps[0].render({ next() {} }) as Node;
     },
   };
 }
+
+test("signup Back returns either role to welcome without navigation history", () => {
+  for (const userType of ["buyer", "seller"] as const) {
+    legalReview.preserveSignupForLegalReview({ userType, phoneNumber: "12345678", legalAccepted: true });
+    const h = signupHarness();
+    h.stepper().props.onBackAtFirstStep();
+    assert.deepEqual(h.replacements, ["/(auth)/auth"]);
+    assert.equal(legalReview.getSignupLegalReviewState(), null);
+  }
+});
 
 test("both legal links preserve the latest seller phone and consent across signup remount", () => {
   for (const documentCode of ["terms_conditions", "privacy_policy"]) {
@@ -339,4 +353,84 @@ test("an unexpected photo save failure stays recoverable, and a replacement imag
   const tree = h.tree();
   assert.equal(descendants(tree).some((node) => node.props.accessibilityRole === "alert"), false);
   assert.equal(descendants(tree).find((node) => node.type === "ProfilePicture")!.props.imageUrl, "file:///replacement.jpg");
+});
+
+async function emailSetupHarness() {
+  const h = hooks();
+  const reuse: unknown[] = [];
+  const send: unknown[] = [];
+  const verify: unknown[] = [];
+  let exits = 0;
+  const module = load<{ default: () => Node }>("../app/(modal)/email-setup.tsx", {
+    react: h.react,
+    "react-native": { ...native, Keyboard: { dismiss() {} }, TouchableWithoutFeedback: "TouchableWithoutFeedback" },
+    "@/src/utils/useAndroidBackAction": { goBackOrHome: () => exits++ },
+    "@/src/utils/useAndroidLeaveGuard": { useAndroidLeaveGuard: () => (fn: () => unknown) => fn() },
+    "@/src/components/button/Button": { __esModule: true, default: "Button" },
+    "@/src/components/groupedList/GroupedList": { GroupedListRow: "GroupedListRow", GroupedListSection: "GroupedListSection" },
+    "@/src/components/Icon": { Icon: "Icon" },
+    "@/src/components/inputField/InputField": { TextField: "TextField" },
+    "@/src/components/loading/LoadingState": { __esModule: true, default: "LoadingState" },
+    "@/src/components/otpValidator/OtpValidator": { __esModule: true, default: "OtpValidator" },
+    "@/src/components/profile/ActiveProfileContext": { useActiveProfile: () => ({ activeProfile: { profile: { id: "seller" }, role: "seller" } }) },
+    "@/src/components/Text": { Text: "Text" },
+    "@/src/services/profile.service": {
+      getCurrentProfileEmailSetupStatus: async () => ({ ok: true, data: { email: null, emailOptIn: false } }),
+      getCurrentProfileVerifiedEmailOptions: async () => ({ ok: true, data: ["account@example.test"] }),
+      reuseCurrentProfileVerifiedEmail: async (input: unknown) => { reuse.push(input); return { ok: true }; },
+      requestCurrentProfileEmailSetupVerification: async (input: unknown) => { send.push(input); return { ok: true }; },
+      verifyCurrentProfileEmailSetup: async (input: unknown) => { verify.push(input); return { ok: true }; },
+    },
+    "@/src/themes": { useTheme: () => theme },
+    "@/src/utils/useToast": { showError() {}, showMissingFields() {}, showSuccess() {} },
+  });
+  const nodes = () => descendants(h.render(module.default));
+  const find = (predicate: (node: Node) => boolean) => {
+    const node = nodes().find(predicate);
+    assert.ok(node);
+    return node.props;
+  };
+  nodes();
+  h.effects();
+  await settle();
+  return {
+    reuse, send, verify,
+    get exits() { return exits; },
+    find,
+    button: (title: string) => find((node) => node.type === "Button" && node.props.title === title),
+    consent: () => find((node) => node.props.accessibilityRole === "checkbox").onPress(),
+  };
+}
+
+test("seller email reuse requires consent and does not send a duplicate verification code", async () => {
+  const h = await emailSetupHarness();
+  h.button("Usar este correo").onPress();
+  await settle();
+  assert.equal(h.reuse.length, 0);
+  assert.equal(h.send.length, 0);
+  h.consent();
+  const { onPress } = h.button("Usar este correo");
+  onPress();
+  onPress();
+  await settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.reuse)), [{ email: "account@example.test", emailOptIn: true }]);
+  assert.equal(h.send.length, 0);
+  assert.equal(h.exits, 1);
+});
+
+test("a separate seller contact still goes through email OTP", async () => {
+  const h = await emailSetupHarness();
+  h.find((node) => node.props.label === "Verificar otro correo del negocio").onPress();
+  h.find((node) => node.type === "TextField").onChangeText("sales@example.test");
+  h.consent();
+  h.button("Enviar código").onPress();
+  await settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.send)), [{ email: "sales@example.test" }]);
+  assert.equal(h.reuse.length, 0);
+  assert.equal(h.exits, 0);
+  h.find((node) => node.type === "OtpValidator").onChange("1234");
+  h.button("Verificar correo").onPress();
+  await settle();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.verify)), [{ email: "sales@example.test", token: "1234", emailOptIn: true }]);
+  assert.equal(h.exits, 1);
 });

@@ -12,7 +12,7 @@ export const PROFILE_IMAGE_MIME_BY_EXTENSION = {
 export type ProfileImageExtension = keyof typeof PROFILE_IMAGE_MIME_BY_EXTENSION;
 export type ProfileImageMimeType =
   (typeof PROFILE_IMAGE_MIME_BY_EXTENSION)[ProfileImageExtension];
-export type ProfileImageKind = "buyer_profile" | "business";
+export type ProfileImageKind = "buyer_profile" | "business" | "pending_business";
 
 export type ProfileImageFile = {
   uri: string;

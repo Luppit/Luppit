@@ -114,7 +114,8 @@ export default function ProfilePictureEditScreen() {
     void loadTarget();
   }, [loadTarget]);
 
-  const isBusiness = target?.kind === "business";
+  const isBusiness = target != null && target.kind !== "buyer_profile";
+  const canRemovePicture = target?.kind !== "pending_business";
   const displayName = isBusiness
     ? activeProfile?.businessName || "negocio"
     : activeProfile?.profile.name || "comprador";
@@ -211,7 +212,7 @@ export default function ProfilePictureEditScreen() {
   };
 
   const confirmRemoveImage = () => {
-    if (!target?.canManage || !hasCurrentPicture || isBusy) return;
+    if (!target?.canManage || !canRemovePicture || !hasCurrentPicture || isBusy) return;
 
     openPopup({
       type: "summary",
@@ -379,7 +380,7 @@ export default function ProfilePictureEditScreen() {
         </View>
       </View>
 
-      {hasCurrentPicture && !draft ? (
+      {hasCurrentPicture && canRemovePicture && !draft ? (
         <GroupedList>
           <GroupedListRow
             icon="trash-2"

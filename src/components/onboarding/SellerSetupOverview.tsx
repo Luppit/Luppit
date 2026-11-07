@@ -41,8 +41,8 @@ export default function SellerSetupOverview() {
         />
         <GroupedListRow
           icon="store"
-          label="Después de la aprobación"
-          description="Completá categorías, distrito, foto y notificaciones. Después podés revisar solicitudes y preparar ofertas."
+          label="Prepará tu negocio durante la revisión"
+          description="Guardá tus categorías, distrito y foto mientras revisamos los documentos. Cuando tu negocio esté aprobado y configurado, podés revisar solicitudes y hacer ofertas."
           descriptionMaxLines={6}
           showChevron={false}
           showSeparator={false}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseBuyerProfileSetup, parseSellerBusinessSetup, parseSellerLocationAvailability } from "../src/services/seller.business.setup.helpers.ts";
+import { parseBuyerProfileSetup, parsePendingSellerBusinessSetup, parseSellerBusinessSetup, parseSellerLocationAvailability } from "../src/services/seller.business.setup.helpers.ts";
 import { fromSupabaseError } from "../src/lib/supabase/errors.ts";
 
 function setup(completed = 2) {
@@ -28,6 +28,28 @@ test("keeps the server's ordered checklist, completion and membership permission
 test("requires the notification step even when every saved business field is complete", () => {
   assert.equal(parseSellerBusinessSetup(setup(4))?.isComplete, false);
   assert.equal(parseSellerBusinessSetup(setup(5))?.isComplete, true);
+});
+
+test("pending seller settings stay separate from marketplace readiness", () => {
+  const raw = {
+    application_id: "verification-application",
+    category_ids: ["category"],
+    location_id: "district",
+    location_label: "Distrito, Cantón, Provincia",
+    image_path: "storage://profile-images/businesses/verification-application/photo.jpg",
+    completed_count: 3,
+    total_count: 3,
+    is_complete: true,
+    steps: setup(5).steps.filter((step) => ["categories", "location", "photo"].includes(step.code)),
+  };
+  const parsed = parsePendingSellerBusinessSetup(raw);
+  assert.equal(parsed?.applicationId, raw.application_id);
+  assert.deepEqual(parsed?.categoryIds, raw.category_ids);
+  assert.equal(parsed?.locationId, raw.location_id);
+  assert.equal(parsed?.imagePath, raw.image_path);
+  assert.equal(parsed?.isComplete, true);
+  assert.equal(parseSellerBusinessSetup({ ...raw, business_id: "business" }), null);
+  assert.equal(parsePendingSellerBusinessSetup({ ...raw, category_ids: [null] }), null);
 });
 
 test("completes the five-step checklist without a business-name setup field", () => {
@@ -73,6 +95,15 @@ test("buyer setup keeps server order and requires location without seller catego
   assert.equal(parsed?.profileId, "buyer");
   assert.equal(parsed?.locationId, "district");
   assert.equal(parsed?.isComplete, false);
+  assert.equal(parsed?.canSaveDraft, false);
+  const draftAllowed = parseBuyerProfileSetup({
+    ...raw,
+    can_save_draft: true,
+    onboarding: { has_published_requests: false, latest_draft: { id: "draft", title: "Silla" } },
+  });
+  assert.equal(draftAllowed?.canSaveDraft, true);
+  assert.equal(draftAllowed?.isComplete, false);
+  assert.equal(draftAllowed?.onboarding?.latestDraft?.title, "Silla");
   assert.deepEqual(parsed?.steps.map((step) => step.code), ["notifications", "photo", "email", "location"]);
   assert.equal(parseBuyerProfileSetup({ ...raw, is_complete: true }), null);
   assert.equal(parseBuyerProfileSetup({ ...raw, profile_id: null }), null);

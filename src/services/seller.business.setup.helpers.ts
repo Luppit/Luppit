@@ -1,3 +1,5 @@
+import { parseBuyerHomeOnboarding, type BuyerHomeOnboarding } from "./buyer.home.onboarding.helpers.ts";
+
 export type SellerBusinessSetupStepCode =
   | "email"
   | "categories"
@@ -28,8 +30,16 @@ export type SellerBusinessSetup = ProfileSetupChecklist & {
   businessId: string;
 };
 
+export type PendingSellerBusinessSetup = ProfileSetupChecklist & {
+  applicationId: string;
+  categoryIds: string[];
+  imagePath: string | null;
+};
+
 export type BuyerProfileSetup = ProfileSetupChecklist & {
   profileId: string;
+  canSaveDraft: boolean;
+  onboarding: BuyerHomeOnboarding | null;
 };
 
 export type SellerLocationAvailability = {
@@ -108,11 +118,32 @@ export function parseSellerBusinessSetup(raw: unknown): SellerBusinessSetup | nu
   return setup ? { ...setup, businessId: value.business_id } : null;
 }
 
+export function parsePendingSellerBusinessSetup(raw: unknown): PendingSellerBusinessSetup | null {
+  const value = record(raw);
+  if (typeof value?.application_id !== "string" || !value.application_id ||
+    !Array.isArray(value.category_ids) ||
+    !value.category_ids.every((id): id is string => typeof id === "string" && Boolean(id.trim()))) {
+    return null;
+  }
+  const setup = parseProfileSetup(value, ["categories", "location", "photo"]);
+  return setup ? {
+    ...setup,
+    applicationId: value.application_id,
+    categoryIds: value.category_ids,
+    imagePath: nullableString(value.image_path),
+  } : null;
+}
+
 export function parseBuyerProfileSetup(raw: unknown): BuyerProfileSetup | null {
   const value = record(raw);
   if (typeof value?.profile_id !== "string" || !value.profile_id) return null;
   const setup = parseProfileSetup(value, ["email", "location", "photo", "notifications"]);
-  return setup ? { ...setup, profileId: value.profile_id } : null;
+  return setup ? {
+    ...setup,
+    profileId: value.profile_id,
+    canSaveDraft: value.can_save_draft === true,
+    onboarding: parseBuyerHomeOnboarding(value.onboarding),
+  } : null;
 }
 
 export function parseSellerLocationAvailability(raw: unknown): SellerLocationAvailability | null {

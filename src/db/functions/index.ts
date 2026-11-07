@@ -49,6 +49,8 @@ export const RPC_FUNCTIONS = {
   GET_CURRENT_BUYER_PROFILE_SETUP: "get_current_buyer_profile_setup",
   GET_CURRENT_PROFILE_CONVERSATIONS: "get_current_profile_conversations",
   GET_CURRENT_PROFILE_PENDING_RATINGS: "get_current_profile_pending_ratings",
+  GET_CURRENT_PROFILE_VERIFIED_EMAIL_OPTIONS: "get_current_profile_verified_email_options",
+  GET_CURRENT_PENDING_SELLER_BUSINESS_SETUP: "get_current_pending_seller_business_setup",
   GET_CURRENT_LEGAL_ACCEPTANCE_STATE:
     "get_current_legal_acceptance_state",
   GET_CURRENT_SAFETY_BLOCKS: "get_current_safety_blocks",
@@ -100,6 +102,7 @@ export const RPC_FUNCTIONS = {
   REGISTER_CURRENT_PUSH_DEVICE: "register_current_push_device",
   REVOKE_CURRENT_USER_BUSINESS_INVITATION:
     "revoke_current_user_business_invitation",
+  REUSE_CURRENT_PROFILE_VERIFIED_EMAIL: "reuse_current_profile_verified_email",
   SEND_EMAIL_VERIFICATION_OTP: "send_email_verification_otp",
   SET_CURRENT_BUSINESS_CATEGORY_PREFERENCES:
     "set_current_business_category_preferences",

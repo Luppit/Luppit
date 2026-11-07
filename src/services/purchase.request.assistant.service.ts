@@ -420,7 +420,7 @@ export async function callPurchaseRequestAssistant(
     };
   }
 
-  if (input.ui_action !== "RESTORE" && input.ui_action !== "DISCARD") {
+  if (input.ui_action === "PUBLISH") {
     const setup = await requireCurrentBuyerProfileSetup();
     if (!setup.ok) {
       return {

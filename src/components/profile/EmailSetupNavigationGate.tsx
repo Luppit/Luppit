@@ -2,7 +2,7 @@ import {
   isEmailSetupAllowedAppPath,
   isProfileEmailSetupComplete,
 } from "@/src/components/navbar/useEmailSetupGate";
-import { Redirect, useLocalSearchParams, usePathname } from "expo-router";
+import { Redirect, useLocalSearchParams, usePathname, useSegments } from "expo-router";
 import React from "react";
 import { useActiveProfile } from "./ActiveProfileContext";
 
@@ -12,6 +12,7 @@ export default function EmailSetupNavigationGate({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const segments = useSegments();
   const params = useLocalSearchParams<{ setup?: string }>();
   const { state, activeProfile } = useActiveProfile();
   const requiresEmailSetup =
@@ -21,13 +22,20 @@ export default function EmailSetupNavigationGate({
 
   const isInitialProfileSetupRoute =
     pathname === "/create-profile" && params.setup === "true";
+  const isBuyerDraftRoute = activeProfile?.role === "buyer" &&
+    pathname === "/chat" && segments[0] === "(chat)";
+  const isPendingBusinessSetupRoute =
+    activeProfile?.businessVerificationStatus === "PENDING" &&
+    activeProfile.role === "seller" &&
+    ["/business-categories", "/business-location-edit", "/profile-picture-edit"].includes(pathname);
   const isBusinessVerificationAllowedRoute =
     pathname === "/business-verification" ||
     pathname === "/email-setup" ||
     pathname === "/legal-document" ||
     pathname === "/faq" ||
     pathname === "/notifications" ||
-    pathname === "/account-settings";
+    pathname === "/account-settings" ||
+    isPendingBusinessSetupRoute;
 
   if (
     state === "location_unavailable" &&
@@ -53,6 +61,7 @@ export default function EmailSetupNavigationGate({
   if (
     requiresEmailSetup &&
     !isInitialProfileSetupRoute &&
+    !isBuyerDraftRoute &&
     !isEmailSetupAllowedAppPath(pathname)
   ) {
     return <Redirect href="/" />;

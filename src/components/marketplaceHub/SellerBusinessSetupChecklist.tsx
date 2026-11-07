@@ -5,6 +5,7 @@ import { usePushNotifications } from "@/src/components/notifications/PushNotific
 import { NAVBAR_HEIGHT } from "@/src/components/navbar/styles";
 import { Text } from "@/src/components/Text";
 import { lucideIcons, LucideIconName } from "@/src/icons/lucide";
+import type { BuyerHomeDraft } from "@/src/services/buyer.home.onboarding.helpers";
 import { type ProfileSetupChecklist, type SellerBusinessSetupStep } from "@/src/services/seller.business.setup.helpers";
 import { Theme, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils/useToast";
@@ -18,11 +19,15 @@ export default function SellerBusinessSetupChecklist({
   topContentInset,
   onRefresh,
   role = "seller",
+  buyerDraftAction,
+  pendingReview = false,
 }: {
   setup: ProfileSetupChecklist;
   topContentInset: number;
   onRefresh: () => void;
   role?: "buyer" | "seller";
+  buyerDraftAction?: { draft: BuyerHomeDraft | null; disabled: boolean; onPress: () => void };
+  pendingReview?: boolean;
 }) {
   const t = useTheme();
   const s = useMemo(() => createStyles(t), [t]);
@@ -32,7 +37,17 @@ export default function SellerBusinessSetupChecklist({
   const nextStep = setup.steps.find((step) => !step.isComplete && step.canEdit);
   const remaining = setup.totalCount - setup.completedCount;
   const needsSettings = !permissionCanAskAgain && permissionStatus !== "undetermined";
-  const setupLabel = role === "buyer" ? "Configuración de tu perfil" : "Configuración del negocio";
+  const setupLabel = pendingReview ? "Prepará tu negocio" :
+    role === "buyer" ? "Configuración de tu perfil" : "Configuración del negocio";
+  const setupDescription = pendingReview
+    ? setup.isComplete
+      ? "Tus cambios están guardados. Los usaremos cuando se apruebe tu negocio."
+      : "Guardá estos datos mientras revisamos tus documentos."
+    : role === "buyer"
+      ? buyerDraftAction
+        ? "Podés preparar tu solicitud ahora. Completá estos pasos para publicarla."
+        : "Completa los pasos pendientes para crear solicitudes."
+      : "Completa los pasos pendientes para hacer ofertas.";
 
   const openStep = async (step: SellerBusinessSetupStep) => {
     switch (step.code) {
@@ -70,47 +85,67 @@ export default function SellerBusinessSetupChecklist({
     }
   };
 
+  const content = (
+    <>
+      <View style={s.summary}>
+        <Text variant="body" color="textMedium">{setupLabel}</Text>
+        <Text variant="subtitle" accessibilityLiveRegion="polite">
+          {setup.completedCount} de {setup.totalCount} pasos completados
+        </Text>
+        <Text variant="body" color="textMedium">
+          {setupDescription}
+        </Text>
+        <View style={s.progress} accessible accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: setup.totalCount, now: setup.completedCount }}
+          accessibilityLabel={setupLabel}
+        >
+          <View style={[s.progressFill, { width: `${100 * setup.completedCount / setup.totalCount}%` }]} />
+        </View>
+      </View>
+      {buyerDraftAction && (
+        <View style={s.summary}>
+          {buyerDraftAction.draft && (
+            <Text variant="body" color="textMedium" maxLines={3}>
+              {buyerDraftAction.draft.title ?? buyerDraftAction.draft.summaryText ?? "Borrador guardado"}
+            </Text>
+          )}
+          <Button variant="white" icon="file-pen-line" disabled={buyerDraftAction.disabled}
+            title={buyerDraftAction.draft ? "Continuar mi solicitud" : "Preparar mi solicitud"}
+            onPress={buyerDraftAction.onPress}
+          />
+        </View>
+      )}
+      <GroupedList>
+        {setup.steps.map((step, index) => (
+          <GroupedListRow key={step.code}
+            icon={step.icon in lucideIcons ? step.icon as LucideIconName : "circle-help"}
+            label={step.label} labelMaxLines={2}
+            description={step.isComplete ? step.description :
+              !step.canEdit ? "Pendiente del administrador principal" :
+              step.code === "notifications" && needsSettings ? "Actívalas en los ajustes del dispositivo." : null}
+            showSeparator={index < setup.steps.length - 1}
+            showChevron={!step.isComplete && step.canEdit}
+            accessibilityLabel={`${step.label}, ${step.isComplete ? "completado" : "pendiente"}`}
+            onPress={step.canEdit && !isEnablingNotifications ? () => void openStep(step) : undefined}
+            rightAccessory={step.isComplete ? (
+              <View style={s.check} accessibilityElementsHidden importantForAccessibility="no">
+                <Icon name="check" size={16} color={t.colors.backgroudWhite} />
+              </View>
+            ) : <Text variant="small" color="textMuted">Pendiente</Text>}
+          />
+        ))}
+      </GroupedList>
+    </>
+  );
+
+  if (pendingReview) return <View style={s.content}>{content}</View>;
+
   return (
     <View style={s.screen}>
       <ScrollView style={s.scroll} showsVerticalScrollIndicator={false}
         contentContainerStyle={[s.content, { paddingTop: topContentInset }]}
       >
-        <View style={s.summary}>
-          <Text variant="body" color="textMedium">{setupLabel}</Text>
-          <Text variant="subtitle" accessibilityLiveRegion="polite">
-            {setup.completedCount} de {setup.totalCount} pasos completados
-          </Text>
-          <Text variant="body" color="textMedium">
-            {role === "buyer" ? "Completa los pasos pendientes para crear solicitudes." :
-              "Completa los pasos pendientes para hacer ofertas."}
-          </Text>
-          <View style={s.progress} accessible accessibilityRole="progressbar"
-            accessibilityValue={{ min: 0, max: setup.totalCount, now: setup.completedCount }}
-            accessibilityLabel={setupLabel}
-          >
-            <View style={[s.progressFill, { width: `${100 * setup.completedCount / setup.totalCount}%` }]} />
-          </View>
-        </View>
-        <GroupedList>
-          {setup.steps.map((step, index) => (
-            <GroupedListRow key={step.code}
-              icon={step.icon in lucideIcons ? step.icon as LucideIconName : "circle-help"}
-              label={step.label} labelMaxLines={2}
-              description={step.isComplete ? step.description :
-                !step.canEdit ? "Pendiente del administrador principal" :
-                step.code === "notifications" && needsSettings ? "Actívalas en los ajustes del dispositivo." : null}
-              showSeparator={index < setup.steps.length - 1}
-              showChevron={!step.isComplete && step.canEdit}
-              accessibilityLabel={`${step.label}, ${step.isComplete ? "completado" : "pendiente"}`}
-              onPress={step.canEdit && !isEnablingNotifications ? () => void openStep(step) : undefined}
-              rightAccessory={step.isComplete ? (
-                <View style={s.check} accessibilityElementsHidden importantForAccessibility="no">
-                  <Icon name="check" size={16} color={t.colors.backgroudWhite} />
-                </View>
-              ) : <Text variant="small" color="textMuted">Pendiente</Text>}
-            />
-          ))}
-        </GroupedList>
+        {content}
       </ScrollView>
       <View style={s.actions}>
         <Button variant="dark" loading={isEnablingNotifications} disabled={!nextStep}

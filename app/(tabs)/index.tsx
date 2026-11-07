@@ -47,7 +47,7 @@ import {
 } from "@/src/services/segment.service";
 import { type Theme, useTheme } from "@/src/themes";
 import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, FlatList, Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
@@ -161,7 +161,12 @@ function getMatchingStageCode(hub: MarketplaceHub, revealMatches: boolean) {
   return selected?.code;
 }
 
+function openBuyerDraft() {
+  router.push("/(chat)/chat");
+}
+
 function BuyerHomeContent() {
+  const { resumeBuyerDraft } = useLocalSearchParams<{ resumeBuyerDraft?: string }>();
   const [isLoading, setIsLoading] = useState(true);
   const [buyerSetup, setBuyerSetup] = useState<BuyerProfileSetup | null>(null);
   const [hub, setHub] = useState<MarketplaceHub | null>(null);
@@ -178,6 +183,13 @@ function BuyerHomeContent() {
   const criteriaKey = JSON.stringify({ filters, selectedSegmentSvgName });
   const hasActiveFilters =
     hasBuyerHomeFilters(filters) || selectedSegmentSvgName !== ALL_SEGMENTS_SVG_NAME;
+  const openDraft = useCallback(() => {
+    if (resumeBuyerDraft === "true") {
+      router.dismissTo("/(chat)/chat");
+      return;
+    }
+    openBuyerDraft();
+  }, [resumeBuyerDraft]);
 
   const loadHub = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
@@ -260,6 +272,7 @@ function BuyerHomeContent() {
       selectedSortCode={selectedSortCode}
       selectedSegmentSvgName={selectedSegmentSvgName}
       hasActiveFilters={hasActiveFilters}
+      onOpenBuyerDraft={openDraft}
       onSelectStage={setSelectedStageCode}
       onSelectSort={setSelectedSortCode}
       onRetry={() => void loadHub()}
@@ -365,19 +378,21 @@ function MarketplaceHomeContent({
   selectedSortCode,
   selectedSegmentSvgName,
   hasActiveFilters,
+  onOpenBuyerDraft = openBuyerDraft,
   onSelectStage,
   onSelectSort,
   onRetry,
 }: {
   role: MarketplaceHubRole;
   isLoading: boolean;
-  profileSetup?: ProfileSetupChecklist | null;
+  profileSetup?: ProfileSetupChecklist | BuyerProfileSetup | null;
   hub: MarketplaceHub | null;
   filters: BuyerHomeFilters | SellerHomeFilters;
   selectedStageCode: string;
   selectedSortCode: string | null;
   selectedSegmentSvgName: string;
   hasActiveFilters: boolean;
+  onOpenBuyerDraft?: () => void;
   onSelectStage: (stageCode: string) => void;
   onSelectSort?: (sortCode: string) => void;
   onRetry: () => void;
@@ -441,13 +456,21 @@ function MarketplaceHomeContent({
     });
   }, [onSelectSort, resolvedSortCode, role, sortConfig]);
 
-  if (isLoading && !hub) {
+  const buyerDraftOnboarding = role === "buyer" && profileSetup && !profileSetup.isComplete &&
+    "canSaveDraft" in profileSetup && profileSetup.canSaveDraft ? profileSetup.onboarding : null;
+
+  if (isLoading && !hub && !buyerDraftOnboarding) {
     return <LoadingState label="Cargando solicitudes..." />;
   }
 
   if (profileSetup && !profileSetup.isComplete) {
     return <SellerBusinessSetupChecklist role={role} setup={profileSetup}
-      topContentInset={topContentInset} onRefresh={onRetry} />;
+      topContentInset={topContentInset} onRefresh={onRetry}
+      buyerDraftAction={buyerDraftOnboarding ? {
+        draft: buyerDraftOnboarding.latestDraft,
+        disabled: isLoading,
+        onPress: onOpenBuyerDraft,
+      } : undefined} />;
   }
 
   if (!hub) {
@@ -461,7 +484,8 @@ function MarketplaceHomeContent({
   }
 
   if (role === "buyer" && !hasActiveFilters && hub.onboarding?.hasPublishedRequests === false) {
-    return <BuyerFirstRequestState draft={hub.onboarding.latestDraft} isRefreshing={isLoading} />;
+    return <BuyerFirstRequestState draft={hub.onboarding.latestDraft} isRefreshing={isLoading}
+      onOpenDraft={onOpenBuyerDraft} />;
   }
 
   if (hub.stages.length === 0 && !hasMatches) {
@@ -510,7 +534,7 @@ function MarketplaceHomeContent({
           descriptionMaxLines={3}
           disabled={isLoading}
           accessibilityLabel="Continuar tu solicitud guardada"
-          onPress={() => router.push("/(chat)/chat")}
+          onPress={onOpenBuyerDraft}
         />
       ) : null}
       <View style={s.summaryBlock}>
@@ -703,9 +727,10 @@ function MarketplaceHomeContent({
   );
 }
 
-function BuyerFirstRequestState({ draft, isRefreshing }: {
+function BuyerFirstRequestState({ draft, isRefreshing, onOpenDraft }: {
   draft: BuyerHomeDraft | null;
   isRefreshing: boolean;
+  onOpenDraft: () => void;
 }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -739,7 +764,7 @@ function BuyerFirstRequestState({ draft, isRefreshing }: {
         variant="primary"
         title={draft ? "Continuar solicitud" : "Crear mi primera solicitud"}
         loading={isRefreshing}
-        onPress={() => router.push("/(chat)/chat")}
+        onPress={onOpenDraft}
       />
       {!draft ? (
         <Text variant="small" color="textMuted">

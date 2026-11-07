@@ -10,6 +10,7 @@ import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { Text } from "@/src/components/Text";
+import { getCurrentProfileSummary } from "@/src/services/active.profile.service";
 import {
   BusinessCategoryOption,
   SellerBusinessCategoryPreference,
@@ -17,6 +18,7 @@ import {
   getCurrentSellerProfileOverview,
   updateCurrentBusinessCategoryPreferences,
 } from "@/src/services/profile.service";
+import { getCurrentPendingSellerBusinessSetup } from "@/src/services/seller.business.setup.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import { useFocusEffect } from "@react-navigation/native";
@@ -62,7 +64,9 @@ export default function BusinessCategoriesScreen() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const { state: activeProfileState, activeProfile } = useActiveProfile();
-  const isBusinessOwner = activeProfile?.membershipRole === "owner";
+  const profileId = activeProfile?.profile.id;
+  const canManageCategories = activeProfile?.membershipRole === "owner" ||
+    (activeProfile?.role === "seller" && activeProfile.businessVerificationStatus === "PENDING");
   const topContentInset = insets.top + DETAIL_TOP_BAR_VISIBLE_HEIGHT;
   const s = useMemo(
     () => createBusinessCategoriesStyles(t, insets.bottom, topContentInset),
@@ -82,29 +86,42 @@ export default function BusinessCategoriesScreen() {
     priority: 1,
   });
   const [didCategoryLoadFail, setDidCategoryLoadFail] = useState(false);
+  const [hasLoadedSelection, setHasLoadedSelection] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const listRef = useRef<FlatList<CategoryBrowserItem> | null>(null);
   const searchRowOffsetRef = useRef(0);
+  const loadGeneration = useRef(0);
 
   const loadCategories = useCallback(async () => {
-    if (!isBusinessOwner) {
+    const generation = ++loadGeneration.current;
+    if (!canManageCategories || !profileId) {
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
+    setHasLoadedSelection(false);
+    const isPending = getCurrentProfileSummary()?.businessVerificationStatus === "PENDING";
     const [profileResult, categoryResult] = await Promise.all([
-      getCurrentSellerProfileOverview(),
+      isPending ? getCurrentPendingSellerBusinessSetup() : getCurrentSellerProfileOverview(),
       getCurrentBusinessCategoryOptions(),
     ]);
+    if (loadGeneration.current !== generation || getCurrentProfileSummary()?.profile.id !== profileId) return;
 
-    if (!profileResult.ok) {
+    const profileData = profileResult.ok ? profileResult.data : null;
+    const pendingSetup = profileData && "applicationId" in profileData ? profileData : null;
+    const canEditPendingCategories = pendingSetup?.steps.some(
+      (step) => step.code === "categories" && step.canEdit,
+    );
+    if (!profileResult.ok || (isPending && !canEditPendingCategories)) {
+      setCategoryOptions([]);
       setSelectedCategories([]);
       setInitialCategories([]);
       setInitialCategoryIds([]);
+      setDidCategoryLoadFail(true);
       setIsLoading(false);
-      showError("No se pudo cargar el negocio", profileResult.error.message);
+      showError("No se pudieron cargar las categorías", profileResult.ok ? undefined : profileResult.error.message);
       return;
     }
 
@@ -117,19 +134,28 @@ export default function BusinessCategoriesScreen() {
       setDidCategoryLoadFail(false);
     }
 
-    const nextSelectedCategories = profileResult.data.business?.categoryPreferences ?? [];
+    const nextSelectedCategories = pendingSetup
+      ? buildPreferencesFromCategoryIds(
+        pendingSetup.categoryIds, [], buildCategoryTree(categoryResult.ok ? categoryResult.data : []),
+      )
+      : profileData && "business" in profileData ? profileData.business?.categoryPreferences ?? [] : [];
+    const selectedIds = nextSelectedCategories.map((preference) => preference.categoryId);
+    const hasCompleteSelection = !pendingSetup ||
+      (categoryResult.ok && selectedIds.length === pendingSetup.categoryIds.length);
     setSelectedCategories(nextSelectedCategories);
     setInitialCategories(nextSelectedCategories);
-    setInitialCategoryIds(nextSelectedCategories.map((preference) => preference.categoryId));
+    setInitialCategoryIds(selectedIds);
+    setHasLoadedSelection(hasCompleteSelection);
+    if (!hasCompleteSelection) setDidCategoryLoadFail(true);
     setCategoryBrowserPath([]);
     setCategorySearchValue("");
     setIsLoading(false);
-  }, [isBusinessOwner]);
+  }, [canManageCategories, profileId]);
 
   useFocusEffect(
     useCallback(() => {
       void loadCategories();
-      return () => {};
+      return () => { loadGeneration.current += 1; };
     }, [loadCategories])
   );
 
@@ -162,7 +188,7 @@ export default function BusinessCategoriesScreen() {
     selectedCategories.map((preference) => preference.categoryId)
   );
   const allowNavigation = useAndroidLeaveGuard(
-    !isLoading && isBusinessOwner && hasCategoryChanges, isSaving
+    !isLoading && canManageCategories && hasCategoryChanges, isSaving
   );
 
   const addCategory = useCallback((category: BusinessCategoryOption) => {
@@ -198,7 +224,7 @@ export default function BusinessCategoriesScreen() {
   };
 
   const saveCategoryPreferences = async () => {
-    if (!isBusinessOwner) {
+    if (!canManageCategories) {
       showError(
         "Acceso restringido",
         "Solo el administrador principal puede cambiar las categorías del negocio."
@@ -206,7 +232,7 @@ export default function BusinessCategoriesScreen() {
       return;
     }
 
-    if (!hasCategoryChanges || isSaving) return;
+    if (!hasCategoryChanges || isSaving || !hasLoadedSelection) return;
 
     const nextCategoryIds = selectedCategories.map((preference) => preference.categoryId);
     setIsSaving(true);
@@ -267,7 +293,7 @@ export default function BusinessCategoriesScreen() {
     scrollToCategorySearch();
   }, [scrollToCategorySearch]);
 
-  if (activeProfileState !== "loading" && !isBusinessOwner) {
+  if (activeProfileState !== "loading" && !canManageCategories) {
     return (
       <View style={s.screen}>
         <View style={s.restrictedContent}>
@@ -305,6 +331,9 @@ export default function BusinessCategoriesScreen() {
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <View style={s.headerContent}>
+              {didCategoryLoadFail && !hasLoadedSelection ? (
+                <Button variant="white" title="Reintentar cargar categorías" onPress={() => void loadCategories()} />
+              ) : null}
               <GroupedListSection title={selectedSectionTitle}>
                 {selectedCategoryRows.length === 0 ? (
                   <View style={s.emptyCategoryRow}>
@@ -397,7 +426,7 @@ export default function BusinessCategoriesScreen() {
             <Button
               title="Guardar"
               loading={isSaving}
-              disabled={!hasCategoryChanges || isSaving}
+              disabled={!hasCategoryChanges || isSaving || !hasLoadedSelection}
               onPress={() => void saveCategoryPreferences()}
             />
             {hasCategoryChanges ? (
