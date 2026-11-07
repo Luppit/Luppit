@@ -41,7 +41,7 @@ export default function SellerSetupOverview() {
         />
         <GroupedListRow
           icon="store"
-          label="Prepará tu negocio durante la revisión"
+          label="Prepará tu negocio"
           description="Guardá tus categorías, distrito y foto mientras revisamos los documentos. Cuando tu negocio esté aprobado y configurado, podés revisar solicitudes y hacer ofertas."
           descriptionMaxLines={6}
           showChevron={false}
