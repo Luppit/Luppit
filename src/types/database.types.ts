@@ -6333,12 +6333,7 @@ export type Database = {
         Returns: Json
       }
       service_submit_business_verification: {
-        Args: {
-          p_evidence: Json
-          p_profile_id: string
-          p_rnp_number: string
-          p_user_id: string
-        }
+        Args: { p_evidence: Json; p_profile_id: string; p_user_id: string }
         Returns: Json
       }
       service_submit_tire_pre_registration: {

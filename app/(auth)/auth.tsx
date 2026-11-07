@@ -1,6 +1,7 @@
 import Button from "@/src/components/button/Button";
 import { BundledSvg } from "@/src/components/BundledSvg";
 import { Text } from "@/src/components/Text";
+import { clearSignupLegalReviewState } from "@/src/components/legal/signupLegalReview";
 import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { colors, spacing } from "@/src/themes";
 import { Link, router } from "expo-router";
@@ -40,7 +41,10 @@ export default function auth() {
       <View style={styles.actions}>
         <View style={styles.actionButton}>
           <Button
-            onPress={() => router.push("/(auth)/signup")}
+            onPress={() => {
+              clearSignupLegalReviewState();
+              router.push("/(auth)/signup");
+            }}
             variant="white"
             title="Crear cuenta con teléfono"
             icon="smartphone"

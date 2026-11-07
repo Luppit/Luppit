@@ -24,6 +24,7 @@ type DetailTopBarProps = {
   menu?: DetailTopBarMenu | null;
   hideBack?: boolean;
   returnToHome?: boolean;
+  returnToSignup?: boolean;
   purchaseRequestId?: string | null;
   purchaseRequestStatus?: string | null;
   topInset: number;
@@ -37,6 +38,7 @@ export default function DetailTopBar({
   menu,
   hideBack = false,
   returnToHome = false,
+  returnToSignup = false,
   purchaseRequestId,
   purchaseRequestStatus,
   topInset,
@@ -49,6 +51,10 @@ export default function DetailTopBar({
     (purchaseRequestStatus ?? "").trim().toLowerCase() === "canceled";
 
   const handleBackPress = useCallback(() => {
+    if (returnToSignup) {
+      router.dismissTo("/(auth)/signup");
+      return;
+    }
     if (returnToHome) {
       router.dismissTo("/(tabs)");
       return;
@@ -59,7 +65,7 @@ export default function DetailTopBar({
     }
 
     router.replace("/(tabs)");
-  }, [returnToHome]);
+  }, [returnToHome, returnToSignup]);
 
   useAndroidBackAction(handleBackPress, { enabled: !hideBack });
 

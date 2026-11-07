@@ -143,7 +143,7 @@ function fixture(role: "buyer" | "seller", listing = false, initialFilters?: any
     "glass/GlassSurface": "GlassSurface", "standaloneList/StandaloneListEmptyState": "StandaloneListEmptyState",
   })) modules[`@/src/components/${path}`] = name;
   const file = listing ? "../app/(detail)/marketplace-hub-section.tsx" : "../app/(tabs)/index.tsx";
-  const source = readFileSync(new URL(file, import.meta.url), "utf8") + (listing ? "" : "\nexport { BuyerHomeContent, SellerHomeContent, MarketplaceHomeContent, getRailEmptyMessage };\n");
+  const source = readFileSync(new URL(file, import.meta.url), "utf8") + (listing ? "" : "\nexport { BuyerHomeContent, SellerHomeContent, MarketplaceHomeContent, BuyerFirstRequestState, getRailEmptyMessage };\n");
   const exports: Record<string, any> = {};
   runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, esModuleInterop: true } }).outputText, {
     exports, console, setTimeout, clearTimeout, requestAnimationFrame: (callback: Function) => callback(),
@@ -174,6 +174,83 @@ function hub(selected: string, counts: Record<string, number>, items: any[] = []
 }
 function item(id: string, category_id = "furniture") { return { id, purchase_request_id: id, category_id, title: `Silla ${id}` }; }
 function resolve(call: { response: ReturnType<typeof deferred> }, data: any) { call.response.resolve({ ok: true, data }); }
+
+test("a buyer with no publications can start or resume the real request assistant from home", (t) => {
+  const f = fixture("buyer"); t.after(f.cleanup);
+  const props = {
+    role: "buyer", filters: f.emptyFilters, selectedStageCode: "all",
+    hasActiveFilters: false, onSelectStage() {}, onRetry() {},
+  };
+  const data = { ...hub("all", { all: 0, history: 0 }), onboarding: { hasPublishedRequests: false, latestDraft: null } };
+  const firstUse = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: data });
+  assert.equal(firstUse.type, f.exports.BuyerFirstRequestState);
+  const firstView = f.render(firstUse.type as Function, firstUse.props);
+  nodes(firstView).find((node) => node.props.title === "Crear mi primera solicitud")!.props.onPress();
+  assert.equal(f.routes[0], "/(chat)/chat");
+
+  const saved = f.render(f.exports.BuyerFirstRequestState, {
+    draft: { id: "draft-1", title: "Solicitud guardada", summaryText: "Dos unidades para uso diario" },
+  });
+  assert.match(text(saved), /Solicitud guardada/);
+  assert.match(text(saved), /Dos unidades para uso diario/);
+  nodes(saved).find((node) => node.props.title === "Continuar solicitud")!.props.onPress();
+  assert.equal(f.routes[1], "/(chat)/chat");
+});
+
+test("empty filters or history do not masquerade as first use, and a saved draft remains discoverable", (t) => {
+  const f = fixture("buyer"); t.after(f.cleanup);
+  const props = {
+    role: "buyer", filters: { ...f.emptyFilters, searchValue: "sin coincidencias" },
+    selectedStageCode: "history", hasActiveFilters: true, onSelectStage() {}, onRetry() {},
+  };
+  const draft = { id: "draft-1", title: "Solicitud guardada", summaryText: "Dos unidades para uso diario" };
+  const data = { ...hub("history", { all: 0, history: 0 }), onboarding: { hasPublishedRequests: true, latestDraft: draft } };
+  const tree = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: data });
+  const resume = nodes(tree).find((node) => node.type === "HomeShortcut" && node.props.title === "Continuar solicitud")!;
+  assert.equal(resume.props.description, draft.summaryText);
+  resume.props.onPress();
+  assert.equal(f.routes[0], "/(chat)/chat");
+  assert.equal(nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage").length, 2);
+
+  for (const onboarding of [undefined, { hasPublishedRequests: false, latestDraft: null }]) {
+    const filtered = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: { ...data, onboarding } });
+    assert.notEqual(filtered.type, f.exports.BuyerFirstRequestState);
+  }
+  const unknown = f.render(f.exports.MarketplaceHomeContent, {
+    ...props, hasActiveFilters: false, hub: hub("all", { all: 0, history: 0 }),
+  });
+  assert.notEqual(unknown.type, f.exports.BuyerFirstRequestState);
+});
+
+test("refreshing buyer home keeps its saved content while new request actions wait for authoritative data", (t) => {
+  const f = fixture("buyer"); t.after(f.cleanup);
+  const draft = { id: "draft-1", title: "Solicitud guardada", summaryText: "Dos unidades para uso diario" };
+  const props = {
+    role: "buyer", filters: f.emptyFilters, selectedStageCode: "all", isLoading: true,
+    hasActiveFilters: false, onSelectStage() {}, onRetry() {},
+  };
+  const onboarding = { hasPublishedRequests: false, latestDraft: draft };
+  const first = f.render(f.exports.MarketplaceHomeContent, {
+    ...props, hub: { ...hub("all", { all: 0 }), onboarding },
+  });
+  assert.equal(first.props.isRefreshing, true);
+  const firstView = f.render(first.type as Function, first.props);
+  assert.match(text(firstView), /Solicitud guardada/);
+  assert.equal(nodes(firstView).find((node) => node.props.title === "Continuar solicitud")!.props.loading, true);
+
+  const regular = f.render(f.exports.MarketplaceHomeContent, {
+    ...props, hub: { ...hub("all", { all: 1 }), onboarding: { ...onboarding, hasPublishedRequests: true } },
+  });
+  const resume = nodes(regular).find((node) => node.type === "HomeShortcut" && node.props.title === "Continuar solicitud")!;
+  assert.equal(resume.props.description, draft.summaryText);
+  assert.equal(resume.props.disabled, true);
+
+  const refreshed = f.render(f.exports.MarketplaceHomeContent, {
+    ...props, isLoading: false,
+    hub: { ...hub("all", { all: 1 }), onboarding: { hasPublishedRequests: true, latestDraft: null } },
+  });
+  assert.equal(nodes(refreshed).some((node) => node.type === "HomeShortcut" && node.props.title === "Continuar solicitud"), false);
+});
 
 for (const role of ["buyer", "seller"] as const) {
 test(`${role} reloads setup after returning from system settings and removes its foreground listener`, async (t) => {

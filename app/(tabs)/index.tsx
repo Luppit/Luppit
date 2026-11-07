@@ -22,6 +22,7 @@ import {
 } from "@/src/services/buyer.home.filters.service";
 import { getCurrentBuyerProfileSetup, type BuyerProfileSetup } from "@/src/services/buyer.profile.setup.service";
 import { type ProfileSetupChecklist } from "@/src/services/seller.business.setup.helpers";
+import type { BuyerHomeDraft } from "@/src/services/buyer.home.onboarding.helpers";
 import {
   DEFAULT_BUYER_MARKETPLACE_HUB_SORT_CODE,
   getCurrentBuyerMarketplaceHub,
@@ -459,6 +460,10 @@ function MarketplaceHomeContent({
     );
   }
 
+  if (role === "buyer" && !hasActiveFilters && hub.onboarding?.hasPublishedRequests === false) {
+    return <BuyerFirstRequestState draft={hub.onboarding.latestDraft} isRefreshing={isLoading} />;
+  }
+
   if (hub.stages.length === 0 && !hasMatches) {
     return (
       <HomeEmptyState
@@ -496,6 +501,18 @@ function MarketplaceHomeContent({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[s.scrollContent, { paddingTop: topContentInset }]}
     >
+      {role === "buyer" && hub.onboarding?.latestDraft ? (
+        <HomeShortcut
+          icon="file-text"
+          title="Continuar solicitud"
+          description={hub.onboarding.latestDraft.summaryText ??
+            hub.onboarding.latestDraft.title ?? "Tu borrador sigue guardado."}
+          descriptionMaxLines={3}
+          disabled={isLoading}
+          accessibilityLabel="Continuar tu solicitud guardada"
+          onPress={() => router.push("/(chat)/chat")}
+        />
+      ) : null}
       <View style={s.summaryBlock}>
         {hasActiveFilters ? (
           <Text variant="small" color="textMedium">
@@ -686,6 +703,53 @@ function MarketplaceHomeContent({
   );
 }
 
+function BuyerFirstRequestState({ draft, isRefreshing }: {
+  draft: BuyerHomeDraft | null;
+  isRefreshing: boolean;
+}) {
+  const t = useTheme();
+  const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={s.firstRequestContent}
+    >
+      <View style={s.firstRequestHeading}>
+        <Text variant="title">
+          {draft ? "Tu solicitud sigue guardada" : "¿Qué necesitás conseguir?"}
+        </Text>
+        <Text variant="body" color="textMedium">
+          {draft
+            ? "Continuá donde quedaste y revisá los detalles antes de publicar."
+            : "Contanos qué necesitás una vez y compará las ofertas que recibás."}
+        </Text>
+      </View>
+      {draft ? (
+        <View style={s.firstRequestDraft}>
+          {draft.title ? <Text variant="body">{draft.title}</Text> : null}
+          {draft.summaryText && draft.summaryText !== draft.title ? (
+            <Text variant="body" color="textMedium" maxLines={4}>
+              {draft.summaryText}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      <Button
+        variant="primary"
+        title={draft ? "Continuar solicitud" : "Crear mi primera solicitud"}
+        loading={isRefreshing}
+        onPress={() => router.push("/(chat)/chat")}
+      />
+      {!draft ? (
+        <Text variant="small" color="textMuted">
+          Te ayudamos a preparar una solicitud. Podés ajustarla antes de publicarla.
+        </Text>
+      ) : null}
+    </ScrollView>
+  );
+}
+
 function HomeRailEmptyState({ message }: { message: string }) {
   const t = useTheme();
   const s = useMemo(() => createMarketplaceHomeStyles(t), [t]);
@@ -750,6 +814,21 @@ function createMarketplaceHomeStyles(t: Theme) {
     scrollContent: {
       paddingBottom: 112,
       gap: t.spacing.md,
+    },
+    firstRequestContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+      paddingHorizontal: t.spacing.lg,
+      paddingTop: t.spacing.lg,
+      paddingBottom: 112,
+      gap: t.spacing.lg,
+    },
+    firstRequestHeading: {
+      gap: t.spacing.sm,
+    },
+    firstRequestDraft: {
+      gap: t.spacing.sm,
+      paddingVertical: t.spacing.sm,
     },
     summaryBlock: {
       gap: t.spacing.xs,

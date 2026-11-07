@@ -16,6 +16,7 @@ import { AppError, fromAppError, fromSupabaseError } from "../lib/supabase/error
 import { supabase } from "../lib/supabase/client";
 import { getCurrentProfileResult } from "./active.profile.service";
 import { ALL_SEGMENTS_SVG_NAME } from "./segment.service";
+import { parseBuyerHomeOnboarding, type BuyerHomeOnboarding } from "./buyer.home.onboarding.helpers";
 
 export type PurchaseRequest = Row<"purchase_request">;
 export type PurchaseRequestStatusUiOption = {
@@ -155,6 +156,7 @@ export type MarketplaceHub = {
   generated_at: string | null;
   sort: MarketplaceHubSortConfig | null;
   overview: MarketplaceHubOverview;
+  onboarding: BuyerHomeOnboarding | null;
   stages: MarketplaceHubStage[];
   rail: MarketplaceHubRail;
 };
@@ -766,6 +768,7 @@ function extractMarketplaceHub(
     generated_at: normalizeNullableString(value.generated_at),
     sort: parseMarketplaceHubSort(value.sort, roleCode, fallbackSelectedSortCode),
     overview: parseMarketplaceHubOverview(value.overview),
+    onboarding: roleCode === "buyer" ? parseBuyerHomeOnboarding(value.onboarding) : null,
     stages: rawStages
       .map(parseMarketplaceHubStage)
       .filter((stage): stage is MarketplaceHubStage => stage !== null),

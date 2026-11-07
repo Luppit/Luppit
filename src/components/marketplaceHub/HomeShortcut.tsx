@@ -10,12 +10,16 @@ export default function HomeShortcut({
   title,
   description,
   accessibilityLabel,
+  descriptionMaxLines,
+  disabled = false,
   onPress,
 }: {
   icon: React.ComponentProps<typeof Icon>["name"];
   title: string;
   description: string;
   accessibilityLabel?: string;
+  descriptionMaxLines?: number;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
@@ -25,8 +29,13 @@ export default function HomeShortcut({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [s.shortcut, pressed ? s.shortcutPressed : null]}
+      style={({ pressed }) => [
+        s.shortcut,
+        disabled ? s.shortcutDisabled : pressed ? s.shortcutPressed : null,
+      ]}
     >
       <View style={s.shortcutContent}>
         <View style={s.shortcutIcon}>
@@ -36,7 +45,7 @@ export default function HomeShortcut({
           <Text variant="body" style={s.shortcutTitle}>
             {title}
           </Text>
-          <Text variant="body" color="textMuted">
+          <Text variant="body" color="textMuted" maxLines={descriptionMaxLines}>
             {description}
           </Text>
         </View>
@@ -55,6 +64,9 @@ function createHomeShortcutStyles(t: Theme) {
     },
     shortcutPressed: {
       opacity: 0.78,
+    },
+    shortcutDisabled: {
+      opacity: 0.5,
     },
     shortcutContent: {
       minHeight: 80,

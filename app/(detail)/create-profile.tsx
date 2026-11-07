@@ -6,6 +6,7 @@ import {
 import { Icon } from "@/src/components/Icon";
 import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
+import SellerSetupOverview from "@/src/components/onboarding/SellerSetupOverview";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
 import { createRoundedSurfaceStyle } from "@/src/components/surface/styles";
 import { Text } from "@/src/components/Text";
@@ -541,6 +542,8 @@ export default function CreateProfileScreen() {
           </GroupedListSection>
         ) : null}
 
+        {role === "seller" && !sellerUsesInvitation ? <SellerSetupOverview /> : null}
+
         <Button
           title={
             createdProfileId
@@ -555,6 +558,8 @@ export default function CreateProfileScreen() {
                 ? "Activar comprador"
               : isRepair
                 ? "Completar perfil"
+              : role === "seller"
+                ? "Crear perfil de negocio"
                 : "Crear y activar"
           }
           loading={isSaving}

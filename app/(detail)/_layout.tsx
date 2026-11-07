@@ -1,4 +1,5 @@
 import DetailTopBar from "./detail-top-bar";
+import { getSignupLegalReviewState } from "@/src/components/legal/signupLegalReview";
 import { DetailTopBarMenuContext } from "@/src/components/navbar/DetailTopBarMenuContext";
 import type { DetailTopBarMenu } from "@/src/components/navbar/DetailTopBarMenuContext";
 import { useTheme } from "@/src/themes";
@@ -119,6 +120,7 @@ export default function DetailLayout() {
           <DetailTopBar
             title={title}
             returnToHome={fromConversation === "true"}
+            returnToSignup={pathname === "/legal-document" && getSignupLegalReviewState() !== null}
             hideMenu={hideMenu}
             menu={showScreenMenu ? screenMenu : null}
             hideBack={pathname === "/business-verification"}

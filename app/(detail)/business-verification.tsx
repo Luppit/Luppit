@@ -2,7 +2,6 @@ import Button from "@/src/components/button/Button";
 import FilePicker, { SelectedFile } from "@/src/components/filePicker/FilePicker";
 import { GroupedListRow, GroupedListSection } from "@/src/components/groupedList/GroupedList";
 import { Icon } from "@/src/components/Icon";
-import { TextField } from "@/src/components/inputField/InputField";
 import LoadingState from "@/src/components/loading/LoadingState";
 import { usePushNotifications } from "@/src/components/notifications/PushNotificationProvider";
 import { useActiveProfile } from "@/src/components/profile/ActiveProfileContext";
@@ -39,7 +38,6 @@ export default function BusinessVerificationScreen() {
   const { presentInitialPushPermissionPrompt } = usePushNotifications();
   const [verification, setVerification] = useState<BusinessVerification | null>(null);
   const [reviewEstimate, setReviewEstimate] = useState<string | null>(null);
-  const [rnpNumber, setRnpNumber] = useState("");
   const [files, setFiles] = useState<SelectedFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -62,7 +60,6 @@ export default function BusinessVerificationScreen() {
     requestRef.current = null;
     verificationRef.current = null;
     setVerification(null);
-    setRnpNumber("");
     setFiles([]);
     setIsLoading(true);
     setIsRefreshing(false);
@@ -96,7 +93,6 @@ export default function BusinessVerificationScreen() {
 
       verificationRef.current = result.data;
       setVerification(result.data);
-      setRnpNumber((current) => current || result.data.rnpNumber || "");
       if (request.showProgress) {
         const message = getBusinessVerificationRefreshMessage(previous, result.data);
         if (result.data.status === "APPROVED" && previous?.status !== "APPROVED") {
@@ -206,15 +202,14 @@ export default function BusinessVerificationScreen() {
       router.push({ pathname: "/(modal)/email-setup", params: { title: "Verificar correo" } });
       return;
     }
-    if (!rnpNumber.trim() || files.length === 0) {
-      showError("Completá el número RNP y adjuntá al menos un documento.");
+    if (files.length === 0) {
+      showError("Adjuntá al menos un documento del negocio.");
       return;
     }
     setIsSubmitting(true);
     const result = await submitCurrentBusinessVerification({
       userId: activeProfile.profile.user_id!,
       profileId: activeProfile.profile.id,
-      rnpNumber,
       files,
     });
     setIsSubmitting(false);
@@ -259,10 +254,23 @@ export default function BusinessVerificationScreen() {
           <View style={s.icon}><Icon name="house" size={24} color={t.colors.primary} /></View>
           <Text variant="title" align="center">Verificá tu negocio</Text>
           <Text color="textMedium" align="center" style={s.description}>
-            Enviá la información para que nuestro equipo pueda revisarla.
+            Adjuntá documentos que acrediten el negocio y tu relación con él.
           </Text>
         </View>
       )}
+
+      {canSubmit ? (
+        <View style={s.setupExpectations}>
+          <Text variant="small" color="textMedium">
+            {reviewEstimate
+              ? `Tiempo estimado de revisión: ${reviewEstimate}.`
+              : "Nuestro equipo revisará los documentos antes de habilitar el negocio."}
+          </Text>
+          <Text variant="small" color="textMedium">
+            Después de la aprobación, completá categorías, distrito, foto y notificaciones para empezar a ofrecer.
+          </Text>
+        </View>
+      ) : null}
 
       {!hasEmail ? (
         <View style={s.surface}>
@@ -319,17 +327,6 @@ export default function BusinessVerificationScreen() {
           ) : null}
 
           <View style={s.surface}>
-            <TextField
-              label="Número de certificación RNP (SICOP)"
-              value={rnpNumber}
-              onChangeText={setRnpNumber}
-              autoCapitalize="characters"
-              accessibilityHint="RNP significa Registro Nacional de Proveedores en SICOP. Ingresa el número que aparece en tu certificación vigente"
-              editable={!isSubmitting}
-            />
-            <Text variant="small" color="textMedium">
-              RNP significa Registro Nacional de Proveedores en SICOP. Escribí el número que aparece en tu certificación vigente y adjuntá esa certificación como respaldo. Si no sabés cuál corresponde, contactá a soporte antes de enviar.
-            </Text>
             <FilePicker
               label="Documentos de respaldo"
               mode="files"
@@ -410,6 +407,7 @@ function createStyles(t: Theme, topInset: number, bottomInset: number) {
       paddingVertical: t.spacing.xs,
     },
     reviewContent: { gap: t.spacing.lg, paddingTop: t.spacing.sm },
+    setupExpectations: { gap: t.spacing.sm, paddingHorizontal: t.spacing.md },
     reviewDetails: { flexDirection: "row", alignItems: "flex-start", gap: t.spacing.md, paddingHorizontal: t.spacing.md },
     reviewClock: { paddingTop: t.spacing.xs },
     reviewMessage: { flex: 1, gap: t.spacing.sm },

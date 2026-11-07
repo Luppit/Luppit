@@ -7,7 +7,6 @@ import type { BusinessVerification } from "../src/services/business-verification
 const pending: BusinessVerification = {
   applicationId: "application-1",
   status: "PENDING",
-  rnpNumber: "RNP-1",
   safeMessage: null,
   submissionVersion: 1,
   evidence: [],
@@ -44,7 +43,6 @@ test("changed instructions or submission data are not reported as unchanged", ()
   for (const change of [
     { safeMessage: "Adjuntá la información solicitada." },
     { submissionVersion: 2 },
-    { rnpNumber: "RNP-2" },
     { applicationId: "application-2" },
   ]) {
     assert.equal(

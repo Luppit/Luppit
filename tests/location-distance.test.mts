@@ -4,6 +4,7 @@ import test from "node:test";
 import { URL } from "node:url";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as buyerHomeOnboarding from "../src/services/buyer.home.onboarding.helpers.ts";
 
 function serviceFixture(file: string, payload: unknown) {
   const calls: { name: string; args: Record<string, unknown> }[] = [];
@@ -18,6 +19,7 @@ function serviceFixture(file: string, payload: unknown) {
     "./active.profile.service": { getCurrentProfileResult: async () => ({ ok: true, data: { id: "profile" } }) },
     "./segment.service": { ALL_SEGMENTS_SVG_NAME: "todas" },
     "./buyer.home.filters.service": {},
+    "./buyer.home.onboarding.helpers": buyerHomeOnboarding,
     "./seller.home.filters.service": {},
     "../utils/conversationOfferPrice": { normalizePurchaseOfferPricing: () => ({}) },
   };

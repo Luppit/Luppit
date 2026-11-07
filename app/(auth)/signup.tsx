@@ -3,6 +3,12 @@ import { Icon } from "@/src/components/Icon";
 import Stepper, { Step, StepperRef } from "@/src/components/stepper/Stepper";
 import { Tab, Tabs } from "@/src/components/tabs/Tab";
 import { Text } from "@/src/components/Text";
+import SellerSetupOverview from "@/src/components/onboarding/SellerSetupOverview";
+import {
+  clearSignupLegalReviewState,
+  getSignupLegalReviewState,
+  preserveSignupForLegalReview,
+} from "@/src/components/legal/signupLegalReview";
 import {
   PostPhoneVerificationSetupError,
   signUpWithPhoneOtp,
@@ -13,7 +19,7 @@ import { LEGAL_DOCUMENT_CODES } from "@/src/services/legal-document.service";
 import { borders, spacing, useTheme } from "@/src/themes";
 import { showError } from "@/src/utils";
 import { Link, router } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import CreateUserFormTab from "./signup/CreateUserFormTab";
 import VerifyCode from "./signup/VerifyCode";
@@ -66,6 +72,13 @@ function SignupEntryStep({
   const legalMissingFields = legalAccepted
     ? []
     : ["aceptación de los documentos legales"];
+  const preserveLegalReview = () => {
+    preserveSignupForLegalReview({
+      userType,
+      phoneNumber: values.phoneNumber,
+      legalAccepted,
+    });
+  };
 
   const tabs: Tab[] = [
     {
@@ -81,6 +94,7 @@ function SignupEntryStep({
             <LegalAcceptance
               accepted={legalAccepted}
               onToggle={onToggleLegal}
+              onDocumentPress={preserveLegalReview}
             />
           )}
         />
@@ -96,10 +110,14 @@ function SignupEntryStep({
           loading={isSendingCode}
           additionalMissingFields={legalMissingFields}
           supportingContent={(
-            <LegalAcceptance
-              accepted={legalAccepted}
-              onToggle={onToggleLegal}
-            />
+            <>
+              <SellerSetupOverview />
+              <LegalAcceptance
+                accepted={legalAccepted}
+                onToggle={onToggleLegal}
+                onDocumentPress={preserveLegalReview}
+              />
+            </>
           )}
         />
       ),
@@ -120,9 +138,11 @@ function SignupEntryStep({
 function LegalAcceptance({
   accepted,
   onToggle,
+  onDocumentPress,
 }: {
   accepted: boolean;
   onToggle: () => void;
+  onDocumentPress: () => void;
 }) {
   const t = useTheme();
   return (
@@ -151,6 +171,7 @@ function LegalAcceptance({
       </Pressable>
       <View style={styles.legalLinks}>
         <Link
+          onPress={onDocumentPress}
           href={{
             pathname: "/(detail)/legal-document",
             params: {
@@ -166,6 +187,7 @@ function LegalAcceptance({
         </Link>
         <Text variant="small">y</Text>
         <Link
+          onPress={onDocumentPress}
           href={{
             pathname: "/(detail)/legal-document",
             params: {
@@ -235,14 +257,19 @@ function VerifyStep({
 
 export default function Signup() {
   const stepperRef = useRef<StepperRef>(null);
+  const [legalReviewState] = useState(getSignupLegalReviewState);
 
-  const [userType, setUserType] = useState<UserType>("buyer");
-  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [userType, setUserType] = useState<UserType>(legalReviewState?.userType ?? "buyer");
+  const [legalAccepted, setLegalAccepted] = useState(legalReviewState?.legalAccepted ?? false);
   const [isVerifying, setIsVerifying] = useState(false);
 
   const [values, setValues] = useState<SignupFormValues>({
-    phoneNumber: "",
+    phoneNumber: legalReviewState?.phoneNumber ?? "",
   });
+
+  useEffect(() => {
+    clearSignupLegalReviewState();
+  }, []);
 
   const steps: Step[] = useMemo(() => {
     return [

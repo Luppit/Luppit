@@ -24,7 +24,7 @@ import { showToast } from "@/src/services/toast.service";
 import { Theme, useTheme } from "@/src/themes";
 import { showError, showSuccess } from "@/src/utils/useToast";
 import * as ImagePicker from "expo-image-picker";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Linking, ScrollView, StyleSheet, View } from "react-native";
 
 const MAX_PROFILE_IMAGE_BYTES = 4_000_000;
@@ -82,6 +82,8 @@ export default function ProfilePictureEditScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveInFlight = useRef(false);
   const [hasImageLoadError, setHasImageLoadError] = useState(false);
   const [showFallbackAfterMetadataClearFailure, setShowFallbackAfterMetadataClearFailure] =
     useState(false);
@@ -103,6 +105,7 @@ export default function ProfilePictureEditScreen() {
 
     setTarget(result.data);
     setDraft(null);
+    setSaveError(null);
     setShowFallbackAfterMetadataClearFailure(false);
     setIsLoading(false);
   }, []);
@@ -168,19 +171,30 @@ export default function ProfilePictureEditScreen() {
       mime: asset.mimeType ?? null,
       size: asset.fileSize ?? null,
     });
+    setSaveError(null);
     setShowFallbackAfterMetadataClearFailure(false);
     setHasImageLoadError(false);
   };
 
   const saveImage = async () => {
-    if (!draft || !target?.canManage || isBusy) return;
+    if (!draft || !target?.canManage || isBusy || saveInFlight.current) return;
 
+    saveInFlight.current = true;
     setIsSaving(true);
-    const result = await saveCurrentProfileImage(draft);
-    setIsSaving(false);
+    setSaveError(null);
+    let result: Awaited<ReturnType<typeof saveCurrentProfileImage>>;
+    try {
+      result = await saveCurrentProfileImage(draft);
+    } catch {
+      setSaveError("No pudimos guardar la foto. Intentá de nuevo.");
+      return;
+    } finally {
+      saveInFlight.current = false;
+      setIsSaving(false);
+    }
 
     if (!result.ok) {
-      showError("No se pudo guardar la foto", result.error.message);
+      setSaveError(result.error.message);
       return;
     }
 
@@ -335,6 +349,19 @@ export default function ProfilePictureEditScreen() {
           </Text>
 
           <View style={s.actions}>
+            {saveError ? (
+              <View
+                style={s.saveError}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                <Text color="error">No se pudo guardar la foto</Text>
+                <Text variant="small" color="textMedium">{saveError}</Text>
+                <Text variant="small" color="textMedium">
+                  La foto que elegiste se mantiene lista para reintentar.
+                </Text>
+              </View>
+            ) : null}
             <Button
               title={hasCurrentPicture || draft ? "Elegir otra foto" : "Elegir foto"}
               variant="white"
@@ -343,7 +370,7 @@ export default function ProfilePictureEditScreen() {
               onPress={() => void selectImage()}
             />
             <Button
-              title="Guardar cambios"
+              title={saveError ? "Reintentar guardar foto" : "Guardar cambios"}
               loading={isSaving}
               disabled={!canSave}
               onPress={() => void saveImage()}
@@ -391,6 +418,10 @@ function createProfilePictureEditStyles(t: Theme) {
     actions: {
       width: "100%",
       gap: t.spacing.sm,
+    },
+    saveError: {
+      gap: t.spacing.xs,
+      paddingVertical: t.spacing.sm,
     },
     fullWidth: {
       width: "100%",

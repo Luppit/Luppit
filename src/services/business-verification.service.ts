@@ -14,7 +14,6 @@ export type BusinessVerificationStatus =
 export type BusinessVerification = {
   applicationId: string | null;
   status: BusinessVerificationStatus | null;
-  rnpNumber: string | null;
   safeMessage: string | null;
   submissionVersion: number;
   evidence: {
@@ -82,7 +81,6 @@ function parseVerification(value: unknown): BusinessVerification | null {
   return {
     applicationId: nullableString(row.application_id),
     status,
-    rnpNumber: nullableString(row.rnp_number),
     safeMessage: nullableString(row.safe_message),
     submissionVersion,
     evidence,
@@ -141,11 +139,9 @@ export async function getCurrentBusinessVerification(
 export async function submitCurrentBusinessVerification(input: {
   userId: string;
   profileId: string;
-  rnpNumber: string;
   files: SelectedFile[];
 }): Promise<ServiceResult<BusinessVerification>> {
-  const rnpNumber = input.rnpNumber.trim();
-  if (!rnpNumber || input.files.length < 1 || input.files.length > MAX_FILES) {
+  if (input.files.length < 1 || input.files.length > MAX_FILES) {
     return { ok: false, error: fromAppError("validation") };
   }
 
@@ -173,7 +169,6 @@ export async function submitCurrentBusinessVerification(input: {
     const submitted = await supabase.functions.invoke("submit-business-verification", {
       body: {
         profileId: input.profileId,
-        rnpNumber,
         evidence: uploads,
       },
     });

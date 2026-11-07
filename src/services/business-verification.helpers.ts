@@ -15,8 +15,7 @@ export function getBusinessVerificationRefreshMessage(
   if (
     previous.applicationId !== current.applicationId ||
     previous.submissionVersion !== current.submissionVersion ||
-    previous.safeMessage !== current.safeMessage ||
-    previous.rnpNumber !== current.rnpNumber
+    previous.safeMessage !== current.safeMessage
   ) {
     return "Actualizamos la información de tu solicitud";
   }

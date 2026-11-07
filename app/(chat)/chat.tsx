@@ -184,6 +184,12 @@ function EmptyRequestAssistantState() {
       <Text variant="body" align="center">
         ¿Qué estás buscando hoy?
       </Text>
+      <Text variant="small" color="textMedium" align="center">
+        Contanos qué necesitás y te ayudamos a preparar una solicitud para recibir ofertas.
+      </Text>
+      <Text variant="small" color="textMuted" align="center">
+        Por ejemplo: “Busco [producto], necesito [cantidad] y lo voy a usar para [uso]”.
+      </Text>
     </View>
   );
 }
