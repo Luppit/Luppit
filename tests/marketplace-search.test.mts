@@ -212,7 +212,8 @@ test("empty filters or history do not masquerade as first use, and a saved draft
   assert.equal(f.routes[0], "/(chat)/chat");
   assert.equal(nodes(tree).filter((node) => node.type === "LuppitChip" && node.props.variant === "homeStage").length, 2);
 
-  for (const onboarding of [undefined, { hasPublishedRequests: false, latestDraft: null }]) {
+  for (const onboarding of [undefined, { hasPublishedRequests: false, latestDraft: null },
+    { hasPublishedRequests: false, latestDraft: draft }]) {
     const filtered = f.render(f.exports.MarketplaceHomeContent, { ...props, hub: { ...data, onboarding } });
     assert.notEqual(filtered.type, f.exports.BuyerFirstRequestState);
   }
@@ -250,6 +251,75 @@ test("refreshing buyer home keeps its saved content while new request actions wa
     hub: { ...hub("all", { all: 1 }), onboarding: { hasPublishedRequests: true, latestDraft: null } },
   });
   assert.equal(nodes(refreshed).some((node) => node.type === "HomeShortcut" && node.props.title === "Continuar solicitud"), false);
+});
+
+for (const latestDraft of [null, {
+  id: "saved-draft", title: "Solicitud guardada", summaryText: "Dos unidades para uso diario",
+}]) {
+  test(`buyer fetch renders the ${latestDraft ? "saved draft" : "first request"} branch without another request and guards its refresh`, async (t) => {
+    const data = fixture("buyer"); t.after(data.cleanup);
+    const view = fixture("buyer"); t.after(view.cleanup);
+    const render = () => {
+      const content = view.render(view.exports.MarketplaceHomeContent, data.screen().props);
+      return content.type === view.exports.BuyerFirstRequestState
+        ? view.render(content.type as Function, content.props)
+        : content;
+    };
+    data.screen(); await flush();
+    assert.equal(data.calls.length, 1);
+    resolve(data.calls[0], {
+      ...hub("all", { all: 0, needs_attention: 0, history: 0 }),
+      onboarding: { hasPublishedRequests: false, latestDraft },
+    });
+    await flush();
+    const actionTitle = latestDraft ? "Continuar solicitud" : "Crear mi primera solicitud";
+    const ready = render();
+    if (latestDraft) assert.match(text(ready), /Solicitud guardada.*Dos unidades para uso diario/s);
+    const action = nodes(ready).find((node) => node.type === "Button" && node.props.title === actionTitle)!;
+    assert.ok(action);
+    assert.equal(action.props.loading, false);
+    action.props.onPress();
+    assert.equal(view.routes[0], "/(chat)/chat");
+    assert.equal(data.calls.length, 1, "rendering onboarding uses the existing home response");
+    assert.equal(view.calls.length, 0, "the visible branch never probes draft state separately");
+
+    data.foreground(); await flush();
+    assert.equal(data.calls.length, 2);
+    const refreshing = render();
+    assert.equal(nodes(refreshing).find((node) => node.type === "Button" && node.props.title === actionTitle)!.props.loading, true);
+    if (latestDraft) assert.match(text(refreshing), /Solicitud guardada/);
+
+    resolve(data.calls[1], {
+      ...hub("all", { all: 1, needs_attention: 0, history: 0 }, [item("published")]),
+      onboarding: { hasPublishedRequests: true, latestDraft: null },
+    });
+    await flush();
+    const updated = render();
+    assert.equal(nodes(updated).some((node) => node.props.title === actionTitle), false);
+    assert.equal(nodes(updated).find((node) => node.type === "MarketplaceRequestCard")!.props.item.id, "published");
+    assert.equal(data.calls.length, 2);
+    assert.equal(view.calls.length, 0);
+  });
+}
+
+test("a refreshed incomplete buyer checklist replaces prior onboarding without fetching marketplace data", async (t) => {
+  const data = fixture("buyer"); t.after(data.cleanup);
+  const view = fixture("buyer"); t.after(view.cleanup);
+  data.screen(); await flush();
+  resolve(data.calls[0], {
+    ...hub("all", { all: 0 }),
+    onboarding: { hasPublishedRequests: false, latestDraft: null },
+  });
+  await flush();
+  data.screen();
+  data.setSetup({ ok: true, data: { isComplete: false, completedCount: 3, totalCount: 4 } });
+  data.foreground(); await flush();
+  const content = view.render(view.exports.MarketplaceHomeContent, data.screen().props);
+  assert.equal(content.type, "SellerBusinessSetupChecklist");
+  assert.equal(content.props.role, "buyer");
+  assert.equal(content.props.setup.isComplete, false);
+  assert.equal(data.calls.length, 1, "setup requirements still prevent marketplace discovery");
+  assert.equal(view.calls.length, 0);
 });
 
 for (const role of ["buyer", "seller"] as const) {
