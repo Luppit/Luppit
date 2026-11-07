@@ -26,7 +26,7 @@ export function createStepperStyles(t: Theme): StepperStyles {
   return {
     header: {
       container: {
-        flex: 1,
+        flexGrow: 1,
         flexDirection: "column",
         paddingHorizontal: spacing.lg,
         width: '100%'
@@ -56,7 +56,7 @@ export function createStepperStyles(t: Theme): StepperStyles {
       },
       contentContainer: {
         marginTop: spacing.xl,
-        flex: 1,
+        flexGrow: 1,
         flexDirection: "column",
       },
       scroll: {

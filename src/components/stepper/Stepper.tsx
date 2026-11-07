@@ -132,16 +132,16 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={[s.base.parent, style]}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <ScrollView
-            contentContainerStyle={s.base.scrollContent}
-            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-            keyboardShouldPersistTaps="handled"
-            ref={scrollViewRef}
-            showsVerticalScrollIndicator={false}
-            style={s.base.scroll}
-          >
-            <StepperKeyboardContext.Provider value={{ scrollToFocusedInput }}>
+        <ScrollView
+          contentContainerStyle={s.base.scrollContent}
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          keyboardShouldPersistTaps="handled"
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          style={s.base.scroll}
+        >
+          <StepperKeyboardContext.Provider value={{ scrollToFocusedInput }}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
               <View style={s.header.container}>
                 {/* Header */}
                 <View style={s.header.icon}>
@@ -184,9 +184,9 @@ const Stepper = forwardRef<StepperRef, StepperProps>(
                   {current.render({ next: goNext, back: goBack, index: currentStep })}
                 </View>
               </View>
-            </StepperKeyboardContext.Provider>
-          </ScrollView>
-        </TouchableWithoutFeedback>
+            </TouchableWithoutFeedback>
+          </StepperKeyboardContext.Provider>
+        </ScrollView>
       </KeyboardAvoidingView>
     );
   }
